@@ -1002,11 +1002,39 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
 )HTML";
         }
 
+        page << R"HTML(
+<div class="section-card">
+<div class="section-title">
+<h2>WireGuard</h2>
+<span class="section-hint">VPN-подключения сервера</span>
+</div>
+
+<p class="muted">
+Профили WireGuard читаются из runtime/wireguard/*.conf.
+Для подключения на Debian должен быть установлен пакет wireguard-tools,
+а процесс Home AI Core должен иметь системное разрешение на управление
+сетевыми интерфейсами.
+</p>
+
+<div class="button-row">
+<button id="vpn-refresh-btn" type="button" class="secondary">
+Обновить WireGuard
+</button>
+</div>
+
+<div id="vpn-message" class="muted" style="margin-top:12px"></div>
+
+<div id="vpn-list" class="placeholder-grid" style="margin-top:14px">
+<div class="placeholder-card">Загрузка профилей WireGuard...</div>
+</div>
+</div>
+)HTML";
+
         renderPlaceholder(
             page,
             "Network Core",
             "Здесь будет управление интерфейсами, адресами, маршрутами, DNS и диагностикой сети.",
-            "<div class=\"placeholder-card\">Интерфейсы — PLANNED</div>"
+            "<div class=\"placeholder-card\">Интерфейсы — NEXT</div>"
             "<div class=\"placeholder-card\">Маршруты — PLANNED</div>"
             "<div class=\"placeholder-card\">DNS — PLANNED</div>"
             "<div class=\"placeholder-card\">Диагностика — PLANNED</div>"
@@ -1664,6 +1692,231 @@ async function updateServerUpdateStatus() {
             "Update status error:",
             error
         );
+    }
+}
+
+async function updateVpnProfiles() {
+    const container =
+        document.getElementById(
+            "vpn-list"
+        );
+
+    if (!container)
+        return;
+
+    const message =
+        document.getElementById(
+            "vpn-message"
+        );
+
+    try {
+        const response =
+            await fetch(
+                "/api/network/vpn",
+                {
+                    cache: "no-store"
+                }
+            );
+
+        if (
+            response.status === 401
+        ) {
+            window.location =
+                "/login";
+
+            return;
+        }
+
+        if (!response.ok)
+            return;
+
+        const data =
+            await response.json();
+
+        container.replaceChildren();
+
+        if (message) {
+            if (!data.available) {
+                message.textContent =
+                    "wg-quick не найден. Установите wireguard-tools.";
+            }
+            else if (data.error) {
+                message.textContent =
+                    data.error;
+            }
+            else {
+                message.textContent =
+                    "WireGuard готов.";
+            }
+        }
+
+        const profiles =
+            Array.isArray(
+                data.profiles
+            )
+            ? data.profiles
+            : [];
+
+        if (profiles.length === 0) {
+            const empty =
+                document.createElement(
+                    "div"
+                );
+
+            empty.className =
+                "placeholder-card";
+
+            empty.textContent =
+                "Профили не найдены. Добавьте *.conf в runtime/wireguard/";
+
+            container.appendChild(
+                empty
+            );
+
+            return;
+        }
+
+        for (const profile of profiles) {
+            const card =
+                document.createElement(
+                    "div"
+                );
+
+            card.className =
+                "placeholder-card";
+
+            const title =
+                document.createElement(
+                    "strong"
+                );
+
+            title.textContent =
+                profile.name;
+
+            card.appendChild(title);
+
+            const state =
+                document.createElement(
+                    "div"
+                );
+
+            state.className =
+                profile.active
+                ? "status-ok"
+                : "muted";
+
+            state.textContent =
+                profile.active
+                ? "CONNECTED"
+                : "DISCONNECTED";
+
+            card.appendChild(state);
+
+            const actions =
+                document.createElement(
+                    "div"
+                );
+
+            actions.className =
+                "button-row";
+
+            const button =
+                document.createElement(
+                    "button"
+                );
+
+            button.type =
+                "button";
+
+            button.textContent =
+                profile.active
+                ? "Отключить"
+                : "Подключить";
+
+            if (profile.active) {
+                button.className =
+                    "secondary";
+            }
+
+            button.addEventListener(
+                "click",
+                async function() {
+                    const parameters =
+                        new URLSearchParams();
+
+                    parameters.set(
+                        "profile",
+                        profile.name
+                    );
+
+                    parameters.set(
+                        "action",
+                        profile.active
+                            ? "disconnect"
+                            : "connect"
+                    );
+
+                    button.disabled = true;
+
+                    try {
+                        const actionResponse =
+                            await fetch(
+                                "/api/network/vpn/action",
+                                {
+                                    method: "POST",
+                                    headers: {
+                                        "Content-Type":
+                                            "application/x-www-form-urlencoded"
+                                    },
+                                    body:
+                                        parameters.toString()
+                                }
+                            );
+
+                        const result =
+                            await actionResponse.json();
+
+                        if (message) {
+                            message.textContent =
+                                result.message
+                                || "Операция завершена.";
+                        }
+
+                        await updateVpnProfiles();
+                    }
+                    catch (error) {
+                        if (message) {
+                            message.textContent =
+                                "Ошибка WireGuard: "
+                                + error;
+                        }
+                    }
+                    finally {
+                        button.disabled =
+                            false;
+                    }
+                }
+            );
+
+            actions.appendChild(
+                button
+            );
+
+            card.appendChild(
+                actions
+            );
+
+            container.appendChild(
+                card
+            );
+        }
+    }
+    catch (error) {
+        if (message) {
+            message.textContent =
+                "Ошибка WireGuard: "
+                + error;
+        }
     }
 }
 
@@ -3282,6 +3535,7 @@ document.addEventListener(
         updateStorageStats();
         updateStorageCandidates();
         updateServerUpdateStatus();
+        updateVpnProfiles();
 
         const updateCheckButton =
             document.getElementById(
@@ -3397,6 +3651,18 @@ document.addEventListener(
                         3500
                     );
                 }
+            );
+        }
+
+        const vpnRefreshButton =
+            document.getElementById(
+                "vpn-refresh-btn"
+            );
+
+        if (vpnRefreshButton) {
+            vpnRefreshButton.addEventListener(
+                "click",
+                updateVpnProfiles
             );
         }
 
@@ -3538,6 +3804,11 @@ document.addEventListener(
         setInterval(
             updateServerUpdateStatus,
             15000
+        );
+
+        setInterval(
+            updateVpnProfiles,
+            10000
         );
 
         setInterval(
