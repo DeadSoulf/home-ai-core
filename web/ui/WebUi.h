@@ -21,6 +21,8 @@ struct WebUiContext {
     std::string storage_files_reserve_percent;
     std::string storage_video_reserve_gb;
     std::string storage_files_reserve_gb;
+    std::string storage_video_pinned_mount;
+    std::string storage_files_pinned_mount;
     std::string files_root;
     std::string username;
     std::string role;
