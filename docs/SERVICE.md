@@ -87,9 +87,9 @@ Check `systemctl status home-ai-core` and the Web UI after disconnecting SSH and
 Physical server/boot verification must be performed on the target Debian host.
 
 
-## Network Helper for DHCP
+## Network Helper for IPv4 management
 
-The Home AI Core service remains non-root. Web DHCP requests use a separate validated helper.
+The Home AI Core service remains non-root. Web DHCP/static IPv4 changes use a separate validated helper.
 
 After building a version that includes `home-ai-network-helper`, install it once for the
 service account:
@@ -105,5 +105,5 @@ This installs:
 /etc/sudoers.d/home-ai-network-helper
 ```
 
-The helper is required only for privileged DHCP changes. Reading interface/IP status does not
-require it.
+The helper is required only for privileged IPv4 changes. Reading interface/IP status does not
+require it. Re-run the installer after updating Home AI Core whenever the helper binary changes.
