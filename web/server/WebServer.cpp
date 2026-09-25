@@ -2,6 +2,7 @@
 #include "web/ui/WebUi.h"
 
 #include "core/logging/Logger.h"
+#include "core/modules/ModuleManager.h"
 #include "core/runtime/CoreRuntime.h"
 #include "security/auth/SecurityManager.h"
 #include "server/system/SystemMonitor.h"
@@ -734,11 +735,13 @@ button {
 WebServer::WebServer(
     CoreRuntime& runtime,
     SecurityManager& security,
-    UpdateManager& updates
+    UpdateManager& updates,
+    ModuleManager& modules
 )
     : runtime_(runtime),
       security_(security),
-      updates_(updates)
+      updates_(updates),
+      modules_(modules)
 {
 }
 
@@ -2000,6 +2003,87 @@ void WebServer::handleClient(
         );
 
         sendActionResult(result);
+
+        return;
+    }
+
+    if (
+        method == "GET" &&
+        path == "/api/modules"
+    ) {
+        const auto modules =
+            modules_.snapshot();
+
+        std::ostringstream json;
+
+        json << "{\"modules\":[";
+
+        bool first = true;
+
+        for (const auto& module : modules) {
+            if (!first)
+                json << ",";
+
+            first = false;
+
+            json
+                << "{"
+                << "\"name\":\""
+                << jsonEscape(
+                    module.name
+                )
+                << "\","
+                << "\"state\":\""
+                << jsonEscape(
+                    ModuleManager::stateToString(
+                        module.state
+                    )
+                )
+                << "\","
+                << "\"health\":\""
+                << jsonEscape(
+                    moduleHealthToString(
+                        module.health
+                    )
+                )
+                << "\","
+                << "\"message\":\""
+                << jsonEscape(
+                    module.message
+                )
+                << "\","
+                << "\"dependencies\":[";
+
+            bool first_dependency = true;
+
+            for (
+                const auto& dependency :
+                module.dependencies
+            ) {
+                if (!first_dependency)
+                    json << ",";
+
+                first_dependency = false;
+
+                json
+                    << "\""
+                    << jsonEscape(
+                        dependency
+                    )
+                    << "\"";
+            }
+
+            json << "]}";
+        }
+
+        json << "]}";
+
+        sendResponse(
+            client_fd,
+            "200 OK",
+            "application/json; charset=utf-8",
+            json.str()
+        );
 
         return;
     }
