@@ -2377,6 +2377,93 @@ main {
     font-size: 0.92rem;
 }
 
+.disk-menu-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.72);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.disk-menu-panel {
+    width: min(620px, 100%);
+    max-height: 90vh;
+    overflow: auto;
+    background: #191c23;
+    border: 1px solid #363c49;
+    border-radius: 14px;
+    padding: 22px;
+}
+
+.disk-menu-panel h3 {
+    margin-top: 0;
+}
+
+.disk-menu-info {
+    padding: 12px;
+    border-radius: 8px;
+    background: #101319;
+    line-height: 1.6;
+    margin-bottom: 14px;
+}
+
+.disk-menu-group {
+    border-top: 1px solid #2c313c;
+    margin-top: 14px;
+    padding-top: 14px;
+}
+
+.disk-menu-group h4 {
+    margin: 0 0 10px;
+}
+
+.disk-menu-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.disk-menu-actions button {
+    margin: 0;
+}
+
+.disk-menu-actions .danger {
+    background: #8c2d36;
+    color: white;
+}
+
+.disk-menu-actions .secondary {
+    background: #303641;
+    color: white;
+}
+
+.disk-menu-warning {
+    margin-top: 12px;
+    color: #f2d784;
+}
+
+.disk-menu-result {
+    display: none;
+    margin-top: 12px;
+    padding: 10px;
+    border-radius: 8px;
+    background: #15261b;
+    color: #9ce0ae;
+}
+
+.disk-menu-result.error {
+    background: #35191d;
+    color: #ffb8c0;
+}
+
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
 label {
     display: block;
     margin-top: 15px;
@@ -2641,6 +2728,71 @@ Load Average<br>
 </div>
 </div>
 
+<div id="disk-menu-overlay" class="disk-menu-overlay">
+<div class="disk-menu-panel">
+<h3>Управление диском</h3>
+
+<div id="disk-menu-info" class="disk-menu-info">
+Устройство не выбрано.
+</div>
+
+<div id="disk-menu-warning" class="disk-menu-warning"></div>
+<div id="disk-menu-result" class="disk-menu-result"></div>
+
+<div class="disk-menu-group">
+<h4>Назначение и подключение</h4>
+<div class="disk-menu-actions">
+<button id="disk-mount-video" type="button">
+Подключить для видео
+</button>
+<button id="disk-mount-personal" type="button">
+Подключить для личных файлов
+</button>
+<button id="disk-assign-video" type="button" class="secondary">
+Назначить как видео
+</button>
+<button id="disk-assign-personal" type="button" class="secondary">
+Назначить как личные файлы
+</button>
+<button id="disk-unassign" type="button" class="secondary">
+Снять назначение
+</button>
+</div>
+</div>
+
+<div class="disk-menu-group">
+<h4>Стандартные операции</h4>
+<div class="disk-menu-actions">
+<button id="disk-refresh" type="button" class="secondary">
+Обновить информацию
+</button>
+<button id="disk-unmount" type="button" class="secondary">
+Размонтировать
+</button>
+<button id="disk-format-ext4" type="button" class="danger">
+Форматировать EXT4
+</button>
+<button id="disk-wipefs" type="button" class="danger">
+Удалить сигнатуры
+</button>
+</div>
+</div>
+
+<p>
+<small>
+Форматирование и удаление сигнатур уничтожают существующие данные.
+Для этих операций потребуется ввести точное имя устройства.
+</small>
+</p>
+
+<div class="disk-menu-actions">
+<button id="disk-menu-close" type="button" class="secondary">
+Закрыть
+</button>
+</div>
+</div>
+</div>
+
 <div class="card">
 <h3>Модули</h3>
 
@@ -2747,6 +2899,15 @@ const ignoredStorageDevices =
 let knownStorageCandidates =
     null;
 
+let storageDeviceInventory =
+    [];
+
+let storageHelperInstalled =
+    false;
+
+let currentDiskDevice =
+    "";
+
 function storageDeviceTitle(device) {
     const model =
         (
@@ -2761,41 +2922,389 @@ function storageDeviceTitle(device) {
     return device.device;
 }
 
-function proposeStorageAction(
-    device,
-    role,
-    card
+function findStorageDevice(
+    devicePath
 ) {
-    const note =
-        card.querySelector(
-            ".device-note"
+    return storageDeviceInventory.find(
+        function(device) {
+            return (
+                device.device ===
+                devicePath
+            );
+        }
+    );
+}
+
+function setDiskMenuResult(
+    message,
+    isError = false
+) {
+    const result =
+        document.getElementById(
+            "disk-menu-result"
         );
 
-    if (!note)
+    if (!result)
         return;
 
-    if (role === "ignore") {
-        ignoredStorageDevices.add(
-            device.device
+    result.style.display =
+        "block";
+
+    result.className =
+        isError
+        ? "disk-menu-result error"
+        : "disk-menu-result";
+
+    result.textContent =
+        message;
+}
+
+function showStorageAlert(
+    message
+) {
+    const alertBox =
+        document.getElementById(
+            "storage-hotplug-alert"
         );
 
-        card.remove();
+    if (!alertBox)
+        return;
+
+    alertBox.style.display =
+        "block";
+
+    alertBox.textContent =
+        message;
+}
+
+function closeDiskMenu() {
+    const overlay =
+        document.getElementById(
+            "disk-menu-overlay"
+        );
+
+    if (overlay)
+        overlay.style.display =
+            "none";
+
+    currentDiskDevice = "";
+}
+
+function updateDiskMenuState(
+    device
+) {
+    const warning =
+        document.getElementById(
+            "disk-menu-warning"
+        );
+
+    const result =
+        document.getElementById(
+            "disk-menu-result"
+        );
+
+    if (result)
+        result.style.display =
+            "none";
+
+    if (warning) {
+        warning.textContent =
+            storageHelperInstalled
+            ? ""
+            : "Для монтирования, форматирования и размонтирования нужно установить привилегированный Storage Helper.";
+    }
+
+    const setDisabled =
+        function(id, disabled) {
+            const button =
+                document.getElementById(
+                    id
+                );
+
+            if (button)
+                button.disabled =
+                    disabled;
+        };
+
+    const canPrivileged =
+        storageHelperInstalled;
+
+    const candidate =
+        Boolean(
+            device &&
+            device.candidate
+        );
+
+    const mounted =
+        Boolean(
+            device &&
+            device.mounted
+        );
+
+    setDisabled(
+        "disk-mount-video",
+        !candidate ||
+        !canPrivileged
+    );
+
+    setDisabled(
+        "disk-mount-personal",
+        !candidate ||
+        !canPrivileged
+    );
+
+    setDisabled(
+        "disk-assign-video",
+        !mounted
+    );
+
+    setDisabled(
+        "disk-assign-personal",
+        !mounted
+    );
+
+    setDisabled(
+        "disk-unassign",
+        !mounted
+    );
+
+    setDisabled(
+        "disk-unmount",
+        !mounted ||
+        !canPrivileged
+    );
+
+    setDisabled(
+        "disk-format-ext4",
+        !candidate ||
+        !canPrivileged
+    );
+
+    setDisabled(
+        "disk-wipefs",
+        !candidate ||
+        !canPrivileged
+    );
+}
+
+function openDiskMenu(
+    devicePath
+) {
+    const device =
+        findStorageDevice(
+            devicePath
+        );
+
+    if (!device) {
+        showStorageAlert(
+            "Не удалось получить информацию об устройстве "
+            + devicePath
+            + ". Обновите список дисков."
+        );
+
         return;
     }
 
-    const target =
-        role === "video"
-        ? "хранилище видео с камер"
-        : "хранилище личных файлов";
+    currentDiskDevice =
+        device.device;
 
-    note.textContent =
-        "Выбрано: "
-        + target
-        + ". Диск "
-        + device.device
-        + " пока не форматируется и не монтируется автоматически. "
-        + "Перед использованием система потребует отдельного "
-        + "подтверждения подготовки диска.";
+    const overlay =
+        document.getElementById(
+            "disk-menu-overlay"
+        );
+
+    const info =
+        document.getElementById(
+            "disk-menu-info"
+        );
+
+    if (info) {
+        const model =
+            storageDeviceTitle(
+                device
+            );
+
+        info.textContent =
+            model
+            + "\nУстройство: "
+            + device.device
+            + "\nРазмер: "
+            + formatBytes(
+                device.size_bytes
+            )
+            + "\nСтатус: "
+            + (
+                device.mounted
+                ? "смонтирован в "
+                    + device.mount_point
+                : (
+                    device.in_use
+                    ? "используется системой"
+                    : "не смонтирован"
+                )
+            )
+            + (
+                device.serial
+                ? "\nSerial: "
+                    + device.serial
+                : ""
+            );
+
+        info.style.whiteSpace =
+            "pre-line";
+    }
+
+    updateDiskMenuState(
+        device
+    );
+
+    if (overlay)
+        overlay.style.display =
+            "flex";
+}
+
+async function runDiskAction(
+    action
+) {
+    const device =
+        findStorageDevice(
+            currentDiskDevice
+        );
+
+    if (!device) {
+        setDiskMenuResult(
+            "Устройство больше не найдено.",
+            true
+        );
+
+        return;
+    }
+
+    const parameters =
+        new URLSearchParams();
+
+    parameters.set(
+        "action",
+        action
+    );
+
+    parameters.set(
+        "device",
+        device.device
+    );
+
+    if (
+        action === "format-ext4"
+        ||
+        action === "wipefs"
+    ) {
+        const confirmation =
+            window.prompt(
+                "ОПАСНАЯ ОПЕРАЦИЯ. Данные могут быть уничтожены. "
+                + "Для подтверждения введите точное имя устройства: "
+                + device.device
+            );
+
+        if (
+            confirmation !==
+            device.device
+        ) {
+            setDiskMenuResult(
+                "Операция отменена: подтверждение не совпало.",
+                true
+            );
+
+            return;
+        }
+
+        parameters.set(
+            "confirm",
+            confirmation
+        );
+    }
+
+    if (
+        action === "format-ext4"
+    ) {
+        const label =
+            window.prompt(
+                "Метка EXT4 (латиница, цифры, -, _, .):",
+                "homeai-data"
+            );
+
+        if (label === null)
+            return;
+
+        parameters.set(
+            "label",
+            label
+        );
+    }
+
+    setDiskMenuResult(
+        "Выполняется операция..."
+    );
+
+    try {
+        const response =
+            await fetch(
+                "/api/storage/action",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type":
+                            "application/x-www-form-urlencoded"
+                    },
+                    body:
+                        parameters.toString()
+                }
+            );
+
+        if (response.status === 401) {
+            window.location =
+                "/login";
+
+            return;
+        }
+
+        const data =
+            await response.json();
+
+        setDiskMenuResult(
+            data.message
+            || "Операция завершена.",
+            !data.success
+        );
+
+        const shouldRefresh =
+            data.success;
+
+        if (shouldRefresh) {
+            await updateStorageCandidates(
+                true
+            );
+
+            await updateStorageStats();
+
+            const refreshed =
+                findStorageDevice(
+                    device.device
+                );
+
+            if (refreshed) {
+                updateDiskMenuState(
+                    refreshed
+                );
+            }
+        }
+    }
+    catch (error) {
+        setDiskMenuResult(
+            "Ошибка выполнения операции: "
+            + error,
+            true
+        );
+    }
 }
 
 function renderStorageCandidate(
@@ -2893,49 +3402,25 @@ function renderStorageCandidate(
     actions.className =
         "device-actions";
 
-    const video =
+    const manage =
         document.createElement(
             "button"
         );
 
-    video.type = "button";
-    video.textContent =
-        "Для видео";
+    manage.type = "button";
+    manage.textContent =
+        "Управление диском";
 
-    video.addEventListener(
+    manage.addEventListener(
         "click",
         function() {
-            proposeStorageAction(
-                device,
-                "video",
-                card
+            openDiskMenu(
+                device.device
             );
         }
     );
 
-    actions.appendChild(video);
-
-    const personal =
-        document.createElement(
-            "button"
-        );
-
-    personal.type = "button";
-    personal.textContent =
-        "Для личных файлов";
-
-    personal.addEventListener(
-        "click",
-        function() {
-            proposeStorageAction(
-                device,
-                "personal",
-                card
-            );
-        }
-    );
-
-    actions.appendChild(personal);
+    actions.appendChild(manage);
 
     const ignore =
         document.createElement(
@@ -2970,7 +3455,7 @@ function renderStorageCandidate(
         "device-note";
 
     note.textContent =
-        "Выберите, для чего планируется использовать этот диск.";
+        "Откройте управление диском для стандартных операций и выбора назначения.";
 
     card.appendChild(note);
 
@@ -3001,13 +3486,21 @@ async function updateStorageCandidates(
         const data =
             await response.json();
 
+        storageDeviceInventory =
+            Array.isArray(
+                data.devices
+            )
+            ? data.devices
+            : [];
+
+        storageHelperInstalled =
+            Boolean(
+                data.helper_installed
+            );
+
         const candidates =
             (
-                Array.isArray(
-                    data.devices
-                )
-                ? data.devices
-                : []
+                storageDeviceInventory
             ).filter(
                 function(device) {
                     return (
@@ -3285,6 +3778,44 @@ async function updateStorageStats() {
 
             card.appendChild(capacity);
 
+            if (volume.source) {
+                const actions =
+                    document.createElement(
+                        "div"
+                    );
+
+                actions.className =
+                    "device-actions";
+
+                const manage =
+                    document.createElement(
+                        "button"
+                    );
+
+                manage.type =
+                    "button";
+
+                manage.textContent =
+                    "Управление диском";
+
+                manage.addEventListener(
+                    "click",
+                    function() {
+                        openDiskMenu(
+                            volume.source
+                        );
+                    }
+                );
+
+                actions.appendChild(
+                    manage
+                );
+
+                card.appendChild(
+                    actions
+                );
+            }
+
             container.appendChild(card);
         }
     }
@@ -3383,6 +3914,108 @@ document.addEventListener(
                     updateStorageCandidates(
                         true
                     );
+                }
+            );
+        }
+
+        const actionMap = {
+            "disk-mount-video":
+                "mount-video",
+            "disk-mount-personal":
+                "mount-personal",
+            "disk-assign-video":
+                "assign-video",
+            "disk-assign-personal":
+                "assign-personal",
+            "disk-unassign":
+                "unassign",
+            "disk-unmount":
+                "unmount",
+            "disk-format-ext4":
+                "format-ext4",
+            "disk-wipefs":
+                "wipefs"
+        };
+
+        for (
+            const [id, action]
+            of Object.entries(
+                actionMap
+            )
+        ) {
+            const button =
+                document.getElementById(
+                    id
+                );
+
+            if (button) {
+                button.addEventListener(
+                    "click",
+                    function() {
+                        runDiskAction(
+                            action
+                        );
+                    }
+                );
+            }
+        }
+
+        const refreshButton =
+            document.getElementById(
+                "disk-refresh"
+            );
+
+        if (refreshButton) {
+            refreshButton.addEventListener(
+                "click",
+                async function() {
+                    await updateStorageCandidates(
+                        true
+                    );
+
+                    await updateStorageStats();
+
+                    const refreshed =
+                        findStorageDevice(
+                            currentDiskDevice
+                        );
+
+                    if (refreshed) {
+                        openDiskMenu(
+                            refreshed.device
+                        );
+                    }
+                }
+            );
+        }
+
+        const closeButton =
+            document.getElementById(
+                "disk-menu-close"
+            );
+
+        if (closeButton) {
+            closeButton.addEventListener(
+                "click",
+                closeDiskMenu
+            );
+        }
+
+        const overlay =
+            document.getElementById(
+                "disk-menu-overlay"
+            );
+
+        if (overlay) {
+            overlay.addEventListener(
+                "click",
+                function(event) {
+                    if (
+                        event.target ===
+                        overlay
+                    ) {
+                        closeDiskMenu();
+                    }
                 }
             );
         }
