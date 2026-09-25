@@ -93,6 +93,82 @@ std::string trimCopy(std::string value)
     return std::string(first, last);
 }
 
+std::optional<std::int64_t>
+parseInt64(
+    const std::string& value
+)
+{
+    if (value.empty())
+        return std::nullopt;
+
+    try {
+        std::size_t consumed = 0;
+
+        const auto result =
+            std::stoll(
+                value,
+                &consumed,
+                10
+            );
+
+        if (consumed != value.size())
+            return std::nullopt;
+
+        return result;
+    }
+    catch (...) {
+        return std::nullopt;
+    }
+}
+
+std::string requiredPermissionForPage(
+    const std::string& path
+)
+{
+    if (
+        path == "/"
+        ||
+        path == "/system"
+    ) {
+        return "system.view";
+    }
+
+    if (path == "/network")
+        return "network.view";
+
+    if (path == "/storage")
+        return "storage.view";
+
+    if (path == "/files")
+        return "files.read";
+
+    if (path == "/cameras")
+        return "cameras.view";
+
+    if (path == "/smart-home")
+        return "smart_home.view";
+
+    if (path == "/automation")
+        return "automation.view";
+
+    if (path == "/ai")
+        return "ai.use";
+
+    if (path == "/users")
+        return "users.view";
+
+    if (path == "/hypervisor")
+        return "hypervisor.view";
+
+    if (path == "/settings")
+        return "system.manage";
+
+    if (path == "/admin")
+        return "ai.manage";
+
+    return {};
+}
+
 std::string lowerCopy(std::string value)
 {
     std::transform(
@@ -1036,8 +1112,16 @@ void WebServer::handleClient(
     const auto query =
         path.find('?');
 
-    if (query != std::string::npos)
+    std::string query_string;
+
+    if (query != std::string::npos) {
+        query_string =
+            path.substr(
+                query + 1
+            );
+
         path.resize(query);
+    }
 
     if (method == "GET" && path == "/assets/i18n.js") {
         sendResponse(client_fd, "200 OK", "application/javascript; charset=utf-8", localizationScript());
@@ -1345,11 +1429,53 @@ void WebServer::handleClient(
         return;
     }
 
-    if (path == "/admin" || path == "/api/admin/gpus" || path == "/api/admin/accelerator") {
-        if (!security_.isAdmin(session->role)) {
-            sendResponse(client_fd, "403 Forbidden", "application/json; charset=utf-8", "{\"error\":\"admin_required\"}");
-            return;
-        }
+    const auto page_permission =
+        requiredPermissionForPage(
+            path
+        );
+
+    if (
+        !page_permission.empty()
+        &&
+        !security_.hasPermission(
+            *session,
+            page_permission
+        )
+    ) {
+        sendResponse(
+            client_fd,
+            "403 Forbidden",
+            isApiPath(path)
+                ? "application/json; charset=utf-8"
+                : "text/plain; charset=utf-8",
+            isApiPath(path)
+                ? "{\"error\":\"permission_denied\"}"
+                : "403 Forbidden"
+        );
+
+        return;
+    }
+
+    if (
+        (
+            path == "/api/admin/gpus"
+            ||
+            path == "/api/admin/accelerator"
+        )
+        &&
+        !security_.hasPermission(
+            *session,
+            "ai.manage"
+        )
+    ) {
+        sendResponse(
+            client_fd,
+            "403 Forbidden",
+            "application/json; charset=utf-8",
+            "{\"error\":\"permission_denied\"}"
+        );
+
+        return;
     }
     if (method == "GET" && path == "/api/admin/gpus") {
         const auto inventory = gpu_monitor_.snapshot();
@@ -1428,6 +1554,937 @@ void WebServer::handleClient(
             "200 OK",
             "application/json; charset=utf-8",
             response
+        );
+
+        return;
+    }
+
+    if (
+        method == "GET"
+        &&
+        path == "/api/users"
+    ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "users.view"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"error\":\"permission_denied\"}"
+            );
+
+            return;
+        }
+
+        std::string error;
+
+        const auto users =
+            security_.listUsers(
+                error
+            );
+
+        if (!error.empty()) {
+            sendResponse(
+                client_fd,
+                "500 Internal Server Error",
+                "application/json; charset=utf-8",
+                "{\"error\":\"user_database_error\",\"message\":\"" +
+                jsonEscape(error) +
+                "\"}"
+            );
+
+            return;
+        }
+
+        std::ostringstream json;
+
+        json << "{\"permission_catalog\":[";
+
+        bool first_permission = true;
+
+        for (
+            const auto& permission :
+            SecurityManager::
+                permissionCatalog()
+        ) {
+            if (!first_permission)
+                json << ",";
+
+            first_permission = false;
+
+            json
+                << "\""
+                << jsonEscape(permission)
+                << "\"";
+        }
+
+        json << "],\"users\":[";
+
+        bool first_user = true;
+
+        for (const auto& user : users) {
+            if (!first_user)
+                json << ",";
+
+            first_user = false;
+
+            json
+                << "{"
+                << "\"id\":"
+                << user.id
+                << ",\"username\":\""
+                << jsonEscape(
+                    user.username
+                )
+                << "\",\"role\":\""
+                << jsonEscape(
+                    SecurityManager::
+                        roleToString(
+                            user.role
+                        )
+                )
+                << "\",\"enabled\":"
+                << (
+                    user.enabled
+                    ? "true"
+                    : "false"
+                )
+                << ",\"created_at\":"
+                << user.created_at
+                << ",\"updated_at\":"
+                << user.updated_at
+                << ",\"last_login_at\":"
+                << user.last_login_at
+                << ",\"permission_overrides\":{";
+
+            bool first_override = true;
+
+            for (
+                const auto& [
+                    permission,
+                    decision
+                ] :
+                user.permission_overrides
+            ) {
+                if (!first_override)
+                    json << ",";
+
+                first_override = false;
+
+                json
+                    << "\""
+                    << jsonEscape(
+                        permission
+                    )
+                    << "\":"
+                    << decision;
+            }
+
+            json
+                << "},\"effective_permissions\":[";
+
+            bool first_effective = true;
+
+            for (
+                const auto& permission :
+                user.effective_permissions
+            ) {
+                if (!first_effective)
+                    json << ",";
+
+                first_effective = false;
+
+                json
+                    << "\""
+                    << jsonEscape(
+                        permission
+                    )
+                    << "\"";
+            }
+
+            json << "]}";
+        }
+
+        json << "]}";
+
+        sendResponse(
+            client_fd,
+            "200 OK",
+            "application/json; charset=utf-8",
+            json.str()
+        );
+
+        return;
+    }
+
+    if (
+        method == "GET"
+        &&
+        path == "/api/users/sessions"
+    ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "users.manage"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"error\":\"permission_denied\"}"
+            );
+
+            return;
+        }
+
+        const auto query_values =
+            parseForm(
+                query_string
+            );
+
+        std::optional<std::int64_t>
+            user_id;
+
+        if (
+            query_values.contains(
+                "user_id"
+            )
+        ) {
+            user_id =
+                parseInt64(
+                    query_values.at(
+                        "user_id"
+                    )
+                );
+
+            if (!user_id) {
+                sendResponse(
+                    client_fd,
+                    "400 Bad Request",
+                    "application/json; charset=utf-8",
+                    "{\"error\":\"invalid_user_id\"}"
+                );
+
+                return;
+            }
+        }
+
+        std::string error;
+
+        const auto sessions =
+            security_.listSessions(
+                user_id,
+                error
+            );
+
+        if (!error.empty()) {
+            sendResponse(
+                client_fd,
+                "500 Internal Server Error",
+                "application/json; charset=utf-8",
+                "{\"error\":\"session_database_error\"}"
+            );
+
+            return;
+        }
+
+        std::ostringstream json;
+
+        json << "{\"sessions\":[";
+
+        bool first = true;
+
+        for (
+            const auto& item :
+            sessions
+        ) {
+            if (!first)
+                json << ",";
+
+            first = false;
+
+            json
+                << "{"
+                << "\"id\":"
+                << item.id
+                << ",\"user_id\":"
+                << item.user_id
+                << ",\"username\":\""
+                << jsonEscape(
+                    item.username
+                )
+                << "\",\"created_at\":"
+                << item.created_at
+                << ",\"expires_at\":"
+                << item.expires_at
+                << ",\"last_seen_at\":"
+                << item.last_seen_at
+                << "}";
+        }
+
+        json << "]}";
+
+        sendResponse(
+            client_fd,
+            "200 OK",
+            "application/json; charset=utf-8",
+            json.str()
+        );
+
+        return;
+    }
+
+    if (
+        method == "GET"
+        &&
+        path == "/api/users/audit"
+    ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "users.manage"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"error\":\"permission_denied\"}"
+            );
+
+            return;
+        }
+
+        const auto values =
+            parseForm(
+                query_string
+            );
+
+        int limit = 50;
+        int offset = 0;
+
+        if (
+            values.contains("limit")
+        ) {
+            const auto parsed =
+                parseInt64(
+                    values.at("limit")
+                );
+
+            if (parsed)
+                limit =
+                    static_cast<int>(
+                        *parsed
+                    );
+        }
+
+        if (
+            values.contains("offset")
+        ) {
+            const auto parsed =
+                parseInt64(
+                    values.at("offset")
+                );
+
+            if (parsed)
+                offset =
+                    static_cast<int>(
+                        *parsed
+                    );
+        }
+
+        const auto username =
+            values.contains(
+                "username"
+            )
+            ? values.at(
+                "username"
+            )
+            : "";
+
+        const auto event =
+            values.contains(
+                "event"
+            )
+            ? values.at(
+                "event"
+            )
+            : "";
+
+        std::string error;
+
+        const auto entries =
+            security_.listAudit(
+                limit,
+                offset,
+                username,
+                event,
+                error
+            );
+
+        if (!error.empty()) {
+            sendResponse(
+                client_fd,
+                "500 Internal Server Error",
+                "application/json; charset=utf-8",
+                "{\"error\":\"audit_database_error\"}"
+            );
+
+            return;
+        }
+
+        std::ostringstream json;
+
+        json << "{\"entries\":[";
+
+        bool first = true;
+
+        for (
+            const auto& entry :
+            entries
+        ) {
+            if (!first)
+                json << ",";
+
+            first = false;
+
+            json
+                << "{"
+                << "\"id\":"
+                << entry.id
+                << ",\"created_at\":"
+                << entry.created_at
+                << ",\"event\":\""
+                << jsonEscape(
+                    entry.event
+                )
+                << "\",\"username\":\""
+                << jsonEscape(
+                    entry.username
+                )
+                << "\",\"details\":\""
+                << jsonEscape(
+                    entry.details
+                )
+                << "\"}";
+        }
+
+        json << "]}";
+
+        sendResponse(
+            client_fd,
+            "200 OK",
+            "application/json; charset=utf-8",
+            json.str()
+        );
+
+        return;
+    }
+
+    if (
+        method == "POST"
+        &&
+        path.rfind(
+            "/api/users/",
+            0
+        ) == 0
+    ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "users.manage"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"error\":\"permission_denied\"}"
+            );
+
+            return;
+        }
+
+        if (
+            headerValue(
+                headers,
+                "X-HomeAI-Request"
+            ) != "1"
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"error\":\"request_header_required\"}"
+            );
+
+            return;
+        }
+
+        const auto form =
+            parseForm(body);
+
+        auto sendUserResult =
+            [&](bool success,
+                const std::string& message,
+                const std::string& code = "") {
+                sendResponse(
+                    client_fd,
+                    success
+                        ? "200 OK"
+                        : "400 Bad Request",
+                    "application/json; charset=utf-8",
+                    "{\"success\":" +
+                    std::string(
+                        success
+                        ? "true"
+                        : "false"
+                    )
+                    +
+                    ",\"code\":\"" +
+                    jsonEscape(code)
+                    +
+                    "\",\"message\":\"" +
+                    jsonEscape(message)
+                    +
+                    "\"}"
+                );
+            };
+
+        if (
+            path == "/api/users/create"
+        ) {
+            const auto username =
+                form.contains(
+                    "username"
+                )
+                ? form.at(
+                    "username"
+                )
+                : "";
+
+            const auto password =
+                form.contains(
+                    "password"
+                )
+                ? form.at(
+                    "password"
+                )
+                : "";
+
+            const auto role_text =
+                form.contains(
+                    "role"
+                )
+                ? form.at("role")
+                : "viewer";
+
+            const auto role =
+                SecurityManager::
+                    roleFromString(
+                        role_text
+                    );
+
+            if (!role) {
+                sendUserResult(
+                    false,
+                    "Invalid role",
+                    "invalid_role"
+                );
+
+                return;
+            }
+
+            std::string error;
+
+            const bool success =
+                security_.createUser(
+                    username,
+                    password,
+                    *role,
+                    error
+                );
+
+            if (success) {
+                security_.audit(
+                    "user.admin.create",
+                    session->username,
+                    "created=" +
+                        username
+                        +
+                        " role=" +
+                        role_text
+                );
+            }
+
+            sendUserResult(
+                success,
+                success
+                    ? "User created"
+                    : error,
+                success
+                    ? "ok"
+                    : "create_failed"
+            );
+
+            return;
+        }
+
+        const auto user_id =
+            form.contains(
+                "user_id"
+            )
+            ? parseInt64(
+                form.at(
+                    "user_id"
+                )
+            )
+            : std::nullopt;
+
+        if (!user_id) {
+            sendUserResult(
+                false,
+                "Invalid user ID",
+                "invalid_user_id"
+            );
+
+            return;
+        }
+
+        if (
+            path == "/api/users/update"
+        ) {
+            const auto role =
+                SecurityManager::
+                    roleFromString(
+                        form.contains(
+                            "role"
+                        )
+                        ? form.at(
+                            "role"
+                        )
+                        : ""
+                    );
+
+            if (!role) {
+                sendUserResult(
+                    false,
+                    "Invalid role",
+                    "invalid_role"
+                );
+
+                return;
+            }
+
+            const bool enabled =
+                form.contains(
+                    "enabled"
+                )
+                &&
+                (
+                    form.at(
+                        "enabled"
+                    ) == "1"
+                    ||
+                    form.at(
+                        "enabled"
+                    ) == "true"
+                );
+
+            std::string error;
+
+            const bool success =
+                security_.updateUser(
+                    *user_id,
+                    *role,
+                    enabled,
+                    error
+                );
+
+            if (success) {
+                security_.audit(
+                    "user.admin.update",
+                    session->username,
+                    "user_id=" +
+                        std::to_string(
+                            *user_id
+                        )
+                );
+            }
+
+            sendUserResult(
+                success,
+                success
+                    ? "User updated"
+                    : error,
+                success
+                    ? "ok"
+                    : "update_failed"
+            );
+
+            return;
+        }
+
+        if (
+            path == "/api/users/password"
+        ) {
+            const auto password =
+                form.contains(
+                    "password"
+                )
+                ? form.at(
+                    "password"
+                )
+                : "";
+
+            std::string error;
+
+            const bool success =
+                security_.setPassword(
+                    *user_id,
+                    password,
+                    error
+                );
+
+            if (success) {
+                security_.audit(
+                    "user.admin.password",
+                    session->username,
+                    "user_id=" +
+                        std::to_string(
+                            *user_id
+                        )
+                );
+            }
+
+            sendUserResult(
+                success,
+                success
+                    ? "Password changed"
+                    : error,
+                success
+                    ? "ok"
+                    : "password_failed"
+            );
+
+            return;
+        }
+
+        if (
+            path == "/api/users/delete"
+        ) {
+            std::string error;
+
+            const bool success =
+                security_.deleteUser(
+                    *user_id,
+                    error
+                );
+
+            if (success) {
+                security_.audit(
+                    "user.admin.delete",
+                    session->username,
+                    "user_id=" +
+                        std::to_string(
+                            *user_id
+                        )
+                );
+            }
+
+            sendUserResult(
+                success,
+                success
+                    ? "User deleted"
+                    : error,
+                success
+                    ? "ok"
+                    : "delete_failed"
+            );
+
+            return;
+        }
+
+        if (
+            path == "/api/users/permission"
+        ) {
+            const auto permission =
+                form.contains(
+                    "permission"
+                )
+                ? form.at(
+                    "permission"
+                )
+                : "";
+
+            const auto decision_value =
+                form.contains(
+                    "decision"
+                )
+                ? parseInt64(
+                    form.at(
+                        "decision"
+                    )
+                )
+                : std::nullopt;
+
+            if (
+                !decision_value
+                ||
+                *decision_value < -1
+                ||
+                *decision_value > 1
+            ) {
+                sendUserResult(
+                    false,
+                    "Invalid permission decision",
+                    "invalid_permission"
+                );
+
+                return;
+            }
+
+            std::string error;
+
+            const bool success =
+                security_.
+                    setPermissionOverride(
+                        *user_id,
+                        permission,
+                        static_cast<int>(
+                            *decision_value
+                        ),
+                        error
+                    );
+
+            if (success) {
+                security_.audit(
+                    "user.admin.permission",
+                    session->username,
+                    "user_id=" +
+                        std::to_string(
+                            *user_id
+                        )
+                        +
+                        " permission=" +
+                        permission
+                );
+            }
+
+            sendUserResult(
+                success,
+                success
+                    ? "Permission updated"
+                    : error,
+                success
+                    ? "ok"
+                    : "permission_failed"
+            );
+
+            return;
+        }
+
+        if (
+            path == "/api/users/session/revoke"
+        ) {
+            const auto session_id =
+                form.contains(
+                    "session_id"
+                )
+                ? parseInt64(
+                    form.at(
+                        "session_id"
+                    )
+                )
+                : std::nullopt;
+
+            if (!session_id) {
+                sendUserResult(
+                    false,
+                    "Invalid session ID",
+                    "invalid_session_id"
+                );
+
+                return;
+            }
+
+            std::string error;
+
+            const bool success =
+                security_.revokeSession(
+                    *session_id,
+                    error
+                );
+
+            if (success) {
+                security_.audit(
+                    "session.admin.revoke",
+                    session->username,
+                    "session_id=" +
+                        std::to_string(
+                            *session_id
+                        )
+                );
+            }
+
+            sendUserResult(
+                success,
+                success
+                    ? "Session revoked"
+                    : error,
+                success
+                    ? "ok"
+                    : "session_failed"
+            );
+
+            return;
+        }
+
+        if (
+            path ==
+                "/api/users/sessions/revoke"
+        ) {
+            std::string error;
+
+            const bool success =
+                security_.revokeUserSessions(
+                    *user_id,
+                    error
+                );
+
+            if (success) {
+                security_.audit(
+                    "session.admin.revoke_all",
+                    session->username,
+                    "user_id=" +
+                        std::to_string(
+                            *user_id
+                        )
+                );
+            }
+
+            sendUserResult(
+                success,
+                success
+                    ? "User sessions revoked"
+                    : error,
+                success
+                    ? "ok"
+                    : "session_failed"
+            );
+
+            return;
+        }
+
+        sendUserResult(
+            false,
+            "Unknown user operation",
+            "unsupported_action"
         );
 
         return;
