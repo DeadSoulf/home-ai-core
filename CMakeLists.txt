@@ -187,6 +187,11 @@ target_link_libraries(
     homeai-core-lib
 )
 
+add_executable(
+    home-ai-network-helper
+    server/network/helper/NetworkHelperMain.cpp
+)
+
 
 add_executable(
     test-web-ui
@@ -309,4 +314,21 @@ target_link_libraries(
 add_test(
     NAME storage_pool
     COMMAND test-storage-pool
+)
+
+
+add_executable(
+    test-network-interfaces
+    tests/test_network_interfaces.cpp
+)
+
+target_link_libraries(
+    test-network-interfaces
+    PRIVATE
+    homeai-core-lib
+)
+
+add_test(
+    NAME network_interfaces
+    COMMAND test-network-interfaces
 )
