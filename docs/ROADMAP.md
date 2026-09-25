@@ -61,6 +61,9 @@ Completed in the current development branch:
 - filtering for mounted, swap and Linux-holder-backed devices
 - `GET /api/storage/devices`
 - `POST /api/storage/action`
+- persistent sidebar navigation with subsystem sections
+- main page reduced to system statistics and active errors
+- existing disk/network/settings controls moved into their own sections
 
 Still planned for 0.0.6:
 
