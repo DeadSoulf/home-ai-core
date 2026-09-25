@@ -193,6 +193,34 @@ void renderPlaceholder(
 
 }
 
+bool isWebUiPath(
+    const std::string& path
+)
+{
+    return
+        path == "/"
+        ||
+        path == "/system"
+        ||
+        path == "/network"
+        ||
+        path == "/storage"
+        ||
+        path == "/cameras"
+        ||
+        path == "/smart-home"
+        ||
+        path == "/automation"
+        ||
+        path == "/ai"
+        ||
+        path == "/users"
+        ||
+        path == "/hypervisor"
+        ||
+        path == "/settings";
+}
+
 std::string renderWebUi(
     const WebUiContext& context
 )
