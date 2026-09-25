@@ -154,6 +154,87 @@ std::uint64_t readUnsigned(
 }
 
 std::map<std::string, std::string>
+filesystemUuids()
+{
+    std::map<std::string, std::string>
+        result;
+
+    const std::filesystem::path root =
+        "/dev/disk/by-uuid";
+
+    std::error_code error;
+
+    if (
+        !std::filesystem::exists(
+            root,
+            error
+        )
+        ||
+        error
+    ) {
+        return result;
+    }
+
+    for (
+        const auto& entry :
+        std::filesystem::directory_iterator(
+            root,
+            error
+        )
+    ) {
+        if (error)
+            break;
+
+        std::error_code canonical_error;
+
+        const auto canonical =
+            std::filesystem::canonical(
+                entry.path(),
+                canonical_error
+            );
+
+        if (canonical_error)
+            continue;
+
+        result[
+            canonical.string()
+        ] =
+            entry.path()
+                .filename()
+                .string();
+    }
+
+    return result;
+}
+
+std::string uuidForDevice(
+    const std::string& device,
+    const std::map<std::string, std::string>& uuids
+)
+{
+    std::error_code error;
+
+    const auto canonical =
+        std::filesystem::canonical(
+            device,
+            error
+        );
+
+    if (error)
+        return {};
+
+    const auto it =
+        uuids.find(
+            canonical.string()
+        );
+
+    if (it == uuids.end())
+        return {};
+
+    return it->second;
+}
+
+std::map<std::string, std::string>
 mountedDevices()
 {
     std::map<std::string, std::string>
@@ -455,6 +536,9 @@ StorageMonitor::snapshot(
             personal_mounts_value
         );
 
+    const auto uuids =
+        filesystemUuids();
+
     std::vector<StorageVolume>
         volumes;
 
@@ -519,6 +603,12 @@ StorageMonitor::snapshot(
             volume.device_size_bytes =
                 blockDeviceSizeBytes(
                     source
+                );
+
+            volume.uuid =
+                uuidForDevice(
+                    source,
+                    uuids
                 );
 
             volume.mount_point =
@@ -729,6 +819,9 @@ StorageMonitor::blockDevices() const
     const auto mounted =
         mountedDevices();
 
+    const auto uuids =
+        filesystemUuids();
+
     const auto swaps =
         swapDevices();
 
@@ -858,6 +951,12 @@ StorageMonitor::blockDevices() const
             readTextFile(
                 metadata_path /
                 "device/serial"
+            );
+
+        device.uuid =
+            uuidForDevice(
+                device.device,
+                uuids
             );
 
         device.size_bytes =
