@@ -8,7 +8,9 @@
 #include <chrono>
 #include <csignal>
 #include <cstdint>
+#include <filesystem>
 #include <thread>
+#include <system_error>
 #include <unistd.h>
 
 static std::atomic<bool>
@@ -31,11 +33,51 @@ int main()
         signal_handler
     );
 
+    const std::filesystem::path
+        runtime_config =
+            "runtime/home-ai.conf";
+
+    const std::filesystem::path
+        template_config =
+            "config/home-ai.conf";
+
+    std::error_code config_error;
+
+    std::filesystem::create_directories(
+        runtime_config.parent_path(),
+        config_error
+    );
+
+    if (
+        !std::filesystem::exists(
+            runtime_config
+        )
+    ) {
+        config_error.clear();
+
+        std::filesystem::copy_file(
+            template_config,
+            runtime_config,
+            std::filesystem::copy_options::
+                overwrite_existing,
+            config_error
+        );
+
+        if (config_error) {
+            homeai::Logger::instance().error(
+                "Unable to create runtime configuration: "
+                + config_error.message()
+            );
+
+            return 1;
+        }
+    }
+
     homeai::CoreRuntime runtime;
 
     if (
         !runtime.initialize(
-            "config/home-ai.conf"
+            runtime_config.string()
         )
     ) {
         homeai::Logger::instance().error(
@@ -44,6 +86,13 @@ int main()
 
         return 1;
     }
+
+#ifdef HOMEAI_VERSION
+    runtime.config().set(
+        "core.version",
+        HOMEAI_VERSION
+    );
+#endif
 
     homeai::SecurityManager security;
 
