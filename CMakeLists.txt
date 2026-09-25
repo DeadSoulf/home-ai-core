@@ -252,3 +252,25 @@ add_test(
     NAME user_management
     COMMAND test-user-management
 )
+
+
+add_executable(
+    test-user-api
+    tests/test_user_api.cpp
+)
+
+target_link_libraries(
+    test-user-api
+    PRIVATE
+    homeai-core-lib
+)
+
+add_test(
+    NAME user_api
+    COMMAND test-user-api
+)
+
+set_tests_properties(
+    user_api
+    PROPERTIES TIMEOUT 30
+)
