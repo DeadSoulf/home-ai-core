@@ -36,6 +36,31 @@ int main()
     context.admin =
         true;
 
+    context.permissions = {
+        "files.read",
+        "files.write",
+        "files.manage",
+        "cameras.view",
+        "cameras.manage",
+        "smart_home.view",
+        "smart_home.control",
+        "smart_home.manage",
+        "ai.use",
+        "ai.manage",
+        "users.view",
+        "users.manage",
+        "system.view",
+        "system.manage",
+        "storage.view",
+        "storage.manage",
+        "network.view",
+        "network.manage",
+        "hypervisor.view",
+        "hypervisor.manage",
+        "automation.view",
+        "automation.manage"
+    };
+
     context.page = "/";
 
     const auto home =
@@ -153,6 +178,37 @@ int main()
     }
 
     context.page =
+        "/users";
+
+    const auto users =
+        homeai::renderWebUi(
+            context
+        );
+
+    if (
+        users.find(
+            "Создать пользователя"
+        ) == std::string::npos
+        ||
+        users.find(
+            "users-list"
+        ) == std::string::npos
+        ||
+        users.find(
+            "sessions-list"
+        ) == std::string::npos
+        ||
+        users.find(
+            "audit-list"
+        ) == std::string::npos
+    ) {
+        std::cerr
+            << "Users administration page is incomplete\n";
+
+        return 1;
+    }
+
+    context.page =
         "/system";
 
     const auto system =
@@ -200,6 +256,16 @@ int main()
     context.page = "/admin";
     if (homeai::renderWebUi(context).find("gpu-clear") == std::string::npos) return 1;
     context.admin = false;
+    context.permissions = {
+        "system.view",
+        "files.read",
+        "cameras.view",
+        "smart_home.view",
+        "ai.use",
+        "storage.view",
+        "network.view",
+        "automation.view"
+    };
     const auto viewer = homeai::renderWebUi(context);
     if (viewer.find("id=\"gpu-list\"") != std::string::npos || viewer.find("href=\"/admin\"") != std::string::npos) return 1;
 
