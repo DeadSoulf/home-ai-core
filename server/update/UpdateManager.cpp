@@ -391,6 +391,17 @@ void UpdateManager::workerLoop()
 
 void UpdateManager::performCheck()
 {
+    {
+        std::lock_guard<std::mutex>
+            lock(mutex_);
+
+        if (
+            status_.restart_required
+        ) {
+            return;
+        }
+    }
+
     setState(
         UpdateState::Checking,
         "Проверка GitHub..."
@@ -604,7 +615,7 @@ void UpdateManager::performUpdate()
 
         setState(
             UpdateState::Error,
-            "Сборка failed. Репозиторий возвращён к предыдущей версии.",
+            "Сборка завершилась ошибкой. Репозиторий возвращён к предыдущей версии.",
             build.output
         );
 
