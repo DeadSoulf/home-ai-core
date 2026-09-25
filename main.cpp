@@ -373,13 +373,26 @@ int main()
                         operations;
 
                     for (const auto& volume : volumes) {
-                        if (
-                            volume.status != "offline"
+                        const bool managed_path =
+                            volume.mount_point.rfind(
+                                "/mnt/home-ai/video/",
+                                0
+                            ) == 0
+                            ||
+                            volume.mount_point.rfind(
+                                "/mnt/home-ai/files/",
+                                0
+                            ) == 0
                             ||
                             volume.mount_point.rfind(
                                 "/mnt/home-ai/storage/",
                                 0
-                            ) != 0
+                            ) == 0;
+
+                        if (
+                            volume.status != "offline"
+                            ||
+                            !managed_path
                         ) {
                             continue;
                         }
