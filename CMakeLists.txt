@@ -235,3 +235,20 @@ add_test(
     NAME module_manager
     COMMAND test-module-manager
 )
+
+
+add_executable(
+    test-user-management
+    tests/test_user_management.cpp
+)
+
+target_link_libraries(
+    test-user-management
+    PRIVATE
+    homeai-core-lib
+)
+
+add_test(
+    NAME user_management
+    COMMAND test-user-management
+)
