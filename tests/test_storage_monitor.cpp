@@ -50,6 +50,49 @@ int main()
         return 1;
     }
 
+    const auto devices =
+        monitor.blockDevices();
+
+    for (const auto& device : devices) {
+        if (
+            device.device.rfind(
+                "/dev/",
+                0
+            ) != 0
+        ) {
+            std::cerr
+                << "Invalid block device path\n";
+
+            return 1;
+        }
+
+        if (
+            device.type != "disk"
+            &&
+            device.type != "partition"
+        ) {
+            std::cerr
+                << "Invalid block device type\n";
+
+            return 1;
+        }
+
+        if (
+            device.candidate
+            &&
+            (
+                device.mounted
+                ||
+                device.size_bytes == 0
+            )
+        ) {
+            std::cerr
+                << "Invalid hotplug candidate state\n";
+
+            return 1;
+        }
+    }
+
     std::cout
         << "Storage Monitor test passed\n";
 
