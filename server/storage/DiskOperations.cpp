@@ -121,31 +121,32 @@ std::string DiskOperations::defaultMountPoint(
     const auto name =
         basenameOf(device);
 
+    const auto uuid =
+        filesystemUuid(
+            device
+        );
+
+    const auto stable_name =
+        uuid.empty()
+        ? name
+        : uuid;
+
     if (role == "video") {
         return
             "/mnt/home-ai/video/" +
-            name;
+            stable_name;
     }
 
     if (role == "personal") {
         return
             "/mnt/home-ai/files/" +
-            name;
+            stable_name;
     }
 
     if (role == "storage") {
-        const auto uuid =
-            filesystemUuid(
-                device
-            );
-
         return
             "/mnt/home-ai/storage/" +
-            (
-                uuid.empty()
-                ? name
-                : uuid
-            );
+            stable_name;
     }
 
     return {};
