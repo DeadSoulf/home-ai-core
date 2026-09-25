@@ -68,6 +68,12 @@ Completed in the current development branch:
 - fast-forward repository update with automatic build and tests
 - rollback when build/tests fail
 - restart into the updated binary after confirmation
+- central SQLite user/security database shared by server modules
+- one-time migration of legacy users and audit without password loss
+- persistent sessions and session revocation
+- role defaults plus per-user allow/deny permission overrides
+- backend permission enforcement by subsystem
+- complete Users page: CRUD, roles, passwords, permissions, sessions and audit
 
 Module Manager implemented in the current development branch:
 
