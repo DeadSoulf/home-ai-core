@@ -19,6 +19,12 @@ public:
         bool read_only = false
     ) const;
 
+    DiskOperationResult mountAt(
+        const std::string& device,
+        const std::string& mount_point,
+        bool read_only = false
+    ) const;
+
     DiskOperationResult unmount(
         const std::string& device
     ) const;
@@ -37,6 +43,10 @@ public:
     static std::string defaultMountPoint(
         const std::string& device,
         const std::string& role
+    );
+
+    static std::string deviceForUuid(
+        const std::string& uuid
     );
 
 private:
