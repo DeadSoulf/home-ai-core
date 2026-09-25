@@ -85,3 +85,25 @@ The core runs under the selected non-root account; sudo is used only for service
 Uninstall stops/disables the service and retains all project and user data.
 Check `systemctl status home-ai-core` and the Web UI after disconnecting SSH and after a reboot.
 Physical server/boot verification must be performed on the target Debian host.
+
+
+## Network Helper for DHCP
+
+The Home AI Core service remains non-root. Web DHCP requests use a separate validated helper.
+
+After building a version that includes `home-ai-network-helper`, install it once for the
+service account:
+
+```bash
+sudo sh scripts/install-network-helper.sh texnik
+```
+
+This installs:
+
+```text
+/usr/local/libexec/home-ai-network-helper
+/etc/sudoers.d/home-ai-network-helper
+```
+
+The helper is required only for privileged DHCP changes. Reading interface/IP status does not
+require it.
