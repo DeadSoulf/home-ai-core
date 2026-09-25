@@ -22,12 +22,33 @@ struct StorageVolume {
     bool read_only{false};
 };
 
+struct BlockDeviceInfo {
+    std::string name;
+    std::string device;
+    std::string parent;
+    std::string type;
+    std::string model;
+    std::string vendor;
+    std::string serial;
+    std::string mount_point;
+
+    std::uint64_t size_bytes{0};
+
+    bool removable{false};
+    bool mounted{false};
+    bool has_partitions{false};
+    bool candidate{false};
+};
+
 class StorageMonitor {
 public:
     std::vector<StorageVolume> snapshot(
         const std::string& video_mounts,
         const std::string& personal_mounts
     ) const;
+
+    std::vector<BlockDeviceInfo>
+    blockDevices() const;
 
 private:
     static std::vector<std::string> parseMountList(
