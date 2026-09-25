@@ -2,6 +2,7 @@
 #include <array>
 #include <arpa/inet.h>
 #include <cctype>
+#include <cstddef>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
