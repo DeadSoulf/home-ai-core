@@ -2,6 +2,7 @@
 
 #include "server/storage/StorageMonitor.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
