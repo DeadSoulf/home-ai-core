@@ -47,17 +47,24 @@ The Web UI uses the same routes and permissions on desktop, tablet and phone.
 At widths up to 860 px:
 
 - the permanent desktop sidebar becomes an off-canvas navigation drawer
-- a 44 px menu button is shown in the sticky top bar
+- navigation links and the menu button use 48 px touch targets
 - tapping the backdrop, selecting a navigation link or pressing Escape closes the drawer
 - the closed drawer is removed from keyboard focus and exposed with matching ARIA state
 - cards, forms, storage layouts, user metadata and permission controls collapse to one column
 - form controls use a 16 px font size to avoid unwanted browser zoom on focus
-- long paths, addresses and status text can wrap instead of forcing horizontal scrolling
+- inputs, selects and primary buttons use approximately 48 px touch targets
+- long paths, addresses, code and status text wrap or scroll instead of widening the page
 - disk-management dialogs become bottom-sheet style panels
 - safe-area insets are respected on phones with notches and home indicators
+- keyboard focus uses a visible accent outline
 
-At widths up to 600 px, action rows stack vertically and primary controls use the available
-width. An additional narrow-screen rule keeps padding compact down to approximately 320 px.
+At widths up to 600 px, the top bar uses a compact grid, action rows stack vertically and
+key/value details are easier to scan on narrow screens.
+
+At widths up to 420 px, secondary Core/version metadata is hidden from the top bar so the
+page title and language selector remain usable.
+
+The viewport uses `viewport-fit=cover` to enable safe-area handling on supported phones.
 
 Desktop behavior and route URLs remain unchanged.
 

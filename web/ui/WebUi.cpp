@@ -271,7 +271,7 @@ std::string renderWebUi(
 <head>
 <script src="/assets/i18n.js"></script>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>)HTML";
 
     page
@@ -317,9 +317,49 @@ body {
         sans-serif;
 }
 
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
 body {
     min-height: 100vh;
+    min-height: 100dvh;
     overflow-x: hidden;
+    overscroll-behavior-y: none;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+    -webkit-tap-highlight-color: transparent;
+}
+
+button,
+.nav-link,
+a {
+    touch-action: manipulation;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+pre,
+code {
+    max-width: 100%;
+}
+
+pre {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 body.mobile-menu-open {
@@ -1016,8 +1056,21 @@ button:disabled {
     }
 
     .nav-link {
-        min-height: 44px;
-        padding: 11px 12px;
+        min-height: 48px;
+        padding: 12px 13px;
+        font-size: 0.98rem;
+    }
+
+    .nav-caption {
+        padding-top: 14px;
+    }
+
+    .brand {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: var(--sidebar);
+        padding-top: 6px;
     }
 
     .topbar {
@@ -1102,6 +1155,44 @@ button:disabled {
         font-size: 16px;
     }
 
+    input:not([type="checkbox"]):not([type="radio"]),
+    select,
+    button {
+        min-height: 48px;
+    }
+
+    input[type="checkbox"],
+    input[type="radio"] {
+        min-height: 22px;
+        min-width: 22px;
+    }
+
+    .section-card p,
+    .device-note,
+    .muted {
+        line-height: 1.5;
+    }
+
+    .stat-card,
+    .placeholder-card,
+    .storage-card,
+    .user-card,
+    .audit-entry {
+        padding: 14px;
+    }
+
+    .user-card,
+    .audit-entry,
+    .storage-card {
+        overflow: hidden;
+    }
+
+    .user-card *,
+    .audit-entry *,
+    .storage-card * {
+        min-width: 0;
+    }
+
     .kv {
         grid-template-columns: minmax(0, 1fr);
         gap: 4px;
@@ -1137,21 +1228,52 @@ button:disabled {
 
 @media (max-width: 600px) {
     .topbar {
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns:
+            minmax(0, 1fr)
+            auto;
+        align-items: center;
+        gap: 8px 10px;
     }
 
     .topbar-left {
-        order: 1;
-        width: calc(100% - 92px);
+        grid-column: 1;
+        grid-row: 1;
+        width: auto;
+        min-width: 0;
     }
 
     .topbar-actions {
-        order: 2;
-        margin-left: auto;
+        grid-column: 1 / -1;
+        grid-row: 2;
+        justify-content: flex-start;
+        margin: 0;
+        min-height: 0;
+    }
+
+    .topbar-actions:has(#update-badge[style*="display:none"]) {
+        display: none;
     }
 
     .topbar > label {
-        order: 3;
+        grid-column: 2;
+        grid-row: 1;
+        order: initial;
+    }
+
+    .mobile-menu-button {
+        width: 48px;
+        height: 48px;
+    }
+
+    .topbar-title {
+        overflow: hidden;
+    }
+
+    .topbar h1 {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .section-title,
@@ -1172,10 +1294,35 @@ button:disabled {
     }
 
     .button-row > button,
+    .button-row > a,
     .device-actions > button,
     .disk-menu-actions > button {
         width: 100%;
-        min-height: 44px;
+        min-height: 48px;
+    }
+
+    .button-row > a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 14px;
+        border-radius: 8px;
+        text-decoration: none;
+    }
+
+    .kv > div:nth-child(odd) {
+        color: var(--muted);
+        font-size: 0.85rem;
+        margin-top: 4px;
+    }
+
+    .kv > div:nth-child(even) {
+        padding-bottom: 9px;
+        border-bottom: 1px solid #242a34;
+    }
+
+    .kv > div:nth-last-child(-n + 2) {
+        border-bottom: 0;
     }
 
     .device-actions,
@@ -1209,6 +1356,23 @@ button:disabled {
 
     .sidebar-user button {
         min-height: 44px;
+    }
+}
+
+@media (max-width: 420px) {
+    .topbar-title > .topbar-meta {
+        display: none;
+    }
+
+    .topbar > label select {
+        min-width: 70px;
+        padding-left: 7px;
+        padding-right: 7px;
+    }
+
+    .section-title h2,
+    .storage-toolbar h2 {
+        font-size: 1.12rem;
     }
 }
 

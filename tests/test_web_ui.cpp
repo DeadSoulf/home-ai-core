@@ -156,7 +156,7 @@ int main()
         ) != std::string::npos
         ||
         home.find(
-            "name=\"viewport\" content=\"width=device-width, initial-scale=1\""
+            "name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\""
         ) == std::string::npos
         ||
         home.find(
@@ -181,6 +181,26 @@ int main()
         ||
         home.find(
             "font-size: 16px;"
+        ) == std::string::npos
+        ||
+        home.find(
+            "min-height: 48px;"
+        ) == std::string::npos
+        ||
+        home.find(
+            "@media (max-width: 420px)"
+        ) == std::string::npos
+        ||
+        home.find(
+            "viewport-fit=cover"
+        ) == std::string::npos
+        ||
+        home.find(
+            "overscroll-behavior-y: none"
+        ) == std::string::npos
+        ||
+        home.find(
+            "touch-action: manipulation"
         ) == std::string::npos
         ||
         home.find(
