@@ -11,7 +11,8 @@
 | 0.0.5 | Security Core + protected Web/API + storage monitoring foundation | DONE |
 | 0.0.6 | Module Manager + hot-plug storage integration + Storage Pool foundation | DONE |
 | 0.0.7 | WireGuard Web editor + centralized versioning | DEVELOPMENT SNAPSHOT |
-| 0.0.8 | Logical permission-aware Web sidebar and navigation | IN DEVELOPMENT |
+| 0.0.8 | Logical permission-aware Web sidebar and navigation | DEVELOPMENT SNAPSHOT |
+| 0.0.9 | Responsive mobile Web UI and off-canvas navigation | IN DEVELOPMENT |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
 | next 0.0.x | Device Core | PLANNED |
 | next 0.0.x | Automation Core | PLANNED |
@@ -125,9 +126,9 @@ Implemented in the 0.0.7 snapshot:
 - GitHub version guard for Core/runtime code changes
 - VPN profile save/load/remove coverage in the test suite
 
-## Current focus: 0.0.8
+## Development snapshot: 0.0.8
 
-Current development work:
+Implemented in the 0.0.8 snapshot:
 
 - task-oriented sidebar groups: Overview, Server, Services, AI and Management
 - Home isolated as the single Overview entry
@@ -141,9 +142,27 @@ Current development work:
 - existing route URLs preserved for backward compatibility
 - Web UI tests cover group ordering and permission-aware visibility
 
-0.0.8 requires a development-server pull, clean build and the test suite before promotion.
+## Current focus: 0.0.9
 
-Patch versions after 0.0.8 are intentionally not pre-assigned to individual roadmap items.
+Current development work:
+
+- off-canvas mobile navigation instead of rendering the full sidebar above page content
+- mobile menu button, backdrop, Escape-key close and automatic close after navigation
+- hidden mobile drawer removed from keyboard focus with inert/ARIA state
+- sticky compact mobile top bar
+- responsive single-column cards, forms, user metadata and permission controls
+- 16px mobile form controls to avoid browser zoom on input focus
+- 44px-class touch targets for navigation and common actions
+- stacked action buttons on narrow screens
+- mobile-friendly key/value layouts and update progress controls
+- disk-management modal rendered as a bottom sheet on phones
+- safe-area support for devices with display cutouts/home indicators
+- 320px-class narrow-screen fallback without horizontal page scrolling
+- mobile-shell regression checks in Web UI tests
+
+0.0.9 requires a development-server pull, clean build and the test suite before promotion.
+
+Patch versions after 0.0.9 are intentionally not pre-assigned to individual roadmap items.
 Each Core/runtime change advances to the next version, while larger minor milestones such as
 0.1.0 remain roadmap targets.
 

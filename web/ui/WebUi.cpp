@@ -319,10 +319,32 @@ body {
 
 body {
     min-height: 100vh;
+    overflow-x: hidden;
+}
+
+body.mobile-menu-open {
+    overflow: hidden;
 }
 
 a {
     color: inherit;
+}
+
+img,
+video,
+canvas,
+svg {
+    max-width: 100%;
+}
+
+.section-card,
+.stat-card,
+.placeholder-card,
+.storage-card,
+.user-card,
+.audit-entry {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .app-shell {
@@ -337,7 +359,12 @@ a {
     background: var(--sidebar);
     border-right: 1px solid var(--border);
     overflow-y: auto;
+    overscroll-behavior: contain;
     z-index: 100;
+}
+
+.mobile-menu-backdrop {
+    display: none;
 }
 
 .brand {
@@ -451,9 +478,21 @@ a {
     backdrop-filter: blur(10px);
 }
 
+.topbar-left {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.topbar-title {
+    min-width: 0;
+}
+
 .topbar h1 {
     margin: 0;
     font-size: 1.35rem;
+    overflow-wrap: anywhere;
 }
 
 .topbar-meta {
@@ -461,8 +500,27 @@ a {
     font-size: 0.9rem;
 }
 
+.topbar-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    min-width: 0;
+}
+
 .mobile-menu-button {
     display: none;
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    align-items: center;
+    justify-content: center;
+    background: #252b35;
+    color: var(--text);
+    border: 1px solid #38404c;
+    font-size: 1.35rem;
+    line-height: 1;
 }
 
 .page {
@@ -605,6 +663,7 @@ textarea {
 }
 
 button {
+    min-height: 42px;
     padding: 10px 14px;
     border: 0;
     border-radius: 8px;
@@ -906,45 +965,275 @@ button:disabled {
 
 @media (max-width: 860px) {
     .sidebar {
-        position: static;
-        width: 100%;
-        border-right: 0;
-        border-bottom: 1px solid var(--border);
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: min(86vw, 320px);
+        height: 100vh;
+        height: 100dvh;
+        padding:
+            max(14px, env(safe-area-inset-top))
+            12px
+            max(14px, env(safe-area-inset-bottom));
+        border-right: 1px solid var(--border);
+        border-bottom: 0;
+        transform: translateX(-105%);
+        transition: transform 0.22s ease;
+        box-shadow: 18px 0 45px rgba(0, 0, 0, 0.34);
+        z-index: 1000;
+    }
+
+    body.mobile-menu-open .sidebar {
+        transform: translateX(0);
+    }
+
+    .mobile-menu-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.62);
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition:
+            opacity 0.22s ease,
+            visibility 0.22s ease;
+        z-index: 900;
+    }
+
+    body.mobile-menu-open .mobile-menu-backdrop {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
     }
 
     .content {
         margin-left: 0;
+        min-width: 0;
     }
 
-    .nav-group {
-        display: grid;
-        grid-template-columns:
-            repeat(auto-fit, minmax(150px, 1fr));
-        gap: 4px;
+    .mobile-menu-button {
+        display: inline-flex;
     }
 
-    .nav-caption {
-        grid-column: 1 / -1;
-    }
-
-    .sidebar-user {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-    }
-
-    .sidebar-user form {
-        margin: 0;
+    .nav-link {
+        min-height: 44px;
+        padding: 11px 12px;
     }
 
     .topbar {
-        position: static;
-        padding: 14px 18px;
+        min-height: 64px;
+        padding:
+            max(10px, env(safe-area-inset-top))
+            14px
+            10px;
+        position: sticky;
+        top: 0;
+        gap: 10px;
+    }
+
+    .topbar-left {
+        flex: 1 1 auto;
+    }
+
+    .topbar-actions {
+        flex: 0 1 auto;
+    }
+
+    .topbar h1 {
+        font-size: 1.12rem;
+    }
+
+    .topbar-title > .topbar-meta {
+        font-size: 0.78rem;
+    }
+
+    .topbar > label {
+        order: 3;
+        padding: 0 !important;
+        margin: 0 !important;
+        font-size: 0;
+    }
+
+    .topbar > label select {
+        width: auto;
+        min-width: 76px;
+        min-height: 42px;
+        padding: 8px 9px;
+        font-size: 0.9rem;
+    }
+
+    .topbar-user-summary {
+        display: none;
+    }
+
+    #update-badge {
+        margin-right: 0 !important;
+        font-size: 0.82rem;
+        white-space: nowrap;
     }
 
     .page {
-        padding: 18px;
+        width: 100%;
+        padding:
+            16px
+            14px
+            max(34px, env(safe-area-inset-bottom));
+    }
+
+    .section-card {
+        padding: 16px;
+        margin-bottom: 14px;
+        border-radius: 11px;
+    }
+
+    .stats-grid,
+    .placeholder-grid,
+    .storage-grid,
+    .form-grid,
+    .user-meta,
+    .permission-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    input,
+    select,
+    textarea {
+        min-width: 0;
+        font-size: 16px;
+    }
+
+    .kv {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 4px;
+    }
+
+    .kv div:nth-child(even) {
+        margin-bottom: 10px;
+    }
+
+    .permission-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .disk-menu-overlay {
+        align-items: flex-end;
+        padding:
+            8px
+            8px
+            max(8px, env(safe-area-inset-bottom));
+    }
+
+    .disk-menu-panel {
+        width: 100%;
+        max-height: calc(100dvh - 16px);
+        padding: 16px;
+        border-radius: 16px 16px 10px 10px;
+    }
+
+    #vpn-profile-config {
+        min-height: 280px;
+    }
+}
+
+@media (max-width: 600px) {
+    .topbar {
+        flex-wrap: wrap;
+    }
+
+    .topbar-left {
+        order: 1;
+        width: calc(100% - 92px);
+    }
+
+    .topbar-actions {
+        order: 2;
+        margin-left: auto;
+    }
+
+    .topbar > label {
+        order: 3;
+    }
+
+    .section-title,
+    .storage-toolbar,
+    .user-card-header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .section-title > button,
+    .storage-toolbar > button {
+        width: 100%;
+    }
+
+    .button-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .button-row > button,
+    .device-actions > button,
+    .disk-menu-actions > button {
+        width: 100%;
+        min-height: 44px;
+    }
+
+    .device-actions,
+    .disk-menu-actions {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .update-progress-head {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .update-progress-percent {
+        min-width: 0;
+        text-align: left;
+    }
+
+    .update-stage-row {
+        grid-template-columns:
+            22px
+            minmax(0, 1fr)
+            44px;
+        padding: 8px;
+    }
+
+    .sidebar-user {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    .sidebar-user button {
+        min-height: 44px;
+    }
+}
+
+@media (max-width: 380px) {
+    .page {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    .section-card {
+        padding: 13px;
+    }
+
+    .topbar {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    .topbar h1 {
+        font-size: 1rem;
+    }
+
+    #update-badge {
+        white-space: normal;
+        text-align: right;
     }
 }
 </style>
@@ -952,7 +1241,7 @@ button:disabled {
 <body>
 <div class="app-shell">
 
-<aside class="sidebar">
+<aside id="sidebar-navigation" class="sidebar">
 <div class="brand">
 <div class="brand-mark">AI</div>
 <div class="brand-text">
@@ -1280,10 +1569,22 @@ button:disabled {
 
     page << R"HTML(
 </aside>
+<div
+    id="mobile-menu-backdrop"
+    class="mobile-menu-backdrop"
+    aria-hidden="true"></div>
 
 <div class="content">
 <header class="topbar">
-<div>
+<div class="topbar-left">
+<button
+    id="mobile-menu-button"
+    class="mobile-menu-button"
+    type="button"
+    aria-label="Открыть меню"
+    aria-controls="sidebar-navigation"
+    aria-expanded="false">☰</button>
+<div class="topbar-title">
 <h1>)HTML";
 
     page
@@ -1295,11 +1596,12 @@ button:disabled {
         << htmlEscape(
             context.version
         )
-        << "</div></div>"
-        << "<div class=\"topbar-meta\">"
+        << "</div></div></div>"
+        << "<div class=\"topbar-meta topbar-actions\">"
         << "<a id=\"update-badge\" href=\"/system\" "
            "style=\"display:none;margin-right:14px;color:#f2d784;text-decoration:none;font-weight:700\">"
            "Доступно обновление</a>"
+        << "<span class=\"topbar-user-summary\">"
         << "<span data-i18n-skip>" << htmlEscape(context.username) << "</span>"
         << " · "
         << htmlEscape(
@@ -1307,7 +1609,7 @@ button:disabled {
                 context.role
             )
         )
-        << "</div>"
+        << "</span></div>"
         << "</header><main class=\"page\">";
 
     if (
@@ -2399,6 +2701,201 @@ PrivateKey отображается в редакторе и сохраняет�
 </div>
 
 <script>
+
+function setMobileMenuOpen(open) {
+    const button =
+        document.getElementById(
+            "mobile-menu-button"
+        );
+
+    const backdrop =
+        document.getElementById(
+            "mobile-menu-backdrop"
+        );
+
+    const sidebar =
+        document.getElementById(
+            "sidebar-navigation"
+        );
+
+    const mobile =
+        window.matchMedia(
+            "(max-width: 860px)"
+        ).matches;
+
+    const english =
+        document.documentElement.lang ===
+        "en";
+
+    document.body.classList.toggle(
+        "mobile-menu-open",
+        open
+    );
+
+    if (button) {
+        button.setAttribute(
+            "aria-expanded",
+            open
+                ? "true"
+                : "false"
+        );
+
+        button.setAttribute(
+            "aria-label",
+            open
+                ? (
+                    english
+                    ? "Close menu"
+                    : "Закрыть меню"
+                )
+                : (
+                    english
+                    ? "Open menu"
+                    : "Открыть меню"
+                )
+        );
+    }
+
+    if (sidebar) {
+        sidebar.inert =
+            mobile
+            &&
+            !open;
+
+        sidebar.setAttribute(
+            "aria-hidden",
+            (
+                mobile
+                &&
+                !open
+            )
+                ? "true"
+                : "false"
+        );
+    }
+
+    if (backdrop) {
+        backdrop.setAttribute(
+            "aria-hidden",
+            open
+                ? "false"
+                : "true"
+        );
+    }
+}
+
+document.addEventListener(
+    "DOMContentLoaded",
+    function() {
+        const button =
+            document.getElementById(
+                "mobile-menu-button"
+            );
+
+        const backdrop =
+            document.getElementById(
+                "mobile-menu-backdrop"
+            );
+
+        const sidebar =
+            document.getElementById(
+                "sidebar-navigation"
+            );
+
+        setMobileMenuOpen(
+            false
+        );
+
+        if (button) {
+            button.addEventListener(
+                "click",
+                function() {
+                    setMobileMenuOpen(
+                        !document.body.classList.contains(
+                            "mobile-menu-open"
+                        )
+                    );
+                }
+            );
+        }
+
+        if (backdrop) {
+            backdrop.addEventListener(
+                "click",
+                function() {
+                    setMobileMenuOpen(
+                        false
+                    );
+                }
+            );
+        }
+
+        if (sidebar) {
+            sidebar.addEventListener(
+                "click",
+                function(event) {
+                    const link =
+                        event.target.closest(
+                            "a.nav-link"
+                        );
+
+                    if (link) {
+                        setMobileMenuOpen(
+                            false
+                        );
+                    }
+                }
+            );
+        }
+
+        document.addEventListener(
+            "keydown",
+            function(event) {
+                if (
+                    event.key === "Escape"
+                    &&
+                    document.body.classList.contains(
+                        "mobile-menu-open"
+                    )
+                ) {
+                    setMobileMenuOpen(
+                        false
+                    );
+
+                    if (button) {
+                        button.focus();
+                    }
+                }
+            }
+        );
+
+        const media =
+            window.matchMedia(
+                "(min-width: 861px)"
+            );
+
+        const closeOnDesktop =
+            function(event) {
+                if (event.matches) {
+                    setMobileMenuOpen(
+                        false
+                    );
+                }
+            };
+
+        if (media.addEventListener) {
+            media.addEventListener(
+                "change",
+                closeOnDesktop
+            );
+        }
+        else if (media.addListener) {
+            media.addListener(
+                closeOnDesktop
+            );
+        }
+    }
+);
 
 let usersPermissionCatalog = [];
 let auditOffset = 0;

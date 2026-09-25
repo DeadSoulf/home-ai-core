@@ -154,6 +154,42 @@ int main()
         home.find(
             "<div class=\"nav-caption\">Интеллект</div>"
         ) != std::string::npos
+        ||
+        home.find(
+            "name=\"viewport\" content=\"width=device-width, initial-scale=1\""
+        ) == std::string::npos
+        ||
+        home.find(
+            "id=\"mobile-menu-button\""
+        ) == std::string::npos
+        ||
+        home.find(
+            "id=\"mobile-menu-backdrop\""
+        ) == std::string::npos
+        ||
+        home.find(
+            "id=\"sidebar-navigation\""
+        ) == std::string::npos
+        ||
+        home.find(
+            "body.mobile-menu-open .sidebar"
+        ) == std::string::npos
+        ||
+        home.find(
+            "@media (max-width: 600px)"
+        ) == std::string::npos
+        ||
+        home.find(
+            "font-size: 16px;"
+        ) == std::string::npos
+        ||
+        home.find(
+            "setMobileMenuOpen"
+        ) == std::string::npos
+        ||
+        home.find(
+            "sidebar.inert"
+        ) == std::string::npos
     ) {
         std::cerr
             << "Home page structure is invalid\n";
