@@ -1381,22 +1381,27 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
 <div id="disk-menu-result" class="disk-menu-result"></div>
 
 <div class="disk-menu-group">
-<h4>Назначение и подключение</h4>
+<h4>Как использовать диск</h4>
+
+<div id="disk-assignment-help" class="device-note">
+Выберите назначение диска.
+</div>
+
 <div class="disk-menu-actions">
 <button id="disk-mount-video" type="button">
-Подключить для видео
+Подключить и использовать для видео
 </button>
 <button id="disk-mount-personal" type="button">
-Подключить для личных файлов
+Подключить и использовать для личных файлов
 </button>
 <button id="disk-assign-video" type="button" class="secondary">
-Назначить как видео
+Использовать текущую точку для видео
 </button>
 <button id="disk-assign-personal" type="button" class="secondary">
-Назначить как личные файлы
+Использовать текущую точку для личных файлов
 </button>
 <button id="disk-unassign" type="button" class="secondary">
-Снять назначение
+Снять назначение Home AI Core
 </button>
 </div>
 </div>
@@ -1408,7 +1413,7 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
 Обновить информацию
 </button>
 <button id="disk-unmount" type="button" class="secondary">
-Размонтировать
+Размонтировать диск
 </button>
 <button id="disk-format-ext4" type="button" class="danger">
 Форматировать EXT4
@@ -4665,6 +4670,21 @@ function updateDiskMenuState(device) {
                     disabled;
         };
 
+    const setVisible =
+        function(id, visible) {
+            const button =
+                document.getElementById(
+                    id
+                );
+
+            if (button) {
+                button.style.display =
+                    visible
+                    ? ""
+                    : "none";
+            }
+        };
+
     const canPrivileged =
         storageHelperInstalled;
 
@@ -4679,6 +4699,59 @@ function updateDiskMenuState(device) {
             device &&
             device.mounted
         );
+
+    const assignmentHelp =
+        document.getElementById(
+            "disk-assignment-help"
+        );
+
+    if (assignmentHelp) {
+        if (mounted) {
+            assignmentHelp.textContent =
+                "Диск уже подключён к Linux в "
+                + (
+                    device.mount_point
+                    || "текущей точке"
+                )
+                + ". Выберите, для чего Home AI Core должен использовать эту точку. Диск перемонтирован не будет.";
+        }
+        else if (candidate) {
+            assignmentHelp.textContent =
+                "Диск ещё не подключён. Выберите назначение — Home AI Core сам смонтирует его в свою папку и сразу назначит для выбранной задачи.";
+        }
+        else {
+            assignmentHelp.textContent =
+                "Этот диск сейчас используется системой или недоступен для безопасного подключения.";
+        }
+    }
+
+    // Показываем только действия, которые имеют смысл в текущем состоянии.
+    // Для несмонтированного диска предлагаем подключение + назначение.
+    // Для уже смонтированного — только назначение существующей точки.
+    setVisible(
+        "disk-mount-video",
+        !mounted
+    );
+
+    setVisible(
+        "disk-mount-personal",
+        !mounted
+    );
+
+    setVisible(
+        "disk-assign-video",
+        mounted
+    );
+
+    setVisible(
+        "disk-assign-personal",
+        mounted
+    );
+
+    setVisible(
+        "disk-unassign",
+        mounted
+    );
 
     setDisabled(
         "disk-mount-video",
