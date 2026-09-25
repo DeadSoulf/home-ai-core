@@ -1374,13 +1374,14 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
 <div class="section-card">
 <div class="section-title">
 <h2>Сетевые интерфейсы</h2>
-<span class="section-hint">IPv4 и получение адреса по DHCP</span>
+<span class="section-hint">DHCP / статический IPv4</span>
 </div>
 
 <p class="muted">
 Home AI Core показывает текущие IPv4-адреса интерфейсов.
-Кнопка DHCP запрашивает или обновляет адрес у DHCP-сервера.
-Если этот интерфейс используется для Web, адрес сервера может измениться.
+Для каждого интерфейса можно выбрать DHCP или статический IPv4 с адресом,
+маской, шлюзом и DNS. Если этот интерфейс используется для Web,
+после применения настроек адрес сервера может измениться.
 </p>
 
 <div id="network-helper-message" class="muted" style="margin-bottom:12px"></div>
@@ -4214,43 +4215,174 @@ async function updateServerUpdateStatus() {
     }
 }
 
-async function requestDhcpAddress(
-    interfaceName,
+function prefixToNetmask(prefix) {
+    const value =
+        Number(prefix);
+
+    if (
+        !Number.isInteger(value)
+        ||
+        value < 1
+        ||
+        value > 32
+    ) {
+        return "255.255.255.0";
+    }
+
+    const mask =
+        value === 32
+        ? 0xffffffff
+        : (
+            0xffffffff
+            <<
+            (
+                32 - value
+            )
+        ) >>> 0;
+
+    return [
+        (mask >>> 24) & 255,
+        (mask >>> 16) & 255,
+        (mask >>> 8) & 255,
+        mask & 255
+    ].join(".");
+}
+
+function currentIpv4Parts(item) {
+    const addresses =
+        Array.isArray(
+            item.ipv4_addresses
+        )
+        ? item.ipv4_addresses
+        : [];
+
+    if (addresses.length === 0) {
+        return {
+            address: "",
+            netmask:
+                "255.255.255.0"
+        };
+    }
+
+    const parts =
+        String(
+            addresses[0]
+        ).split("/");
+
+    return {
+        address:
+            parts[0]
+            || "",
+        netmask:
+            prefixToNetmask(
+                Number(
+                    parts[1]
+                    || 24
+                )
+            )
+    };
+}
+
+async function applyIpv4Configuration(
+    item,
+    controls,
     button
 ) {
-    const accepted =
-        window.confirm(
-            tr(
-                "Запросить IP-адрес по DHCP для интерфейса "
-            )
-            + interfaceName
-            + tr(
-                "? Если Web работает через этот интерфейс, адрес сервера может измениться."
-            )
-        );
+    const mode =
+        controls.mode.value;
 
-    if (!accepted)
+    let warning =
+        tr(
+            "Применить сетевые настройки для интерфейса "
+        )
+        + item.name
+        + "?";
+
+    if (item.default_route) {
+        warning +=
+            "\n\n"
+            + tr(
+                "Это интерфейс маршрута по умолчанию. Текущее Web-подключение может быть потеряно."
+            );
+    }
+    else {
+        warning +=
+            "\n\n"
+            + tr(
+                "Если Web использует этот интерфейс, адрес сервера может измениться."
+            );
+    }
+
+    if (
+        !window.confirm(
+            warning
+        )
+    ) {
         return;
+    }
 
     const message =
         document.getElementById(
             "network-helper-message"
         );
 
-    if (button)
-        button.disabled = true;
+    button.disabled = true;
 
     if (message) {
         message.textContent =
-            tr(
+            mode === "dhcp"
+            ? tr(
                 "Запрос DHCP выполняется..."
+            )
+            : tr(
+                "Применяется статический IPv4..."
             );
+    }
+
+    const parameters =
+        new URLSearchParams();
+
+    parameters.set(
+        "interface",
+        item.name
+    );
+
+    parameters.set(
+        "mode",
+        mode
+    );
+
+    if (mode === "static") {
+        parameters.set(
+            "address",
+            controls.address.value.trim()
+        );
+
+        parameters.set(
+            "netmask",
+            controls.netmask.value.trim()
+        );
+
+        parameters.set(
+            "gateway",
+            controls.gateway.value.trim()
+        );
+
+        parameters.set(
+            "dns_primary",
+            controls.dnsPrimary.value.trim()
+        );
+
+        parameters.set(
+            "dns_secondary",
+            controls.dnsSecondary.value.trim()
+        );
     }
 
     try {
         const response =
             await fetch(
-                "/api/network/dhcp",
+                "/api/network/ipv4",
                 {
                     method: "POST",
                     headers: {
@@ -4260,18 +4392,12 @@ async function requestDhcpAddress(
                             "application/x-www-form-urlencoded"
                     },
                     body:
-                        new URLSearchParams(
-                            {
-                                interface:
-                                    interfaceName
-                            }
-                        ).toString()
+                        parameters.toString()
                 }
             );
 
         if (
-            response.status ===
-            401
+            response.status === 401
         ) {
             window.location =
                 "/login";
@@ -4286,7 +4412,7 @@ async function requestDhcpAddress(
             message.textContent =
                 data.message
                 || tr(
-                    "DHCP-операция завершена."
+                    "Сетевая конфигурация применена."
                 );
         }
 
@@ -4295,21 +4421,20 @@ async function requestDhcpAddress(
 
         window.setTimeout(
             updateNetworkInterfaces,
-            1000
+            1500
         );
     }
     catch (error) {
         if (message) {
             message.textContent =
                 tr(
-                    "Ошибка DHCP: "
+                    "Ошибка настройки IPv4: "
                 )
                 + error;
         }
     }
     finally {
-        if (button)
-            button.disabled = false;
+        button.disabled = false;
     }
 }
 
@@ -4523,6 +4648,234 @@ async function updateNetworkInterfaces() {
                 &&
                 !item.loopback
             ) {
+                const current =
+                    currentIpv4Parts(
+                        item
+                    );
+
+                const config =
+                    document.createElement(
+                        "div"
+                    );
+
+                config.className =
+                    "form-grid";
+
+                config.style.marginTop =
+                    "12px";
+
+                const makeField =
+                    function(
+                        labelText,
+                        value,
+                        type
+                    ) {
+                        const wrapper =
+                            document.createElement(
+                                "div"
+                            );
+
+                        const label =
+                            document.createElement(
+                                "label"
+                            );
+
+                        label.textContent =
+                            tr(labelText);
+
+                        const input =
+                            document.createElement(
+                                type === "select"
+                                ? "select"
+                                : "input"
+                            );
+
+                        wrapper.appendChild(
+                            label
+                        );
+
+                        wrapper.appendChild(
+                            input
+                        );
+
+                        return {
+                            wrapper:
+                                wrapper,
+                            input:
+                                input,
+                            value:
+                                value
+                        };
+                    };
+
+                const modeField =
+                    makeField(
+                        "Режим IPv4",
+                        item.ipv4_method,
+                        "select"
+                    );
+
+                for (
+                    const optionData of [
+                        {
+                            value:
+                                "dhcp",
+                            label:
+                                tr("DHCP")
+                        },
+                        {
+                            value:
+                                "static",
+                            label:
+                                tr(
+                                    "Статический IP"
+                                )
+                        }
+                    ]
+                ) {
+                    const option =
+                        document.createElement(
+                            "option"
+                        );
+
+                    option.value =
+                        optionData.value;
+
+                    option.textContent =
+                        optionData.label;
+
+                    modeField.input.appendChild(
+                        option
+                    );
+                }
+
+                modeField.input.value =
+                    item.ipv4_method ===
+                        "static"
+                    ? "static"
+                    : "dhcp";
+
+                config.appendChild(
+                    modeField.wrapper
+                );
+
+                const addressField =
+                    makeField(
+                        "IP-адрес",
+                        current.address
+                    );
+
+                addressField.input.value =
+                    current.address;
+
+                config.appendChild(
+                    addressField.wrapper
+                );
+
+                const netmaskField =
+                    makeField(
+                        "Маска сети",
+                        current.netmask
+                    );
+
+                netmaskField.input.value =
+                    current.netmask;
+
+                config.appendChild(
+                    netmaskField.wrapper
+                );
+
+                const gatewayField =
+                    makeField(
+                        "Шлюз",
+                        item.gateway
+                        || ""
+                    );
+
+                gatewayField.input.value =
+                    item.gateway
+                    || "";
+
+                config.appendChild(
+                    gatewayField.wrapper
+                );
+
+                const dns =
+                    Array.isArray(
+                        item.dns_servers
+                    )
+                    ? item.dns_servers
+                    : [];
+
+                const dnsPrimaryField =
+                    makeField(
+                        "Основной DNS",
+                        dns[0]
+                        || ""
+                    );
+
+                dnsPrimaryField.input.value =
+                    dns[0]
+                    || "";
+
+                config.appendChild(
+                    dnsPrimaryField.wrapper
+                );
+
+                const dnsSecondaryField =
+                    makeField(
+                        "Дополнительный DNS",
+                        dns[1]
+                        || ""
+                    );
+
+                dnsSecondaryField.input.value =
+                    dns[1]
+                    || "";
+
+                config.appendChild(
+                    dnsSecondaryField.wrapper
+                );
+
+                const staticInputs = [
+                    addressField.input,
+                    netmaskField.input,
+                    gatewayField.input,
+                    dnsPrimaryField.input,
+                    dnsSecondaryField.input
+                ];
+
+                const refreshMode =
+                    function() {
+                        const staticMode =
+                            modeField.input.value ===
+                            "static";
+
+                        for (
+                            const input of
+                            staticInputs
+                        ) {
+                            input.disabled =
+                                !staticMode
+                                ||
+                                !data.helper_installed;
+                        }
+                    };
+
+                modeField.input.disabled =
+                    !data.helper_installed;
+
+                modeField.input.addEventListener(
+                    "change",
+                    refreshMode
+                );
+
+                refreshMode();
+
+                card.appendChild(
+                    config
+                );
+
                 const actions =
                     document.createElement(
                         "div"
@@ -4531,34 +4884,48 @@ async function updateNetworkInterfaces() {
                 actions.className =
                     "button-row";
 
-                const dhcp =
+                const apply =
                     document.createElement(
                         "button"
                     );
 
-                dhcp.type =
+                apply.type =
                     "button";
 
-                dhcp.textContent =
+                apply.textContent =
                     tr(
-                        "Получить IP по DHCP"
+                        "Применить IPv4"
                     );
 
-                dhcp.disabled =
+                apply.disabled =
                     !data.helper_installed;
 
-                dhcp.addEventListener(
+                apply.addEventListener(
                     "click",
                     function() {
-                        requestDhcpAddress(
-                            item.name,
-                            dhcp
+                        applyIpv4Configuration(
+                            item,
+                            {
+                                mode:
+                                    modeField.input,
+                                address:
+                                    addressField.input,
+                                netmask:
+                                    netmaskField.input,
+                                gateway:
+                                    gatewayField.input,
+                                dnsPrimary:
+                                    dnsPrimaryField.input,
+                                dnsSecondary:
+                                    dnsSecondaryField.input
+                            },
+                            apply
                         );
                     }
                 );
 
                 actions.appendChild(
-                    dhcp
+                    apply
                 );
 
                 card.appendChild(
