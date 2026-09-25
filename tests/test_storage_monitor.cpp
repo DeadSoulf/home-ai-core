@@ -83,6 +83,8 @@ int main()
             (
                 device.mounted
                 ||
+                device.in_use
+                ||
                 device.size_bytes == 0
             )
         ) {
