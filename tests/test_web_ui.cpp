@@ -104,6 +104,14 @@ int main()
         ) == std::string::npos
         ||
         storage.find(
+            "Подключить и использовать для видео"
+        ) == std::string::npos
+        ||
+        storage.find(
+            "Использовать текущую точку для видео"
+        ) == std::string::npos
+        ||
+        storage.find(
             "Проверить новые диски"
         ) == std::string::npos
     ) {
