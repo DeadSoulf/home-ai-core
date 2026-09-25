@@ -320,18 +320,22 @@ bool SecurityManager::updateUser(
             !enabled
         );
 
-    if (
-        removes_admin
-        &&
-        isLastEnabledAdmin(
-            *user,
-            error
-        )
-    ) {
-        error =
-            "The last enabled administrator cannot be disabled or demoted.";
+    if (removes_admin) {
+        const bool last_admin =
+            isLastEnabledAdmin(
+                *user,
+                error
+            );
 
-        return false;
+        if (!error.empty())
+            return false;
+
+        if (last_admin) {
+            error =
+                "The last enabled administrator cannot be disabled or demoted.";
+
+            return false;
+        }
     }
 
     if (
@@ -395,16 +399,22 @@ bool SecurityManager::deleteUser(
         user->role == "admin"
         &&
         user->enabled
-        &&
-        isLastEnabledAdmin(
-            *user,
-            error
-        )
     ) {
-        error =
-            "The last enabled administrator cannot be deleted.";
+        const bool last_admin =
+            isLastEnabledAdmin(
+                *user,
+                error
+            );
 
-        return false;
+        if (!error.empty())
+            return false;
+
+        if (last_admin) {
+            error =
+                "The last enabled administrator cannot be deleted.";
+
+            return false;
+        }
     }
 
     if (
@@ -566,16 +576,22 @@ bool SecurityManager::setPermissionOverride(
         user->role == "admin"
         &&
         user->enabled
-        &&
-        isLastEnabledAdmin(
-            *user,
-            error
-        )
     ) {
-        error =
-            "users.manage cannot be denied for the last enabled administrator.";
+        const bool last_admin =
+            isLastEnabledAdmin(
+                *user,
+                error
+            );
 
-        return false;
+        if (!error.empty())
+            return false;
+
+        if (last_admin) {
+            error =
+                "users.manage cannot be denied for the last enabled administrator.";
+
+            return false;
+        }
     }
 
     bool success = false;
