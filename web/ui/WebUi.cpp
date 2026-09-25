@@ -6070,7 +6070,8 @@ function renderStoragePools(data) {
             title,
             role,
             policy,
-            target
+            target,
+            summary
         ) {
             const matching =
                 volumes.filter(
@@ -6089,14 +6090,12 @@ function renderStoragePools(data) {
                     function(volume) {
                         return (
                             volume.status ===
-                                "online"
-                            &&
-                            volume.capacity_available
+                            "online"
                         );
                     }
                 );
 
-            const total =
+            const fallbackTotal =
                 online.reduce(
                     function(sum, volume) {
                         return (
@@ -6104,26 +6103,78 @@ function renderStoragePools(data) {
                             +
                             Number(
                                 volume.total_bytes
-                                || 0
+                                ||
+                                volume.device_size_bytes
+                                ||
+                                0
                             )
                         );
                     },
                     0
                 );
 
-            const free =
+            const fallbackFree =
                 online.reduce(
                     function(sum, volume) {
                         return (
                             sum
                             +
-                            Number(
-                                volume.free_bytes
-                                || 0
+                            (
+                                volume.capacity_available
+                                ? Number(
+                                    volume.free_bytes
+                                    || 0
+                                )
+                                : 0
                             )
                         );
                     },
                     0
+                );
+
+            const total =
+                summary
+                ? Number(
+                    summary.total_bytes
+                    || 0
+                )
+                : fallbackTotal;
+
+            const free =
+                summary
+                ? Number(
+                    summary.free_bytes
+                    || 0
+                )
+                : fallbackFree;
+
+            const assignedCount =
+                summary
+                ? Number(
+                    summary.assigned_volumes
+                    || 0
+                )
+                : matching.length;
+
+            const onlineCount =
+                summary
+                ? Number(
+                    summary.online_volumes
+                    || 0
+                )
+                : online.length;
+
+            const freeComplete =
+                summary
+                ? Boolean(
+                    summary.free_bytes_complete
+                )
+                : online.every(
+                    function(volume) {
+                        return Boolean(
+                            volume.capacity_available
+                        );
+                    }
                 );
 
             const card =
@@ -6154,7 +6205,11 @@ function renderStoragePools(data) {
             count.textContent =
                 tr("Дисков в пуле")
                 + ": "
-                + matching.length;
+                + assignedCount
+                + " · "
+                + tr("в сети")
+                + ": "
+                + onlineCount;
 
             card.appendChild(
                 count
@@ -6188,7 +6243,17 @@ function renderStoragePools(data) {
                 + ", "
                 + tr("свободно")
                 + " "
-                + formatBytes(free);
+                + (
+                    freeComplete
+                    ? formatBytes(free)
+                    : (
+                        formatBytes(free)
+                        + " + "
+                        + tr(
+                            "данные части дисков недоступны"
+                        )
+                    )
+                );
 
             card.appendChild(
                 capacity
@@ -6226,13 +6291,15 @@ function renderStoragePools(data) {
             tr("Видео-пул"),
             "video",
             data.video_policy,
-            data.video_target
+            data.video_target,
+            data.video_summary
         ),
         renderPool(
             tr("Пул домашних файлов"),
             "personal",
             data.files_policy,
-            data.files_target
+            data.files_target,
+            data.files_summary
         )
     );
 }
