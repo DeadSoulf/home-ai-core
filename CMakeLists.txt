@@ -1,8 +1,31 @@
 cmake_minimum_required(VERSION 3.20)
 
+file(
+    STRINGS
+    "${CMAKE_CURRENT_SOURCE_DIR}/VERSION"
+    HOMEAI_VERSION_FILE
+    LIMIT_COUNT 1
+)
+
+string(
+    STRIP
+    "${HOMEAI_VERSION_FILE}"
+    HOMEAI_VERSION_FILE
+)
+
+if (
+    NOT HOMEAI_VERSION_FILE
+    MATCHES "^[0-9]+[.][0-9]+[.][0-9]+$"
+)
+    message(
+        FATAL_ERROR
+        "VERSION must contain a semantic version such as 0.0.7"
+    )
+endif()
+
 project(
     HomeAICore
-    VERSION 0.0.6
+    VERSION ${HOMEAI_VERSION_FILE}
     LANGUAGES CXX
 )
 
@@ -27,7 +50,14 @@ find_package(
 
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/web/ui/translations.tsv" HOMEAI_TRANSLATIONS)
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/web/ui/localization.js" HOMEAI_LOCALIZATION_JS)
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS web/ui/translations.tsv web/ui/localization.js)
+set_property(
+    DIRECTORY
+    APPEND
+    PROPERTY CMAKE_CONFIGURE_DEPENDS
+    VERSION
+    web/ui/translations.tsv
+    web/ui/localization.js
+)
 configure_file(web/ui/Localization.cpp.in "${CMAKE_CURRENT_BINARY_DIR}/Localization.cpp" @ONLY)
 
 file(

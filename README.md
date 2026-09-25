@@ -16,9 +16,11 @@ Home AI Core is a local-first autonomous server platform designed for:
 
 0.0.5
 
-## Current development target
+## Current development version
 
-0.0.6 — Module Manager + administration/security foundation
+0.0.7 — WireGuard Web editor + centralized automatic version discipline
+
+The repository root `VERSION` file is the single source of the compiled Core version.
 
 ## Platform
 

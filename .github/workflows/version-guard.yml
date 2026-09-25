@@ -1,0 +1,61 @@
+name: Version guard
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  pull_request:
+    branches:
+      - develop
+      - main
+
+jobs:
+  require-version-bump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require VERSION change with Core code
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            git fetch origin "$BASE_REF" --depth=1
+            RANGE="origin/$BASE_REF..HEAD"
+          else
+            if [[ -z "${BEFORE_SHA:-}" || "$BEFORE_SHA" =~ ^0+$ ]]; then
+              exit 0
+            fi
+            RANGE="$BEFORE_SHA..HEAD"
+          fi
+
+          runtime_pattern='^(core/|server/|security/|web/|config/|main[.]cpp$|CMakeLists[.]txt$)'
+
+          while IFS= read -r commit; do
+            [[ -n "$commit" ]] || continue
+
+            parent_count=$(git rev-list --parents -n 1 "$commit" | awk '{print NF - 1}')
+
+            if (( parent_count > 1 )); then
+              continue
+            fi
+
+            changed=$(git diff-tree --no-commit-id --name-only -r "$commit")
+
+            if grep -Eq "$runtime_pattern" <<<"$changed"; then
+              if ! grep -qx "VERSION" <<<"$changed"; then
+                echo "::error::Core/runtime code changed in $commit without advancing VERSION."
+                echo "$changed"
+                exit 1
+              fi
+            fi
+          done < <(git rev-list --reverse "$RANGE")

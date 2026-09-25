@@ -9,10 +9,11 @@
 | 0.0.3 | Integrated Web Core | DONE |
 | 0.0.4 | System Monitor and live Dashboard metrics | DONE |
 | 0.0.5 | Security Core + protected Web/API + storage monitoring foundation | DONE |
-| 0.0.6 | Module Manager + hot-plug storage integration + Storage Pool foundation | IN DEVELOPMENT |
-| 0.0.7 | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
-| 0.0.8 | Device Core | PLANNED |
-| 0.0.9 | Automation Core | PLANNED |
+| 0.0.6 | Module Manager + hot-plug storage integration + Storage Pool foundation | DONE |
+| 0.0.7 | WireGuard Web editor + centralized versioning | IN DEVELOPMENT |
+| next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
+| next 0.0.x | Device Core | PLANNED |
+| next 0.0.x | Automation Core | PLANNED |
 | 0.1.0 | First AI Brain runtime | PLANNED |
 | 0.2.0 | Video Surveillance / NVR Core | PLANNED |
 | 0.3.0 | Hypervisor Core | PLANNED |
@@ -46,7 +47,7 @@ Validated on the Debian development server:
 - ONLINE/OFFLINE, filesystem, capacity and read-only reporting
 - authenticated `/api/storage` endpoint and live storage dashboard
 
-## Current focus: 0.0.6
+## Completed development milestone: 0.0.6
 
 Completed in the current development branch:
 
@@ -100,13 +101,35 @@ Module Manager implemented in the current development branch:
 - module status exposure in the System page
 - degraded/unhealthy module reporting on the Home page
 
-0.0.6 now needs integration testing on the Debian development server.
+0.0.6 passed the development-server build and 14-test suite before the 0.0.7 WireGuard/versioning work began.
 
 The Module Manager lifecycle will be:
 
 ```text
 discover -> initialize -> start -> health -> stop
 ```
+
+## Current focus: 0.0.7
+
+Current development work:
+
+- editable WireGuard profiles in the Network Web UI
+- create, edit and remove WireGuard `*.conf` profiles
+- profile contents available only to users with `network.manage`
+- atomic WireGuard configuration saves with file mode `0600`
+- WireGuard private keys excluded from the normal profile inventory and audit details
+- active tunnels are not silently restarted when a profile is saved
+- repository-root `VERSION` as the single compiled version source
+- `scripts/bump-version.sh` for the next patch/minor/major version
+- GitHub version guard for Core/runtime code changes
+- VPN profile save/load/remove coverage in the test suite
+
+0.0.7 requires a development-server pull, clean build and the expanded test suite before
+it can be promoted as a stable version.
+
+Patch versions after 0.0.7 are intentionally not pre-assigned to individual roadmap items.
+Each Core/runtime change advances to the next version, while larger minor milestones such as
+0.1.0 remain roadmap targets.
 
 ## Later major capabilities
 

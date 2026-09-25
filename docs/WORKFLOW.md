@@ -25,6 +25,37 @@ feature/device-core
 
 They should merge into `develop` before reaching `main`.
 
+## Versioning
+
+The repository root `VERSION` file is the single source of truth for the Home AI Core
+version. CMake reads this file and exposes the same version to the runtime and Web UI.
+
+Every commit that changes Core/runtime code must also advance `VERSION`. For normal
+development changes, increment the patch component:
+
+```bash
+./scripts/bump-version.sh
+```
+
+Example:
+
+```text
+0.0.7 -> 0.0.8
+```
+
+For an intentional minor or major milestone, pass the exact semantic version:
+
+```bash
+./scripts/bump-version.sh 0.1.0
+```
+
+Do not hard-code the version in `CMakeLists.txt`, `config/home-ai.conf`, tests or Web UI.
+The GitHub version-guard workflow rejects Core-code commits that do not include a
+`VERSION` change.
+
+Documentation-only and test-only commits do not require a version increment unless they
+also change runtime behavior.
+
 ## Server update workflow
 
 The Debian development server should normally track `develop`.

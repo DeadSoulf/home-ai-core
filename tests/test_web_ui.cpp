@@ -12,8 +12,13 @@ int main()
     context.core_name =
         "Home AI Core";
 
+#ifdef HOMEAI_VERSION
     context.version =
-        "0.0.6";
+        HOMEAI_VERSION;
+#else
+    context.version =
+        "dev";
+#endif
 
     context.log_level =
         "debug";
