@@ -36,6 +36,7 @@ struct BlockDeviceInfo {
 
     bool removable{false};
     bool mounted{false};
+    bool in_use{false};
     bool has_partitions{false};
     bool candidate{false};
 };
