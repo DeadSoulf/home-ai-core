@@ -31,6 +31,7 @@ add_library(
     server/system/SystemMonitor.cpp
     server/storage/StorageMonitor.cpp
     server/storage/DiskOperations.cpp
+    server/update/UpdateManager.cpp
 
     security/auth/SecurityManager.cpp
 
