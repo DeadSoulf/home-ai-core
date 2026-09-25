@@ -1610,6 +1610,38 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
                 )
                 << R"HTML(">
 </div>
+
+<div>
+<label>Закреплённый диск для видео</label>
+<select
+    id="storage-video-pinned"
+    name="storage.video_pinned_mount"
+    data-selected=")HTML";
+
+            page
+                << htmlEscape(
+                    context.storage_video_pinned_mount
+                )
+                << R"HTML(">
+<option value="">Автоматически</option>
+</select>
+</div>
+
+<div>
+<label>Закреплённый диск для файлов</label>
+<select
+    id="storage-files-pinned"
+    name="storage.files_pinned_mount"
+    data-selected=")HTML";
+
+            page
+                << htmlEscape(
+                    context.storage_files_pinned_mount
+                )
+                << R"HTML(">
+<option value="">Автоматически</option>
+</select>
+</div>
 </div>
 
 <p class="muted">
