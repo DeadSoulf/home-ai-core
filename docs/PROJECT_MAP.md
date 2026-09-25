@@ -121,6 +121,8 @@ server/
 │   └── SystemMonitor
 ├── network/
 ├── storage/
+│   └── StorageMonitor
+│       mounted disk discovery, capacity, roles and online/offline state
 ├── processes/
 └── backup/
 ```
@@ -211,6 +213,7 @@ docs/
 ├── WORKFLOW.md
 ├── ARCHITECTURE.md   (planned)
 ├── SECURITY.md
+├── STORAGE.md
 ├── API.md            (planned)
 └── BUILD.md          (planned)
 ```
