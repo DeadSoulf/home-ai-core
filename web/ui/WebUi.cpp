@@ -1427,7 +1427,12 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
 
 <div id="storage-hotplug-alert" class="hotplug-alert"></div>
 
-<h3>Подключённые хранилища</h3>
+<h3>Пулы хранения</h3>
+<div id="storage-pools" class="storage-grid">
+<div class="storage-card">Загрузка пулов хранения...</div>
+</div>
+
+<h3 style="margin-top:22px">Подключённые хранилища</h3>
 <div id="storage-list" class="storage-grid">
 <div class="storage-card">Загрузка информации о дисках...</div>
 </div>
@@ -1447,42 +1452,173 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
         ) {
             page << R"HTML(
 <div class="section-card">
-<h2>Настройки хранилищ</h2>
+<h2>Настройки пулов хранения</h2>
 <form method="POST" action="/api/config">
 <input type="hidden" name="return_to" value="/storage">
 
 <div class="form-grid">
 <div>
-<label>Диски для видео</label>
+<label>Стратегия видео</label>
+<select name="storage.video_policy">
+<option value="most_free")HTML";
+
+            page
+                << (
+                    context.storage_video_policy ==
+                        "most_free"
+                    ? " selected"
+                    : ""
+                )
+                << R"HTML(>Больше всего свободного места</option>
+<option value="sequential")HTML";
+
+            page
+                << (
+                    context.storage_video_policy ==
+                        "sequential"
+                    ? " selected"
+                    : ""
+                )
+                << R"HTML(>Заполнять диски по очереди</option>
+<option value="balanced")HTML";
+
+            page
+                << (
+                    context.storage_video_policy ==
+                        "balanced"
+                    ? " selected"
+                    : ""
+                )
+                << R"HTML(>Равномерная загрузка</option>
+<option value="pinned")HTML";
+
+            page
+                << (
+                    context.storage_video_policy ==
+                        "pinned"
+                    ? " selected"
+                    : ""
+                )
+                << R"HTML(>Закрепление за диском</option>
+</select>
+</div>
+
+<div>
+<label>Стратегия файлов</label>
+<select name="storage.files_policy">
+<option value="most_free")HTML";
+
+            page
+                << (
+                    context.storage_files_policy ==
+                        "most_free"
+                    ? " selected"
+                    : ""
+                )
+                << R"HTML(>Больше всего свободного места</option>
+<option value="sequential")HTML";
+
+            page
+                << (
+                    context.storage_files_policy ==
+                        "sequential"
+                    ? " selected"
+                    : ""
+                )
+                << R"HTML(>Заполнять диски по очереди</option>
+<option value="balanced")HTML";
+
+            page
+                << (
+                    context.storage_files_policy ==
+                        "balanced"
+                    ? " selected"
+                    : ""
+                )
+                << R"HTML(>Равномерная загрузка</option>
+<option value="pinned")HTML";
+
+            page
+                << (
+                    context.storage_files_policy ==
+                        "pinned"
+                    ? " selected"
+                    : ""
+                )
+                << R"HTML(>Закрепление за диском</option>
+</select>
+</div>
+
+<div>
+<label>Резерв видео, %</label>
 <input
-    name="storage.video_mounts"
-    placeholder="/mnt/home-ai/video/sdb1"
+    type="number"
+    min="0"
+    max="95"
+    name="storage.video_reserve_percent"
     value=")HTML";
 
             page
                 << htmlEscape(
-                    context.storage_video_mounts
+                    context.storage_video_reserve_percent
                 )
                 << R"HTML(">
 </div>
 
 <div>
-<label>Диски для личных файлов</label>
+<label>Резерв видео, GB</label>
 <input
-    name="storage.personal_mounts"
-    placeholder="/mnt/home-ai/files/sdc1"
+    type="number"
+    min="0"
+    name="storage.video_reserve_gb"
     value=")HTML";
 
             page
                 << htmlEscape(
-                    context.storage_personal_mounts
+                    context.storage_video_reserve_gb
+                )
+                << R"HTML(">
+</div>
+
+<div>
+<label>Резерв файлов, %</label>
+<input
+    type="number"
+    min="0"
+    max="95"
+    name="storage.files_reserve_percent"
+    value=")HTML";
+
+            page
+                << htmlEscape(
+                    context.storage_files_reserve_percent
+                )
+                << R"HTML(">
+</div>
+
+<div>
+<label>Резерв файлов, GB</label>
+<input
+    type="number"
+    min="0"
+    name="storage.files_reserve_gb"
+    value=")HTML";
+
+            page
+                << htmlEscape(
+                    context.storage_files_reserve_gb
                 )
                 << R"HTML(">
 </div>
 </div>
 
+<p class="muted">
+Один физический диск можно одновременно добавить в пул видео и в пул домашних файлов.
+Для новых дисков Home AI Core использует стабильный путь на основе UUID файловой системы.
+</p>
+
 <div class="button-row">
-<button type="submit">Сохранить</button>
+<button type="submit">Сохранить настройки пулов</button>
 </div>
 </form>
 </div>
@@ -1505,24 +1641,23 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
 <h4>Как использовать диск</h4>
 
 <div id="disk-assignment-help" class="device-note">
-Выберите назначение диска.
+Выберите одно или несколько назначений.
+</div>
+
+<div class="form-grid" style="margin-top:12px">
+<label>
+<input id="disk-role-video" type="checkbox" style="width:auto;margin-right:8px">
+Использовать для видео
+</label>
+<label>
+<input id="disk-role-personal" type="checkbox" style="width:auto;margin-right:8px">
+Использовать для домашних файлов
+</label>
 </div>
 
 <div class="disk-menu-actions">
-<button id="disk-mount-video" type="button">
-Подключить и использовать для видео
-</button>
-<button id="disk-mount-personal" type="button">
-Подключить и использовать для личных файлов
-</button>
-<button id="disk-assign-video" type="button" class="secondary">
-Использовать текущую точку для видео
-</button>
-<button id="disk-assign-personal" type="button" class="secondary">
-Использовать текущую точку для личных файлов
-</button>
-<button id="disk-unassign" type="button" class="secondary">
-Снять назначение Home AI Core
+<button id="disk-apply-roles" type="button">
+Применить назначение
 </button>
 </div>
 </div>
