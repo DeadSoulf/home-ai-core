@@ -1395,6 +1395,94 @@ void WebServer::handleClient(
 
     if (
         method == "GET" &&
+        path == "/api/storage/devices"
+    ) {
+        static StorageMonitor monitor;
+
+        const auto devices =
+            monitor.blockDevices();
+
+        std::ostringstream json;
+
+        json << "{\"devices\":[";
+
+        bool first = true;
+
+        for (const auto& device : devices) {
+            if (!first)
+                json << ",";
+
+            first = false;
+
+            json
+                << "{"
+                << "\"name\":\""
+                << jsonEscape(device.name)
+                << "\","
+                << "\"device\":\""
+                << jsonEscape(device.device)
+                << "\","
+                << "\"parent\":\""
+                << jsonEscape(device.parent)
+                << "\","
+                << "\"type\":\""
+                << jsonEscape(device.type)
+                << "\","
+                << "\"model\":\""
+                << jsonEscape(device.model)
+                << "\","
+                << "\"vendor\":\""
+                << jsonEscape(device.vendor)
+                << "\","
+                << "\"serial\":\""
+                << jsonEscape(device.serial)
+                << "\","
+                << "\"mount_point\":\""
+                << jsonEscape(device.mount_point)
+                << "\","
+                << "\"size_bytes\":"
+                << device.size_bytes
+                << ",\"removable\":"
+                << (
+                    device.removable
+                    ? "true"
+                    : "false"
+                )
+                << ",\"mounted\":"
+                << (
+                    device.mounted
+                    ? "true"
+                    : "false"
+                )
+                << ",\"has_partitions\":"
+                << (
+                    device.has_partitions
+                    ? "true"
+                    : "false"
+                )
+                << ",\"candidate\":"
+                << (
+                    device.candidate
+                    ? "true"
+                    : "false"
+                )
+                << "}";
+        }
+
+        json << "]}";
+
+        sendResponse(
+            client_fd,
+            "200 OK",
+            "application/json; charset=utf-8",
+            json.str()
+        );
+
+        return;
+    }
+
+    if (
+        method == "GET" &&
         path == "/api/config"
     ) {
         if (
@@ -1726,6 +1814,50 @@ main {
     padding: 14px;
 }
 
+.storage-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.storage-toolbar h3 {
+    margin: 0;
+}
+
+.storage-toolbar button {
+    margin: 0;
+}
+
+.hotplug-alert {
+    display: none;
+    margin: 14px 0;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #755d26;
+    background: #2b2515;
+    color: #f2d784;
+}
+
+.device-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.device-actions button {
+    margin: 0;
+    padding: 8px 10px;
+}
+
+.device-note {
+    margin-top: 10px;
+    color: #aeb4c0;
+    font-size: 0.92rem;
+}
+
 label {
     display: block;
     margin-top: 15px;
@@ -1962,7 +2094,12 @@ Load Average<br>
 
         page << R"HTML(
 <div class="card">
+<div class="storage-toolbar">
 <h3>Хранилища</h3>
+<button id="scan-storage-btn" type="button">
+Проверить новые диски
+</button>
+</div>
 
 <p>
 <small>
@@ -1972,8 +2109,16 @@ Load Average<br>
 </small>
 </p>
 
+<div id="storage-hotplug-alert" class="hotplug-alert"></div>
+
+<h4>Подключённые хранилища</h4>
 <div id="storage-list" class="grid">
 <div class="metric">Загрузка информации о дисках...</div>
+</div>
+
+<h4>Новые / неиспользуемые диски</h4>
+<div id="storage-candidates" class="grid">
+<div class="metric">Поиск новых дисков...</div>
 </div>
 </div>
 
@@ -2075,6 +2220,387 @@ function storageRoleLabel(role) {
         return "Системный";
 
     return "Не назначен";
+}
+
+const ignoredStorageDevices =
+    new Set();
+
+let knownStorageCandidates =
+    null;
+
+function storageDeviceTitle(device) {
+    const model =
+        (
+            (device.vendor || "")
+            + " "
+            + (device.model || "")
+        ).trim();
+
+    if (model)
+        return model;
+
+    return device.device;
+}
+
+function proposeStorageAction(
+    device,
+    role,
+    card
+) {
+    const note =
+        card.querySelector(
+            ".device-note"
+        );
+
+    if (!note)
+        return;
+
+    if (role === "ignore") {
+        ignoredStorageDevices.add(
+            device.device
+        );
+
+        card.remove();
+        return;
+    }
+
+    const target =
+        role === "video"
+        ? "хранилище видео с камер"
+        : "хранилище личных файлов";
+
+    note.textContent =
+        "Выбрано: "
+        + target
+        + ". Диск "
+        + device.device
+        + " пока не форматируется и не монтируется автоматически. "
+        + "Перед использованием система потребует отдельного "
+        + "подтверждения подготовки диска.";
+}
+
+function renderStorageCandidate(
+    device
+) {
+    const card =
+        document.createElement(
+            "div"
+        );
+
+    card.className = "metric";
+
+    const title =
+        document.createElement(
+            "strong"
+        );
+
+    title.textContent =
+        storageDeviceTitle(device);
+
+    card.appendChild(title);
+
+    const state =
+        document.createElement(
+            "div"
+        );
+
+    state.textContent =
+        "НОВЫЙ / НЕ СМОНТИРОВАН";
+
+    card.appendChild(state);
+
+    const deviceLine =
+        document.createElement(
+            "div"
+        );
+
+    deviceLine.textContent =
+        "Устройство: "
+        + device.device;
+
+    card.appendChild(deviceLine);
+
+    const typeLine =
+        document.createElement(
+            "div"
+        );
+
+    typeLine.textContent =
+        "Тип: "
+        + (
+            device.type === "partition"
+            ? "раздел"
+            : "диск"
+        )
+        + (
+            device.removable
+            ? " · hot-plug/removable"
+            : ""
+        );
+
+    card.appendChild(typeLine);
+
+    const capacity =
+        document.createElement(
+            "div"
+        );
+
+    capacity.textContent =
+        "Размер: "
+        + formatBytes(
+            device.size_bytes
+        );
+
+    card.appendChild(capacity);
+
+    if (device.serial) {
+        const serial =
+            document.createElement(
+                "div"
+            );
+
+        serial.textContent =
+            "Serial: "
+            + device.serial;
+
+        card.appendChild(serial);
+    }
+
+    const actions =
+        document.createElement(
+            "div"
+        );
+
+    actions.className =
+        "device-actions";
+
+    const video =
+        document.createElement(
+            "button"
+        );
+
+    video.type = "button";
+    video.textContent =
+        "Для видео";
+
+    video.addEventListener(
+        "click",
+        function() {
+            proposeStorageAction(
+                device,
+                "video",
+                card
+            );
+        }
+    );
+
+    actions.appendChild(video);
+
+    const personal =
+        document.createElement(
+            "button"
+        );
+
+    personal.type = "button";
+    personal.textContent =
+        "Для личных файлов";
+
+    personal.addEventListener(
+        "click",
+        function() {
+            proposeStorageAction(
+                device,
+                "personal",
+                card
+            );
+        }
+    );
+
+    actions.appendChild(personal);
+
+    const ignore =
+        document.createElement(
+            "button"
+        );
+
+    ignore.type = "button";
+    ignore.textContent =
+        "Пока не использовать";
+
+    ignore.addEventListener(
+        "click",
+        function() {
+            proposeStorageAction(
+                device,
+                "ignore",
+                card
+            );
+        }
+    );
+
+    actions.appendChild(ignore);
+
+    card.appendChild(actions);
+
+    const note =
+        document.createElement(
+            "div"
+        );
+
+    note.className =
+        "device-note";
+
+    note.textContent =
+        "Выберите, для чего планируется использовать этот диск.";
+
+    card.appendChild(note);
+
+    return card;
+}
+
+async function updateStorageCandidates(
+    manual = false
+) {
+    try {
+        const response =
+            await fetch(
+                "/api/storage/devices",
+                {
+                    method: "GET",
+                    cache: "no-store"
+                }
+            );
+
+        if (response.status === 401) {
+            window.location = "/login";
+            return;
+        }
+
+        if (!response.ok)
+            return;
+
+        const data =
+            await response.json();
+
+        const candidates =
+            (
+                Array.isArray(
+                    data.devices
+                )
+                ? data.devices
+                : []
+            ).filter(
+                function(device) {
+                    return (
+                        device.candidate
+                        &&
+                        !ignoredStorageDevices.has(
+                            device.device
+                        )
+                    );
+                }
+            );
+
+        const currentSet =
+            new Set(
+                candidates.map(
+                    function(device) {
+                        return device.device;
+                    }
+                )
+            );
+
+        const added =
+            knownStorageCandidates === null
+            ? []
+            : candidates.filter(
+                function(device) {
+                    return !knownStorageCandidates.has(
+                        device.device
+                    );
+                }
+            );
+
+        knownStorageCandidates =
+            currentSet;
+
+        const alertBox =
+            document.getElementById(
+                "storage-hotplug-alert"
+            );
+
+        if (
+            alertBox
+            &&
+            added.length > 0
+        ) {
+            alertBox.style.display =
+                "block";
+
+            alertBox.textContent =
+                "Обнаружен новый диск: "
+                + added.map(
+                    function(device) {
+                        return device.device;
+                    }
+                ).join(", ")
+                + ". Выберите действие ниже.";
+        }
+        else if (
+            alertBox
+            &&
+            manual
+        ) {
+            alertBox.style.display =
+                "block";
+
+            alertBox.textContent =
+                candidates.length > 0
+                ? "Обнаружено доступных дисков: "
+                    + candidates.length
+                : "Новых неиспользуемых дисков не обнаружено.";
+        }
+
+        const container =
+            document.getElementById(
+                "storage-candidates"
+            );
+
+        if (!container)
+            return;
+
+        container.replaceChildren();
+
+        if (candidates.length === 0) {
+            const empty =
+                document.createElement(
+                    "div"
+                );
+
+            empty.className =
+                "metric";
+
+            empty.textContent =
+                "Новых неиспользуемых дисков нет.";
+
+            container.appendChild(empty);
+            return;
+        }
+
+        for (const device of candidates) {
+            container.appendChild(
+                renderStorageCandidate(
+                    device
+                )
+            );
+        }
+    }
+    catch (error) {
+        console.error(
+            "Storage hotplug scan error:",
+            error
+        );
+    }
 }
 
 async function updateStorageStats() {
@@ -2323,6 +2849,24 @@ document.addEventListener(
     function() {
         updateSystemStats();
         updateStorageStats();
+        updateStorageCandidates();
+
+        const scanButton =
+            document.getElementById(
+                "scan-storage-btn"
+            );
+
+        if (scanButton) {
+            scanButton.addEventListener(
+                "click",
+                function() {
+                    updateStorageStats();
+                    updateStorageCandidates(
+                        true
+                    );
+                }
+            );
+        }
 
         setInterval(
             updateSystemStats,
@@ -2332,6 +2876,11 @@ document.addEventListener(
         setInterval(
             updateStorageStats,
             5000
+        );
+
+        setInterval(
+            updateStorageCandidates,
+            3000
         );
     }
 );
