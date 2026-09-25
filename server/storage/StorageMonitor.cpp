@@ -612,20 +612,10 @@ StorageMonitor::snapshot(
                                 volume.total_bytes
                             )
                         ) * 100.0;
-                }
-            }
 
-            // Some freshly formatted or unusual mounts can temporarily
-            // report zero filesystem capacity through statvfs. Keep the
-            // physical block-device size available so the Web UI still
-            // shows the real disk size instead of 0 B.
-            if (
-                volume.total_bytes == 0
-                &&
-                volume.device_size_bytes > 0
-            ) {
-                volume.total_bytes =
-                    volume.device_size_bytes;
+                    volume.capacity_available =
+                        true;
+                }
             }
 
             volumes.push_back(
