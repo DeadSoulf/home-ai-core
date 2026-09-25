@@ -1,5 +1,6 @@
 #include "web/ui/WebUi.h"
 
+#include <algorithm>
 #include <sstream>
 #include <string>
 
@@ -37,6 +38,19 @@ std::string htmlEscape(
     }
 
     return result;
+}
+
+bool uiHasPermission(
+    const WebUiContext& context,
+    const std::string& permission
+)
+{
+    return
+        std::find(
+            context.permissions.begin(),
+            context.permissions.end(),
+            permission
+        ) != context.permissions.end();
 }
 
 void navLink(
@@ -760,31 +774,131 @@ button:disabled {
 
     page << "<div class=\"nav-group\">";
     page << "<div class=\"nav-caption\">Обзор</div>";
-    navLink(page, context, "/", "Главная", "⌂");
-    navLink(page, context, "/system", "Система", "▣");
-    navLink(page, context, "/network", "Сеть", "⇄");
-    navLink(page, context, "/storage", "Диски", "◫");
-    navLink(page, context, "/files", "Файлы", "▱");
+
+    if (
+        uiHasPermission(
+            context,
+            "system.view"
+        )
+    ) {
+        navLink(page, context, "/", "Главная", "⌂");
+        navLink(page, context, "/system", "Система", "▣");
+    }
+
+    if (
+        uiHasPermission(
+            context,
+            "network.view"
+        )
+    ) {
+        navLink(page, context, "/network", "Сеть", "⇄");
+    }
+
+    if (
+        uiHasPermission(
+            context,
+            "storage.view"
+        )
+    ) {
+        navLink(page, context, "/storage", "Диски", "◫");
+    }
+
+    if (
+        uiHasPermission(
+            context,
+            "files.read"
+        )
+    ) {
+        navLink(page, context, "/files", "Файлы", "▱");
+    }
+
     page << "</div>";
 
     page << "<div class=\"nav-group\">";
     page << "<div class=\"nav-caption\">Дом и сервисы</div>";
-    navLink(page, context, "/cameras", "Камеры", "◉");
-    navLink(page, context, "/smart-home", "Умный дом", "⌁");
-    navLink(page, context, "/automation", "Автоматизация", "⚙");
+
+    if (
+        uiHasPermission(
+            context,
+            "cameras.view"
+        )
+    ) {
+        navLink(page, context, "/cameras", "Камеры", "◉");
+    }
+
+    if (
+        uiHasPermission(
+            context,
+            "smart_home.view"
+        )
+    ) {
+        navLink(page, context, "/smart-home", "Умный дом", "⌁");
+    }
+
+    if (
+        uiHasPermission(
+            context,
+            "automation.view"
+        )
+    ) {
+        navLink(page, context, "/automation", "Автоматизация", "⚙");
+    }
+
     page << "</div>";
 
     page << "<div class=\"nav-group\">";
     page << "<div class=\"nav-caption\">Интеллект</div>";
-    navLink(page, context, "/ai", "AI", "✦");
+
+    if (
+        uiHasPermission(
+            context,
+            "ai.use"
+        )
+    ) {
+        navLink(page, context, "/ai", "AI", "✦");
+    }
+
     page << "</div>";
 
     page << "<div class=\"nav-group\">";
     page << "<div class=\"nav-caption\">Администрирование</div>";
-    if (context.admin) navLink(page, context, "/admin", "Администрирование", "⚒");
-    navLink(page, context, "/users", "Пользователи", "♙");
-    navLink(page, context, "/hypervisor", "Виртуализация", "▤");
-    navLink(page, context, "/settings", "Настройки", "⚙");
+
+    if (
+        uiHasPermission(
+            context,
+            "ai.manage"
+        )
+    ) {
+        navLink(page, context, "/admin", "Администрирование", "⚒");
+    }
+
+    if (
+        uiHasPermission(
+            context,
+            "users.view"
+        )
+    ) {
+        navLink(page, context, "/users", "Пользователи", "♙");
+    }
+
+    if (
+        uiHasPermission(
+            context,
+            "hypervisor.view"
+        )
+    ) {
+        navLink(page, context, "/hypervisor", "Виртуализация", "▤");
+    }
+
+    if (
+        uiHasPermission(
+            context,
+            "system.manage"
+        )
+    ) {
+        navLink(page, context, "/settings", "Настройки", "⚙");
+    }
+
     page << "</div></nav>";
 
     page
@@ -830,9 +944,23 @@ button:disabled {
         << "</div>"
         << "</header><main class=\"page\">";
 
-    if (context.admin) page << R"HTML(<div id="gpu-notice" role="status" class="section-card" hidden></div>)HTML";
+    if (
+        uiHasPermission(
+            context,
+            "ai.manage"
+        )
+    ) {
+        page << R"HTML(<div id="gpu-notice" role="status" class="section-card" hidden></div>)HTML";
+    }
 
-    if (context.page == "/admin" && context.admin) {
+    if (
+        context.page == "/admin"
+        &&
+        uiHasPermission(
+            context,
+            "ai.manage"
+        )
+    ) {
         page << R"HTML(
 <div class="section-card">
 <h2>GPU / AI accelerator</h2>
@@ -920,7 +1048,12 @@ button:disabled {
 </button>
 )HTML";
 
-        if (context.admin) {
+        if (
+            uiHasPermission(
+                context,
+                "system.manage"
+            )
+        ) {
             page << R"HTML(
 <button id="update-apply-btn" type="button" disabled>
 Обновить сервер
@@ -962,7 +1095,12 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
 </div>
 )HTML";
 
-        if (context.admin) {
+        if (
+            uiHasPermission(
+                context,
+                "network.manage"
+            )
+        ) {
             page << R"HTML(
 <div class="section-card">
 <h2>Настройки сети</h2>
@@ -1079,7 +1217,12 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
 </div>
 )HTML";
 
-        if (context.admin) {
+        if (
+            uiHasPermission(
+                context,
+                "storage.manage"
+            )
+        ) {
             page << R"HTML(
 <div class="section-card">
 <h2>Настройки хранилищ</h2>
@@ -1227,7 +1370,12 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
 </div>
 )HTML";
 
-        if (context.admin) {
+        if (
+            uiHasPermission(
+                context,
+                "files.manage"
+            )
+        ) {
             page << R"HTML(
 <div class="section-card">
 <h2>Настройки хранения файлов</h2>
@@ -1373,7 +1521,12 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
     else if (
         context.page == "/settings"
     ) {
-        if (context.admin) {
+        if (
+            uiHasPermission(
+                context,
+                "system.manage"
+            )
+        ) {
             page << R"HTML(
 <div class="section-card">
 <h2>Основные настройки</h2>
