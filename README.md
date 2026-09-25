@@ -1,20 +1,24 @@
 # Home AI Core
 
-Home AI Core is a local autonomous server platform designed for:
+Home AI Core is a local-first autonomous server platform designed for:
 
-- Artificial intelligence
-- Smart home control
-- Personal data management
-- Server management
-- Hypervisor management
-- Video surveillance and recording
-- Automation
-- Long-term memory
-- Controlled self-development
+- artificial intelligence
+- smart home control
+- personal data management
+- server management
+- hypervisor management
+- video surveillance and recording
+- automation
+- long-term memory
+- controlled self-development
 
-## Current version
+## Current stable version
 
-0.0.1
+0.0.4
+
+## Current development target
+
+0.0.5 — Security Core
 
 ## Platform
 
@@ -34,9 +38,21 @@ Home AI Core is a local autonomous server platform designed for:
 - Security
 - Hypervisor
 - Video
-- API
-- UI
+- Web/API
+
+## Documentation
+
+- [Project Map](docs/PROJECT_MAP.md)
+- [Roadmap](docs/ROADMAP.md)
+- [Development Workflow](docs/WORKFLOW.md)
+
+## Branches
+
+- `main` — stable, tested code
+- `develop` — active development and integration
+
+The development server should normally track `develop`.
 
 ## Status
 
-Early development.
+Early development. The current working foundation includes Core Runtime, logging, Event Bus, configuration, integrated Web Core, system monitoring and the live dashboard.
