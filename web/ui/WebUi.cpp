@@ -1464,14 +1464,32 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
     else if (
         context.page == "/users"
     ) {
+        const bool can_manage_users =
+            uiHasPermission(
+                context,
+                "users.manage"
+            );
+
         page << R"HTML(
-<div class="section-card">
+<div id="users-root" class="section-card" data-can-manage=")HTML";
+
+        page
+            << (
+                can_manage_users
+                ? "1"
+                : "0"
+            )
+            << R"HTML(">
 <h2>Текущий пользователь</h2>
 <div class="kv">
 <div>Имя</div><div>)HTML";
 
         page
-            << "<span data-i18n-skip>" << htmlEscape(context.username) << "</span>"
+            << "<span data-i18n-skip>"
+            << htmlEscape(
+                context.username
+            )
+            << "</span>"
             << "</div><div>Роль</div><div>"
             << htmlEscape(
                 context.role
@@ -1482,15 +1500,97 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
 </div>
 )HTML";
 
-        renderPlaceholder(
-            page,
-            "Управление пользователями",
-            "Создание пользователей, изменение ролей, сброс паролей и активные сессии будут находиться здесь.",
-            "<div class=\"placeholder-card\">Список пользователей — NEXT</div>"
-            "<div class=\"placeholder-card\">Роли и права — NEXT</div>"
-            "<div class=\"placeholder-card\">Сессии — NEXT</div>"
-            "<div class=\"placeholder-card\">Audit — NEXT</div>"
-        );
+        if (can_manage_users) {
+            page << R"HTML(
+<div class="section-card">
+<h2>Создать пользователя</h2>
+
+<div class="form-grid">
+<div>
+<label>Имя пользователя</label>
+<input id="new-user-name" maxlength="32" autocomplete="off">
+</div>
+
+<div>
+<label>Пароль</label>
+<input id="new-user-password" type="password" minlength="12" maxlength="256" autocomplete="new-password">
+</div>
+
+<div>
+<label>Роль</label>
+<select id="new-user-role">
+<option value="viewer">Наблюдатель</option>
+<option value="operator">Оператор</option>
+<option value="admin">Администратор</option>
+</select>
+</div>
+</div>
+
+<div class="button-row">
+<button id="user-create-btn" type="button">Создать пользователя</button>
+</div>
+
+<div id="user-action-message" class="muted" role="status" style="margin-top:12px"></div>
+</div>
+)HTML";
+        }
+
+        page << R"HTML(
+<div class="section-card">
+<div class="section-title">
+<h2>Пользователи</h2>
+<button id="users-refresh-btn" type="button" class="secondary">Обновить</button>
+</div>
+
+<div id="users-list" class="users-grid">
+<div class="user-card">Загрузка пользователей...</div>
+</div>
+</div>
+)HTML";
+
+        if (can_manage_users) {
+            page << R"HTML(
+<div class="section-card">
+<div class="section-title">
+<h2>Активные сессии</h2>
+<button id="sessions-refresh-btn" type="button" class="secondary">Обновить</button>
+</div>
+
+<div id="sessions-list" class="users-grid">
+<div class="user-card">Загрузка активных сессий...</div>
+</div>
+</div>
+
+<div class="section-card">
+<div class="section-title">
+<h2>Журнал безопасности</h2>
+<span class="section-hint">Последние события Security Core</span>
+</div>
+
+<div class="form-grid">
+<div>
+<label>Пользователь</label>
+<input id="audit-user-filter" placeholder="admin">
+</div>
+
+<div>
+<label>Событие</label>
+<input id="audit-event-filter" placeholder="login.success">
+</div>
+</div>
+
+<div class="button-row">
+<button id="audit-filter-btn" type="button">Применить фильтр</button>
+<button id="audit-prev-btn" type="button" class="secondary">Назад</button>
+<button id="audit-next-btn" type="button" class="secondary">Далее</button>
+</div>
+
+<div id="audit-list" class="audit-list" style="margin-top:16px">
+<div class="user-card">Загрузка журнала безопасности...</div>
+</div>
+</div>
+)HTML";
+        }
     }
     else if (
         context.page == "/automation"
