@@ -49,6 +49,7 @@ Home AI Core is a local-first autonomous server platform designed for:
 - [Storage Monitoring](docs/STORAGE.md)
 - [Web UI](docs/WEB_UI.md)
 - [Server Updates](docs/UPDATES.md)
+- [Module Manager](docs/MODULES.md)
 
 ## Branches
 
