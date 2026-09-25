@@ -28,9 +28,12 @@ The panel shows:
 - configured branch
 - local Git commit
 - remote GitHub commit
-- update state
+- a live 0–100% progress bar
+- explicit update stages
+- real Ninja compile progress when available
+- real CTest progress when available
 - progress/error message
-- build/test output when relevant
+- an expandable detailed build/test log
 
 The top bar also shows `Доступно обновление` when the remote commit differs from the local commit.
 
@@ -128,3 +131,23 @@ POST /api/update/check
 POST /api/update/apply
 POST /api/update/restart
 ```
+
+
+## Progress model
+
+The Web UI polls update status once per second while the server is running. The update stages are:
+
+```text
+5%   GitHub check
+15%  fetch changes
+25%  CMake configuration
+30-70%  Ninja build
+70-90%  CTest
+92-95%  build activation
+100% restart request
+```
+
+Ninja `[current/total]` output and CTest `current/total Test` output are parsed so the
+build and test percentages are based on actual command progress rather than a timer.
+The updater keeps reading child-process output even after the visible log reaches its 64 KiB
+rolling limit, preventing a verbose build from being terminated by a closed pipe.
