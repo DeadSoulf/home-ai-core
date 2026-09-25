@@ -3,6 +3,8 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstddef>
+#include <functional>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -30,6 +32,11 @@ struct UpdateStatus {
     std::string branch;
     std::string message;
     std::string last_output;
+
+    std::string progress_stage{"idle"};
+    int progress_percent{0};
+    std::size_t progress_current{0};
+    std::size_t progress_total{0};
 
     bool update_available{false};
     bool busy{false};
@@ -77,13 +84,19 @@ private:
         std::string output;
     };
 
+    using OutputCallback =
+        std::function<void(
+            const std::string&
+        )>;
+
     void workerLoop();
     void performCheck();
     void performUpdate();
 
     CommandResult runCommand(
         const std::string& executable,
-        const std::vector<std::string>& arguments
+        const std::vector<std::string>& arguments,
+        const OutputCallback& output_callback = {}
     ) const;
 
     bool worktreeClean(
@@ -97,6 +110,14 @@ private:
     void setState(
         UpdateState state,
         const std::string& message,
+        const std::string& output = ""
+    );
+
+    void setProgress(
+        const std::string& stage,
+        int percent,
+        std::size_t current = 0,
+        std::size_t total = 0,
         const std::string& output = ""
     );
 
