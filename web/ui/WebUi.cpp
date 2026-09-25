@@ -816,6 +816,9 @@ button:disabled {
         )
         << "</div></div>"
         << "<div class=\"topbar-meta\">"
+        << "<a id=\"update-badge\" href=\"/system\" "
+           "style=\"display:none;margin-right:14px;color:#f2d784;text-decoration:none;font-weight:700\">"
+           "Доступно обновление</a>"
         << htmlEscape(
             context.username
         )
@@ -867,6 +870,47 @@ button:disabled {
             )
             << R"HTML(</div>
 </div>
+</div>
+
+<div class="section-card">
+<div class="section-title">
+<h2>Обновление сервера</h2>
+<span class="section-hint">GitHub → build → tests → restart</span>
+</div>
+
+<div class="kv">
+<div>Ветка</div><div id="update-branch">...</div>
+<div>Локальная версия</div><div id="update-local">...</div>
+<div>GitHub версия</div><div id="update-remote">...</div>
+<div>Состояние</div><div id="update-state">...</div>
+</div>
+
+<div id="update-message" class="muted" style="margin-top:14px">
+Проверка состояния обновлений...
+</div>
+
+<div class="button-row">
+<button id="update-check-btn" type="button" class="secondary">
+Проверить обновления
+</button>
+)HTML";
+
+        if (context.admin) {
+            page << R"HTML(
+<button id="update-apply-btn" type="button" disabled>
+Обновить сервер
+</button>
+<button id="update-restart-btn" type="button" class="secondary" disabled>
+Перезапустить сервер
+</button>
+)HTML";
+        }
+
+        page << R"HTML(
+</div>
+
+<pre id="update-output"
+style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-radius:8px;overflow:auto"></pre>
 </div>
 )HTML";
     }
@@ -1328,6 +1372,197 @@ function formatUptime(seconds) {
         hours + "h "
         + minutes + "m"
     );
+}
+
+function shortSha(value) {
+    if (!value)
+        return "-";
+
+    return String(value).slice(0, 12);
+}
+
+async function postUpdateAction(
+    url,
+    parameters = null
+) {
+    const options = {
+        method: "POST"
+    };
+
+    if (parameters) {
+        options.headers = {
+            "Content-Type":
+                "application/x-www-form-urlencoded"
+        };
+
+        options.body =
+            parameters.toString();
+    }
+
+    const response =
+        await fetch(
+            url,
+            options
+        );
+
+    if (
+        response.status === 401
+    ) {
+        window.location =
+            "/login";
+
+        return null;
+    }
+
+    return await response.json();
+}
+
+async function updateServerUpdateStatus() {
+    try {
+        const response =
+            await fetch(
+                "/api/update/status",
+                {
+                    cache: "no-store"
+                }
+            );
+
+        if (
+            response.status === 401
+        ) {
+            window.location =
+                "/login";
+
+            return;
+        }
+
+        if (!response.ok)
+            return;
+
+        const data =
+            await response.json();
+
+        const badge =
+            document.getElementById(
+                "update-badge"
+            );
+
+        if (badge) {
+            if (
+                data.restart_required
+            ) {
+                badge.style.display =
+                    "inline";
+
+                badge.textContent =
+                    "Требуется перезапуск";
+            }
+            else if (
+                data.update_available
+            ) {
+                badge.style.display =
+                    "inline";
+
+                badge.textContent =
+                    "Доступно обновление";
+            }
+            else {
+                badge.style.display =
+                    "none";
+            }
+        }
+
+        const branch =
+            document.getElementById(
+                "update-branch"
+            );
+
+        if (!branch)
+            return;
+
+        branch.textContent =
+            data.branch || "-";
+
+        document.getElementById(
+            "update-local"
+        ).textContent =
+            shortSha(
+                data.local_sha
+            );
+
+        document.getElementById(
+            "update-remote"
+        ).textContent =
+            shortSha(
+                data.remote_sha
+            );
+
+        document.getElementById(
+            "update-state"
+        ).textContent =
+            data.state || "-";
+
+        document.getElementById(
+            "update-message"
+        ).textContent =
+            data.message || "";
+
+        const output =
+            document.getElementById(
+                "update-output"
+            );
+
+        if (output) {
+            if (data.last_output) {
+                output.style.display =
+                    "block";
+
+                output.textContent =
+                    data.last_output;
+            }
+            else {
+                output.style.display =
+                    "none";
+            }
+        }
+
+        const checkButton =
+            document.getElementById(
+                "update-check-btn"
+            );
+
+        if (checkButton)
+            checkButton.disabled =
+                Boolean(data.busy);
+
+        const applyButton =
+            document.getElementById(
+                "update-apply-btn"
+            );
+
+        if (applyButton) {
+            applyButton.disabled =
+                Boolean(data.busy)
+                ||
+                !data.update_available;
+        }
+
+        const restartButton =
+            document.getElementById(
+                "update-restart-btn"
+            );
+
+        if (restartButton) {
+            restartButton.disabled =
+                !data.restart_required;
+        }
+    }
+    catch (error) {
+        console.error(
+            "Update status error:",
+            error
+        );
+    }
 }
 
 function formatBytes(value) {
@@ -2660,6 +2895,124 @@ document.addEventListener(
         updateHomeErrors();
         updateStorageStats();
         updateStorageCandidates();
+        updateServerUpdateStatus();
+
+        const updateCheckButton =
+            document.getElementById(
+                "update-check-btn"
+            );
+
+        if (updateCheckButton) {
+            updateCheckButton.addEventListener(
+                "click",
+                async function() {
+                    await postUpdateAction(
+                        "/api/update/check"
+                    );
+
+                    setTimeout(
+                        updateServerUpdateStatus,
+                        400
+                    );
+                }
+            );
+        }
+
+        const updateApplyButton =
+            document.getElementById(
+                "update-apply-btn"
+            );
+
+        if (updateApplyButton) {
+            updateApplyButton.addEventListener(
+                "click",
+                async function() {
+                    const accepted =
+                        window.confirm(
+                            "Обновить репозиторий с GitHub, собрать новую версию и запустить тесты?"
+                        );
+
+                    if (!accepted)
+                        return;
+
+                    const parameters =
+                        new URLSearchParams();
+
+                    parameters.set(
+                        "confirm",
+                        "UPDATE"
+                    );
+
+                    const result =
+                        await postUpdateAction(
+                            "/api/update/apply",
+                            parameters
+                        );
+
+                    if (
+                        result
+                        &&
+                        result.message
+                    ) {
+                        const message =
+                            document.getElementById(
+                                "update-message"
+                            );
+
+                        if (message) {
+                            message.textContent =
+                                result.message;
+                        }
+                    }
+
+                    setTimeout(
+                        updateServerUpdateStatus,
+                        500
+                    );
+                }
+            );
+        }
+
+        const updateRestartButton =
+            document.getElementById(
+                "update-restart-btn"
+            );
+
+        if (updateRestartButton) {
+            updateRestartButton.addEventListener(
+                "click",
+                async function() {
+                    const accepted =
+                        window.confirm(
+                            "Перезапустить Home AI Core и применить новую сборку?"
+                        );
+
+                    if (!accepted)
+                        return;
+
+                    await postUpdateAction(
+                        "/api/update/restart"
+                    );
+
+                    const message =
+                        document.getElementById(
+                            "update-message"
+                        );
+
+                    if (message) {
+                        message.textContent =
+                            "Сервер перезапускается...";
+                    }
+
+                    setTimeout(
+                        function() {
+                            window.location.reload();
+                        },
+                        3500
+                    );
+                }
+            );
+        }
 
         const scanButton =
             document.getElementById(
@@ -2789,6 +3142,11 @@ document.addEventListener(
         setInterval(
             updateHomeErrors,
             5000
+        );
+
+        setInterval(
+            updateServerUpdateStatus,
+            15000
         );
 
         setInterval(
