@@ -404,15 +404,43 @@ int main()
                             .filename()
                             .string();
 
-                        const auto device =
+                        auto device =
                             homeai::DiskOperations::
                                 deviceForUuid(
                                     uuid
                                 );
 
                         if (device.empty()) {
+                            // Backward compatibility for mounts created
+                            // before UUID-based paths were introduced,
+                            // for example /mnt/home-ai/video/sdb.
+                            const auto devices =
+                                storage_monitor.
+                                    blockDevices();
+
+                            for (
+                                const auto& candidate :
+                                devices
+                            ) {
+                                if (
+                                    candidate.name ==
+                                        uuid
+                                    &&
+                                    !candidate.mounted
+                                    &&
+                                    candidate.candidate
+                                ) {
+                                    device =
+                                        candidate.device;
+
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (device.empty()) {
                             homeai::Logger::instance().warning(
-                                "Storage UUID not present: "
+                                "Managed storage device not present: "
                                 + uuid
                             );
 
