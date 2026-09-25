@@ -18,6 +18,13 @@ int main()
             "personal"
         );
 
+    const auto managed =
+        homeai::DiskOperations::
+        defaultMountPoint(
+            "/dev/sdd1",
+            "storage"
+        );
+
     const auto invalid =
         homeai::DiskOperations::
         defaultMountPoint(
@@ -31,6 +38,9 @@ int main()
         ||
         personal !=
             "/mnt/home-ai/files/nvme0n1p1"
+        ||
+        managed !=
+            "/mnt/home-ai/storage/sdd1"
         ||
         !invalid.empty()
     ) {
