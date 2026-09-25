@@ -2416,11 +2416,14 @@ UserDatabase::listSessions(
         ? "SELECT s.id,s.user_id,u.username,u.role,u.enabled,"
           "s.token_hash,s.created_at,s.expires_at,s.last_seen_at "
           "FROM sessions s JOIN users u ON u.id=s.user_id "
-          "WHERE s.user_id=?1 ORDER BY s.last_seen_at DESC;"
+          "WHERE s.user_id=?1 "
+          "AND s.expires_at>CAST(strftime('%s','now') AS INTEGER) "
+          "ORDER BY s.last_seen_at DESC;"
         : "SELECT s.id,s.user_id,u.username,u.role,u.enabled,"
           "s.token_hash,s.created_at,s.expires_at,s.last_seen_at "
           "FROM sessions s JOIN users u ON u.id=s.user_id "
-          "ORDER BY s.last_seen_at DESC;";
+          "WHERE s.expires_at>CAST(strftime('%s','now') AS INTEGER) "
+          "ORDER BY s.last_seen_at DESC;"
 
     Statement statement(
         database_,
