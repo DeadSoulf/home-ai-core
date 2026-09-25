@@ -56,6 +56,7 @@ add_library(
     security/auth/UserDatabase.cpp
 
     web/server/WebServer.cpp
+    web/server/JsonUtils.cpp
     web/ui/WebUi.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/Localization.cpp
 )
@@ -273,4 +274,21 @@ add_test(
 set_tests_properties(
     user_api
     PROPERTIES TIMEOUT 30
+)
+
+
+add_executable(
+    test-json-utils
+    tests/test_json_utils.cpp
+)
+
+target_link_libraries(
+    test-json-utils
+    PRIVATE
+    homeai-core-lib
+)
+
+add_test(
+    NAME json_utils
+    COMMAND test-json-utils
 )
