@@ -113,6 +113,49 @@ std::uint64_t usableFree(
 
 }
 
+StoragePoolSummary
+StoragePoolSelector::summarize(
+    const std::vector<StorageVolume>& volumes,
+    const std::string& role
+)
+{
+    StoragePoolSummary summary;
+
+    for (const auto& volume : volumes) {
+        if (
+            !hasRole(
+                volume,
+                role
+            )
+        ) {
+            continue;
+        }
+
+        ++summary.assigned_volumes;
+
+        if (volume.status != "online")
+            continue;
+
+        ++summary.online_volumes;
+
+        summary.total_bytes +=
+            volume.total_bytes > 0
+            ? volume.total_bytes
+            : volume.device_size_bytes;
+
+        if (volume.capacity_available) {
+            summary.free_bytes +=
+                volume.free_bytes;
+        }
+        else {
+            summary.free_bytes_complete =
+                false;
+        }
+    }
+
+    return summary;
+}
+
 StoragePoolPolicy
 StoragePoolSelector::policyFromString(
     const std::string& value
