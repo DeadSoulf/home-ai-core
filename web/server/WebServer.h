@@ -8,10 +8,15 @@
 namespace homeai {
 
 class CoreRuntime;
+class SecurityManager;
 
 class WebServer {
 public:
-    explicit WebServer(CoreRuntime& runtime);
+    WebServer(
+        CoreRuntime& runtime,
+        SecurityManager& security
+    );
+
     ~WebServer();
 
     bool start(
@@ -28,6 +33,7 @@ private:
     void handleClient(int client_fd);
 
     CoreRuntime& runtime_;
+    SecurityManager& security_;
 
     std::atomic<bool> running_{false};
 
