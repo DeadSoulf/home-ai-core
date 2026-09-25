@@ -121,8 +121,12 @@ server/
 │   └── SystemMonitor
 ├── network/
 ├── storage/
-│   └── StorageMonitor
-│       mounted storage, hot-plug discovery, capacity, roles and online/offline state
+│   ├── StorageMonitor
+│   │   mounted storage, hot-plug discovery, capacity, roles and online/offline state
+│   ├── DiskOperations
+│   │   unprivileged client for guarded disk actions
+│   └── StorageHelperMain
+│       privileged validated mount/unmount/format helper
 ├── processes/
 └── backup/
 ```
