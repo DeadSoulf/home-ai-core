@@ -590,6 +590,22 @@ void UpdateManager::performCheck()
             ? "Доступна новая версия в GitHub."
             : "Сервер использует актуальную версию.";
 
+        status_.progress_stage =
+            status_.update_available
+            ? "check"
+            : "complete";
+
+        status_.progress_percent =
+            status_.update_available
+            ? 10
+            : 100;
+
+        status_.progress_current =
+            1;
+
+        status_.progress_total =
+            1;
+
         status_.busy = false;
     }
 }
