@@ -829,6 +829,23 @@ bool rewriteIfupdown(
                 &&
                 !type_error
             ) {
+                const auto filename =
+                    entry.path()
+                        .filename()
+                        .string();
+
+                if (
+                    filename.ends_with(
+                        ".home-ai.bak"
+                    )
+                    ||
+                    filename.ends_with(
+                        ".home-ai.tmp"
+                    )
+                ) {
+                    continue;
+                }
+
                 candidates.push_back(
                     entry.path()
                 );
