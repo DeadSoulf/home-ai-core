@@ -81,6 +81,9 @@ Completed in the current development branch:
 - most-free, sequential, balanced and pinned pool placement policies
 - per-volume reserve thresholds by percentage and GB
 - automatic best-effort remount of UUID-managed storage after server restart
+- network interface inventory in Web UI
+- DHCP address request/renew through a constrained privileged Network Helper
+- NetworkManager, systemd-networkd, dhclient and udhcpc DHCP backend support
 
 Module Manager implemented in the current development branch:
 
