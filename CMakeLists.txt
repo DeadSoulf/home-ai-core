@@ -35,6 +35,7 @@ add_library(
     security/auth/SecurityManager.cpp
 
     web/server/WebServer.cpp
+    web/ui/WebUi.cpp
 )
 
 target_include_directories(
@@ -145,4 +146,21 @@ target_link_libraries(
     home-ai-storage-helper
     PRIVATE
     homeai-core-lib
+)
+
+
+add_executable(
+    test-web-ui
+    tests/test_web_ui.cpp
+)
+
+target_link_libraries(
+    test-web-ui
+    PRIVATE
+    homeai-core-lib
+)
+
+add_test(
+    NAME web_ui
+    COMMAND test-web-ui
 )
