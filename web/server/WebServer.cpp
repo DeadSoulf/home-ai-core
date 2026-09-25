@@ -2410,6 +2410,14 @@ void WebServer::handleClient(
                     ""
                 )
             ) +
+            "\","
+            "\"files.root\":\"" +
+            jsonEscape(
+                config.get(
+                    "files.root",
+                    "/mnt/home-ai/files"
+                )
+            ) +
             "\""
             "}";
 
@@ -2455,7 +2463,8 @@ void WebServer::handleClient(
             "web.bind",
             "web.port",
             "storage.video_mounts",
-            "storage.personal_mounts"
+            "storage.personal_mounts",
+            "files.root"
         };
 
         for (const auto* key : allowed_keys) {
@@ -2573,6 +2582,12 @@ void WebServer::handleClient(
             config.get(
                 "storage.personal_mounts",
                 ""
+            );
+
+        context.files_root =
+            config.get(
+                "files.root",
+                "/mnt/home-ai/files"
             );
 
         context.username =
