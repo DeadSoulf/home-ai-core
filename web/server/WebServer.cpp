@@ -2671,7 +2671,15 @@ void WebServer::handleClient(
                 << "\"status\":\""
                 << jsonEscape(volume.status)
                 << "\","
-                << "\"total_bytes\":"
+                << "\"device_size_bytes\":"
+                << volume.device_size_bytes
+                << ",\"capacity_available\":"
+                << (
+                    volume.capacity_available
+                    ? "true"
+                    : "false"
+                )
+                << ",\"total_bytes\":"
                 << volume.total_bytes
                 << ",\"used_bytes\":"
                 << volume.used_bytes
