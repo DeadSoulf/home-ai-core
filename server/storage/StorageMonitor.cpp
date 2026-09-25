@@ -8,6 +8,7 @@
 #include <map>
 #include <mntent.h>
 #include <set>
+#include <sstream>
 #include <string>
 #include <sys/statvfs.h>
 #include <utility>
