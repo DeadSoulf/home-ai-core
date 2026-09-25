@@ -13,6 +13,7 @@ struct StorageVolume {
     std::string role;
     std::string status;
 
+    std::uint64_t device_size_bytes{0};
     std::uint64_t total_bytes{0};
     std::uint64_t used_bytes{0};
     std::uint64_t free_bytes{0};
