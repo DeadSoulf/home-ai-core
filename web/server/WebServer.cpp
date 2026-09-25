@@ -2980,6 +2980,16 @@ void WebServer::handleClient(
             ? form.at("label")
             : "homeai-data";
 
+        const bool use_video =
+            form.contains("video")
+            &&
+            form.at("video") == "1";
+
+        const bool use_personal =
+            form.contains("personal")
+            &&
+            form.at("personal") == "1";
+
         StorageMonitor monitor;
 
         const auto devices =
@@ -3036,6 +3046,158 @@ void WebServer::handleClient(
                     response
                 );
             };
+
+        if (
+            action == "apply-roles"
+        ) {
+            std::string mount_point =
+                info->mount_point;
+
+            if (!info->mounted) {
+                if (
+                    !use_video
+                    &&
+                    !use_personal
+                ) {
+                    sendActionResult(
+                        {
+                            false,
+                            "role_required",
+                            "Выберите хотя бы одно назначение для нового диска."
+                        }
+                    );
+
+                    return;
+                }
+
+                DiskOperations role_operations;
+
+                const auto mount_result =
+                    role_operations.mount(
+                        device,
+                        "storage",
+                        false
+                    );
+
+                if (!mount_result.success) {
+                    sendActionResult(
+                        mount_result
+                    );
+
+                    return;
+                }
+
+                mount_point =
+                    DiskOperations::
+                        defaultMountPoint(
+                            device,
+                            "storage"
+                        );
+            }
+
+            if (mount_point.empty()) {
+                sendActionResult(
+                    {
+                        false,
+                        "mount_point_missing",
+                        "Не удалось определить точку монтирования диска."
+                    }
+                );
+
+                return;
+            }
+
+            const auto video_key =
+                "storage.video_mounts";
+
+            const auto personal_key =
+                "storage.personal_mounts";
+
+            config.set(
+                video_key,
+                use_video
+                ? addCsvValue(
+                    config.get(
+                        video_key,
+                        ""
+                    ),
+                    mount_point
+                )
+                : removeCsvValue(
+                    config.get(
+                        video_key,
+                        ""
+                    ),
+                    mount_point
+                )
+            );
+
+            config.set(
+                personal_key,
+                use_personal
+                ? addCsvValue(
+                    config.get(
+                        personal_key,
+                        ""
+                    ),
+                    mount_point
+                )
+                : removeCsvValue(
+                    config.get(
+                        personal_key,
+                        ""
+                    ),
+                    mount_point
+                )
+            );
+
+            if (!config.save()) {
+                sendActionResult(
+                    {
+                        false,
+                        "config_save_failed",
+                        "Не удалось сохранить назначение диска."
+                    }
+                );
+
+                return;
+            }
+
+            security_.audit(
+                "storage.roles",
+                session->username,
+                "device=" +
+                device +
+                " uuid=" +
+                info->uuid +
+                " mount=" +
+                mount_point +
+                " video=" +
+                (
+                    use_video
+                    ? "1"
+                    : "0"
+                ) +
+                " files=" +
+                (
+                    use_personal
+                    ? "1"
+                    : "0"
+                )
+            );
+
+            sendActionResult(
+                {
+                    true,
+                    "ok",
+                    use_video || use_personal
+                    ? "Назначение диска обновлено."
+                    : "Назначение Home AI Core снято."
+                }
+            );
+
+            return;
+        }
 
         if (
             action == "assign-video"
