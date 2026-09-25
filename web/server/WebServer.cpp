@@ -3530,6 +3530,26 @@ void WebServer::handleClient(
                 status.last_output
             ) +
             "\","
+            "\"progress_stage\":\"" +
+            jsonEscape(
+                status.progress_stage
+            ) +
+            "\","
+            "\"progress_percent\":" +
+            std::to_string(
+                status.progress_percent
+            ) +
+            ","
+            "\"progress_current\":" +
+            std::to_string(
+                status.progress_current
+            ) +
+            ","
+            "\"progress_total\":" +
+            std::to_string(
+                status.progress_total
+            ) +
+            ","
             "\"update_available\":" +
             std::string(
                 status.update_available
