@@ -3060,6 +3060,11 @@ void WebServer::handleClient(
             std::string mount_point =
                 info->mount_point;
 
+            DiskOperations role_operations;
+
+            bool mounted_by_request =
+                false;
+
             if (!info->mounted) {
                 if (
                     !use_video
@@ -3076,8 +3081,6 @@ void WebServer::handleClient(
 
                     return;
                 }
-
-                DiskOperations role_operations;
 
                 const std::string mount_role =
                     use_video
@@ -3105,9 +3108,17 @@ void WebServer::handleClient(
                             device,
                             mount_role
                         );
+
+                mounted_by_request =
+                    true;
             }
 
             if (mount_point.empty()) {
+                if (mounted_by_request) {
+                    role_operations.unmount(
+                        device
+                    );
+                }
                 sendActionResult(
                     {
                         false,
@@ -3124,6 +3135,18 @@ void WebServer::handleClient(
 
             const auto personal_key =
                 "storage.personal_mounts";
+
+            const auto previous_video =
+                config.get(
+                    video_key,
+                    ""
+                );
+
+            const auto previous_personal =
+                config.get(
+                    personal_key,
+                    ""
+                );
 
             config.set(
                 video_key,
@@ -3164,6 +3187,22 @@ void WebServer::handleClient(
             );
 
             if (!config.save()) {
+                config.set(
+                    video_key,
+                    previous_video
+                );
+
+                config.set(
+                    personal_key,
+                    previous_personal
+                );
+
+                if (mounted_by_request) {
+                    role_operations.unmount(
+                        device
+                    );
+                }
+
                 sendActionResult(
                     {
                         false,
