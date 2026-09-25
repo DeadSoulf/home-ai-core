@@ -805,6 +805,87 @@ button:disabled {
     margin-right: 8px;
 }
 
+.update-progress-shell {
+    margin-top: 16px;
+    padding: 14px;
+    border-radius: 10px;
+    background: var(--surface-2);
+    border: 1px solid #242a34;
+}
+
+.update-progress-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.update-progress-track {
+    flex: 1;
+    height: 12px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #0d1015;
+    border: 1px solid #2d3440;
+}
+
+.update-progress-bar {
+    width: 0%;
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.3s ease;
+}
+
+.update-progress-percent {
+    min-width: 48px;
+    text-align: right;
+    font-weight: 800;
+}
+
+.update-progress-detail {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.update-stage-list {
+    display: grid;
+    gap: 7px;
+    margin-top: 14px;
+}
+
+.update-stage-row {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) 48px;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #11151b;
+    border: 1px solid #242a34;
+}
+
+.update-stage-row.current {
+    border-color: #45638b;
+    background: #162033;
+}
+
+.update-stage-row.done .update-stage-icon {
+    color: var(--ok);
+}
+
+.update-stage-row.error {
+    border-color: #6b3138;
+    background: #2a171b;
+}
+
+.update-stage-row.error .update-stage-icon {
+    color: var(--danger);
+}
+
+.update-stage-row.pending {
+    opacity: 0.68;
+}
+
 @media (max-width: 860px) {
     .sidebar {
         position: static;
@@ -1143,6 +1224,43 @@ button:disabled {
 Проверка состояния обновлений...
 </div>
 
+<div class="update-progress-shell">
+<div class="update-progress-head">
+<div class="update-progress-track">
+<div id="update-progress-bar" class="update-progress-bar"></div>
+</div>
+<div id="update-progress-percent" class="update-progress-percent">0%</div>
+</div>
+
+<div id="update-progress-detail" class="update-progress-detail">
+Ожидание...
+</div>
+
+<div id="update-stage-list" class="update-stage-list">
+<div class="update-stage-row pending" data-update-stage="check" data-threshold="5">
+<span class="update-stage-icon">○</span><span>Проверка GitHub</span><span>5%</span>
+</div>
+<div class="update-stage-row pending" data-update-stage="download" data-threshold="15">
+<span class="update-stage-icon">○</span><span>Получение изменений</span><span>15%</span>
+</div>
+<div class="update-stage-row pending" data-update-stage="configure" data-threshold="25">
+<span class="update-stage-icon">○</span><span>Подготовка CMake</span><span>25%</span>
+</div>
+<div class="update-stage-row pending" data-update-stage="build" data-threshold="70">
+<span class="update-stage-icon">○</span><span>Сборка</span><span>70%</span>
+</div>
+<div class="update-stage-row pending" data-update-stage="tests" data-threshold="90">
+<span class="update-stage-icon">○</span><span>Тестирование</span><span>90%</span>
+</div>
+<div class="update-stage-row pending" data-update-stage="activation" data-threshold="95">
+<span class="update-stage-icon">○</span><span>Активация новой версии</span><span>95%</span>
+</div>
+<div class="update-stage-row pending" data-update-stage="restart" data-threshold="100">
+<span class="update-stage-icon">○</span><span>Перезапуск</span><span>100%</span>
+</div>
+</div>
+</div>
+
 <div class="button-row">
 <button id="update-check-btn" type="button" class="secondary">
 Проверить обновления
@@ -1168,8 +1286,11 @@ button:disabled {
         page << R"HTML(
 </div>
 
+<details id="update-log-details" style="margin-top:14px">
+<summary>Показать подробный журнал</summary>
 <pre id="update-output"
-style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-radius:8px;overflow:auto"></pre>
+style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-radius:8px;overflow:auto;max-height:360px"></pre>
+</details>
 </div>
 )HTML";
     }
@@ -3559,6 +3680,186 @@ async function postUpdateAction(
     return await response.json();
 }
 
+function renderUpdateProgress(data) {
+    const percent =
+        Math.max(
+            0,
+            Math.min(
+                100,
+                Number(
+                    data.progress_percent
+                    || 0
+                )
+            )
+        );
+
+    const bar =
+        document.getElementById(
+            "update-progress-bar"
+        );
+
+    if (bar)
+        bar.style.width =
+            percent + "%";
+
+    const percentLabel =
+        document.getElementById(
+            "update-progress-percent"
+        );
+
+    if (percentLabel)
+        percentLabel.textContent =
+            percent + "%";
+
+    const detail =
+        document.getElementById(
+            "update-progress-detail"
+        );
+
+    if (detail) {
+        if (
+            Number(data.progress_total) > 0
+        ) {
+            detail.textContent =
+                tr("Выполнено")
+                + ": "
+                + Number(
+                    data.progress_current
+                )
+                + " / "
+                + Number(
+                    data.progress_total
+                );
+        }
+        else {
+            detail.textContent =
+                data.message
+                || tr("Ожидание...");
+        }
+    }
+
+    const order = [
+        "check",
+        "download",
+        "configure",
+        "build",
+        "tests",
+        "activation",
+        "restart"
+    ];
+
+    const stage =
+        String(
+            data.progress_stage
+            || ""
+        );
+
+    let currentIndex =
+        order.indexOf(stage);
+
+    if (
+        data.state === "up_to_date"
+        ||
+        data.state === "update_available"
+    ) {
+        currentIndex = 0;
+    }
+
+    const failed =
+        data.state === "error";
+
+    const rows =
+        document.querySelectorAll(
+            "[data-update-stage]"
+        );
+
+    rows.forEach(
+        function(row) {
+            const rowStage =
+                row.dataset.updateStage;
+
+            const index =
+                order.indexOf(
+                    rowStage
+                );
+
+            const icon =
+                row.querySelector(
+                    ".update-stage-icon"
+                );
+
+            row.classList.remove(
+                "done",
+                "current",
+                "error",
+                "pending"
+            );
+
+            if (
+                index < currentIndex
+            ) {
+                row.classList.add(
+                    "done"
+                );
+
+                if (icon)
+                    icon.textContent =
+                        "✓";
+
+                return;
+            }
+
+            if (
+                index === currentIndex
+            ) {
+                if (failed) {
+                    row.classList.add(
+                        "error"
+                    );
+
+                    if (icon)
+                        icon.textContent =
+                            "!";
+                }
+                else if (
+                    data.state ===
+                        "up_to_date"
+                    ||
+                    data.state ===
+                        "update_available"
+                ) {
+                    row.classList.add(
+                        "done"
+                    );
+
+                    if (icon)
+                        icon.textContent =
+                            "✓";
+                }
+                else {
+                    row.classList.add(
+                        "current"
+                    );
+
+                    if (icon)
+                        icon.textContent =
+                            "●";
+                }
+
+                return;
+            }
+
+            row.classList.add(
+                "pending"
+            );
+
+            if (icon)
+                icon.textContent =
+                    "○";
+        }
+    );
+}
+
 async function updateServerUpdateStatus() {
     try {
         const response =
@@ -3648,6 +3949,10 @@ async function updateServerUpdateStatus() {
             "update-message"
         ).textContent =
             data.message || "";
+
+        renderUpdateProgress(
+            data
+        );
 
         const output =
             document.getElementById(
@@ -5920,7 +6225,7 @@ document.addEventListener(
 
         setInterval(
             updateServerUpdateStatus,
-            15000
+            1000
         );
 
         setInterval(
