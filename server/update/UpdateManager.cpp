@@ -407,6 +407,29 @@ void UpdateManager::performCheck()
         "Проверка GitHub..."
     );
 
+    const auto current_branch =
+        currentBranch();
+
+    if (
+        current_branch.empty()
+        ||
+        current_branch != branch_
+    ) {
+        setState(
+            UpdateState::Error,
+            "Ветка сервера не совпадает с настроенной веткой обновлений. Ожидается: "
+            + branch_
+            + ", текущая: "
+            + (
+                current_branch.empty()
+                ? "unknown"
+                : current_branch
+            )
+        );
+
+        return;
+    }
+
     const auto local =
         gitHead();
 
@@ -463,6 +486,22 @@ void UpdateManager::performCheck()
 
 void UpdateManager::performUpdate()
 {
+    const auto current_branch =
+        currentBranch();
+
+    if (
+        current_branch != branch_
+    ) {
+        setState(
+            UpdateState::Error,
+            "Обновление отменено: сервер находится не в ветке "
+            + branch_
+            + "."
+        );
+
+        return;
+    }
+
     std::string dirty;
 
     if (!worktreeClean(dirty)) {
@@ -971,6 +1010,26 @@ std::string UpdateManager::remoteHead() const
                 remote_,
                 "refs/heads/" +
                     branch_
+            }
+        );
+
+    if (result.exit_code != 0)
+        return {};
+
+    return firstToken(
+        result.output
+    );
+}
+
+std::string UpdateManager::currentBranch() const
+{
+    const auto result =
+        runCommand(
+            "/usr/bin/git",
+            {
+                "rev-parse",
+                "--abbrev-ref",
+                "HEAD"
             }
         );
 
