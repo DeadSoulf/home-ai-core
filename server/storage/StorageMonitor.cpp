@@ -218,6 +218,58 @@ mountedDevices()
     return mounted;
 }
 
+std::uint64_t blockDeviceSizeBytes(
+    const std::string& source
+)
+{
+    if (
+        source.empty()
+        ||
+        source.rfind(
+            "/dev/",
+            0
+        ) != 0
+    ) {
+        return 0;
+    }
+
+    std::filesystem::path device_path =
+        source;
+
+    std::error_code error;
+
+    const auto canonical =
+        std::filesystem::canonical(
+            device_path,
+            error
+        );
+
+    if (!error)
+        device_path = canonical;
+
+    const auto name =
+        device_path
+            .filename()
+            .string();
+
+    if (name.empty())
+        return 0;
+
+    const auto sectors =
+        readUnsigned(
+            std::filesystem::path(
+                "/sys/class/block"
+            )
+            /
+            name
+            /
+            "size"
+        );
+
+    return
+        sectors * 512ULL;
+}
+
 std::set<std::string>
 swapDevices()
 {
@@ -464,6 +516,11 @@ StorageMonitor::snapshot(
             volume.source =
                 source;
 
+            volume.device_size_bytes =
+                blockDeviceSizeBytes(
+                    source
+                );
+
             volume.mount_point =
                 mount_point;
 
@@ -556,6 +613,19 @@ StorageMonitor::snapshot(
                             )
                         ) * 100.0;
                 }
+            }
+
+            // Some freshly formatted or unusual mounts can temporarily
+            // report zero filesystem capacity through statvfs. Keep the
+            // physical block-device size available so the Web UI still
+            // shows the real disk size instead of 0 B.
+            if (
+                volume.total_bytes == 0
+                &&
+                volume.device_size_bytes > 0
+            ) {
+                volume.total_bytes =
+                    volume.device_size_bytes;
             }
 
             volumes.push_back(
