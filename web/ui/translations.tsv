@@ -457,3 +457,5 @@ AI: управление	AI: manage
 Ошибка базы аутентификации	Authentication database error
 Некорректная роль пользователя	Invalid user role
 Не удалось защитить токен сессии	Unable to protect session token
+Размер диска:	Disk size:
+Использование ФС: данные временно недоступны	Filesystem usage: temporarily unavailable
