@@ -4,6 +4,7 @@
 #include "core/runtime/CoreRuntime.h"
 #include "security/auth/SecurityManager.h"
 #include "server/system/SystemMonitor.h"
+#include "server/storage/StorageMonitor.h"
 
 #include <algorithm>
 #include <arpa/inet.h>
@@ -1318,6 +1319,82 @@ void WebServer::handleClient(
 
     if (
         method == "GET" &&
+        path == "/api/storage"
+    ) {
+        static StorageMonitor monitor;
+
+        const auto volumes =
+            monitor.snapshot(
+                runtime_.config().get(
+                    "storage.video_mounts",
+                    ""
+                ),
+                runtime_.config().get(
+                    "storage.personal_mounts",
+                    ""
+                )
+            );
+
+        std::ostringstream json;
+
+        json << "{\"volumes\":[";
+
+        bool first = true;
+
+        for (const auto& volume : volumes) {
+            if (!first)
+                json << ",";
+
+            first = false;
+
+            json
+                << "{"
+                << "\"source\":\""
+                << jsonEscape(volume.source)
+                << "\","
+                << "\"mount_point\":\""
+                << jsonEscape(volume.mount_point)
+                << "\","
+                << "\"filesystem\":\""
+                << jsonEscape(volume.filesystem)
+                << "\","
+                << "\"role\":\""
+                << jsonEscape(volume.role)
+                << "\","
+                << "\"status\":\""
+                << jsonEscape(volume.status)
+                << "\","
+                << "\"total_bytes\":"
+                << volume.total_bytes
+                << ",\"used_bytes\":"
+                << volume.used_bytes
+                << ",\"free_bytes\":"
+                << volume.free_bytes
+                << ",\"used_percent\":"
+                << volume.used_percent
+                << ",\"read_only\":"
+                << (
+                    volume.read_only
+                    ? "true"
+                    : "false"
+                )
+                << "}";
+        }
+
+        json << "]}";
+
+        sendResponse(
+            client_fd,
+            "200 OK",
+            "application/json; charset=utf-8",
+            json.str()
+        );
+
+        return;
+    }
+
+    if (
+        method == "GET" &&
         path == "/api/config"
     ) {
         if (
@@ -1387,6 +1464,22 @@ void WebServer::handleClient(
                     "8080"
                 )
             ) +
+            "\","
+            "\"storage.video_mounts\":\"" +
+            jsonEscape(
+                config.get(
+                    "storage.video_mounts",
+                    ""
+                )
+            ) +
+            "\","
+            "\"storage.personal_mounts\":\"" +
+            jsonEscape(
+                config.get(
+                    "storage.personal_mounts",
+                    ""
+                )
+            ) +
             "\""
             "}";
 
@@ -1430,7 +1523,9 @@ void WebServer::handleClient(
             "log.level",
             "runtime.tick_ms",
             "web.bind",
-            "web.port"
+            "web.port",
+            "storage.video_mounts",
+            "storage.personal_mounts"
         };
 
         for (const auto* key : allowed_keys) {
@@ -1522,6 +1617,22 @@ void WebServer::handleClient(
                 config.get(
                     "web.port",
                     "8080"
+                )
+            );
+
+        const auto storage_video_mounts =
+            htmlEscape(
+                config.get(
+                    "storage.video_mounts",
+                    ""
+                )
+            );
+
+        const auto storage_personal_mounts =
+            htmlEscape(
+                config.get(
+                    "storage.personal_mounts",
+                    ""
                 )
             );
 
@@ -1813,6 +1924,26 @@ Load Average<br>
 
             page << R"HTML(">
 
+<label>Диски для видео (точки монтирования через запятую)</label>
+<input
+    name="storage.video_mounts"
+    placeholder="/mnt/video1,/mnt/video2"
+    value=")HTML";
+
+            page << storage_video_mounts;
+
+            page << R"HTML(">
+
+<label>Диски для личных файлов (точки монтирования через запятую)</label>
+<input
+    name="storage.personal_mounts"
+    placeholder="/mnt/files1"
+    value=")HTML";
+
+            page << storage_personal_mounts;
+
+            page << R"HTML(">
+
 <button type="submit">
 Сохранить настройки
 </button>
@@ -1830,6 +1961,22 @@ Load Average<br>
         }
 
         page << R"HTML(
+<div class="card">
+<h3>Хранилища</h3>
+
+<p>
+<small>
+Показываются смонтированные блочные устройства и настроенные
+точки хранения видео/личных файлов. Несмонтированный настроенный
+диск будет отмечен как OFFLINE.
+</small>
+</p>
+
+<div id="storage-list" class="grid">
+<div class="metric">Загрузка информации о дисках...</div>
+</div>
+</div>
+
 <div class="card">
 <h3>Модули</h3>
 
@@ -1874,6 +2021,234 @@ function formatUptime(seconds) {
         hours + "h " +
         minutes + "m"
     );
+}
+
+function formatBytes(value) {
+    const bytes = Number(value);
+
+    if (!Number.isFinite(bytes) || bytes <= 0)
+        return "0 B";
+
+    const units = [
+        "B",
+        "KiB",
+        "MiB",
+        "GiB",
+        "TiB",
+        "PiB"
+    ];
+
+    let size = bytes;
+    let index = 0;
+
+    while (
+        size >= 1024
+        &&
+        index < units.length - 1
+    ) {
+        size /= 1024;
+        ++index;
+    }
+
+    return (
+        size.toFixed(
+            index === 0
+            ? 0
+            : 1
+        )
+        + " "
+        + units[index]
+    );
+}
+
+function storageRoleLabel(role) {
+    if (role === "video")
+        return "Видео";
+
+    if (role === "personal")
+        return "Личные файлы";
+
+    if (role === "video+personal")
+        return "Видео + личные файлы";
+
+    if (role === "system")
+        return "Системный";
+
+    return "Не назначен";
+}
+
+async function updateStorageStats() {
+    try {
+        const response =
+            await fetch(
+                "/api/storage",
+                {
+                    method: "GET",
+                    cache: "no-store"
+                }
+            );
+
+        if (response.status === 401) {
+            window.location = "/login";
+            return;
+        }
+
+        if (!response.ok)
+            return;
+
+        const data =
+            await response.json();
+
+        const container =
+            document.getElementById(
+                "storage-list"
+            );
+
+        if (!container)
+            return;
+
+        container.replaceChildren();
+
+        if (
+            !Array.isArray(data.volumes)
+            ||
+            data.volumes.length === 0
+        ) {
+            const empty =
+                document.createElement(
+                    "div"
+                );
+
+            empty.className = "metric";
+            empty.textContent =
+                "Блочные хранилища не обнаружены.";
+
+            container.appendChild(empty);
+            return;
+        }
+
+        for (const volume of data.volumes) {
+            const card =
+                document.createElement(
+                    "div"
+                );
+
+            card.className = "metric";
+
+            const title =
+                document.createElement(
+                    "strong"
+                );
+
+            title.textContent =
+                storageRoleLabel(
+                    volume.role
+                );
+
+            card.appendChild(title);
+
+            const status =
+                document.createElement(
+                    "div"
+                );
+
+            status.textContent =
+                "Статус: "
+                + (
+                    volume.status === "online"
+                    ? "ONLINE"
+                    : "OFFLINE"
+                )
+                + (
+                    volume.read_only
+                    ? " · READ ONLY"
+                    : ""
+                );
+
+            card.appendChild(status);
+
+            const device =
+                document.createElement(
+                    "div"
+                );
+
+            device.textContent =
+                "Устройство: "
+                + (
+                    volume.source
+                    || "не смонтировано"
+                );
+
+            card.appendChild(device);
+
+            const mount =
+                document.createElement(
+                    "div"
+                );
+
+            mount.textContent =
+                "Точка: "
+                + (
+                    volume.mount_point
+                    || "-"
+                );
+
+            card.appendChild(mount);
+
+            const filesystem =
+                document.createElement(
+                    "div"
+                );
+
+            filesystem.textContent =
+                "ФС: "
+                + (
+                    volume.filesystem
+                    || "-"
+                );
+
+            card.appendChild(filesystem);
+
+            const capacity =
+                document.createElement(
+                    "div"
+                );
+
+            if (volume.status === "online") {
+                capacity.textContent =
+                    "Занято: "
+                    + formatBytes(
+                        volume.used_bytes
+                    )
+                    + " / "
+                    + formatBytes(
+                        volume.total_bytes
+                    )
+                    + " ("
+                    + Number(
+                        volume.used_percent
+                    ).toFixed(1)
+                    + "%), свободно "
+                    + formatBytes(
+                        volume.free_bytes
+                    );
+            }
+            else {
+                capacity.textContent =
+                    "Ёмкость недоступна";
+            }
+
+            card.appendChild(capacity);
+
+            container.appendChild(card);
+        }
+    }
+    catch (error) {
+        console.error(
+            "Storage monitor error:",
+            error
+        );
+    }
 }
 
 async function updateSystemStats() {
@@ -1947,10 +2322,16 @@ document.addEventListener(
     "DOMContentLoaded",
     function() {
         updateSystemStats();
+        updateStorageStats();
 
         setInterval(
             updateSystemStats,
             2000
+        );
+
+        setInterval(
+            updateStorageStats,
+            5000
         );
     }
 );
