@@ -27,6 +27,16 @@ struct StoragePoolOptions {
     std::string preferred_mount;
 };
 
+struct StoragePoolSummary {
+    std::size_t assigned_volumes{0};
+    std::size_t online_volumes{0};
+
+    std::uint64_t total_bytes{0};
+    std::uint64_t free_bytes{0};
+
+    bool free_bytes_complete{true};
+};
+
 class StoragePoolSelector {
 public:
     static StoragePoolPolicy policyFromString(
@@ -35,6 +45,11 @@ public:
 
     static std::string policyToString(
         StoragePoolPolicy policy
+    );
+
+    static StoragePoolSummary summarize(
+        const std::vector<StorageVolume>& volumes,
+        const std::string& role
     );
 
     static std::optional<StorageVolume>
