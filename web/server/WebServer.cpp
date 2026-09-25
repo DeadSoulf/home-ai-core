@@ -1454,6 +1454,12 @@ void WebServer::handleClient(
                     ? "true"
                     : "false"
                 )
+                << ",\"in_use\":"
+                << (
+                    device.in_use
+                    ? "true"
+                    : "false"
+                )
                 << ",\"has_partitions\":"
                 << (
                     device.has_partitions
