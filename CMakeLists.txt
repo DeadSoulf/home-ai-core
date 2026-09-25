@@ -20,6 +20,11 @@ find_package(
     REQUIRED
 )
 
+file(
+    GLOB HOMEAI_NETWORK_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/server/network/*.cpp"
+)
+
 add_library(
     homeai-core-lib
 
@@ -31,6 +36,7 @@ add_library(
     core/runtime/CoreRuntime.cpp
 
     server/system/SystemMonitor.cpp
+    ${HOMEAI_NETWORK_SOURCES}
     server/storage/StorageMonitor.cpp
     server/storage/DiskOperations.cpp
     server/update/UpdateManager.cpp
