@@ -1,0 +1,1957 @@
+#include "server/cameras/CameraManager.h"
+
+#include <openssl/evp.h>
+#include <openssl/rand.h>
+#include <sqlite3.h>
+
+#include <algorithm>
+#include <array>
+#include <cctype>
+#include <cerrno>
+#include <chrono>
+#include <cstring>
+#include <filesystem>
+#include <fcntl.h>
+#include <fstream>
+#include <mutex>
+#include <netdb.h>
+#include <optional>
+#include <sstream>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <utility>
+#include <vector>
+
+namespace homeai {
+
+namespace {
+
+constexpr std::size_t secret_key_size = 32;
+constexpr std::size_t gcm_nonce_size = 12;
+constexpr std::size_t gcm_tag_size = 16;
+constexpr int probe_timeout_seconds = 2;
+
+std::int64_t unixNow()
+{
+    return std::chrono::duration_cast<
+        std::chrono::seconds
+    >(
+        std::chrono::system_clock::now()
+            .time_since_epoch()
+    ).count();
+}
+
+bool validText(
+    const std::string& value,
+    std::size_t maximum,
+    bool allow_empty
+)
+{
+    if (
+        value.size() > maximum
+        ||
+        (
+            !allow_empty
+            &&
+            value.empty()
+        )
+    ) {
+        return false;
+    }
+
+    return std::none_of(
+        value.begin(),
+        value.end(),
+        [](unsigned char character) {
+            return
+                character == 0
+                ||
+                character == '\r'
+                ||
+                character == '\n';
+        }
+    );
+}
+
+struct RtspEndpoint {
+    std::string host;
+    std::string port;
+};
+
+std::optional<RtspEndpoint>
+parseRtspEndpoint(
+    const std::string& url
+)
+{
+    std::string default_port;
+    std::size_t scheme_size = 0;
+
+    if (url.rfind("rtsp://", 0) == 0) {
+        scheme_size = 7;
+        default_port = "554";
+    }
+    else if (
+        url.rfind("rtsps://", 0) == 0
+    ) {
+        scheme_size = 8;
+        default_port = "322";
+    }
+    else {
+        return std::nullopt;
+    }
+
+    const auto authority_end =
+        url.find_first_of(
+            "/?#",
+            scheme_size
+        );
+
+    const auto authority =
+        url.substr(
+            scheme_size,
+            authority_end ==
+                std::string::npos
+            ? std::string::npos
+            : authority_end -
+                scheme_size
+        );
+
+    if (
+        authority.empty()
+        ||
+        authority.find('@') !=
+            std::string::npos
+    ) {
+        return std::nullopt;
+    }
+
+    RtspEndpoint endpoint;
+    endpoint.port = default_port;
+
+    if (authority.front() == '[') {
+        const auto closing =
+            authority.find(']');
+
+        if (
+            closing ==
+                std::string::npos
+            ||
+            closing == 1
+        ) {
+            return std::nullopt;
+        }
+
+        endpoint.host =
+            authority.substr(
+                1,
+                closing - 1
+            );
+
+        if (
+            closing + 1 <
+            authority.size()
+        ) {
+            if (
+                authority[
+                    closing + 1
+                ] != ':'
+            ) {
+                return std::nullopt;
+            }
+
+            endpoint.port =
+                authority.substr(
+                    closing + 2
+                );
+        }
+    }
+    else {
+        const auto colon =
+            authority.rfind(':');
+
+        if (
+            colon !=
+                std::string::npos
+            &&
+            authority.find(':') ==
+                colon
+        ) {
+            endpoint.host =
+                authority.substr(
+                    0,
+                    colon
+                );
+
+            endpoint.port =
+                authority.substr(
+                    colon + 1
+                );
+        }
+        else {
+            endpoint.host =
+                authority;
+        }
+    }
+
+    if (
+        endpoint.host.empty()
+        ||
+        endpoint.port.empty()
+    ) {
+        return std::nullopt;
+    }
+
+    if (
+        !std::all_of(
+            endpoint.port.begin(),
+            endpoint.port.end(),
+            [](unsigned char character) {
+                return std::isdigit(
+                    character
+                ) != 0;
+            }
+        )
+    ) {
+        return std::nullopt;
+    }
+
+    try {
+        const auto port =
+            std::stoi(endpoint.port);
+
+        if (
+            port < 1
+            ||
+            port > 65535
+        ) {
+            return std::nullopt;
+        }
+    }
+    catch (...) {
+        return std::nullopt;
+    }
+
+    return endpoint;
+}
+
+bool validateInput(
+    const CameraInput& input,
+    std::string& error
+)
+{
+    if (
+        !validText(
+            input.name,
+            128,
+            false
+        )
+    ) {
+        error =
+            "Имя камеры должно содержать 1–128 символов.";
+
+        return false;
+    }
+
+    if (
+        !validText(
+            input.rtsp_url,
+            2048,
+            false
+        )
+        ||
+        !parseRtspEndpoint(
+            input.rtsp_url
+        )
+    ) {
+        error =
+            "Некорректный RTSP URL. Используйте rtsp:// или rtsps:// без логина и пароля в URL.";
+
+        return false;
+    }
+
+    if (
+        !validText(
+            input.username,
+            128,
+            true
+        )
+        ||
+        !validText(
+            input.password,
+            512,
+            true
+        )
+    ) {
+        error =
+            "Некорректные учётные данные камеры.";
+
+        return false;
+    }
+
+    return true;
+}
+
+class Statement {
+public:
+    Statement(
+        sqlite3* database,
+        const char* sql
+    )
+    {
+        if (
+            sqlite3_prepare_v2(
+                database,
+                sql,
+                -1,
+                &statement_,
+                nullptr
+            ) != SQLITE_OK
+        ) {
+            statement_ = nullptr;
+        }
+    }
+
+    ~Statement()
+    {
+        if (statement_)
+            sqlite3_finalize(statement_);
+    }
+
+    sqlite3_stmt* get() const
+    {
+        return statement_;
+    }
+
+    explicit operator bool() const
+    {
+        return statement_ != nullptr;
+    }
+
+private:
+    sqlite3_stmt* statement_{nullptr};
+};
+
+bool bindText(
+    sqlite3_stmt* statement,
+    int index,
+    const std::string& value
+)
+{
+    return
+        sqlite3_bind_text(
+            statement,
+            index,
+            value.c_str(),
+            static_cast<int>(
+                value.size()
+            ),
+            SQLITE_TRANSIENT
+        ) == SQLITE_OK;
+}
+
+bool bindBlob(
+    sqlite3_stmt* statement,
+    int index,
+    const std::vector<unsigned char>& value
+)
+{
+    if (value.empty()) {
+        return
+            sqlite3_bind_null(
+                statement,
+                index
+            ) == SQLITE_OK;
+    }
+
+    return
+        sqlite3_bind_blob(
+            statement,
+            index,
+            value.data(),
+            static_cast<int>(
+                value.size()
+            ),
+            SQLITE_TRANSIENT
+        ) == SQLITE_OK;
+}
+
+std::vector<unsigned char>
+readBlob(
+    sqlite3_stmt* statement,
+    int column
+)
+{
+    const auto* data =
+        static_cast<
+            const unsigned char*
+        >(
+            sqlite3_column_blob(
+                statement,
+                column
+            )
+        );
+
+    const auto size =
+        sqlite3_column_bytes(
+            statement,
+            column
+        );
+
+    if (
+        !data
+        ||
+        size <= 0
+    ) {
+        return {};
+    }
+
+    return {
+        data,
+        data + size
+    };
+}
+
+std::string columnText(
+    sqlite3_stmt* statement,
+    int column
+)
+{
+    const auto* value =
+        sqlite3_column_text(
+            statement,
+            column
+        );
+
+    return
+        value
+        ? reinterpret_cast<
+            const char*
+          >(value)
+        : "";
+}
+
+bool writeExact(
+    int descriptor,
+    const unsigned char* data,
+    std::size_t size
+)
+{
+    std::size_t offset = 0;
+
+    while (offset < size) {
+        const auto written =
+            ::write(
+                descriptor,
+                data + offset,
+                size - offset
+            );
+
+        if (written <= 0)
+            return false;
+
+        offset +=
+            static_cast<
+                std::size_t
+            >(written);
+    }
+
+    return true;
+}
+
+bool readExact(
+    int descriptor,
+    unsigned char* data,
+    std::size_t size
+)
+{
+    std::size_t offset = 0;
+
+    while (offset < size) {
+        const auto received =
+            ::read(
+                descriptor,
+                data + offset,
+                size - offset
+            );
+
+        if (received <= 0)
+            return false;
+
+        offset +=
+            static_cast<
+                std::size_t
+            >(received);
+    }
+
+    return true;
+}
+
+struct EncryptedSecret {
+    std::vector<unsigned char> nonce;
+    std::vector<unsigned char> cipher;
+    std::vector<unsigned char> tag;
+};
+
+bool encryptSecret(
+    const std::vector<unsigned char>& key,
+    const std::string& plaintext,
+    EncryptedSecret& output
+)
+{
+    output = {};
+
+    if (plaintext.empty())
+        return true;
+
+    if (
+        key.size() !=
+        secret_key_size
+    ) {
+        return false;
+    }
+
+    output.nonce.resize(
+        gcm_nonce_size
+    );
+
+    output.tag.resize(
+        gcm_tag_size
+    );
+
+    output.cipher.resize(
+        plaintext.size()
+    );
+
+    if (
+        RAND_bytes(
+            output.nonce.data(),
+            static_cast<int>(
+                output.nonce.size()
+            )
+        ) != 1
+    ) {
+        return false;
+    }
+
+    EVP_CIPHER_CTX* context =
+        EVP_CIPHER_CTX_new();
+
+    if (!context)
+        return false;
+
+    int length = 0;
+    int final_length = 0;
+
+    const bool success =
+        EVP_EncryptInit_ex(
+            context,
+            EVP_aes_256_gcm(),
+            nullptr,
+            nullptr,
+            nullptr
+        ) == 1
+        &&
+        EVP_CIPHER_CTX_ctrl(
+            context,
+            EVP_CTRL_GCM_SET_IVLEN,
+            static_cast<int>(
+                output.nonce.size()
+            ),
+            nullptr
+        ) == 1
+        &&
+        EVP_EncryptInit_ex(
+            context,
+            nullptr,
+            nullptr,
+            key.data(),
+            output.nonce.data()
+        ) == 1
+        &&
+        EVP_EncryptUpdate(
+            context,
+            output.cipher.data(),
+            &length,
+            reinterpret_cast<
+                const unsigned char*
+            >(
+                plaintext.data()
+            ),
+            static_cast<int>(
+                plaintext.size()
+            )
+        ) == 1
+        &&
+        EVP_EncryptFinal_ex(
+            context,
+            output.cipher.data() +
+                length,
+            &final_length
+        ) == 1
+        &&
+        EVP_CIPHER_CTX_ctrl(
+            context,
+            EVP_CTRL_GCM_GET_TAG,
+            static_cast<int>(
+                output.tag.size()
+            ),
+            output.tag.data()
+        ) == 1;
+
+    EVP_CIPHER_CTX_free(
+        context
+    );
+
+    if (!success) {
+        output = {};
+        return false;
+    }
+
+    output.cipher.resize(
+        static_cast<std::size_t>(
+            length + final_length
+        )
+    );
+
+    return true;
+}
+
+bool connectEndpoint(
+    const RtspEndpoint& endpoint,
+    std::string& error
+)
+{
+    addrinfo hints{};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+
+    addrinfo* addresses = nullptr;
+
+    const int lookup =
+        ::getaddrinfo(
+            endpoint.host.c_str(),
+            endpoint.port.c_str(),
+            &hints,
+            &addresses
+        );
+
+    if (lookup != 0) {
+        error =
+            "Не удалось определить адрес камеры.";
+
+        return false;
+    }
+
+    bool connected = false;
+
+    for (
+        auto* address = addresses;
+        address;
+        address = address->ai_next
+    ) {
+        const int descriptor =
+            ::socket(
+                address->ai_family,
+                address->ai_socktype,
+                address->ai_protocol
+            );
+
+        if (descriptor < 0)
+            continue;
+
+        const int flags =
+            ::fcntl(
+                descriptor,
+                F_GETFL,
+                0
+            );
+
+        if (flags >= 0) {
+            ::fcntl(
+                descriptor,
+                F_SETFL,
+                flags | O_NONBLOCK
+            );
+        }
+
+        const int result =
+            ::connect(
+                descriptor,
+                address->ai_addr,
+                address->ai_addrlen
+            );
+
+        if (result == 0) {
+            connected = true;
+        }
+        else if (errno == EINPROGRESS) {
+            fd_set write_set;
+            FD_ZERO(&write_set);
+            FD_SET(
+                descriptor,
+                &write_set
+            );
+
+            timeval timeout{};
+            timeout.tv_sec =
+                probe_timeout_seconds;
+
+            const int selected =
+                ::select(
+                    descriptor + 1,
+                    nullptr,
+                    &write_set,
+                    nullptr,
+                    &timeout
+                );
+
+            if (
+                selected > 0
+                &&
+                FD_ISSET(
+                    descriptor,
+                    &write_set
+                )
+            ) {
+                int socket_error = 0;
+                socklen_t size =
+                    sizeof(socket_error);
+
+                if (
+                    ::getsockopt(
+                        descriptor,
+                        SOL_SOCKET,
+                        SO_ERROR,
+                        &socket_error,
+                        &size
+                    ) == 0
+                    &&
+                    socket_error == 0
+                ) {
+                    connected = true;
+                }
+            }
+        }
+
+        ::close(descriptor);
+
+        if (connected)
+            break;
+    }
+
+    ::freeaddrinfo(addresses);
+
+    if (!connected) {
+        error =
+            "RTSP-порт камеры недоступен.";
+    }
+
+    return connected;
+}
+
+}
+
+struct CameraManager::Impl {
+    mutable std::mutex mutex;
+    sqlite3* database{nullptr};
+    std::filesystem::path runtime_directory;
+    std::filesystem::path database_file;
+    std::filesystem::path key_file;
+    std::vector<unsigned char> key;
+    bool initialized{false};
+
+    ~Impl()
+    {
+        if (database)
+            sqlite3_close(database);
+    }
+
+    bool loadOrCreateKey(
+        std::string& error
+    )
+    {
+        key.resize(
+            secret_key_size
+        );
+
+        const int existing =
+            ::open(
+                key_file.c_str(),
+                O_RDONLY
+            );
+
+        if (existing >= 0) {
+            const bool ok =
+                readExact(
+                    existing,
+                    key.data(),
+                    key.size()
+                );
+
+            unsigned char extra = 0;
+
+            const bool exact =
+                ok
+                &&
+                ::read(
+                    existing,
+                    &extra,
+                    1
+                ) == 0;
+
+            ::close(existing);
+
+            if (!exact) {
+                error =
+                    "Camera secret key has an invalid size.";
+
+                return false;
+            }
+
+            ::chmod(
+                key_file.c_str(),
+                0600
+            );
+
+            return true;
+        }
+
+        if (
+            RAND_bytes(
+                key.data(),
+                static_cast<int>(
+                    key.size()
+                )
+            ) != 1
+        ) {
+            error =
+                "Unable to generate camera secret key.";
+
+            return false;
+        }
+
+        const int created =
+            ::open(
+                key_file.c_str(),
+                O_WRONLY |
+                    O_CREAT |
+                    O_EXCL,
+                0600
+            );
+
+        if (created < 0) {
+            error =
+                "Unable to create camera secret key.";
+
+            return false;
+        }
+
+        const bool written =
+            writeExact(
+                created,
+                key.data(),
+                key.size()
+            );
+
+        ::fsync(created);
+        ::close(created);
+
+        if (!written) {
+            std::error_code ignored;
+
+            std::filesystem::remove(
+                key_file,
+                ignored
+            );
+
+            error =
+                "Unable to write camera secret key.";
+
+            return false;
+        }
+
+        return true;
+    }
+
+    bool openDatabase(
+        std::string& error
+    )
+    {
+        if (
+            sqlite3_open_v2(
+                database_file.c_str(),
+                &database,
+                SQLITE_OPEN_READWRITE |
+                    SQLITE_OPEN_CREATE |
+                    SQLITE_OPEN_FULLMUTEX,
+                nullptr
+            ) != SQLITE_OK
+        ) {
+            error =
+                "Unable to open camera database.";
+
+            return false;
+        }
+
+        sqlite3_busy_timeout(
+            database,
+            3000
+        );
+
+        const char* schema =
+            "PRAGMA journal_mode=WAL;"
+            "PRAGMA foreign_keys=ON;"
+            "CREATE TABLE IF NOT EXISTS cameras("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "name TEXT NOT NULL UNIQUE,"
+            "rtsp_url TEXT NOT NULL,"
+            "username TEXT NOT NULL DEFAULT '',"
+            "password_nonce BLOB,"
+            "password_cipher BLOB,"
+            "password_tag BLOB,"
+            "enabled INTEGER NOT NULL DEFAULT 1,"
+            "status TEXT NOT NULL DEFAULT 'unknown',"
+            "last_error TEXT NOT NULL DEFAULT '',"
+            "last_seen_at INTEGER NOT NULL DEFAULT 0,"
+            "created_at INTEGER NOT NULL,"
+            "updated_at INTEGER NOT NULL"
+            ");"
+            "CREATE INDEX IF NOT EXISTS idx_cameras_enabled "
+            "ON cameras(enabled);";
+
+        char* message = nullptr;
+
+        if (
+            sqlite3_exec(
+                database,
+                schema,
+                nullptr,
+                nullptr,
+                &message
+            ) != SQLITE_OK
+        ) {
+            error =
+                message
+                ? message
+                : "Unable to initialize camera database.";
+
+            sqlite3_free(message);
+
+            return false;
+        }
+
+        ::chmod(
+            database_file.c_str(),
+            0600
+        );
+
+        return true;
+    }
+
+    CameraInfo readCamera(
+        sqlite3_stmt* statement
+    ) const
+    {
+        CameraInfo camera;
+
+        camera.id =
+            sqlite3_column_int64(
+                statement,
+                0
+            );
+
+        camera.name =
+            columnText(
+                statement,
+                1
+            );
+
+        camera.rtsp_url =
+            columnText(
+                statement,
+                2
+            );
+
+        camera.username =
+            columnText(
+                statement,
+                3
+            );
+
+        camera.has_password =
+            sqlite3_column_type(
+                statement,
+                4
+            ) != SQLITE_NULL
+            &&
+            sqlite3_column_bytes(
+                statement,
+                4
+            ) > 0;
+
+        camera.enabled =
+            sqlite3_column_int(
+                statement,
+                5
+            ) != 0;
+
+        camera.status =
+            columnText(
+                statement,
+                6
+            );
+
+        camera.last_error =
+            columnText(
+                statement,
+                7
+            );
+
+        camera.last_seen_at =
+            sqlite3_column_int64(
+                statement,
+                8
+            );
+
+        camera.created_at =
+            sqlite3_column_int64(
+                statement,
+                9
+            );
+
+        camera.updated_at =
+            sqlite3_column_int64(
+                statement,
+                10
+            );
+
+        return camera;
+    }
+
+    std::optional<CameraInfo>
+    findCamera(
+        std::int64_t id,
+        std::string& error
+    ) const
+    {
+        Statement statement(
+            database,
+            "SELECT id,name,rtsp_url,username,password_cipher,"
+            "enabled,status,last_error,last_seen_at,created_at,updated_at "
+            "FROM cameras WHERE id=?;"
+        );
+
+        if (!statement) {
+            error =
+                "Unable to prepare camera query.";
+
+            return std::nullopt;
+        }
+
+        sqlite3_bind_int64(
+            statement.get(),
+            1,
+            id
+        );
+
+        if (
+            sqlite3_step(
+                statement.get()
+            ) != SQLITE_ROW
+        ) {
+            error =
+                "Камера не найдена.";
+
+            return std::nullopt;
+        }
+
+        return
+            readCamera(
+                statement.get()
+            );
+    }
+
+    bool setStatus(
+        std::int64_t id,
+        const std::string& status,
+        const std::string& last_error,
+        std::int64_t last_seen
+    )
+    {
+        Statement statement(
+            database,
+            "UPDATE cameras "
+            "SET status=?,last_error=?,last_seen_at=? "
+            "WHERE id=?;"
+        );
+
+        if (!statement)
+            return false;
+
+        bindText(
+            statement.get(),
+            1,
+            status
+        );
+
+        bindText(
+            statement.get(),
+            2,
+            last_error
+        );
+
+        sqlite3_bind_int64(
+            statement.get(),
+            3,
+            last_seen
+        );
+
+        sqlite3_bind_int64(
+            statement.get(),
+            4,
+            id
+        );
+
+        return
+            sqlite3_step(
+                statement.get()
+            ) == SQLITE_DONE;
+    }
+};
+
+CameraManager::CameraManager()
+    : impl_(
+        std::make_unique<Impl>()
+    )
+{
+}
+
+CameraManager::~CameraManager()
+{
+    stop();
+}
+
+bool CameraManager::initialize(
+    const std::string& runtime_directory,
+    std::string& error
+)
+{
+    std::lock_guard<std::mutex>
+        lock(impl_->mutex);
+
+    if (impl_->initialized)
+        return true;
+
+    impl_->runtime_directory =
+        runtime_directory;
+
+    impl_->database_file =
+        impl_->runtime_directory /
+        "cameras.db";
+
+    impl_->key_file =
+        impl_->runtime_directory /
+        "secret.key";
+
+    std::error_code filesystem_error;
+
+    std::filesystem::create_directories(
+        impl_->runtime_directory,
+        filesystem_error
+    );
+
+    if (filesystem_error) {
+        error =
+            "Unable to create camera runtime directory: "
+            + filesystem_error.message();
+
+        return false;
+    }
+
+    ::chmod(
+        impl_->runtime_directory.c_str(),
+        0700
+    );
+
+    if (
+        !impl_->loadOrCreateKey(
+            error
+        )
+        ||
+        !impl_->openDatabase(
+            error
+        )
+    ) {
+        return false;
+    }
+
+    impl_->initialized = true;
+
+    return true;
+}
+
+bool CameraManager::start(
+    std::string& error
+)
+{
+    if (!impl_->initialized) {
+        error =
+            "Camera Manager is not initialized.";
+
+        return false;
+    }
+
+    if (running_)
+        return true;
+
+    running_ = true;
+
+    worker_ =
+        std::thread(
+            &CameraManager::workerLoop,
+            this
+        );
+
+    return true;
+}
+
+void CameraManager::stop()
+{
+    if (!running_)
+        return;
+
+    running_ = false;
+
+    if (worker_.joinable())
+        worker_.join();
+}
+
+bool CameraManager::healthy() const
+{
+    return impl_->initialized;
+}
+
+std::string
+CameraManager::healthMessage() const
+{
+    std::string error;
+    const auto items =
+        cameras(error);
+
+    if (!error.empty())
+        return error;
+
+    std::size_t online = 0;
+    std::size_t offline = 0;
+
+    for (const auto& camera : items) {
+        if (camera.status == "online")
+            ++online;
+        else if (
+            camera.enabled
+            &&
+            camera.status == "offline"
+        ) {
+            ++offline;
+        }
+    }
+
+    return
+        "Cameras: "
+        + std::to_string(
+            items.size()
+        )
+        + ", online: "
+        + std::to_string(online)
+        + ", offline: "
+        + std::to_string(offline)
+        + ".";
+}
+
+std::vector<CameraInfo>
+CameraManager::cameras(
+    std::string& error
+) const
+{
+    std::lock_guard<std::mutex>
+        lock(impl_->mutex);
+
+    std::vector<CameraInfo> result;
+
+    if (!impl_->initialized) {
+        error =
+            "Camera Manager is not initialized.";
+
+        return result;
+    }
+
+    Statement statement(
+        impl_->database,
+        "SELECT id,name,rtsp_url,username,password_cipher,"
+        "enabled,status,last_error,last_seen_at,created_at,updated_at "
+        "FROM cameras ORDER BY name COLLATE NOCASE,id;"
+    );
+
+    if (!statement) {
+        error =
+            "Unable to query camera database.";
+
+        return result;
+    }
+
+    while (
+        sqlite3_step(
+            statement.get()
+        ) == SQLITE_ROW
+    ) {
+        result.push_back(
+            impl_->readCamera(
+                statement.get()
+            )
+        );
+    }
+
+    return result;
+}
+
+CameraResult CameraManager::create(
+    const CameraInput& input
+)
+{
+    std::string validation_error;
+
+    if (
+        !validateInput(
+            input,
+            validation_error
+        )
+    ) {
+        return {
+            false,
+            "invalid_camera",
+            validation_error,
+            0
+        };
+    }
+
+    std::lock_guard<std::mutex>
+        lock(impl_->mutex);
+
+    if (!impl_->initialized) {
+        return {
+            false,
+            "not_initialized",
+            "Camera Manager is not initialized.",
+            0
+        };
+    }
+
+    EncryptedSecret password;
+
+    if (
+        !encryptSecret(
+            impl_->key,
+            input.password,
+            password
+        )
+    ) {
+        return {
+            false,
+            "secret_failed",
+            "Не удалось защитить пароль камеры.",
+            0
+        };
+    }
+
+    Statement statement(
+        impl_->database,
+        "INSERT INTO cameras("
+        "name,rtsp_url,username,"
+        "password_nonce,password_cipher,password_tag,"
+        "enabled,status,last_error,last_seen_at,created_at,updated_at"
+        ") VALUES(?,?,?,?,?,?,?,?,'',0,?,?);"
+    );
+
+    if (!statement) {
+        return {
+            false,
+            "database_error",
+            "Не удалось подготовить сохранение камеры.",
+            0
+        };
+    }
+
+    const auto now = unixNow();
+
+    const bool bound =
+        bindText(
+            statement.get(),
+            1,
+            input.name
+        )
+        &&
+        bindText(
+            statement.get(),
+            2,
+            input.rtsp_url
+        )
+        &&
+        bindText(
+            statement.get(),
+            3,
+            input.username
+        )
+        &&
+        bindBlob(
+            statement.get(),
+            4,
+            password.nonce
+        )
+        &&
+        bindBlob(
+            statement.get(),
+            5,
+            password.cipher
+        )
+        &&
+        bindBlob(
+            statement.get(),
+            6,
+            password.tag
+        )
+        &&
+        sqlite3_bind_int(
+            statement.get(),
+            7,
+            input.enabled
+                ? 1
+                : 0
+        ) == SQLITE_OK
+        &&
+        bindText(
+            statement.get(),
+            8,
+            input.enabled
+                ? "unknown"
+                : "disabled"
+        )
+        &&
+        sqlite3_bind_int64(
+            statement.get(),
+            9,
+            now
+        ) == SQLITE_OK
+        &&
+        sqlite3_bind_int64(
+            statement.get(),
+            10,
+            now
+        ) == SQLITE_OK;
+
+    if (
+        !bound
+        ||
+        sqlite3_step(
+            statement.get()
+        ) != SQLITE_DONE
+    ) {
+        return {
+            false,
+            "database_error",
+            "Не удалось сохранить камеру. Проверьте уникальность имени.",
+            0
+        };
+    }
+
+    return {
+        true,
+        "ok",
+        "Камера добавлена.",
+        sqlite3_last_insert_rowid(
+            impl_->database
+        )
+    };
+}
+
+CameraResult CameraManager::update(
+    std::int64_t id,
+    const CameraInput& input
+)
+{
+    if (id <= 0) {
+        return {
+            false,
+            "invalid_id",
+            "Некорректный ID камеры.",
+            0
+        };
+    }
+
+    std::string validation_error;
+
+    if (
+        !validateInput(
+            input,
+            validation_error
+        )
+    ) {
+        return {
+            false,
+            "invalid_camera",
+            validation_error,
+            id
+        };
+    }
+
+    std::lock_guard<std::mutex>
+        lock(impl_->mutex);
+
+    if (!impl_->initialized) {
+        return {
+            false,
+            "not_initialized",
+            "Camera Manager is not initialized.",
+            id
+        };
+    }
+
+    std::string find_error;
+
+    if (
+        !impl_->findCamera(
+            id,
+            find_error
+        )
+    ) {
+        return {
+            false,
+            "not_found",
+            find_error,
+            id
+        };
+    }
+
+    const auto now = unixNow();
+
+    if (input.update_password) {
+        EncryptedSecret password;
+
+        if (
+            !encryptSecret(
+                impl_->key,
+                input.password,
+                password
+            )
+        ) {
+            return {
+                false,
+                "secret_failed",
+                "Не удалось защитить пароль камеры.",
+                id
+            };
+        }
+
+        Statement statement(
+            impl_->database,
+            "UPDATE cameras SET "
+            "name=?,rtsp_url=?,username=?,"
+            "password_nonce=?,password_cipher=?,password_tag=?,"
+            "enabled=?,status=?,last_error='',updated_at=? "
+            "WHERE id=?;"
+        );
+
+        if (!statement) {
+            return {
+                false,
+                "database_error",
+                "Не удалось подготовить изменение камеры.",
+                id
+            };
+        }
+
+        const bool bound =
+            bindText(
+                statement.get(),
+                1,
+                input.name
+            )
+            &&
+            bindText(
+                statement.get(),
+                2,
+                input.rtsp_url
+            )
+            &&
+            bindText(
+                statement.get(),
+                3,
+                input.username
+            )
+            &&
+            bindBlob(
+                statement.get(),
+                4,
+                password.nonce
+            )
+            &&
+            bindBlob(
+                statement.get(),
+                5,
+                password.cipher
+            )
+            &&
+            bindBlob(
+                statement.get(),
+                6,
+                password.tag
+            )
+            &&
+            sqlite3_bind_int(
+                statement.get(),
+                7,
+                input.enabled
+                    ? 1
+                    : 0
+            ) == SQLITE_OK
+            &&
+            bindText(
+                statement.get(),
+                8,
+                input.enabled
+                    ? "unknown"
+                    : "disabled"
+            )
+            &&
+            sqlite3_bind_int64(
+                statement.get(),
+                9,
+                now
+            ) == SQLITE_OK
+            &&
+            sqlite3_bind_int64(
+                statement.get(),
+                10,
+                id
+            ) == SQLITE_OK;
+
+        if (
+            !bound
+            ||
+            sqlite3_step(
+                statement.get()
+            ) != SQLITE_DONE
+        ) {
+            return {
+                false,
+                "database_error",
+                "Не удалось изменить камеру. Проверьте уникальность имени.",
+                id
+            };
+        }
+    }
+    else {
+        Statement statement(
+            impl_->database,
+            "UPDATE cameras SET "
+            "name=?,rtsp_url=?,username=?,enabled=?,"
+            "status=?,last_error='',updated_at=? "
+            "WHERE id=?;"
+        );
+
+        if (!statement) {
+            return {
+                false,
+                "database_error",
+                "Не удалось подготовить изменение камеры.",
+                id
+            };
+        }
+
+        const bool bound =
+            bindText(
+                statement.get(),
+                1,
+                input.name
+            )
+            &&
+            bindText(
+                statement.get(),
+                2,
+                input.rtsp_url
+            )
+            &&
+            bindText(
+                statement.get(),
+                3,
+                input.username
+            )
+            &&
+            sqlite3_bind_int(
+                statement.get(),
+                4,
+                input.enabled
+                    ? 1
+                    : 0
+            ) == SQLITE_OK
+            &&
+            bindText(
+                statement.get(),
+                5,
+                input.enabled
+                    ? "unknown"
+                    : "disabled"
+            )
+            &&
+            sqlite3_bind_int64(
+                statement.get(),
+                6,
+                now
+            ) == SQLITE_OK
+            &&
+            sqlite3_bind_int64(
+                statement.get(),
+                7,
+                id
+            ) == SQLITE_OK;
+
+        if (
+            !bound
+            ||
+            sqlite3_step(
+                statement.get()
+            ) != SQLITE_DONE
+        ) {
+            return {
+                false,
+                "database_error",
+                "Не удалось изменить камеру. Проверьте уникальность имени.",
+                id
+            };
+        }
+    }
+
+    return {
+        true,
+        "ok",
+        "Камера сохранена.",
+        id
+    };
+}
+
+CameraResult CameraManager::remove(
+    std::int64_t id
+)
+{
+    if (id <= 0) {
+        return {
+            false,
+            "invalid_id",
+            "Некорректный ID камеры.",
+            id
+        };
+    }
+
+    std::lock_guard<std::mutex>
+        lock(impl_->mutex);
+
+    if (!impl_->initialized) {
+        return {
+            false,
+            "not_initialized",
+            "Camera Manager is not initialized.",
+            id
+        };
+    }
+
+    Statement statement(
+        impl_->database,
+        "DELETE FROM cameras WHERE id=?;"
+    );
+
+    if (!statement) {
+        return {
+            false,
+            "database_error",
+            "Не удалось подготовить удаление камеры.",
+            id
+        };
+    }
+
+    sqlite3_bind_int64(
+        statement.get(),
+        1,
+        id
+    );
+
+    if (
+        sqlite3_step(
+            statement.get()
+        ) != SQLITE_DONE
+    ) {
+        return {
+            false,
+            "database_error",
+            "Не удалось удалить камеру.",
+            id
+        };
+    }
+
+    if (
+        sqlite3_changes(
+            impl_->database
+        ) == 0
+    ) {
+        return {
+            false,
+            "not_found",
+            "Камера не найдена.",
+            id
+        };
+    }
+
+    return {
+        true,
+        "ok",
+        "Камера удалена.",
+        id
+    };
+}
+
+CameraResult CameraManager::probe(
+    std::int64_t id
+)
+{
+    CameraInfo camera;
+
+    {
+        std::lock_guard<std::mutex>
+            lock(impl_->mutex);
+
+        if (!impl_->initialized) {
+            return {
+                false,
+                "not_initialized",
+                "Camera Manager is not initialized.",
+                id
+            };
+        }
+
+        std::string error;
+
+        const auto found =
+            impl_->findCamera(
+                id,
+                error
+            );
+
+        if (!found) {
+            return {
+                false,
+                "not_found",
+                error,
+                id
+            };
+        }
+
+        camera = *found;
+
+        if (!camera.enabled) {
+            impl_->setStatus(
+                id,
+                "disabled",
+                "",
+                0
+            );
+
+            return {
+                false,
+                "disabled",
+                "Камера отключена.",
+                id
+            };
+        }
+    }
+
+    const auto endpoint =
+        parseRtspEndpoint(
+            camera.rtsp_url
+        );
+
+    std::string probe_error;
+
+    const bool online =
+        endpoint
+        &&
+        connectEndpoint(
+            *endpoint,
+            probe_error
+        );
+
+    {
+        std::lock_guard<std::mutex>
+            lock(impl_->mutex);
+
+        impl_->setStatus(
+            id,
+            online
+                ? "online"
+                : "offline",
+            online
+                ? ""
+                : probe_error,
+            online
+                ? unixNow()
+                : camera.last_seen_at
+        );
+    }
+
+    return {
+        online,
+        online
+            ? "online"
+            : "offline",
+        online
+            ? "RTSP-порт камеры доступен."
+            : probe_error,
+        id
+    };
+}
+
+void CameraManager::workerLoop()
+{
+    while (running_) {
+        std::string error;
+
+        const auto items =
+            cameras(error);
+
+        if (error.empty()) {
+            for (const auto& camera : items) {
+                if (!running_)
+                    break;
+
+                if (camera.enabled) {
+                    probe(
+                        camera.id
+                    );
+                }
+            }
+        }
+
+        for (
+            int second = 0;
+            second < 30
+            &&
+            running_;
+            ++second
+        ) {
+            std::this_thread::sleep_for(
+                std::chrono::seconds(1)
+            );
+        }
+    }
+}
+
+}

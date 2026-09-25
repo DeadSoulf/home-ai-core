@@ -11,6 +11,7 @@
 #include "server/system/SystemMonitor.h"
 #include "server/network/NetworkInterfaceManager.h"
 #include "server/network/VpnService.h"
+#include "server/cameras/CameraManager.h"
 #include "server/storage/StorageMonitor.h"
 #include "server/storage/StoragePool.h"
 #include "server/storage/DiskOperations.h"
@@ -804,13 +805,15 @@ WebServer::WebServer(
     SecurityManager& security,
     UpdateManager& updates,
     ModuleManager& modules,
-    GpuMonitor gpu_monitor
+    GpuMonitor gpu_monitor,
+    CameraManager* cameras
 )
     : runtime_(runtime),
       security_(security),
       updates_(updates),
       modules_(modules),
-      gpu_monitor_(std::move(gpu_monitor))
+      gpu_monitor_(std::move(gpu_monitor)),
+      cameras_(cameras)
 {
 }
 
@@ -2542,6 +2545,375 @@ void WebServer::handleClient(
             "200 OK",
             "application/json; charset=utf-8",
             response
+        );
+
+        return;
+    }
+
+    if (
+        method == "GET"
+        &&
+        path == "/api/cameras"
+    ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "cameras.view"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"error\":\"permission_denied\"}"
+            );
+
+            return;
+        }
+
+        if (
+            !cameras_
+            ||
+            !cameras_->healthy()
+        ) {
+            sendResponse(
+                client_fd,
+                "503 Service Unavailable",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"error\":\"camera_core_unavailable\"}"
+            );
+
+            return;
+        }
+
+        std::string error;
+        const auto items =
+            cameras_->cameras(error);
+
+        if (!error.empty()) {
+            sendResponse(
+                client_fd,
+                "500 Internal Server Error",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"" +
+                jsonEscape(error) +
+                "\"}"
+            );
+
+            return;
+        }
+
+        std::ostringstream json;
+        json << "{\"success\":true,\"cameras\":[";
+
+        bool first = true;
+
+        for (const auto& camera : items) {
+            if (!first)
+                json << ",";
+
+            first = false;
+
+            json
+                << "{"
+                << "\"id\":"
+                << camera.id
+                << ",\"name\":\""
+                << jsonEscape(camera.name)
+                << "\",\"rtsp_url\":\""
+                << jsonEscape(camera.rtsp_url)
+                << "\",\"username\":\""
+                << jsonEscape(camera.username)
+                << "\",\"has_password\":"
+                << (
+                    camera.has_password
+                    ? "true"
+                    : "false"
+                )
+                << ",\"enabled\":"
+                << (
+                    camera.enabled
+                    ? "true"
+                    : "false"
+                )
+                << ",\"status\":\""
+                << jsonEscape(camera.status)
+                << "\",\"last_error\":\""
+                << jsonEscape(camera.last_error)
+                << "\",\"last_seen_at\":"
+                << camera.last_seen_at
+                << ",\"created_at\":"
+                << camera.created_at
+                << ",\"updated_at\":"
+                << camera.updated_at
+                << "}";
+        }
+
+        json << "]}";
+
+        sendResponse(
+            client_fd,
+            "200 OK",
+            "application/json; charset=utf-8",
+            json.str()
+        );
+
+        return;
+    }
+
+    if (
+        method == "POST"
+        &&
+        (
+            path == "/api/cameras/save"
+            ||
+            path == "/api/cameras/delete"
+            ||
+            path == "/api/cameras/probe"
+        )
+    ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "cameras.manage"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"Требуются права управления камерами.\"}"
+            );
+
+            return;
+        }
+
+        if (
+            headerValue(
+                headers,
+                "X-HomeAI-Request"
+            ) != "1"
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"error\":\"request_header_required\"}"
+            );
+
+            return;
+        }
+
+        if (
+            !cameras_
+            ||
+            !cameras_->healthy()
+        ) {
+            sendResponse(
+                client_fd,
+                "503 Service Unavailable",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"error\":\"camera_core_unavailable\"}"
+            );
+
+            return;
+        }
+
+        const auto form =
+            parseForm(body);
+
+        auto parse_id =
+            [&]() -> std::int64_t {
+                const auto it =
+                    form.find("id");
+
+                if (
+                    it == form.end()
+                    ||
+                    it->second.empty()
+                ) {
+                    return 0;
+                }
+
+                try {
+                    std::size_t consumed = 0;
+
+                    const auto value =
+                        std::stoll(
+                            it->second,
+                            &consumed
+                        );
+
+                    if (
+                        consumed !=
+                            it->second.size()
+                        ||
+                        value <= 0
+                    ) {
+                        return 0;
+                    }
+
+                    return value;
+                }
+                catch (...) {
+                    return 0;
+                }
+            };
+
+        CameraResult result;
+
+        if (
+            path == "/api/cameras/save"
+        ) {
+            CameraInput input;
+
+            input.name =
+                form.contains("name")
+                ? form.at("name")
+                : "";
+
+            input.rtsp_url =
+                form.contains("rtsp_url")
+                ? form.at("rtsp_url")
+                : "";
+
+            input.username =
+                form.contains("username")
+                ? form.at("username")
+                : "";
+
+            input.password =
+                form.contains("password")
+                ? form.at("password")
+                : "";
+
+            input.enabled =
+                form.contains("enabled")
+                &&
+                (
+                    form.at("enabled") ==
+                        "1"
+                    ||
+                    form.at("enabled") ==
+                        "true"
+                    ||
+                    form.at("enabled") ==
+                        "on"
+                );
+
+            const auto id = parse_id();
+
+            input.update_password =
+                id == 0
+                ||
+                (
+                    form.contains(
+                        "update_password"
+                    )
+                    &&
+                    form.at(
+                        "update_password"
+                    ) == "1"
+                );
+
+            result =
+                id == 0
+                ? cameras_->create(input)
+                : cameras_->update(
+                    id,
+                    input
+                );
+
+            if (result.success) {
+                security_.audit(
+                    id == 0
+                        ? "camera.create"
+                        : "camera.update",
+                    session->username,
+                    "camera_id=" +
+                    std::to_string(
+                        result.id
+                    )
+                    +
+                    " name=" +
+                    input.name
+                );
+            }
+        }
+        else {
+            const auto id =
+                parse_id();
+
+            if (id <= 0) {
+                result = {
+                    false,
+                    "invalid_id",
+                    "Некорректный ID камеры.",
+                    0
+                };
+            }
+            else if (
+                path ==
+                    "/api/cameras/delete"
+            ) {
+                result =
+                    cameras_->remove(id);
+
+                if (result.success) {
+                    security_.audit(
+                        "camera.delete",
+                        session->username,
+                        "camera_id=" +
+                        std::to_string(id)
+                    );
+                }
+            }
+            else {
+                result =
+                    cameras_->probe(id);
+
+                security_.audit(
+                    "camera.probe",
+                    session->username,
+                    "camera_id=" +
+                    std::to_string(id)
+                    +
+                    " result=" +
+                    result.code
+                );
+            }
+        }
+
+        sendResponse(
+            client_fd,
+            result.success
+                ? "200 OK"
+                : (
+                    result.code ==
+                        "not_found"
+                    ? "404 Not Found"
+                    : "400 Bad Request"
+                ),
+            "application/json; charset=utf-8",
+            "{\"success\":" +
+            std::string(
+                result.success
+                    ? "true"
+                    : "false"
+            )
+            +
+            ",\"code\":\"" +
+            jsonEscape(result.code)
+            +
+            "\",\"message\":\"" +
+            jsonEscape(result.message)
+            +
+            "\",\"id\":" +
+            std::to_string(
+                result.id
+            )
+            +
+            "}"
         );
 
         return;

@@ -65,6 +65,11 @@ file(
     "${CMAKE_CURRENT_SOURCE_DIR}/server/network/*.cpp"
 )
 
+file(
+    GLOB HOMEAI_CAMERA_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/server/cameras/*.cpp"
+)
+
 add_library(
     homeai-core-lib
 
@@ -78,6 +83,7 @@ add_library(
     server/system/SystemMonitor.cpp
     server/hardware/GpuMonitor.cpp
     ${HOMEAI_NETWORK_SOURCES}
+    ${HOMEAI_CAMERA_SOURCES}
     server/storage/StorageMonitor.cpp
     server/storage/StoragePool.cpp
     server/storage/DiskOperations.cpp
@@ -378,4 +384,21 @@ target_link_libraries(
 add_test(
     NAME vpn_service
     COMMAND test-vpn-service
+)
+
+
+add_executable(
+    test-camera-manager
+    tests/test_camera_manager.cpp
+)
+
+target_link_libraries(
+    test-camera-manager
+    PRIVATE
+    homeai-core-lib
+)
+
+add_test(
+    NAME camera_manager
+    COMMAND test-camera-manager
 )

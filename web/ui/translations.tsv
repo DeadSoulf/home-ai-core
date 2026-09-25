@@ -580,3 +580,37 @@ IP-адрес	IP address
 Не удалось применить статический IPv4.	Unable to apply static IPv4.
 Network Helper готов.	Network Helper is ready.
 Для изменения IPv4 установите Network Helper.	Install Network Helper to change IPv4 settings.
+Всего	Total
+Добавить камеру	Add camera
+Редактировать камеру	Edit camera
+Название	Name
+RTSP URL	RTSP URL
+Логин	Username
+Оставьте пустым, чтобы не менять	Leave empty to keep unchanged
+Камера включена	Camera enabled
+Сохранить камеру	Save camera
+Очистить форму	Clear form
+Список камер	Camera list
+Загрузка камер...	Loading cameras...
+Следующие этапы	Next stages
+Проверить	Check
+Редактировать	Edit
+Удалить	Delete
+Последняя связь	Last seen
+Камера сохранена.	Camera saved.
+Ошибка камеры: 	Camera error: 
+Заполните название и RTSP URL.	Enter a name and RTSP URL.
+Пароль сохранён. Оставьте поле пустым, чтобы не менять его.	Password is stored. Leave the field empty to keep it unchanged.
+Пароль не задан.	Password is not configured.
+Камеры не добавлены. Добавьте первую RTSP-камеру.	No cameras configured. Add the first RTSP camera.
+Камеры не добавлены.	No cameras configured.
+Ошибка загрузки камер: 	Unable to load cameras: 
+Удалить камеру	Delete camera
+Camera Core	Camera Core
+RTSP-порт камеры доступен.	Camera RTSP port is reachable.
+RTSP-порт камеры недоступен.	Camera RTSP port is unreachable.
+Камера добавлена.	Camera added.
+Камера удалена.	Camera deleted.
+Камера отключена.	Camera is disabled.
+Требуются права управления камерами.	Camera management permission is required.
+Удалить сохранённый пароль	Remove stored password

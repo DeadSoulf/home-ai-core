@@ -13,7 +13,11 @@
 | 0.0.7 | WireGuard Web editor + centralized versioning | DEVELOPMENT SNAPSHOT |
 | 0.0.8 | Logical permission-aware Web sidebar and navigation | DEVELOPMENT SNAPSHOT |
 | 0.0.9 | Responsive mobile Web UI and off-canvas navigation | DEVELOPMENT SNAPSHOT |
-| 0.0.10 | Refined phone/tablet Web UI and touch ergonomics | IN DEVELOPMENT |
+| 0.0.10 | Refined phone/tablet Web UI and touch ergonomics | DEVELOPMENT SNAPSHOT |
+| 0.0.11 | Camera Core foundation: secure RTSP registry and health monitoring | IN DEVELOPMENT |
+| next 0.0.x | ONVIF discovery + Live View | PLANNED |
+| next 0.0.x | Recorder + archive + event pipeline | PLANNED |
+| next 0.0.x | Video analytics | PLANNED |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
 | next 0.0.x | Device Core | PLANNED |
 | next 0.0.x | Automation Core | PLANNED |
@@ -154,9 +158,9 @@ Implemented in the 0.0.9 snapshot:
 - 16 px mobile form controls
 - accessibility state for hidden navigation
 
-## Current focus: 0.0.10
+## Development snapshot: 0.0.10
 
-Current development work:
+Implemented in the 0.0.10 snapshot:
 
 - viewport-fit=cover safe-area support
 - 48 px touch targets for navigation, inputs, selects and buttons
@@ -169,11 +173,26 @@ Current development work:
 - improved touch behavior and reduced accidental zoom/highlight effects
 - expanded Web UI tests for mobile layout guarantees
 
-0.0.10 requires a development-server pull, clean build and the test suite before promotion.
+## Current focus: 0.0.11
 
-Patch versions after 0.0.10 are intentionally not pre-assigned to individual roadmap items.
-Each Core/runtime change advances to the next version, while larger minor milestones such as
-0.1.0 remain roadmap targets.
+Current Camera Core foundation:
+
+- CameraManager registered in Module Manager
+- dedicated SQLite camera database under `runtime/cameras`
+- per-installation 256-bit camera secret key with mode `0600`
+- AES-256-GCM protection for stored camera passwords
+- RTSP URL validation that rejects embedded credentials
+- camera CRUD with `cameras.view` / `cameras.manage`
+- password-preserving camera edits when the password field is left empty
+- manual and periodic RTSP host/port connectivity checks
+- ONLINE / OFFLINE / disabled state and last successful contact time
+- Camera Core health surfaced through the module status API
+- Web UI overview, add/edit form, camera cards, probe and delete actions
+- camera passwords excluded from list API responses and security audit details
+- CameraManager test covering CRUD, password preservation and plaintext-secret absence
+
+0.0.11 establishes the camera inventory/security/health layer. ONVIF, actual media probing,
+Live View, recording, archive and analytics are intentionally layered on top of this base.
 
 ## Later major capabilities
 

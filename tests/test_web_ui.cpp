@@ -323,6 +323,57 @@ int main()
         return 1;
     }
 
+    context.page =
+        "/cameras";
+
+    const auto cameras =
+        homeai::renderWebUi(
+            context
+        );
+
+    if (
+        cameras.find(
+            "id=\"camera-root\""
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "id=\"camera-list\""
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "id=\"camera-save-btn\""
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "id=\"camera-clear-password\""
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "/api/cameras/save"
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "/api/cameras/delete"
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "/api/cameras/probe"
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "Camera Core 0.0.11"
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "Камеры RTSP / ONVIF — PLANNED"
+        ) != std::string::npos
+    ) {
+        std::cerr
+            << "Camera page structure is invalid\n";
+
+        return 1;
+    }
+
     const std::string routes[] = {
         "/",
         "/system",

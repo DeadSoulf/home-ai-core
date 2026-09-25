@@ -3,6 +3,7 @@
 #include "core/modules/ModuleManager.h"
 #include "core/runtime/CoreRuntime.h"
 #include "security/auth/SecurityManager.h"
+#include "server/cameras/CameraManager.h"
 #include "server/storage/DiskOperations.h"
 #include "server/storage/StorageMonitor.h"
 #include "server/system/SystemMonitor.h"
@@ -167,13 +168,16 @@ int main()
     homeai::UpdateManager updates;
     homeai::SystemMonitor system_monitor;
     homeai::StorageMonitor storage_monitor;
+    homeai::CameraManager camera_manager;
     homeai::ModuleManager modules;
 
     homeai::WebServer web(
         runtime,
         security,
         updates,
-        modules
+        modules,
+        homeai::GpuMonitor(),
+        &camera_manager
     );
 
     std::string module_error;
@@ -599,12 +603,60 @@ int main()
             std::make_unique<
                 homeai::CallbackModule
             >(
+                "cameras",
+                std::vector<std::string>{},
+                [&](std::string& error) {
+                    return
+                        camera_manager.initialize(
+                            "runtime/cameras",
+                            error
+                        );
+                },
+                [&](std::string& error) {
+                    return
+                        camera_manager.start(
+                            error
+                        );
+                },
+                [&]() {
+                    camera_manager.stop();
+                },
+                [&]() {
+                    return
+                        camera_manager.healthy()
+                        ? homeai::ModuleHealth::
+                            Healthy
+                        : homeai::ModuleHealth::
+                            Unhealthy;
+                },
+                [&]() {
+                    return
+                        camera_manager.
+                            healthMessage();
+                }
+            ),
+            module_error
+        )
+    ) {
+        homeai::Logger::instance().error(
+            module_error
+        );
+
+        return 1;
+    }
+
+    if (
+        !modules.registerModule(
+            std::make_unique<
+                homeai::CallbackModule
+            >(
                 "web",
                 std::vector<std::string>{
                     "security",
                     "update",
                     "system-monitor",
-                    "storage-monitor"
+                    "storage-monitor",
+                    "cameras"
                 },
                 [](std::string&) {
                     return true;

@@ -12,6 +12,7 @@ class CoreRuntime;
 class SecurityManager;
 class UpdateManager;
 class ModuleManager;
+class CameraManager;
 
 class WebServer {
 public:
@@ -20,7 +21,8 @@ public:
         SecurityManager& security,
         UpdateManager& updates,
         ModuleManager& modules,
-        GpuMonitor gpu_monitor = GpuMonitor()
+        GpuMonitor gpu_monitor = GpuMonitor(),
+        CameraManager* cameras = nullptr
     );
 
     ~WebServer();
@@ -43,6 +45,7 @@ private:
     UpdateManager& updates_;
     ModuleManager& modules_;
     GpuMonitor gpu_monitor_;
+    CameraManager* cameras_{nullptr};
 
     std::atomic<bool> running_{false};
 

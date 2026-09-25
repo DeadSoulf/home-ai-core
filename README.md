@@ -18,7 +18,7 @@ Home AI Core is a local-first autonomous server platform designed for:
 
 ## Current development version
 
-0.0.10 — refined phone/tablet Web UI with larger touch targets and compact headers
+0.0.11 — Camera Core foundation: secure RTSP camera registry, status and Web management
 
 The repository root `VERSION` file is the single source of the compiled Core version.
 
@@ -50,6 +50,7 @@ The repository root `VERSION` file is the single source of the compiled Core ver
 - [Security](docs/SECURITY.md)
 - [Storage Monitoring](docs/STORAGE.md)
 - [Web UI](docs/WEB_UI.md)
+- [Cameras](docs/CAMERAS.md)
 - [Server Updates](docs/UPDATES.md)
 - [Module Manager](docs/MODULES.md)
 

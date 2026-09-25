@@ -2559,15 +2559,176 @@ PrivateKey отображается в редакторе и сохраняет�
     else if (
         context.page == "/cameras"
     ) {
-        renderPlaceholder(
-            page,
-            "Камеры",
-            "Все функции видеонаблюдения будут собраны в этом разделе.",
-            "<div class=\"placeholder-card\">Камеры RTSP / ONVIF — PLANNED</div>"
-            "<div class=\"placeholder-card\">Live View — PLANNED</div>"
-            "<div class=\"placeholder-card\">Архив — PLANNED</div>"
-            "<div class=\"placeholder-card\">Аналитика — PLANNED</div>"
-        );
+        const bool can_manage_cameras =
+            uiHasPermission(
+                context,
+                "cameras.manage"
+            );
+
+        page << R"HTML(
+<div id="camera-root" data-can-manage=")HTML";
+
+        page
+            << (
+                can_manage_cameras
+                ? "1"
+                : "0"
+            )
+            << R"HTML(">
+
+<div class="section-card">
+<div class="section-title">
+<h2>Камеры</h2>
+<span class="section-hint">Camera Core 0.0.11</span>
+</div>
+
+<div class="stats-grid">
+<div class="stat-card">
+<span class="stat-label">Всего</span>
+<strong id="camera-total">0</strong>
+</div>
+<div class="stat-card">
+<span class="stat-label">В сети</span>
+<strong id="camera-online" class="status-ok">0</strong>
+</div>
+<div class="stat-card">
+<span class="stat-label">Не в сети</span>
+<strong id="camera-offline" class="status-error">0</strong>
+</div>
+<div class="stat-card">
+<span class="stat-label">Отключено</span>
+<strong id="camera-disabled">0</strong>
+</div>
+</div>
+</div>
+)HTML";
+
+        if (can_manage_cameras) {
+            page << R"HTML(
+<div class="section-card">
+<div class="section-title">
+<h2 id="camera-form-title">Добавить камеру</h2>
+<span class="section-hint">RTSP</span>
+</div>
+
+<input id="camera-id" type="hidden">
+
+<div class="form-grid">
+<div>
+<label for="camera-name">Название</label>
+<input
+    id="camera-name"
+    maxlength="128"
+    autocomplete="off"
+    placeholder="Вход">
+</div>
+
+<div>
+<label for="camera-rtsp-url">RTSP URL</label>
+<input
+    id="camera-rtsp-url"
+    maxlength="2048"
+    autocomplete="off"
+    inputmode="url"
+    placeholder="rtsp://192.168.1.50:554/stream1">
+</div>
+
+<div>
+<label for="camera-username">Логин</label>
+<input
+    id="camera-username"
+    maxlength="128"
+    autocomplete="off"
+    placeholder="admin">
+</div>
+
+<div>
+<label for="camera-password">Пароль</label>
+<input
+    id="camera-password"
+    type="password"
+    maxlength="512"
+    autocomplete="new-password"
+    placeholder="Оставьте пустым, чтобы не менять">
+</div>
+</div>
+
+<label style="margin-top:14px">
+<input
+    id="camera-clear-password"
+    type="checkbox"
+    style="width:auto;margin-right:8px">
+Удалить сохранённый пароль
+</label>
+
+<label style="margin-top:14px">
+<input
+    id="camera-enabled"
+    type="checkbox"
+    checked
+    style="width:auto;margin-right:8px">
+Камера включена
+</label>
+
+<p class="muted">
+Логин и пароль указываются отдельно от RTSP URL.
+Пароль шифруется локальным ключом и не возвращается через API.
+</p>
+
+<div class="button-row">
+<button id="camera-save-btn" type="button">
+Сохранить камеру
+</button>
+<button id="camera-cancel-btn" type="button" class="secondary">
+Очистить форму
+</button>
+</div>
+
+<div
+    id="camera-form-message"
+    class="muted"
+    role="status"
+    style="margin-top:12px"></div>
+</div>
+)HTML";
+        }
+
+        page << R"HTML(
+<div class="section-card">
+<div class="section-title">
+<h2>Список камер</h2>
+<button
+    id="camera-refresh-btn"
+    type="button"
+    class="secondary">
+Обновить
+</button>
+</div>
+
+<div
+    id="camera-list"
+    class="placeholder-grid">
+<div class="placeholder-card">
+Загрузка камер...
+</div>
+</div>
+</div>
+
+<div class="section-card">
+<div class="section-title">
+<h2>Следующие этапы</h2>
+<span class="section-hint">Video / NVR</span>
+</div>
+<div class="placeholder-grid">
+<div class="placeholder-card">ONVIF discovery — NEXT</div>
+<div class="placeholder-card">Live View — NEXT</div>
+<div class="placeholder-card">Запись и архив — NEXT</div>
+<div class="placeholder-card">Аналитика — NEXT</div>
+</div>
+</div>
+
+</div>
+)HTML";
     }
     else if (
         context.page == "/smart-home"
@@ -4707,6 +4868,831 @@ document.addEventListener('DOMContentLoaded', () => {
     if (clear) clear.addEventListener('click', () => selectGpu(''));
 });
 
+let cameraCache = [];
+
+function cameraCanManage() {
+    const root =
+        document.getElementById(
+            "camera-root"
+        );
+
+    return (
+        root
+        &&
+        root.dataset.canManage === "1"
+    );
+}
+
+function cameraStatusLabel(camera) {
+    if (!camera.enabled)
+        return tr("Отключено");
+
+    if (camera.status === "online")
+        return tr("В сети");
+
+    if (camera.status === "offline")
+        return tr("Не в сети");
+
+    return tr("Неизвестно");
+}
+
+function cameraStatusClass(camera) {
+    if (!camera.enabled)
+        return "muted";
+
+    if (camera.status === "online")
+        return "status-ok";
+
+    if (camera.status === "offline")
+        return "status-error";
+
+    return "status-warn";
+}
+
+function clearCameraForm() {
+    const id =
+        document.getElementById(
+            "camera-id"
+        );
+
+    if (!id)
+        return;
+
+    id.value = "";
+
+    document.getElementById(
+        "camera-name"
+    ).value = "";
+
+    document.getElementById(
+        "camera-rtsp-url"
+    ).value = "";
+
+    document.getElementById(
+        "camera-username"
+    ).value = "";
+
+    document.getElementById(
+        "camera-password"
+    ).value = "";
+
+    document.getElementById(
+        "camera-enabled"
+    ).checked = true;
+
+    document.getElementById(
+        "camera-clear-password"
+    ).checked = false;
+
+    const title =
+        document.getElementById(
+            "camera-form-title"
+        );
+
+    if (title)
+        title.textContent =
+            tr("Добавить камеру");
+
+    const message =
+        document.getElementById(
+            "camera-form-message"
+        );
+
+    if (message)
+        message.textContent = "";
+}
+
+function editCamera(id) {
+    const camera =
+        cameraCache.find(
+            item =>
+                Number(item.id) ===
+                Number(id)
+        );
+
+    if (
+        !camera
+        ||
+        !cameraCanManage()
+    ) {
+        return;
+    }
+
+    document.getElementById(
+        "camera-id"
+    ).value = camera.id;
+
+    document.getElementById(
+        "camera-name"
+    ).value = camera.name || "";
+
+    document.getElementById(
+        "camera-rtsp-url"
+    ).value = camera.rtsp_url || "";
+
+    document.getElementById(
+        "camera-username"
+    ).value = camera.username || "";
+
+    document.getElementById(
+        "camera-password"
+    ).value = "";
+
+    document.getElementById(
+        "camera-enabled"
+    ).checked = !!camera.enabled;
+
+    document.getElementById(
+        "camera-clear-password"
+    ).checked = false;
+
+    const title =
+        document.getElementById(
+            "camera-form-title"
+        );
+
+    if (title) {
+        title.textContent =
+            tr("Редактировать камеру");
+    }
+
+    const message =
+        document.getElementById(
+            "camera-form-message"
+        );
+
+    if (message) {
+        message.textContent =
+            camera.has_password
+            ? tr("Пароль сохранён. Оставьте поле пустым, чтобы не менять его.")
+            : tr("Пароль не задан.");
+    }
+
+    const form =
+        document.getElementById(
+            "camera-form-title"
+        );
+
+    if (form) {
+        form.scrollIntoView(
+            {
+                behavior: "smooth",
+                block: "start"
+            }
+        );
+    }
+}
+
+async function cameraPost(
+    path,
+    parameters
+) {
+    const response =
+        await fetch(
+            path,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type":
+                        "application/x-www-form-urlencoded",
+                    "X-HomeAI-Request":
+                        "1"
+                },
+                body:
+                    parameters.toString()
+            }
+        );
+
+    if (response.status === 401) {
+        window.location = "/login";
+        return null;
+    }
+
+    const data =
+        await response.json();
+
+    if (!response.ok) {
+        throw new Error(
+            data.message
+            || data.error
+            || "Camera operation failed"
+        );
+    }
+
+    return data;
+}
+
+async function saveCamera() {
+    if (!cameraCanManage())
+        return;
+
+    const id =
+        document.getElementById(
+            "camera-id"
+        ).value;
+
+    const name =
+        document.getElementById(
+            "camera-name"
+        ).value.trim();
+
+    const rtspUrl =
+        document.getElementById(
+            "camera-rtsp-url"
+        ).value.trim();
+
+    const username =
+        document.getElementById(
+            "camera-username"
+        ).value.trim();
+
+    const password =
+        document.getElementById(
+            "camera-password"
+        ).value;
+
+    const enabled =
+        document.getElementById(
+            "camera-enabled"
+        ).checked;
+
+    const clearPassword =
+        document.getElementById(
+            "camera-clear-password"
+        ).checked;
+
+    const message =
+        document.getElementById(
+            "camera-form-message"
+        );
+
+    if (
+        !name
+        ||
+        !rtspUrl
+    ) {
+        if (message) {
+            message.textContent =
+                tr("Заполните название и RTSP URL.");
+        }
+
+        return;
+    }
+
+    const parameters =
+        new URLSearchParams();
+
+    if (id)
+        parameters.set("id", id);
+
+    parameters.set("name", name);
+    parameters.set("rtsp_url", rtspUrl);
+    parameters.set("username", username);
+    parameters.set("password", password);
+    parameters.set(
+        "enabled",
+        enabled ? "1" : "0"
+    );
+
+    if (
+        !id
+        ||
+        password.length > 0
+        ||
+        clearPassword
+    ) {
+        parameters.set(
+            "update_password",
+            "1"
+        );
+
+        if (clearPassword) {
+            parameters.set(
+                "password",
+                ""
+            );
+        }
+    }
+
+    const button =
+        document.getElementById(
+            "camera-save-btn"
+        );
+
+    if (button)
+        button.disabled = true;
+
+    try {
+        const result =
+            await cameraPost(
+                "/api/cameras/save",
+                parameters
+            );
+
+        if (!result)
+            return;
+
+        if (message)
+            message.textContent =
+                result.message
+                || tr("Камера сохранена.");
+
+        clearCameraForm();
+        await updateCameras();
+    }
+    catch (error) {
+        if (message) {
+            message.textContent =
+                tr("Ошибка камеры: ")
+                + error;
+        }
+    }
+    finally {
+        if (button)
+            button.disabled = false;
+    }
+}
+
+async function probeCamera(id) {
+    const parameters =
+        new URLSearchParams();
+
+    parameters.set(
+        "id",
+        String(id)
+    );
+
+    try {
+        await cameraPost(
+            "/api/cameras/probe",
+            parameters
+        );
+    }
+    catch (_) {
+        // Status and detailed error are refreshed from the camera list.
+    }
+
+    await updateCameras();
+}
+
+async function deleteCamera(id, name) {
+    if (
+        !window.confirm(
+            tr("Удалить камеру")
+            + " "
+            + name
+            + "?"
+        )
+    ) {
+        return;
+    }
+
+    const parameters =
+        new URLSearchParams();
+
+    parameters.set(
+        "id",
+        String(id)
+    );
+
+    try {
+        await cameraPost(
+            "/api/cameras/delete",
+            parameters
+        );
+
+        clearCameraForm();
+        await updateCameras();
+    }
+    catch (error) {
+        const message =
+            document.getElementById(
+                "camera-form-message"
+            );
+
+        if (message) {
+            message.textContent =
+                tr("Ошибка камеры: ")
+                + error;
+        }
+    }
+}
+
+function renderCameraCard(camera) {
+    const card =
+        document.createElement(
+            "div"
+        );
+
+    card.className =
+        "placeholder-card";
+
+    const title =
+        document.createElement(
+            "strong"
+        );
+
+    title.textContent =
+        camera.name;
+
+    title.dataset.i18nSkip = "";
+
+    card.appendChild(title);
+
+    const state =
+        document.createElement(
+            "div"
+        );
+
+    state.className =
+        cameraStatusClass(
+            camera
+        );
+
+    state.style.marginTop =
+        "8px";
+
+    state.textContent =
+        cameraStatusLabel(
+            camera
+        );
+
+    card.appendChild(state);
+
+    const address =
+        document.createElement(
+            "div"
+        );
+
+    address.className =
+        "muted";
+
+    address.style.marginTop =
+        "8px";
+
+    address.textContent =
+        camera.rtsp_url;
+
+    address.dataset.i18nSkip = "";
+
+    card.appendChild(address);
+
+    if (camera.username) {
+        const user =
+            document.createElement(
+                "div"
+            );
+
+        user.className =
+            "muted";
+
+        user.textContent =
+            tr("Логин")
+            + ": "
+            + camera.username;
+
+        user.dataset.i18nSkip = "";
+
+        card.appendChild(user);
+    }
+
+    if (camera.last_error) {
+        const error =
+            document.createElement(
+                "div"
+            );
+
+        error.className =
+            "status-error";
+
+        error.style.marginTop =
+            "8px";
+
+        error.textContent =
+            camera.last_error;
+
+        card.appendChild(error);
+    }
+
+    if (
+        camera.last_seen_at
+        &&
+        camera.last_seen_at > 0
+    ) {
+        const lastSeen =
+            document.createElement(
+                "div"
+            );
+
+        lastSeen.className =
+            "muted";
+
+        lastSeen.style.marginTop =
+            "6px";
+
+        lastSeen.textContent =
+            tr("Последняя связь")
+            + ": "
+            + new Date(
+                Number(
+                    camera.last_seen_at
+                ) * 1000
+            ).toLocaleString();
+
+        card.appendChild(lastSeen);
+    }
+
+    if (cameraCanManage()) {
+        const actions =
+            document.createElement(
+                "div"
+            );
+
+        actions.className =
+            "button-row";
+
+        const probe =
+            document.createElement(
+                "button"
+            );
+
+        probe.type = "button";
+        probe.className =
+            "secondary";
+        probe.textContent =
+            tr("Проверить");
+
+        probe.addEventListener(
+            "click",
+            function() {
+                probeCamera(
+                    camera.id
+                );
+            }
+        );
+
+        actions.appendChild(
+            probe
+        );
+
+        const edit =
+            document.createElement(
+                "button"
+            );
+
+        edit.type = "button";
+        edit.className =
+            "secondary";
+        edit.textContent =
+            tr("Редактировать");
+
+        edit.addEventListener(
+            "click",
+            function() {
+                editCamera(
+                    camera.id
+                );
+            }
+        );
+
+        actions.appendChild(
+            edit
+        );
+
+        const remove =
+            document.createElement(
+                "button"
+            );
+
+        remove.type = "button";
+        remove.className =
+            "danger";
+        remove.textContent =
+            tr("Удалить");
+
+        remove.addEventListener(
+            "click",
+            function() {
+                deleteCamera(
+                    camera.id,
+                    camera.name
+                );
+            }
+        );
+
+        actions.appendChild(
+            remove
+        );
+
+        card.appendChild(
+            actions
+        );
+    }
+
+    return card;
+}
+
+async function updateCameras() {
+    const container =
+        document.getElementById(
+            "camera-list"
+        );
+
+    if (!container)
+        return;
+
+    try {
+        const response =
+            await fetch(
+                "/api/cameras",
+                {
+                    cache: "no-store"
+                }
+            );
+
+        if (response.status === 401) {
+            window.location = "/login";
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error(
+                "Unable to load cameras"
+            );
+        }
+
+        const data =
+            await response.json();
+
+        cameraCache =
+            Array.isArray(
+                data.cameras
+            )
+            ? data.cameras
+            : [];
+
+        let online = 0;
+        let offline = 0;
+        let disabled = 0;
+
+        for (
+            const camera of
+            cameraCache
+        ) {
+            if (!camera.enabled)
+                ++disabled;
+            else if (
+                camera.status ===
+                    "online"
+            ) {
+                ++online;
+            }
+            else if (
+                camera.status ===
+                    "offline"
+            ) {
+                ++offline;
+            }
+        }
+
+        const counters = {
+            "camera-total":
+                cameraCache.length,
+            "camera-online":
+                online,
+            "camera-offline":
+                offline,
+            "camera-disabled":
+                disabled
+        };
+
+        for (
+            const [id, value] of
+            Object.entries(counters)
+        ) {
+            const element =
+                document.getElementById(
+                    id
+                );
+
+            if (element)
+                element.textContent =
+                    String(value);
+        }
+
+        container.replaceChildren();
+
+        if (
+            cameraCache.length === 0
+        ) {
+            const empty =
+                document.createElement(
+                    "div"
+                );
+
+            empty.className =
+                "placeholder-card";
+
+            empty.textContent =
+                cameraCanManage()
+                ? tr("Камеры не добавлены. Добавьте первую RTSP-камеру.")
+                : tr("Камеры не добавлены.");
+
+            container.appendChild(
+                empty
+            );
+
+            return;
+        }
+
+        for (
+            const camera of
+            cameraCache
+        ) {
+            container.appendChild(
+                renderCameraCard(
+                    camera
+                )
+            );
+        }
+    }
+    catch (error) {
+        container.replaceChildren();
+
+        const card =
+            document.createElement(
+                "div"
+            );
+
+        card.className =
+            "placeholder-card status-error";
+
+        card.textContent =
+            tr("Ошибка загрузки камер: ")
+            + error;
+
+        container.appendChild(
+            card
+        );
+    }
+}
+
+document.addEventListener(
+    "DOMContentLoaded",
+    function() {
+        if (
+            !document.getElementById(
+                "camera-list"
+            )
+        ) {
+            return;
+        }
+
+        updateCameras();
+
+        const refresh =
+            document.getElementById(
+                "camera-refresh-btn"
+            );
+
+        if (refresh) {
+            refresh.addEventListener(
+                "click",
+                updateCameras
+            );
+        }
+
+        const save =
+            document.getElementById(
+                "camera-save-btn"
+            );
+
+        if (save) {
+            save.addEventListener(
+                "click",
+                saveCamera
+            );
+        }
+
+        const cancel =
+            document.getElementById(
+                "camera-cancel-btn"
+            );
+
+        if (cancel) {
+            cancel.addEventListener(
+                "click",
+                clearCameraForm
+            );
+        }
+
+        setInterval(
+            updateCameras,
+            10000
+        );
+    }
+);
+
 function formatUptime(seconds) {
     seconds = Number(seconds);
 
@@ -6672,6 +7658,7 @@ function moduleDisplayName(name) {
         "update": "Update Manager",
         "system-monitor": "System Monitor",
         "storage-monitor": "Storage Monitor",
+        "cameras": "Camera Core",
         "web": "Web Core"
     };
 

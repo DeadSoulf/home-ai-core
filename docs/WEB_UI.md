@@ -151,12 +151,26 @@ Current storage UI includes:
 
 ## Cameras
 
-Reserved for:
+Current content:
 
-- RTSP/ONVIF cameras
-- live view
-- recording
-- archive
+- Camera Core status overview
+- persistent RTSP camera registry
+- create, edit and delete cameras
+- separate RTSP URL, username and password fields
+- local encrypted password storage
+- ONLINE/OFFLINE/disabled state
+- manual camera connectivity check
+- automatic periodic connectivity checks
+- permission-aware controls using `cameras.view` and `cameras.manage`
+
+The camera list never returns camera passwords through the normal Web API.
+
+Next stages:
+
+- ONVIF discovery and media profiles
+- browser Live View
+- continuous/event recording
+- archive and timeline
 - analytics
 
 ## Smart Home
