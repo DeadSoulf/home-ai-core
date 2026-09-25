@@ -329,6 +329,18 @@ bool validateInput(
             256,
             true
         )
+        ||
+        !validText(
+            input.ptz_xaddr,
+            2048,
+            true
+        )
+        ||
+        !validText(
+            input.ptz_profile_token,
+            512,
+            true
+        )
     ) {
         error =
             "Некорректная ONVIF информация камеры.";
@@ -1311,6 +1323,8 @@ struct CameraManager::Impl {
             "firmware_version TEXT NOT NULL DEFAULT '',"
             "serial_number TEXT NOT NULL DEFAULT '',"
             "hardware_id TEXT NOT NULL DEFAULT '',"
+            "ptz_xaddr TEXT NOT NULL DEFAULT '',"
+            "ptz_profile_token TEXT NOT NULL DEFAULT '',"
             "FOREIGN KEY(camera_id) REFERENCES cameras(id) ON DELETE CASCADE"
             ");";
 
@@ -1395,6 +1409,100 @@ struct CameraManager::Impl {
 
                 return false;
             }
+        }
+
+        bool has_ptz_xaddr = false;
+        bool has_ptz_profile_token = false;
+
+        {
+            Statement columns(
+                database,
+                "PRAGMA table_info(camera_device_info);"
+            );
+
+            if (!columns) {
+                error =
+                    "Unable to inspect camera device info schema.";
+
+                return false;
+            }
+
+            while (
+                sqlite3_step(
+                    columns.get()
+                ) == SQLITE_ROW
+            ) {
+                const auto name =
+                    columnText(
+                        columns.get(),
+                        1
+                    );
+
+                if (name == "ptz_xaddr")
+                    has_ptz_xaddr = true;
+                else if (
+                    name ==
+                        "ptz_profile_token"
+                ) {
+                    has_ptz_profile_token =
+                        true;
+                }
+            }
+        }
+
+        auto add_device_info_column =
+            [&](
+                const char* sql
+            ) -> bool {
+                char* migration_message =
+                    nullptr;
+
+                if (
+                    sqlite3_exec(
+                        database,
+                        sql,
+                        nullptr,
+                        nullptr,
+                        &migration_message
+                    ) != SQLITE_OK
+                ) {
+                    error =
+                        migration_message
+                        ? migration_message
+                        : "Unable to migrate camera device info.";
+
+                    sqlite3_free(
+                        migration_message
+                    );
+
+                    return false;
+                }
+
+                return true;
+            };
+
+        if (
+            !has_ptz_xaddr
+            &&
+            !add_device_info_column(
+                "ALTER TABLE camera_device_info "
+                "ADD COLUMN ptz_xaddr "
+                "TEXT NOT NULL DEFAULT '';"
+            )
+        ) {
+            return false;
+        }
+
+        if (
+            !has_ptz_profile_token
+            &&
+            !add_device_info_column(
+                "ALTER TABLE camera_device_info "
+                "ADD COLUMN ptz_profile_token "
+                "TEXT NOT NULL DEFAULT '';"
+            )
+        ) {
+            return false;
         }
 
         ::chmod(
@@ -1547,7 +1655,7 @@ struct CameraManager::Impl {
         Statement statement(
             database,
             "SELECT manufacturer,model,firmware_version,"
-            "serial_number,hardware_id "
+            "serial_number,hardware_id,ptz_xaddr,ptz_profile_token "
             "FROM camera_device_info WHERE camera_id=?;"
         );
 
@@ -1597,6 +1705,18 @@ struct CameraManager::Impl {
                 statement.get(),
                 4
             );
+
+        camera.ptz_xaddr =
+            columnText(
+                statement.get(),
+                5
+            );
+
+        camera.ptz_profile_token =
+            columnText(
+                statement.get(),
+                6
+            );
     }
 
     bool saveDeviceInfo(
@@ -1608,14 +1728,16 @@ struct CameraManager::Impl {
             database,
             "INSERT INTO camera_device_info("
             "camera_id,manufacturer,model,firmware_version,"
-            "serial_number,hardware_id"
-            ") VALUES(?,?,?,?,?,?) "
+            "serial_number,hardware_id,ptz_xaddr,ptz_profile_token"
+            ") VALUES(?,?,?,?,?,?,?,?) "
             "ON CONFLICT(camera_id) DO UPDATE SET "
             "manufacturer=excluded.manufacturer,"
             "model=excluded.model,"
             "firmware_version=excluded.firmware_version,"
             "serial_number=excluded.serial_number,"
-            "hardware_id=excluded.hardware_id;"
+            "hardware_id=excluded.hardware_id,"
+            "ptz_xaddr=excluded.ptz_xaddr,"
+            "ptz_profile_token=excluded.ptz_profile_token;"
         );
 
         if (!statement)
@@ -1656,6 +1778,18 @@ struct CameraManager::Impl {
                 statement.get(),
                 6,
                 input.hardware_id
+            )
+            &&
+            bindText(
+                statement.get(),
+                7,
+                input.ptz_xaddr
+            )
+            &&
+            bindText(
+                statement.get(),
+                8,
+                input.ptz_profile_token
             )
             &&
             sqlite3_step(
@@ -1812,6 +1946,128 @@ struct CameraManager::Impl {
                 username,
                 password
             );
+
+        return true;
+    }
+
+    bool onvifControlAccess(
+        std::int64_t id,
+        std::string& ptz_xaddr,
+        std::string& profile_token,
+        std::string& username,
+        std::string& password,
+        std::string& error
+    ) const
+    {
+        Statement statement(
+            database,
+            "SELECT c.username,c.password_nonce,c.password_cipher,"
+            "c.password_tag,c.enabled,"
+            "COALESCE(d.ptz_xaddr,''),"
+            "COALESCE(d.ptz_profile_token,'') "
+            "FROM cameras c "
+            "LEFT JOIN camera_device_info d "
+            "ON d.camera_id=c.id "
+            "WHERE c.id=?;"
+        );
+
+        if (!statement) {
+            error =
+                "Unable to prepare ONVIF credential query.";
+
+            return false;
+        }
+
+        sqlite3_bind_int64(
+            statement.get(),
+            1,
+            id
+        );
+
+        if (
+            sqlite3_step(
+                statement.get()
+            ) != SQLITE_ROW
+        ) {
+            error =
+                "Камера не найдена.";
+
+            return false;
+        }
+
+        if (
+            sqlite3_column_int(
+                statement.get(),
+                4
+            ) == 0
+        ) {
+            error =
+                "Камера отключена.";
+
+            return false;
+        }
+
+        username =
+            columnText(
+                statement.get(),
+                0
+            );
+
+        const auto nonce =
+            readBlob(
+                statement.get(),
+                1
+            );
+
+        const auto cipher =
+            readBlob(
+                statement.get(),
+                2
+            );
+
+        const auto tag =
+            readBlob(
+                statement.get(),
+                3
+            );
+
+        ptz_xaddr =
+            columnText(
+                statement.get(),
+                5
+            );
+
+        profile_token =
+            columnText(
+                statement.get(),
+                6
+            );
+
+        if (
+            ptz_xaddr.empty()
+            ||
+            profile_token.empty()
+        ) {
+            error =
+                "PTZ не поддерживается или ещё не обнаружен через ONVIF.";
+
+            return false;
+        }
+
+        if (
+            !decryptSecret(
+                key,
+                nonce,
+                cipher,
+                tag,
+                password
+            )
+        ) {
+            error =
+                "Не удалось расшифровать пароль камеры.";
+
+            return false;
+        }
 
         return true;
     }
@@ -2827,6 +3083,81 @@ CameraManager::discoverOnvifStreams(
             username,
             password
         );
+}
+
+OnvifPtzResult
+CameraManager::ptz(
+    std::int64_t id,
+    const std::string& action,
+    double speed
+)
+{
+    if (id <= 0) {
+        return {
+            false,
+            "invalid_id",
+            "Некорректный ID камеры."
+        };
+    }
+
+    std::string ptz_xaddr;
+    std::string profile_token;
+    std::string username;
+    std::string password;
+    std::string error;
+
+    {
+        std::lock_guard<std::mutex>
+            lock(impl_->mutex);
+
+        if (!impl_->initialized) {
+            return {
+                false,
+                "not_initialized",
+                "Camera Manager is not initialized."
+            };
+        }
+
+        if (
+            !impl_->onvifControlAccess(
+                id,
+                ptz_xaddr,
+                profile_token,
+                username,
+                password,
+                error
+            )
+        ) {
+            return {
+                false,
+                "ptz_unavailable",
+                error
+            };
+        }
+    }
+
+    OnvifMediaClient client;
+
+    auto result =
+        client.ptz(
+            ptz_xaddr,
+            profile_token,
+            username,
+            password,
+            action,
+            speed
+        );
+
+    result.message =
+        sanitizeMediaError(
+            result.message,
+            "",
+            password
+        );
+
+    cleanseString(password);
+
+    return result;
 }
 
 void CameraManager::workerLoop()

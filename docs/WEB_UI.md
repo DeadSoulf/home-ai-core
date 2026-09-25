@@ -164,6 +164,9 @@ Current content:
 - automatic ONVIF Media Profile retrieval
 - ONVIF device information: manufacturer, model, firmware version and serial number
 - persistent camera device metadata shown on camera cards
+- ONVIF PTZ controls for cameras exposing a PTZ profile
+- touch-friendly press-and-hold pan/tilt/zoom controls
+- on-demand Live View preview with automatically refreshed JPEG frames
 - automatic RTSP URI selection with the highest-resolution profile preferred
 - alternate ONVIF profiles available for manual main/substream choice
 - real RTSP media probe through ffprobe
@@ -175,8 +178,7 @@ The camera list never returns camera passwords through the normal Web API.
 
 Next stages:
 
-- ONVIF PTZ
-- browser Live View
+- continuous browser video transport integrated with the recorder
 - continuous/event recording
 - archive and timeline
 - analytics

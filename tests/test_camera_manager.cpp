@@ -62,6 +62,10 @@ int main()
     input.firmware_version = "1.2.3";
     input.serial_number = "SN-42";
     input.hardware_id = "HW-A";
+    input.ptz_xaddr =
+        "http://192.0.2.10/onvif/ptz_service";
+    input.ptz_profile_token =
+        "profile-main";
     input.username = "viewer";
     input.password = secret;
     input.enabled = true;
@@ -112,6 +116,12 @@ int main()
         ||
         list.front().hardware_id !=
             input.hardware_id
+        ||
+        list.front().ptz_xaddr !=
+            input.ptz_xaddr
+        ||
+        list.front().ptz_profile_token !=
+            input.ptz_profile_token
         ||
         list.front().username !=
             input.username

@@ -1,7 +1,10 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
+#include <cstddef>
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include <thread>
 #include "server/hardware/GpuMonitor.h"
@@ -39,6 +42,7 @@ public:
 private:
     void run();
     void handleClient(int client_fd);
+    void handleClientWorker(int client_fd);
 
     CoreRuntime& runtime_;
     SecurityManager& security_;
@@ -55,6 +59,10 @@ private:
     std::uint16_t port_{0};
 
     std::thread server_thread_;
+
+    std::mutex client_mutex_;
+    std::condition_variable client_cv_;
+    std::size_t active_clients_{0};
 };
 
 }

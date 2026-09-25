@@ -23,6 +23,8 @@ struct CameraInfo {
     std::string firmware_version;
     std::string serial_number;
     std::string hardware_id;
+    std::string ptz_xaddr;
+    std::string ptz_profile_token;
     std::string username;
     bool has_password{false};
     bool enabled{true};
@@ -42,6 +44,8 @@ struct CameraInput {
     std::string firmware_version;
     std::string serial_number;
     std::string hardware_id;
+    std::string ptz_xaddr;
+    std::string ptz_profile_token;
     std::string username;
     std::string password;
     bool update_password{false};
@@ -126,6 +130,12 @@ public:
         const std::string& username,
         const std::string& password
     ) const;
+
+    OnvifPtzResult ptz(
+        std::int64_t id,
+        const std::string& action,
+        double speed = 0.55
+    );
 
 private:
     struct Impl;

@@ -393,6 +393,22 @@ int main()
         ) == std::string::npos
         ||
         cameras.find(
+            "id=\"camera-ptz-xaddr\""
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "/api/cameras/ptz"
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "startCameraLive"
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "createPtzControls"
+        ) == std::string::npos
+        ||
+        cameras.find(
             "Версия прошивки"
         ) == std::string::npos
         ||
@@ -405,7 +421,7 @@ int main()
         ) == std::string::npos
         ||
         cameras.find(
-            "Camera Core 0.0.15"
+            "Camera Core 0.0.16"
         ) == std::string::npos
         ||
         cameras.find(

@@ -676,3 +676,17 @@ ONVIF камера не ответила вовремя.	ONVIF camera did not re
 Некорректная ONVIF информация камеры.	Invalid ONVIF camera information.
 Камера добавлена, но не удалось сохранить ONVIF информацию.	Camera was added, but ONVIF information could not be saved.
 Камера сохранена, но не удалось сохранить ONVIF информацию.	Camera was saved, but ONVIF information could not be saved.
+Live	Live
+Стоп Live	Stop Live
+Live View камеры	Camera Live View
+Live View включён.	Live View is on.
+Live View остановлен.	Live View stopped.
+Live View: не удалось получить кадр.	Live View: unable to get a frame.
+PTZ управление	PTZ controls
+Удерживайте кнопку для движения.	Hold a button to move.
+PTZ команда выполнена.	PTZ command completed.
+PTZ движение остановлено.	PTZ movement stopped.
+PTZ не поддерживается этой камерой.	PTZ is not supported by this camera.
+PTZ для этой камеры не настроен.	PTZ is not configured for this camera.
+PTZ не поддерживается или ещё не обнаружен через ONVIF.	PTZ is not supported or has not yet been detected via ONVIF.
+Неизвестная PTZ команда.	Unknown PTZ command.

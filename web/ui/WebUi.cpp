@@ -2579,7 +2579,7 @@ PrivateKey отображается в редакторе и сохраняет�
 <div class="section-card">
 <div class="section-title">
 <h2>Камеры</h2>
-<span class="section-hint">Camera Core 0.0.15</span>
+<span class="section-hint">Camera Core 0.0.16</span>
 </div>
 
 <div class="stats-grid">
@@ -2644,6 +2644,8 @@ PrivateKey отображается в редакторе и сохраняет�
 <input id="camera-firmware-version" type="hidden">
 <input id="camera-serial-number" type="hidden">
 <input id="camera-hardware-id" type="hidden">
+<input id="camera-ptz-xaddr" type="hidden">
+<input id="camera-ptz-profile-token" type="hidden">
 
 <div class="form-grid">
 <div>
@@ -3196,6 +3198,20 @@ function setMobileMenuOpen(open) {
         );
     }
 }
+
+window.addEventListener(
+    "pagehide",
+    function() {
+        for (
+            const id of
+            Array.from(
+                cameraLiveActive
+            )
+        ) {
+            stopCameraLive(id);
+        }
+    }
+);
 
 document.addEventListener(
     "DOMContentLoaded",
@@ -5110,6 +5126,14 @@ function clearCameraForm() {
     setCameraDeviceInfo({});
 
     document.getElementById(
+        "camera-ptz-xaddr"
+    ).value = "";
+
+    document.getElementById(
+        "camera-ptz-profile-token"
+    ).value = "";
+
+    document.getElementById(
         "camera-enabled"
     ).checked = true;
 
@@ -5208,6 +5232,16 @@ function editCamera(id) {
                 camera.hardware_id || ""
         }
     );
+
+    document.getElementById(
+        "camera-ptz-xaddr"
+    ).value =
+        camera.ptz_xaddr || "";
+
+    document.getElementById(
+        "camera-ptz-profile-token"
+    ).value =
+        camera.ptz_profile_token || "";
 
     document.getElementById(
         "camera-enabled"
@@ -5594,6 +5628,16 @@ async function autoDetectCameraStream() {
             deviceInfo
         );
 
+        document.getElementById(
+            "camera-ptz-xaddr"
+        ).value =
+            result.ptz_xaddr || "";
+
+        document.getElementById(
+            "camera-ptz-profile-token"
+        ).value =
+            result.ptz_profile_token || "";
+
         const cameraName =
             document.getElementById(
                 "camera-name"
@@ -5744,6 +5788,16 @@ async function saveCamera() {
             "camera-hardware-id"
         ).value.trim();
 
+    const ptzXaddr =
+        document.getElementById(
+            "camera-ptz-xaddr"
+        ).value.trim();
+
+    const ptzProfileToken =
+        document.getElementById(
+            "camera-ptz-profile-token"
+        ).value.trim();
+
     const username =
         document.getElementById(
             "camera-username"
@@ -5813,6 +5867,14 @@ async function saveCamera() {
     parameters.set(
         "hardware_id",
         hardwareId
+    );
+    parameters.set(
+        "ptz_xaddr",
+        ptzXaddr
+    );
+    parameters.set(
+        "ptz_profile_token",
+        ptzProfileToken
     );
     parameters.set("username", username);
     parameters.set("password", password);
@@ -6466,6 +6528,509 @@ async function discoverOnvifCameras() {
     }
 }
 
+function liveCameraFrame(id) {
+    if (
+        !cameraLiveActive.has(
+            Number(id)
+        )
+    ) {
+        return;
+    }
+
+    if (document.hidden) {
+        const timer =
+            window.setTimeout(
+                function() {
+                    liveCameraFrame(id);
+                },
+                1500
+            );
+
+        cameraLiveTimers.set(
+            Number(id),
+            timer
+        );
+
+        return;
+    }
+
+    const container =
+        document.getElementById(
+            "camera-live-"
+            + id
+        );
+
+    if (!container)
+        return;
+
+    let image =
+        container.querySelector(
+            "img"
+        );
+
+    if (!image) {
+        container.replaceChildren();
+
+        image =
+            document.createElement(
+                "img"
+            );
+
+        image.alt =
+            tr("Live View камеры");
+        image.style.width =
+            "100%";
+        image.style.maxHeight =
+            "420px";
+        image.style.objectFit =
+            "contain";
+        image.style.marginTop =
+            "12px";
+        image.style.borderRadius =
+            "8px";
+        image.style.background =
+            "#0f1217";
+
+        container.appendChild(
+            image
+        );
+    }
+
+    const scheduleNext =
+        function(delay) {
+            if (
+                !cameraLiveActive.has(
+                    Number(id)
+                )
+            ) {
+                return;
+            }
+
+            const timer =
+                window.setTimeout(
+                    function() {
+                        liveCameraFrame(
+                            id
+                        );
+                    },
+                    delay
+                );
+
+            cameraLiveTimers.set(
+                Number(id),
+                timer
+            );
+        };
+
+    image.onload =
+        function() {
+            scheduleNext(900);
+        };
+
+    image.onerror =
+        function() {
+            const status =
+                document.getElementById(
+                    "camera-live-status-"
+                    + id
+                );
+
+            if (status) {
+                status.className =
+                    "status-error";
+                status.textContent =
+                    tr("Live View: не удалось получить кадр.");
+            }
+
+            scheduleNext(2000);
+        };
+
+    image.src =
+        "/api/cameras/snapshot?id="
+        + encodeURIComponent(
+            String(id)
+        )
+        + "&live="
+        + Date.now();
+}
+
+function startCameraLive(id) {
+    const numericId =
+        Number(id);
+
+    if (
+        cameraLiveActive.has(
+            numericId
+        )
+    ) {
+        return;
+    }
+
+    cameraLiveActive.add(
+        numericId
+    );
+
+    const status =
+        document.getElementById(
+            "camera-live-status-"
+            + id
+        );
+
+    if (status) {
+        status.className =
+            "status-ok";
+        status.textContent =
+            tr("Live View включён.");
+    }
+
+    liveCameraFrame(id);
+}
+
+function stopCameraLive(id) {
+    const numericId =
+        Number(id);
+
+    cameraLiveActive.delete(
+        numericId
+    );
+
+    const timer =
+        cameraLiveTimers.get(
+            numericId
+        );
+
+    if (timer)
+        window.clearTimeout(timer);
+
+    cameraLiveTimers.delete(
+        numericId
+    );
+
+    const container =
+        document.getElementById(
+            "camera-live-"
+            + id
+        );
+
+    if (container)
+        container.replaceChildren();
+
+    const status =
+        document.getElementById(
+            "camera-live-status-"
+            + id
+        );
+
+    if (status) {
+        status.className =
+            "muted";
+        status.textContent =
+            tr("Live View остановлен.");
+    }
+}
+
+async function runPtzCommand(
+    id,
+    action
+) {
+    const status =
+        document.getElementById(
+            "camera-ptz-status-"
+            + id
+        );
+
+    const parameters =
+        new URLSearchParams();
+
+    parameters.set(
+        "id",
+        String(id)
+    );
+
+    parameters.set(
+        "action",
+        action
+    );
+
+    parameters.set(
+        "speed",
+        "0.55"
+    );
+
+    try {
+        const result =
+            await cameraPost(
+                "/api/cameras/ptz",
+                parameters
+            );
+
+        if (
+            status
+            &&
+            action !== "stop"
+        ) {
+            status.className =
+                "status-ok";
+            status.textContent =
+                result.message
+                || tr("PTZ команда выполнена.");
+        }
+    }
+    catch (error) {
+        if (status) {
+            status.className =
+                "status-error";
+            status.textContent =
+                error.message;
+        }
+    }
+}
+
+function ptzCommand(
+    id,
+    action
+) {
+    const numericId =
+        Number(id);
+
+    const previous =
+        cameraPtzQueues.get(
+            numericId
+        )
+        || Promise.resolve();
+
+    const next =
+        previous
+            .catch(
+                function() {
+                }
+            )
+            .then(
+                function() {
+                    return runPtzCommand(
+                        id,
+                        action
+                    );
+                }
+            );
+
+    cameraPtzQueues.set(
+        numericId,
+        next
+    );
+
+    next.finally(
+        function() {
+            if (
+                cameraPtzQueues.get(
+                    numericId
+                ) === next
+            ) {
+                cameraPtzQueues.delete(
+                    numericId
+                );
+            }
+        }
+    );
+}
+
+function bindPtzButton(
+    button,
+    id,
+    action
+) {
+    if (!button)
+        return;
+
+    let moving = false;
+
+    const start =
+        function(event) {
+            event.preventDefault();
+
+            if (moving)
+                return;
+
+            moving = true;
+
+            button.setPointerCapture?.(
+                event.pointerId
+            );
+
+            ptzCommand(
+                id,
+                action
+            );
+        };
+
+    const stop =
+        function(event) {
+            event.preventDefault();
+
+            if (!moving)
+                return;
+
+            moving = false;
+
+            ptzCommand(
+                id,
+                "stop"
+            );
+        };
+
+    button.addEventListener(
+        "pointerdown",
+        start
+    );
+
+    button.addEventListener(
+        "pointerup",
+        stop
+    );
+
+    button.addEventListener(
+        "pointercancel",
+        stop
+    );
+
+    button.addEventListener(
+        "lostpointercapture",
+        stop
+    );
+
+    button.addEventListener(
+        "contextmenu",
+        function(event) {
+            event.preventDefault();
+        }
+    );
+}
+
+function createPtzControls(camera) {
+    const wrapper =
+        document.createElement(
+            "div"
+        );
+
+    wrapper.style.marginTop =
+        "12px";
+
+    const title =
+        document.createElement(
+            "strong"
+        );
+
+    title.textContent =
+        tr("PTZ управление");
+
+    wrapper.appendChild(title);
+
+    const grid =
+        document.createElement(
+            "div"
+        );
+
+    grid.style.display =
+        "grid";
+    grid.style.gridTemplateColumns =
+        "repeat(3, minmax(48px, 72px))";
+    grid.style.gap =
+        "8px";
+    grid.style.marginTop =
+        "8px";
+
+    const controls = [
+        null,
+        ["↑", "up"],
+        null,
+        ["←", "left"],
+        ["■", "stop"],
+        ["→", "right"],
+        ["−", "zoom_out"],
+        ["↓", "down"],
+        ["+", "zoom_in"]
+    ];
+
+    for (
+        const control of
+        controls
+    ) {
+        if (!control) {
+            const spacer =
+                document.createElement(
+                    "div"
+                );
+
+            grid.appendChild(
+                spacer
+            );
+
+            continue;
+        }
+
+        const button =
+            document.createElement(
+                "button"
+            );
+
+        button.type = "button";
+        button.className =
+            "secondary";
+        button.textContent =
+            control[0];
+        button.style.minHeight =
+            "48px";
+        button.style.touchAction =
+            "none";
+
+        if (control[1] === "stop") {
+            button.addEventListener(
+                "click",
+                function() {
+                    ptzCommand(
+                        camera.id,
+                        "stop"
+                    );
+                }
+            );
+        }
+        else {
+            bindPtzButton(
+                button,
+                camera.id,
+                control[1]
+            );
+        }
+
+        grid.appendChild(
+            button
+        );
+    }
+
+    wrapper.appendChild(grid);
+
+    const status =
+        document.createElement(
+            "div"
+        );
+
+    status.id =
+        "camera-ptz-status-"
+        + camera.id;
+    status.className =
+        "muted";
+    status.style.marginTop =
+        "8px";
+    status.textContent =
+        tr("Удерживайте кнопку для движения.");
+
+    wrapper.appendChild(
+        status
+    );
+
+    return wrapper;
+}
+
 async function deleteCamera(id, name) {
     if (
         !window.confirm(
@@ -6477,6 +7042,8 @@ async function deleteCamera(id, name) {
     ) {
         return;
     }
+
+    stopCameraLive(id);
 
     const parameters =
         new URLSearchParams();
@@ -6720,6 +7287,40 @@ function renderCameraCard(camera) {
 
     card.appendChild(media);
 
+    const liveStatus =
+        document.createElement(
+            "div"
+        );
+
+    liveStatus.id =
+        "camera-live-status-"
+        + camera.id;
+    liveStatus.className =
+        "muted";
+    liveStatus.style.marginTop =
+        "8px";
+    liveStatus.textContent =
+        cameraLiveActive.has(
+            Number(camera.id)
+        )
+        ? tr("Live View включён.")
+        : "";
+
+    card.appendChild(
+        liveStatus
+    );
+
+    const live =
+        document.createElement(
+            "div"
+        );
+
+    live.id =
+        "camera-live-"
+        + camera.id;
+
+    card.appendChild(live);
+
     const snapshot =
         document.createElement(
             "div"
@@ -6738,6 +7339,54 @@ function renderCameraCard(camera) {
 
     actions.className =
         "button-row";
+
+    const liveButton =
+        document.createElement(
+            "button"
+        );
+
+    liveButton.type =
+        "button";
+    liveButton.textContent =
+        tr("Live");
+
+    liveButton.addEventListener(
+        "click",
+        function() {
+            startCameraLive(
+                camera.id
+            );
+        }
+    );
+
+    actions.appendChild(
+        liveButton
+    );
+
+    const stopLiveButton =
+        document.createElement(
+            "button"
+        );
+
+    stopLiveButton.type =
+        "button";
+    stopLiveButton.className =
+        "secondary";
+    stopLiveButton.textContent =
+        tr("Стоп Live");
+
+    stopLiveButton.addEventListener(
+        "click",
+        function() {
+            stopCameraLive(
+                camera.id
+            );
+        }
+    );
+
+    actions.appendChild(
+        stopLiveButton
+    );
 
     const snapshotButton =
         document.createElement(
@@ -6868,6 +7517,39 @@ function renderCameraCard(camera) {
         actions
     );
 
+    if (
+        cameraCanManage()
+        &&
+        camera.ptz_supported
+    ) {
+        card.appendChild(
+            createPtzControls(
+                camera
+            )
+        );
+    }
+    else if (
+        cameraCanManage()
+        &&
+        camera.onvif_xaddr
+    ) {
+        const ptzUnavailable =
+            document.createElement(
+                "div"
+            );
+
+        ptzUnavailable.className =
+            "muted";
+        ptzUnavailable.style.marginTop =
+            "10px";
+        ptzUnavailable.textContent =
+            tr("PTZ не поддерживается этой камерой.");
+
+        card.appendChild(
+            ptzUnavailable
+        );
+    }
+
     window.setTimeout(
         function() {
             renderCameraMedia(
@@ -6877,6 +7559,27 @@ function renderCameraCard(camera) {
             renderCameraSnapshot(
                 camera.id
             );
+
+            if (
+                cameraLiveActive.has(
+                    Number(
+                        camera.id
+                    )
+                )
+            ) {
+                const existingTimer =
+                    cameraLiveTimers.get(
+                        Number(
+                            camera.id
+                        )
+                    );
+
+                if (!existingTimer) {
+                    liveCameraFrame(
+                        camera.id
+                    );
+                }
+            }
         },
         0
     );
@@ -6930,6 +7633,16 @@ async function updateCameras() {
                         Number(item.id)
                 )
             );
+
+        for (
+            const id of
+            Array.from(
+                cameraLiveActive
+            )
+        ) {
+            if (!ids.has(id))
+                stopCameraLive(id);
+        }
 
         for (
             const id of

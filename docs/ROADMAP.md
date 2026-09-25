@@ -18,9 +18,9 @@
 | 0.0.12 | ONVIF discovery + real RTSP media probe + snapshots | DEVELOPMENT SNAPSHOT |
 | 0.0.13 | Fix camera inventory projection after ONVIF migration | DEVELOPMENT SNAPSHOT |
 | 0.0.14 | Automatic RTSP discovery from ONVIF Media Profiles | DEVELOPMENT SNAPSHOT |
-| 0.0.15 | ONVIF manufacturer/model/firmware/serial metadata | IN DEVELOPMENT |
-| next 0.0.x | ONVIF PTZ + Live View | PLANNED |
-| next 0.0.x | Recorder + archive + event pipeline | PLANNED |
+| 0.0.15 | ONVIF manufacturer/model/firmware/serial metadata | DEVELOPMENT SNAPSHOT |
+| 0.0.16 | ONVIF PTZ controls + browser Live View preview | IN DEVELOPMENT |
+| next 0.0.x | Recorder + continuous video transport + archive/event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
 | next 0.0.x | Device Core | PLANNED |
@@ -219,9 +219,9 @@ Implemented in the 0.0.14 snapshot:
 - automatic RTSP URL fill in Web UI
 - sanitized RTSP URIs without embedded credentials
 
-## Current focus: 0.0.15
+## Development snapshot: 0.0.15
 
-Current Camera Core work:
+Implemented in the 0.0.15 snapshot:
 
 - ONVIF GetDeviceInformation during automatic camera setup
 - manufacturer persistence and display
@@ -229,12 +229,28 @@ Current Camera Core work:
 - firmware version persistence and display
 - serial number persistence and display
 - hardware ID persistence for diagnostics
-- camera metadata stored in a separate SQLite table
-- existing cameras can refresh metadata by rerunning automatic detection
-- parser and persistence tests for device information
+- camera metadata stored separately from encrypted credentials
 
-0.0.15 keeps credentials isolated from descriptive camera metadata and exposes only safe device
-information through the normal camera inventory API.
+## Current focus: 0.0.16
+
+Current Camera Core work:
+
+- ONVIF PTZ service discovery
+- PTZ-capable Media Profile detection
+- persistent PTZ XAddr and profile token with automatic SQLite migration
+- authenticated ContinuousMove / Stop commands
+- touch-friendly press-and-hold pan / tilt / zoom controls
+- short PTZ safety timeout plus explicit Stop on release
+- on-demand browser Live View preview
+- Live View refreshes JPEG frames only while enabled
+- Live View automatically stops when the page is left
+- parallel Web client workers so camera frame generation does not block unrelated requests
+- 15-second client socket timeout and clean worker drain during server shutdown
+- PTZ parser/persistence/Web UI test coverage
+
+0.0.16 intentionally keeps Live View as a JPEG preview. The next recorder milestone will own
+the persistent high-frame-rate stream pipeline and reuse it for browser playback, recording
+and archive.
 
 ## Later major capabilities
 

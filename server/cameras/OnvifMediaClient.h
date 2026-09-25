@@ -14,6 +14,7 @@ struct OnvifMediaProfile {
     int height{0};
     double fps{0.0};
     std::string rtsp_uri;
+    bool ptz{false};
 };
 
 struct OnvifDeviceInformation {
@@ -32,6 +33,15 @@ struct OnvifMediaResult {
     OnvifDeviceInformation device_info;
     std::vector<OnvifMediaProfile> profiles;
     std::size_t recommended_index{0};
+    std::string ptz_xaddr;
+    std::string ptz_profile_token;
+    bool ptz_supported{false};
+};
+
+struct OnvifPtzResult {
+    bool success{false};
+    std::string code;
+    std::string message;
 };
 
 class OnvifMediaClient {
@@ -52,6 +62,11 @@ public:
         const std::string& xml
     );
 
+    static std::string
+    parsePtzXAddr(
+        const std::string& xml
+    );
+
     static std::vector<OnvifMediaProfile>
     parseProfiles(
         const std::string& xml
@@ -66,6 +81,15 @@ public:
     stripUriCredentials(
         const std::string& uri
     );
+
+    OnvifPtzResult ptz(
+        const std::string& ptz_xaddr,
+        const std::string& profile_token,
+        const std::string& username,
+        const std::string& password,
+        const std::string& action,
+        double speed = 0.55
+    ) const;
 };
 
 }

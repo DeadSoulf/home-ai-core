@@ -953,6 +953,19 @@ void WebServer::stop()
     if (server_thread_.joinable())
         server_thread_.join();
 
+    {
+        std::unique_lock<std::mutex>
+            lock(client_mutex_);
+
+        client_cv_.wait(
+            lock,
+            [this]() {
+                return
+                    active_clients_ == 0;
+            }
+        );
+    }
+
     Logger::instance().info(
         "Web interface stopped"
     );
@@ -989,15 +1002,120 @@ void WebServer::run()
             continue;
         }
 
-        handleClient(client_fd);
+        timeval client_timeout{};
+        client_timeout.tv_sec = 15;
 
-        ::shutdown(
+        ::setsockopt(
             client_fd,
-            SHUT_RDWR
+            SOL_SOCKET,
+            SO_RCVTIMEO,
+            &client_timeout,
+            sizeof(client_timeout)
         );
 
-        ::close(client_fd);
+        ::setsockopt(
+            client_fd,
+            SOL_SOCKET,
+            SO_SNDTIMEO,
+            &client_timeout,
+            sizeof(client_timeout)
+        );
+
+        bool client_slot = false;
+
+        {
+            std::lock_guard<std::mutex>
+                lock(client_mutex_);
+
+            if (
+                active_clients_ <
+                64
+            ) {
+                ++active_clients_;
+                client_slot = true;
+            }
+        }
+
+        if (!client_slot) {
+            sendResponse(
+                client_fd,
+                "503 Service Unavailable",
+                "text/plain; charset=utf-8",
+                "Server busy"
+            );
+
+            ::shutdown(
+                client_fd,
+                SHUT_RDWR
+            );
+
+            ::close(client_fd);
+            continue;
+        }
+
+        try {
+            std::thread(
+                &WebServer::handleClientWorker,
+                this,
+                client_fd
+            ).detach();
+        }
+        catch (...) {
+            ::shutdown(
+                client_fd,
+                SHUT_RDWR
+            );
+
+            ::close(client_fd);
+
+            {
+                std::lock_guard<std::mutex>
+                    lock(client_mutex_);
+
+                if (active_clients_ > 0)
+                    --active_clients_;
+            }
+
+            client_cv_.notify_all();
+
+            Logger::instance().error(
+                "WebServer: unable to start client worker"
+            );
+        }
     }
+}
+
+void WebServer::handleClientWorker(
+    int client_fd
+)
+{
+    try {
+        handleClient(
+            client_fd
+        );
+    }
+    catch (...) {
+        Logger::instance().error(
+            "WebServer: client worker failed"
+        );
+    }
+
+    ::shutdown(
+        client_fd,
+        SHUT_RDWR
+    );
+
+    ::close(client_fd);
+
+    {
+        std::lock_guard<std::mutex>
+            lock(client_mutex_);
+
+        if (active_clients_ > 0)
+            --active_clients_;
+    }
+
+    client_cv_.notify_all();
 }
 
 void WebServer::handleClient(
@@ -2634,7 +2752,19 @@ void WebServer::handleClient(
                 << jsonEscape(camera.serial_number)
                 << "\",\"hardware_id\":\""
                 << jsonEscape(camera.hardware_id)
-                << "\",\"username\":\""
+                << "\",\"ptz_xaddr\":\""
+                << jsonEscape(camera.ptz_xaddr)
+                << "\",\"ptz_profile_token\":\""
+                << jsonEscape(camera.ptz_profile_token)
+                << "\",\"ptz_supported\":"
+                << (
+                    !camera.ptz_xaddr.empty()
+                    &&
+                    !camera.ptz_profile_token.empty()
+                    ? "true"
+                    : "false"
+                )
+                << ",\"username\":\""
                 << jsonEscape(camera.username)
                 << "\",\"has_password\":"
                 << (
@@ -2792,6 +2922,8 @@ void WebServer::handleClient(
             path == "/api/cameras/discover"
             ||
             path == "/api/cameras/onvif-streams"
+            ||
+            path == "/api/cameras/ptz"
         )
     ) {
         if (
@@ -3044,7 +3176,21 @@ void WebServer::handleClient(
                 << jsonEscape(
                     result.device_info.hardware_id
                 )
-                << "\"},\"recommended_index\":"
+                << "\"},\"ptz_xaddr\":\""
+                << jsonEscape(
+                    result.ptz_xaddr
+                )
+                << "\",\"ptz_profile_token\":\""
+                << jsonEscape(
+                    result.ptz_profile_token
+                )
+                << "\",\"ptz_supported\":"
+                << (
+                    result.ptz_supported
+                    ? "true"
+                    : "false"
+                )
+                << ",\"recommended_index\":"
                 << result.recommended_index
                 << ",\"profiles\":[";
 
@@ -3127,6 +3273,90 @@ void WebServer::handleClient(
                     ? *parsed
                     : 0;
             };
+
+        if (
+            path ==
+                "/api/cameras/ptz"
+        ) {
+            const auto id =
+                parse_id();
+
+            if (id <= 0) {
+                sendResponse(
+                    client_fd,
+                    "400 Bad Request",
+                    "application/json; charset=utf-8",
+                    "{\"success\":false,\"message\":\"Некорректный ID камеры.\"}"
+                );
+
+                return;
+            }
+
+            const auto action =
+                form.contains("action")
+                ? form.at("action")
+                : "";
+
+            double speed = 0.55;
+
+            if (
+                form.contains("speed")
+            ) {
+                try {
+                    speed =
+                        std::stod(
+                            form.at("speed")
+                        );
+                }
+                catch (...) {
+                    speed = 0.55;
+                }
+            }
+
+            const auto result =
+                cameras_->ptz(
+                    id,
+                    action,
+                    speed
+                );
+
+            security_.audit(
+                "camera.ptz",
+                session->username,
+                "camera_id=" +
+                std::to_string(id)
+                +
+                " action=" +
+                action
+                +
+                " result=" +
+                result.code
+            );
+
+            sendResponse(
+                client_fd,
+                result.success
+                    ? "200 OK"
+                    : "400 Bad Request",
+                "application/json; charset=utf-8",
+                "{\"success\":" +
+                std::string(
+                    result.success
+                    ? "true"
+                    : "false"
+                )
+                +
+                ",\"code\":\"" +
+                jsonEscape(result.code)
+                +
+                "\",\"message\":\"" +
+                jsonEscape(result.message)
+                +
+                "\"}"
+            );
+
+            return;
+        }
 
         if (
             path ==
@@ -3267,6 +3497,24 @@ void WebServer::handleClient(
                 )
                 ? form.at(
                     "hardware_id"
+                )
+                : "";
+
+            input.ptz_xaddr =
+                form.contains(
+                    "ptz_xaddr"
+                )
+                ? form.at(
+                    "ptz_xaddr"
+                )
+                : "";
+
+            input.ptz_profile_token =
+                form.contains(
+                    "ptz_profile_token"
+                )
+                ? form.at(
+                    "ptz_profile_token"
                 )
                 : "";
 

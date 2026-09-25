@@ -303,6 +303,7 @@ std::string soapEnvelope(
         "xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\" "
         "xmlns:tds=\"http://www.onvif.org/ver10/device/wsdl\" "
         "xmlns:trt=\"http://www.onvif.org/ver10/media/wsdl\" "
+        "xmlns:tptz=\"http://www.onvif.org/ver20/ptz/wsdl\" "
         "xmlns:tt=\"http://www.onvif.org/ver10/schema\">"
         "<s:Header>"
         + securityHeader(
@@ -1107,6 +1108,37 @@ OnvifMediaClient::parseMediaXAddr(
         );
 }
 
+std::string
+OnvifMediaClient::parsePtzXAddr(
+    const std::string& xml
+)
+{
+    const std::regex ptz_block(
+        R"(<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?PTZ\b[^>]*>([\s\S]*?)</(?:[A-Za-z_][A-Za-z0-9_.-]*:)?PTZ>)",
+        std::regex::icase
+    );
+
+    std::smatch match;
+
+    if (
+        std::regex_search(
+            xml,
+            match,
+            ptz_block
+        )
+        &&
+        match.size() >= 2
+    ) {
+        return
+            localTagValue(
+                match[1].str(),
+                "XAddr"
+            );
+    }
+
+    return {};
+}
+
 std::vector<OnvifMediaProfile>
 OnvifMediaClient::parseProfiles(
     const std::string& xml
@@ -1181,6 +1213,17 @@ OnvifMediaClient::parseProfiles(
                     body,
                     "FrameRateLimit"
                 )
+            );
+
+        const std::regex ptz_configuration(
+            R"(<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?PTZConfiguration\b)",
+            std::regex::icase
+        );
+
+        profile.ptz =
+            std::regex_search(
+                body,
+                ptz_configuration
             );
 
         if (!profile.token.empty()) {
@@ -1309,6 +1352,37 @@ OnvifMediaClient::profiles(
         device_info =
             parseDeviceInformation(
                 information_response.body
+            );
+    }
+
+    std::string ptz_xaddr;
+
+    const auto ptz_capabilities_body =
+        soapEnvelope(
+            "<tds:GetCapabilities>"
+            "<tds:Category>PTZ</tds:Category>"
+            "</tds:GetCapabilities>",
+            username,
+            password
+        );
+
+    const auto ptz_capabilities =
+        httpPost(
+            device_xaddr,
+            "http://www.onvif.org/ver10/device/wsdl/GetCapabilities",
+            ptz_capabilities_body
+        );
+
+    if (
+        ptz_capabilities.error.empty()
+        &&
+        soapFault(
+            ptz_capabilities.body
+        ).empty()
+    ) {
+        ptz_xaddr =
+            parsePtzXAddr(
+                ptz_capabilities.body
             );
     }
 
@@ -1483,6 +1557,24 @@ OnvifMediaClient::profiles(
             result_profiles
         );
 
+    std::string ptz_profile_token;
+
+    for (
+        const auto& profile :
+        result_profiles
+    ) {
+        if (
+            profile.ptz
+            &&
+            !profile.token.empty()
+        ) {
+            ptz_profile_token =
+                profile.token;
+
+            break;
+        }
+    }
+
     return {
         true,
         "ok",
@@ -1492,7 +1584,167 @@ OnvifMediaClient::profiles(
         std::move(
             result_profiles
         ),
-        recommended
+        recommended,
+        ptz_xaddr,
+        ptz_profile_token,
+        !ptz_xaddr.empty()
+            &&
+            !ptz_profile_token.empty()
+    };
+}
+
+OnvifPtzResult
+OnvifMediaClient::ptz(
+    const std::string& ptz_xaddr,
+    const std::string& profile_token,
+    const std::string& username,
+    const std::string& password,
+    const std::string& action,
+    double speed
+) const
+{
+    if (
+        ptz_xaddr.empty()
+        ||
+        profile_token.empty()
+    ) {
+        return {
+            false,
+            "ptz_unavailable",
+            "PTZ для этой камеры не настроен."
+        };
+    }
+
+    speed =
+        std::clamp(
+            speed,
+            0.1,
+            1.0
+        );
+
+    std::string body;
+    std::string soap_action;
+
+    if (action == "stop") {
+        soap_action =
+            "http://www.onvif.org/ver20/ptz/wsdl/Stop";
+
+        body =
+            "<tptz:Stop>"
+            "<tptz:ProfileToken>"
+            + xmlEscape(
+                profile_token
+            )
+            + "</tptz:ProfileToken>"
+            "<tptz:PanTilt>true</tptz:PanTilt>"
+            "<tptz:Zoom>true</tptz:Zoom>"
+            "</tptz:Stop>";
+    }
+    else {
+        double x = 0.0;
+        double y = 0.0;
+        double z = 0.0;
+        bool pan_tilt = true;
+
+        if (action == "left")
+            x = -speed;
+        else if (action == "right")
+            x = speed;
+        else if (action == "up")
+            y = speed;
+        else if (action == "down")
+            y = -speed;
+        else if (action == "zoom_in") {
+            z = speed;
+            pan_tilt = false;
+        }
+        else if (action == "zoom_out") {
+            z = -speed;
+            pan_tilt = false;
+        }
+        else {
+            return {
+                false,
+                "invalid_action",
+                "Неизвестная PTZ команда."
+            };
+        }
+
+        std::ostringstream velocity;
+
+        if (pan_tilt) {
+            velocity
+                << "<tt:PanTilt x=\""
+                << x
+                << "\" y=\""
+                << y
+                << "\"/>";
+        }
+        else {
+            velocity
+                << "<tt:Zoom x=\""
+                << z
+                << "\"/>";
+        }
+
+        soap_action =
+            "http://www.onvif.org/ver20/ptz/wsdl/ContinuousMove";
+
+        body =
+            "<tptz:ContinuousMove>"
+            "<tptz:ProfileToken>"
+            + xmlEscape(
+                profile_token
+            )
+            + "</tptz:ProfileToken>"
+            "<tptz:Velocity>"
+            + velocity.str()
+            + "</tptz:Velocity>"
+            "<tptz:Timeout>PT2S</tptz:Timeout>"
+            "</tptz:ContinuousMove>";
+    }
+
+    const auto envelope =
+        soapEnvelope(
+            body,
+            username,
+            password
+        );
+
+    const auto response =
+        httpPost(
+            ptz_xaddr,
+            soap_action,
+            envelope
+        );
+
+    if (!response.error.empty()) {
+        return {
+            false,
+            "ptz_failed",
+            response.error
+        };
+    }
+
+    const auto fault =
+        soapFault(
+            response.body
+        );
+
+    if (!fault.empty()) {
+        return {
+            false,
+            "onvif_fault",
+            fault
+        };
+    }
+
+    return {
+        true,
+        "ok",
+        action == "stop"
+            ? "PTZ движение остановлено."
+            : "PTZ команда выполнена."
     };
 }
 

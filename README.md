@@ -18,7 +18,7 @@ Home AI Core is a local-first autonomous server platform designed for:
 
 ## Current development version
 
-0.0.15 — ONVIF camera manufacturer, model, firmware and serial metadata
+0.0.16 — ONVIF PTZ controls + browser Live View preview
 
 The repository root `VERSION` file is the single source of the compiled Core version.
 

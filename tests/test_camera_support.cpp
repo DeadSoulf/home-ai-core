@@ -173,11 +173,35 @@ int main()
         return 1;
     }
 
+    const std::string ptzCapabilities =
+        "<s:Envelope><s:Body>"
+        "<tds:GetCapabilitiesResponse>"
+        "<tds:Capabilities>"
+        "<tt:PTZ>"
+        "<tt:XAddr>http://192.0.2.20/onvif/ptz_service</tt:XAddr>"
+        "</tt:PTZ>"
+        "</tds:Capabilities>"
+        "</tds:GetCapabilitiesResponse>"
+        "</s:Body></s:Envelope>";
+
+    if (
+        OnvifMediaClient::parsePtzXAddr(
+            ptzCapabilities
+        ) !=
+        "http://192.0.2.20/onvif/ptz_service"
+    ) {
+        std::cerr
+            << "ONVIF PTZ XAddr parser failed\n";
+
+        return 1;
+    }
+
     const std::string profilesXml =
         "<s:Envelope><s:Body>"
         "<trt:GetProfilesResponse>"
         "<trt:Profiles token=\"main\">"
         "<tt:Name>MainStream</tt:Name>"
+        "<tt:PTZConfiguration token=\"ptz-main\"/>"
         "<tt:VideoEncoderConfiguration>"
         "<tt:Encoding>H264</tt:Encoding>"
         "<tt:Resolution>"
@@ -220,6 +244,8 @@ int main()
         ||
         profiles[0].encoding !=
             "H264"
+        ||
+        !profiles[0].ptz
         ||
         profiles[0].width != 1920
         ||

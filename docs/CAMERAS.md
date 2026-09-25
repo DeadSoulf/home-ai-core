@@ -2,13 +2,13 @@
 
 ## Scope
 
-Camera Core 0.0.15 introduces the persistent camera inventory and health layer used by the
+Camera Core 0.0.16 introduces the persistent camera inventory and health layer used by the
 future NVR stack.
 
-0.0.15 extends automatic ONVIF setup with GetDeviceInformation. Home AI Core stores and
-shows the camera manufacturer, model, firmware version, serial number and hardware ID together
-with the existing automatically detected RTSP stream. Continuous Live View, recording, archive
-and analytics will build on the same camera IDs and database.
+0.0.16 adds ONVIF PTZ controls and the first browser Live View implementation on top of the
+automatic ONVIF/RTSP setup. The Live View is an on-demand JPEG preview that refreshes while the
+user keeps it enabled. Continuous high-frame-rate video transport, recording, archive and
+analytics will share the later recorder pipeline.
 
 ## Runtime data
 
@@ -178,6 +178,9 @@ The Cameras page provides:
 - ONVIF WS-Discovery results
 - manufacturer, model, firmware version and serial number
 - persistent device metadata on camera cards
+- ONVIF PTZ capability detection from PTZ service + Media Profile
+- press-and-hold pan / tilt / zoom controls with Stop on release
+- on-demand Live View preview with refreshed JPEG frames
 - automatic RTSP discovery from ONVIF Media Profiles
 - automatic selection of the highest-resolution stream
 - alternate profile selection for substreams
@@ -189,11 +192,10 @@ The Cameras page provides:
 
 ## Next stages
 
-1. ONVIF PTZ.
-2. Live View with main/sub streams.
-3. Recorder integrated with the video Storage Pool.
-4. Archive/timeline and event metadata.
-5. Motion/object analytics and Automation Core integration.
+1. Recorder integrated with the video Storage Pool.
+2. Continuous browser video transport using the recorder pipeline.
+3. Archive/timeline and event metadata.
+4. Motion/object analytics and Automation Core integration.
 
 
 ## Automatic RTSP setup
@@ -247,3 +249,35 @@ HardwareId
 The metadata is stored separately from credentials and is safe to return through the normal
 camera inventory API. Existing cameras can refresh this information by opening Edit and running
 automatic stream detection again.
+
+
+## PTZ and Live View
+
+During automatic ONVIF setup Camera Core now also requests PTZ capabilities. PTZ controls are
+enabled only when both a PTZ service XAddr and a PTZ-capable Media Profile are detected.
+
+The Web UI sends these commands:
+
+```text
+left
+right
+up
+down
+zoom_in
+zoom_out
+stop
+```
+
+Movement uses ONVIF ContinuousMove with a short safety timeout. The Web UI sends Stop when the
+user releases the control.
+
+Live View in 0.0.16 is intentionally an on-demand JPEG preview. It repeatedly requests the
+existing authenticated snapshot endpoint only while Live is enabled. This keeps the browser
+implementation simple and avoids exposing RTSP credentials to the browser.
+
+WebServer client requests are now handled by short worker threads so a camera snapshot or
+ffmpeg operation does not block unrelated Web/API requests. Client socket timeouts and shutdown
+waiting keep server stop/restart bounded.
+
+A later recorder milestone will replace the repeated-JPEG preview with a persistent continuous
+video transport shared with recording and archive playback.
