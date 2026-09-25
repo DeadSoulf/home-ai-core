@@ -161,6 +161,9 @@ Current content:
 - ONLINE/OFFLINE/disabled network state
 - lightweight RTSP endpoint checks
 - ONVIF WS-Discovery
+- automatic ONVIF Media Profile retrieval
+- automatic RTSP URI selection with the highest-resolution profile preferred
+- alternate ONVIF profiles available for manual main/substream choice
 - real RTSP media probe through ffprobe
 - video codec, resolution, FPS and audio codec diagnostics
 - JPEG snapshots through ffmpeg
@@ -170,7 +173,7 @@ The camera list never returns camera passwords through the normal Web API.
 
 Next stages:
 
-- ONVIF media profiles and PTZ
+- ONVIF PTZ
 - browser Live View
 - continuous/event recording
 - archive and timeline

@@ -2,11 +2,12 @@
 
 ## Scope
 
-Camera Core 0.0.12 introduces the persistent camera inventory and health layer used by the
+Camera Core 0.0.14 introduces the persistent camera inventory and health layer used by the
 future NVR stack.
 
-0.0.12 adds ONVIF discovery, on-demand RTSP media inspection and JPEG snapshots. Continuous
-Live View, recording, archive and analytics will build on the same camera IDs and database.
+0.0.14 adds automatic RTSP configuration through authenticated ONVIF Media Profiles on top
+of discovery, media inspection and snapshots. Continuous Live View, recording, archive and
+analytics will build on the same camera IDs and database.
 
 ## Runtime data
 
@@ -106,6 +107,21 @@ X-HomeAI-Request: 1
 timeout_ms=2000
 ```
 
+Automatic ONVIF stream discovery:
+
+```text
+POST /api/cameras/onvif-streams
+X-HomeAI-Request: 1
+
+onvif_xaddr=http%3A%2F%2F192.168.1.50%2Fonvif%2Fdevice_service
+username=admin
+password=secret
+```
+
+The response contains ONVIF Media Profiles and sanitized RTSP URIs. The recommended profile
+is the highest-resolution profile returned by the camera. Credentials are not included in
+the returned RTSP URI and are not written to audit details.
+
 Real RTSP media probe:
 
 ```text
@@ -159,6 +175,9 @@ The Cameras page provides:
 - edit without exposing the stored password
 - enable/disable control
 - ONVIF WS-Discovery results
+- automatic RTSP discovery from ONVIF Media Profiles
+- automatic selection of the highest-resolution stream
+- alternate profile selection for substreams
 - fast RTSP endpoint check
 - real media probe with codec / resolution / FPS
 - JPEG snapshot preview
@@ -167,8 +186,38 @@ The Cameras page provides:
 
 ## Next stages
 
-1. ONVIF authenticated media profiles and PTZ.
+1. ONVIF PTZ.
 2. Live View with main/sub streams.
 3. Recorder integrated with the video Storage Pool.
 4. Archive/timeline and event metadata.
 5. Motion/object analytics and Automation Core integration.
+
+
+## Automatic RTSP setup
+
+For an ONVIF camera the user does not need to know the RTSP path.
+
+The normal flow is:
+
+```text
+Find ONVIF cameras
+        ↓
+Select a discovered camera
+        ↓
+Enter camera username/password
+        ↓
+Detect stream automatically
+        ↓
+GetCapabilities
+        ↓
+GetProfiles
+        ↓
+GetStreamUri
+        ↓
+Recommended RTSP URL is filled into the form
+```
+
+ONVIF authentication uses WS-Security UsernameToken PasswordDigest. Home AI Core does not
+send an HTTP Basic Authorization header by default, so the password is not transmitted as
+clear-text HTTP Basic credentials. The current automatic Media client supports HTTP ONVIF
+XAddr endpoints. Manual RTSP entry remains available as a compatibility fallback.

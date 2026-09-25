@@ -373,6 +373,18 @@ int main()
         ) == std::string::npos
         ||
         cameras.find(
+            "/api/cameras/onvif-streams"
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "id=\"camera-auto-stream-btn\""
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "id=\"camera-profile-list\""
+        ) == std::string::npos
+        ||
+        cameras.find(
             "id=\"camera-onvif-xaddr\""
         ) == std::string::npos
         ||
@@ -381,7 +393,7 @@ int main()
         ) == std::string::npos
         ||
         cameras.find(
-            "Camera Core 0.0.12"
+            "Camera Core 0.0.14"
         ) == std::string::npos
         ||
         cameras.find(

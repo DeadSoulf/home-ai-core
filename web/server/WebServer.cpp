@@ -2780,6 +2780,8 @@ void WebServer::handleClient(
             path == "/api/cameras/media-probe"
             ||
             path == "/api/cameras/discover"
+            ||
+            path == "/api/cameras/onvif-streams"
         )
     ) {
         if (
@@ -2932,6 +2934,134 @@ void WebServer::handleClient(
             sendResponse(
                 client_fd,
                 "200 OK",
+                "application/json; charset=utf-8",
+                json.str()
+            );
+
+            return;
+        }
+
+        if (
+            path ==
+                "/api/cameras/onvif-streams"
+        ) {
+            const auto xaddr =
+                form.contains(
+                    "onvif_xaddr"
+                )
+                ? form.at(
+                    "onvif_xaddr"
+                )
+                : "";
+
+            const auto username =
+                form.contains(
+                    "username"
+                )
+                ? form.at(
+                    "username"
+                )
+                : "";
+
+            const auto password =
+                form.contains(
+                    "password"
+                )
+                ? form.at(
+                    "password"
+                )
+                : "";
+
+            const auto result =
+                cameras_->
+                    discoverOnvifStreams(
+                        xaddr,
+                        username,
+                        password
+                    );
+
+            security_.audit(
+                "camera.onvif.streams",
+                session->username,
+                "profiles=" +
+                std::to_string(
+                    result.profiles.size()
+                )
+                +
+                " result=" +
+                result.code
+            );
+
+            std::ostringstream json;
+
+            json
+                << "{\"success\":"
+                << (
+                    result.success
+                    ? "true"
+                    : "false"
+                )
+                << ",\"code\":\""
+                << jsonEscape(
+                    result.code
+                )
+                << "\",\"message\":\""
+                << jsonEscape(
+                    result.message
+                )
+                << "\",\"media_xaddr\":\""
+                << jsonEscape(
+                    result.media_xaddr
+                )
+                << "\",\"recommended_index\":"
+                << result.recommended_index
+                << ",\"profiles\":[";
+
+            bool first = true;
+
+            for (
+                const auto& profile :
+                result.profiles
+            ) {
+                if (!first)
+                    json << ",";
+
+                first = false;
+
+                json
+                    << "{"
+                    << "\"token\":\""
+                    << jsonEscape(
+                        profile.token
+                    )
+                    << "\",\"name\":\""
+                    << jsonEscape(
+                        profile.name
+                    )
+                    << "\",\"encoding\":\""
+                    << jsonEscape(
+                        profile.encoding
+                    )
+                    << "\",\"width\":"
+                    << profile.width
+                    << ",\"height\":"
+                    << profile.height
+                    << ",\"fps\":"
+                    << profile.fps
+                    << ",\"rtsp_uri\":\""
+                    << jsonEscape(
+                        profile.rtsp_uri
+                    )
+                    << "\"}";
+            }
+
+            json << "]}";
+
+            sendResponse(
+                client_fd,
+                result.success
+                    ? "200 OK"
+                    : "400 Bad Request",
                 "application/json; charset=utf-8",
                 json.str()
             );

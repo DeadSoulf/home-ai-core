@@ -2599,6 +2599,23 @@ CameraManager::discoverOnvif(
         );
 }
 
+OnvifMediaResult
+CameraManager::discoverOnvifStreams(
+    const std::string& device_xaddr,
+    const std::string& username,
+    const std::string& password
+) const
+{
+    OnvifMediaClient client;
+
+    return
+        client.profiles(
+            device_xaddr,
+            username,
+            password
+        );
+}
+
 void CameraManager::workerLoop()
 {
     while (running_) {

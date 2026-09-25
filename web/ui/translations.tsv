@@ -643,3 +643,28 @@ FFmpeg не вернул JPEG-кадр.	FFmpeg did not return a JPEG frame.
 Не удалось открыть сокет ONVIF discovery.	Unable to open ONVIF discovery socket.
 Не удалось отправить ONVIF discovery probe.	Unable to send ONVIF discovery probe.
 Некорректный ID камеры.	Invalid camera ID.
+RTSP URL (определяется автоматически)	RTSP URL (detected automatically)
+Определить поток автоматически	Detect stream automatically
+Сначала найдите и выберите ONVIF камеру.	Find and select an ONVIF camera first.
+Получение ONVIF Media Profiles...	Loading ONVIF Media Profiles...
+RTSP поток определён автоматически.	RTSP stream detected automatically.
+RTSP поток выбран автоматически.	RTSP stream selected automatically.
+Не удалось определить RTSP автоматически: 	Unable to detect RTSP automatically: 
+Введите логин/пароль камеры и нажмите «Определить поток автоматически».	Enter the camera username/password and press “Detect stream automatically”.
+Профиль	Profile
+ONVIF профиль	ONVIF profile
+Основной поток	Main stream
+Использовать этот поток	Use this stream
+Будет заполнен через ONVIF	Will be filled via ONVIF
+Камера не сообщила адрес ONVIF Media Service.	Camera did not report an ONVIF Media Service address.
+ONVIF Media Profiles не найдены.	No ONVIF Media Profiles found.
+Камера не вернула RTSP URI для ONVIF профилей.	Camera did not return an RTSP URI for ONVIF profiles.
+ONVIF отклонил логин или пароль.	ONVIF rejected the username or password.
+Автонастройка ONVIF сейчас поддерживает HTTP XAddr.	ONVIF automatic setup currently supports HTTP XAddr.
+Не удалось подключиться к ONVIF сервису камеры.	Unable to connect to the camera ONVIF service.
+Не удалось отправить ONVIF запрос.	Unable to send ONVIF request.
+ONVIF камера не ответила вовремя.	ONVIF camera did not respond in time.
+Некорректный HTTP ответ ONVIF.	Invalid ONVIF HTTP response.
+Ответ ONVIF слишком большой.	ONVIF response is too large.
+Не удалось декодировать ONVIF HTTP ответ.	Unable to decode ONVIF HTTP response.
+Сначала выберите найденную ONVIF камеру.	Select a discovered ONVIF camera first.

@@ -16,8 +16,9 @@
 | 0.0.10 | Refined phone/tablet Web UI and touch ergonomics | DEVELOPMENT SNAPSHOT |
 | 0.0.11 | Camera Core foundation: secure RTSP registry and health monitoring | DEVELOPMENT SNAPSHOT |
 | 0.0.12 | ONVIF discovery + real RTSP media probe + snapshots | DEVELOPMENT SNAPSHOT |
-| 0.0.13 | Fix camera inventory projection after ONVIF migration | IN DEVELOPMENT |
-| next 0.0.x | ONVIF profiles/PTZ + Live View | PLANNED |
+| 0.0.13 | Fix camera inventory projection after ONVIF migration | DEVELOPMENT SNAPSHOT |
+| 0.0.14 | Automatic RTSP discovery from ONVIF Media Profiles | IN DEVELOPMENT |
+| next 0.0.x | ONVIF PTZ + Live View | PLANNED |
 | next 0.0.x | Recorder + archive + event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
@@ -185,9 +186,9 @@ Implemented in the 0.0.11 snapshot:
 - lightweight endpoint health checks
 - Web camera management
 
-## Current focus: 0.0.12
+## Development snapshot: 0.0.12
 
-Current Camera Core work:
+Implemented in the 0.0.12 snapshot:
 
 - persistent ONVIF XAddr with automatic database migration
 - WS-Discovery for ONVIF NetworkVideoTransmitter devices
@@ -195,12 +196,32 @@ Current Camera Core work:
 - real RTSP media diagnostics through ffprobe
 - codec, resolution, FPS and audio codec reporting
 - JPEG snapshots through ffmpeg
-- internal credential decryption for media access
-- redacted media-tool errors
 - parser tests for ONVIF XML and ffprobe output
 
-0.0.12 keeps background health checks lightweight. Live View and recording remain separate
-future processes.
+## Development snapshot: 0.0.13
+
+Implemented in the 0.0.13 snapshot:
+
+- corrected the camera inventory SQL projection after adding ONVIF XAddr
+- restored CameraManager list/test consistency after the schema migration
+
+## Current focus: 0.0.14
+
+Current Camera Core work:
+
+- ONVIF GetCapabilities support for the Media Service address
+- ONVIF GetProfiles parsing
+- ONVIF GetStreamUri retrieval for each profile
+- WS-Security UsernameToken PasswordDigest authentication
+- automatic selection of the highest-resolution stream
+- alternate profile selection for main/substream workflows
+- automatic RTSP URL fill in the Web camera form
+- removal of embedded credentials from returned RTSP URIs
+- no HTTP Basic credential fallback by default
+- Web API and parser tests for automatic ONVIF stream discovery
+
+0.0.14 removes the need for the user to know vendor-specific RTSP paths on compatible ONVIF
+cameras. Manual RTSP entry remains only as a compatibility fallback.
 
 ## Later major capabilities
 

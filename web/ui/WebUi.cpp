@@ -2579,7 +2579,7 @@ PrivateKey отображается в редакторе и сохраняет�
 <div class="section-card">
 <div class="section-title">
 <h2>Камеры</h2>
-<span class="section-hint">Camera Core 0.0.12</span>
+<span class="section-hint">Camera Core 0.0.14</span>
 </div>
 
 <div class="stats-grid">
@@ -2651,13 +2651,13 @@ PrivateKey отображается в редакторе и сохраняет�
 </div>
 
 <div>
-<label for="camera-rtsp-url">RTSP URL</label>
+<label for="camera-rtsp-url">RTSP URL (определяется автоматически)</label>
 <input
     id="camera-rtsp-url"
     maxlength="2048"
     autocomplete="off"
     inputmode="url"
-    placeholder="rtsp://192.168.1.50:554/stream1">
+    placeholder="Будет заполнен через ONVIF">
 </div>
 
 <div>
@@ -2708,10 +2708,30 @@ PrivateKey отображается в редакторе и сохраняет�
 </label>
 
 <p class="muted">
-Логин и пароль указываются отдельно от RTSP URL.
-Пароль шифруется локальным ключом и не возвращается через API.
-ONVIF XAddr необязателен.
+Для ONVIF-камер RTSP URL вручную вводить не нужно:
+выберите найденную камеру, укажите логин/пароль и запустите автоопределение.
+Ручной RTSP URL остаётся только как резервный вариант.
 </p>
+
+<div class="button-row">
+<button
+    id="camera-auto-stream-btn"
+    type="button"
+    class="secondary">
+Определить поток автоматически
+</button>
+</div>
+
+<div
+    id="camera-profile-message"
+    class="muted"
+    role="status"
+    style="margin-top:12px"></div>
+
+<div
+    id="camera-profile-list"
+    class="placeholder-grid"
+    style="margin-top:12px"></div>
 
 <div class="button-row">
 <button id="camera-save-btn" type="button">
@@ -4918,6 +4938,7 @@ const cameraMediaCache =
 const cameraSnapshotCache =
     new Map();
 let onvifDiscoveryCache = [];
+let onvifProfileCache = [];
 
 function cameraCanManage() {
     const root =
@@ -4996,6 +5017,24 @@ function clearCameraForm() {
     document.getElementById(
         "camera-clear-password"
     ).checked = false;
+
+    onvifProfileCache = [];
+
+    const profileMessage =
+        document.getElementById(
+            "camera-profile-message"
+        );
+
+    if (profileMessage)
+        profileMessage.textContent = "";
+
+    const profileList =
+        document.getElementById(
+            "camera-profile-list"
+        );
+
+    if (profileList)
+        profileList.replaceChildren();
 
     const title =
         document.getElementById(
@@ -5142,6 +5181,355 @@ async function cameraPost(
     }
 
     return data;
+}
+
+function useOnvifProfile(index) {
+    const profile =
+        onvifProfileCache[
+            index
+        ];
+
+    if (!profile)
+        return;
+
+    const rtsp =
+        document.getElementById(
+            "camera-rtsp-url"
+        );
+
+    if (rtsp) {
+        rtsp.value =
+            profile.rtsp_uri
+            || "";
+    }
+
+    const message =
+        document.getElementById(
+            "camera-profile-message"
+        );
+
+    if (message) {
+        message.className =
+            "status-ok";
+
+        message.textContent =
+            tr("RTSP поток выбран автоматически.")
+            +
+            (
+                profile.name
+                ? (
+                    " "
+                    + profile.name
+                )
+                : ""
+            );
+    }
+}
+
+function renderOnvifProfiles(
+    recommendedIndex
+) {
+    const list =
+        document.getElementById(
+            "camera-profile-list"
+        );
+
+    if (!list)
+        return;
+
+    list.replaceChildren();
+
+    for (
+        let index = 0;
+        index <
+            onvifProfileCache.length;
+        ++index
+    ) {
+        const profile =
+            onvifProfileCache[
+                index
+            ];
+
+        const card =
+            document.createElement(
+                "div"
+            );
+
+        card.className =
+            "placeholder-card";
+
+        const title =
+            document.createElement(
+                "strong"
+            );
+
+        title.textContent =
+            profile.name
+            || (
+                tr("Профиль")
+                + " "
+                + (
+                    index + 1
+                )
+            );
+
+        title.dataset.i18nSkip = "";
+        card.appendChild(title);
+
+        const details =
+            document.createElement(
+                "div"
+            );
+
+        details.className =
+            "muted";
+        details.style.marginTop =
+            "8px";
+
+        const parts = [];
+
+        if (profile.encoding)
+            parts.push(
+                profile.encoding
+            );
+
+        if (
+            profile.width
+            &&
+            profile.height
+        ) {
+            parts.push(
+                profile.width
+                + "×"
+                + profile.height
+            );
+        }
+
+        if (
+            Number(
+                profile.fps
+            ) > 0
+        ) {
+            parts.push(
+                Number(
+                    profile.fps
+                ).toFixed(2)
+                + " FPS"
+            );
+        }
+
+        details.textContent =
+            parts.join(" · ")
+            || tr("ONVIF профиль");
+
+        details.dataset.i18nSkip = "";
+        card.appendChild(details);
+
+        const uri =
+            document.createElement(
+                "div"
+            );
+
+        uri.className =
+            "muted";
+        uri.style.marginTop =
+            "6px";
+        uri.textContent =
+            profile.rtsp_uri
+            || "";
+        uri.dataset.i18nSkip = "";
+
+        card.appendChild(uri);
+
+        const actions =
+            document.createElement(
+                "div"
+            );
+
+        actions.className =
+            "button-row";
+
+        const use =
+            document.createElement(
+                "button"
+            );
+
+        use.type = "button";
+        use.className =
+            index ===
+                recommendedIndex
+            ? ""
+            : "secondary";
+
+        use.textContent =
+            index ===
+                recommendedIndex
+            ? tr("Основной поток")
+            : tr("Использовать этот поток");
+
+        use.addEventListener(
+            "click",
+            function() {
+                useOnvifProfile(
+                    index
+                );
+            }
+        );
+
+        actions.appendChild(
+            use
+        );
+
+        card.appendChild(
+            actions
+        );
+
+        list.appendChild(
+            card
+        );
+    }
+}
+
+async function autoDetectCameraStream() {
+    const xaddr =
+        document.getElementById(
+            "camera-onvif-xaddr"
+        ).value.trim();
+
+    const username =
+        document.getElementById(
+            "camera-username"
+        ).value.trim();
+
+    const password =
+        document.getElementById(
+            "camera-password"
+        ).value;
+
+    const message =
+        document.getElementById(
+            "camera-profile-message"
+        );
+
+    const button =
+        document.getElementById(
+            "camera-auto-stream-btn"
+        );
+
+    if (!xaddr) {
+        if (message) {
+            message.className =
+                "status-error";
+            message.textContent =
+                tr("Сначала найдите и выберите ONVIF камеру.");
+        }
+
+        return;
+    }
+
+    if (button)
+        button.disabled = true;
+
+    if (message) {
+        message.className =
+            "muted";
+        message.textContent =
+            tr("Получение ONVIF Media Profiles...");
+    }
+
+    const parameters =
+        new URLSearchParams();
+
+    parameters.set(
+        "onvif_xaddr",
+        xaddr
+    );
+
+    parameters.set(
+        "username",
+        username
+    );
+
+    parameters.set(
+        "password",
+        password
+    );
+
+    try {
+        const result =
+            await cameraPost(
+                "/api/cameras/onvif-streams",
+                parameters
+            );
+
+        if (!result)
+            return;
+
+        onvifProfileCache =
+            Array.isArray(
+                result.profiles
+            )
+            ? result.profiles
+            : [];
+
+        const recommended =
+            Math.max(
+                0,
+                Math.min(
+                    Number(
+                        result.recommended_index
+                    ) || 0,
+                    Math.max(
+                        0,
+                        onvifProfileCache.length
+                        - 1
+                    )
+                )
+            );
+
+        renderOnvifProfiles(
+            recommended
+        );
+
+        if (
+            onvifProfileCache.length
+        ) {
+            useOnvifProfile(
+                recommended
+            );
+        }
+
+        if (message) {
+            message.className =
+                "status-ok";
+            message.textContent =
+                result.message
+                || tr("RTSP поток определён автоматически.");
+        }
+    }
+    catch (error) {
+        onvifProfileCache = [];
+
+        const list =
+            document.getElementById(
+                "camera-profile-list"
+            );
+
+        if (list)
+            list.replaceChildren();
+
+        if (message) {
+            message.className =
+                "status-error";
+            message.textContent =
+                tr("Не удалось определить RTSP автоматически: ")
+                + error.message;
+        }
+    }
+    finally {
+        if (button)
+            button.disabled = false;
+    }
 }
 
 async function saveCamera() {
@@ -5781,6 +6169,38 @@ async function discoverOnvifCameras() {
                             || "";
                     }
 
+                    const rtsp =
+                        document.getElementById(
+                            "camera-rtsp-url"
+                        );
+
+                    if (rtsp) {
+                        rtsp.value = "";
+                    }
+
+                    onvifProfileCache = [];
+
+                    const profileList =
+                        document.getElementById(
+                            "camera-profile-list"
+                        );
+
+                    if (profileList) {
+                        profileList.replaceChildren();
+                    }
+
+                    const profileMessage =
+                        document.getElementById(
+                            "camera-profile-message"
+                        );
+
+                    if (profileMessage) {
+                        profileMessage.className =
+                            "muted";
+                        profileMessage.textContent =
+                            tr("Введите логин/пароль камеры и нажмите «Определить поток автоматически».");
+                    }
+
                     if (
                         name
                         &&
@@ -6409,6 +6829,18 @@ document.addEventListener(
             discover.addEventListener(
                 "click",
                 discoverOnvifCameras
+            );
+        }
+
+        const autoStream =
+            document.getElementById(
+                "camera-auto-stream-btn"
+            );
+
+        if (autoStream) {
+            autoStream.addEventListener(
+                "click",
+                autoDetectCameraStream
             );
         }
 

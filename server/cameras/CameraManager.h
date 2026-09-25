@@ -9,6 +9,7 @@
 
 #include "server/cameras/CameraMediaTools.h"
 #include "server/cameras/OnvifDiscovery.h"
+#include "server/cameras/OnvifMediaClient.h"
 
 namespace homeai {
 
@@ -107,6 +108,13 @@ public:
     discoverOnvif(
         int timeout_ms,
         std::string& error
+    ) const;
+
+    OnvifMediaResult
+    discoverOnvifStreams(
+        const std::string& device_xaddr,
+        const std::string& username,
+        const std::string& password
     ) const;
 
 private:

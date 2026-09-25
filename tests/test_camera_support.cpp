@@ -1,5 +1,6 @@
 #include "server/cameras/CameraMediaTools.h"
 #include "server/cameras/OnvifDiscovery.h"
+#include "server/cameras/OnvifMediaClient.h"
 
 #include <cmath>
 #include <iostream>
@@ -107,6 +108,116 @@ int main()
     ) {
         std::cerr
             << "Fractional FPS parsing failed\n";
+
+        return 1;
+    }
+
+    const std::string capabilities =
+        "<s:Envelope><s:Body>"
+        "<tds:GetCapabilitiesResponse>"
+        "<tds:Capabilities>"
+        "<tt:Media>"
+        "<tt:XAddr>http://192.0.2.20/onvif/media_service</tt:XAddr>"
+        "</tt:Media>"
+        "</tds:Capabilities>"
+        "</tds:GetCapabilitiesResponse>"
+        "</s:Body></s:Envelope>";
+
+    if (
+        OnvifMediaClient::parseMediaXAddr(
+            capabilities
+        ) !=
+        "http://192.0.2.20/onvif/media_service"
+    ) {
+        std::cerr
+            << "ONVIF media XAddr parser failed\n";
+
+        return 1;
+    }
+
+    const std::string profilesXml =
+        "<s:Envelope><s:Body>"
+        "<trt:GetProfilesResponse>"
+        "<trt:Profiles token=\"main\">"
+        "<tt:Name>MainStream</tt:Name>"
+        "<tt:VideoEncoderConfiguration>"
+        "<tt:Encoding>H264</tt:Encoding>"
+        "<tt:Resolution>"
+        "<tt:Width>1920</tt:Width>"
+        "<tt:Height>1080</tt:Height>"
+        "</tt:Resolution>"
+        "<tt:RateControl>"
+        "<tt:FrameRateLimit>25</tt:FrameRateLimit>"
+        "</tt:RateControl>"
+        "</tt:VideoEncoderConfiguration>"
+        "</trt:Profiles>"
+        "<trt:Profiles token=\"sub\">"
+        "<tt:Name>SubStream</tt:Name>"
+        "<tt:VideoEncoderConfiguration>"
+        "<tt:Encoding>H264</tt:Encoding>"
+        "<tt:Resolution>"
+        "<tt:Width>640</tt:Width>"
+        "<tt:Height>360</tt:Height>"
+        "</tt:Resolution>"
+        "<tt:RateControl>"
+        "<tt:FrameRateLimit>15</tt:FrameRateLimit>"
+        "</tt:RateControl>"
+        "</tt:VideoEncoderConfiguration>"
+        "</trt:Profiles>"
+        "</trt:GetProfilesResponse>"
+        "</s:Body></s:Envelope>";
+
+    const auto profiles =
+        OnvifMediaClient::parseProfiles(
+            profilesXml
+        );
+
+    if (
+        profiles.size() != 2
+        ||
+        profiles[0].token != "main"
+        ||
+        profiles[0].name !=
+            "MainStream"
+        ||
+        profiles[0].encoding !=
+            "H264"
+        ||
+        profiles[0].width != 1920
+        ||
+        profiles[0].height != 1080
+        ||
+        std::abs(
+            profiles[0].fps - 25.0
+        ) > 0.001
+        ||
+        profiles[1].token != "sub"
+        ||
+        profiles[1].width != 640
+        ||
+        profiles[1].height != 360
+    ) {
+        std::cerr
+            << "ONVIF media profiles parser failed\n";
+
+        return 1;
+    }
+
+    const auto uri =
+        OnvifMediaClient::parseStreamUri(
+            "<s:Envelope><tt:MediaUri>"
+            "<tt:Uri>rtsp://admin:secret@192.0.2.20:554/main</tt:Uri>"
+            "</tt:MediaUri></s:Envelope>"
+        );
+
+    if (
+        uri !=
+        "rtsp://192.0.2.20:554/main"
+    ) {
+        std::cerr
+            << "ONVIF stream URI sanitizer failed: "
+            << uri
+            << '\n';
 
         return 1;
     }
