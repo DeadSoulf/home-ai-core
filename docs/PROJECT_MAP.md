@@ -122,7 +122,7 @@ server/
 ├── network/
 ├── storage/
 │   └── StorageMonitor
-│       mounted disk discovery, capacity, roles and online/offline state
+│       mounted storage, hot-plug discovery, capacity, roles and online/offline state
 ├── processes/
 └── backup/
 ```
