@@ -1,0 +1,9 @@
+#include "web/ui/Localization.h"
+namespace homeai {
+std::string localizationScript() {
+    return R"I18N((() => {
+const catalog = String.raw`@HOMEAI_TRANSLATIONS@`;
+@HOMEAI_LOCALIZATION_JS@
+})();)I18N";
+}
+}

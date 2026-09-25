@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <thread>
+#include "server/hardware/GpuMonitor.h"
 
 namespace homeai {
 
@@ -18,7 +19,8 @@ public:
         CoreRuntime& runtime,
         SecurityManager& security,
         UpdateManager& updates,
-        ModuleManager& modules
+        ModuleManager& modules,
+        GpuMonitor gpu_monitor = GpuMonitor()
     );
 
     ~WebServer();
@@ -40,6 +42,7 @@ private:
     SecurityManager& security_;
     UpdateManager& updates_;
     ModuleManager& modules_;
+    GpuMonitor gpu_monitor_;
 
     std::atomic<bool> running_{false};
 

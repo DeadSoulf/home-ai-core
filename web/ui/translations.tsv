@@ -1,0 +1,368 @@
+Главная	Home
+Сеть	Network
+Диски	Disks
+Файлы	Files
+Камеры	Cameras
+Умный дом	Smart home
+Пользователи	Users
+Автоматизация	Automation
+Виртуализация	Virtualization
+Система	System
+Настройки	Settings
+Администрирование	Administration
+Статистика	Statistics
+Обновление каждые 2 секунды	Updated every 2 seconds
+Ядро	Core
+Системный диск	System disk
+Обзор	Overview
+Дом и сервисы	Home and services
+Интеллект	Intelligence
+Выйти	Sign out
+Доступно обновление	Update available
+Ошибки и предупреждения	Errors and warnings
+Текущие контролируемые проверки	Current health checks
+Проверка состояния...	Checking status...
+Состояние ядра	Core status
+Версия	Version
+Модули ядра	Core modules
+Загрузка состояния модулей...	Loading module status...
+Обновление сервера	Server update
+Ветка	Branch
+Локальная версия	Local revision
+GitHub версия	GitHub revision
+Состояние	State
+Проверка состояния обновлений...	Checking update status...
+Проверить обновления	Check for updates
+Обновить сервер	Update server
+Перезапустить сервер	Restart server
+Web / сеть управления	Web / management network
+Настройки сети	Network settings
+Сохранить	Save
+Изменение bind address или порта вступит в силу после перезапуска ядра.	Changes to the bind address or port take effect after restarting the core.
+VPN-подключения сервера	Server VPN connections
+Профили WireGuard читаются из runtime/wireguard/*.conf. Для подключения на Debian должен быть установлен пакет wireguard-tools, а процесс Home AI Core должен иметь системное разрешение на управление сетевыми интерфейсами.	WireGuard profiles are read from runtime/wireguard/*.conf. Connecting on Debian requires wireguard-tools and permission to manage network interfaces.
+Обновить WireGuard	Refresh WireGuard
+Загрузка профилей WireGuard...	Loading WireGuard profiles...
+Здесь будет управление интерфейсами, адресами, маршрутами, DNS и диагностикой сети.	Network interfaces, addresses, routes, DNS and diagnostics will be managed here.
+Интерфейсы	Interfaces
+Маршруты	Routes
+Диагностика	Diagnostics
+Диски и хранилища	Disks and storage
+Проверить новые диски	Scan for new disks
+Здесь находятся все операции с дисками, назначение хранилищ для камер и личных файлов, а также hot-plug обнаружение.	Manage disks, assign storage for cameras and personal files, and detect newly connected devices here.
+Подключённые хранилища	Connected storage
+Новые / неиспользуемые диски	New / unused disks
+Загрузка информации о дисках...	Loading disk information...
+Поиск новых дисков...	Scanning for new disks...
+Настройки хранилищ	Storage settings
+Диски для видео	Video disks
+Диски для личных файлов	Personal file disks
+Управление диском	Manage disk
+Устройство не выбрано.	No device selected.
+Назначение и подключение	Assignment and mounting
+Подключить для видео	Mount for video
+Подключить для личных файлов	Mount for personal files
+Назначить как видео	Assign to video
+Назначить как личные файлы	Assign to personal files
+Снять назначение	Clear assignment
+Стандартные операции	Standard operations
+Обновить информацию	Refresh information
+Размонтировать	Unmount
+Форматировать EXT4	Format as EXT4
+Удалить сигнатуры	Erase signatures
+Форматирование и удаление сигнатур уничтожают существующие данные. Для этих операций требуется ввести точное имя устройства.	Formatting and erasing signatures destroy existing data. These operations require typing the exact device name.
+Закрыть	Close
+Домашнее облако	Home cloud
+Личное файловое хранилище	Personal file storage
+Корневая папка	Root directory
+Диски личных файлов	Personal file disks
+Не назначены	Not assigned
+Файлы домашнего облака будут храниться только в выбранном каталоге. Физические диски для личных данных назначаются в разделе «Диски».	Home cloud files will be stored only in the selected directory. Assign physical disks for personal data in Disks.
+Настройки хранения файлов	File storage settings
+Корневая папка домашнего облака	Home cloud root directory
+Следующим этапом здесь появятся браузер файлов, папки пользователей, корзина, квоты, версии файлов и общий доступ внутри домашней сети.	Future features include a file browser, user folders, trash, quotas, file versions and sharing on the home network.
+Файловый сервис	File service
+Раздел подготовлен как центр будущего домашнего облака.	This section is the foundation for the future home cloud.
+Файловый браузер	File browser
+Папки пользователей	User folders
+Квоты	Quotas
+Корзина и версии	Trash and versions
+Все функции видеонаблюдения будут собраны в этом разделе.	All video surveillance functions will be available here.
+Камеры RTSP / ONVIF	RTSP / ONVIF cameras
+Архив	Archive
+Аналитика	Analytics
+Устройства, комнаты, состояния и сценарии умного дома будут находиться здесь.	Smart home devices, rooms, states and scenes will be available here.
+Устройства	Devices
+Комнаты	Rooms
+Состояния	States
+Управление локальным AI, памятью, задачами и навыками.	Manage local AI, memory, tasks and skills.
+Текущий пользователь	Current user
+Имя	Name
+Роль	Role
+Сессия	Session
+Управление пользователями	User management
+Создание пользователей, изменение ролей, сброс паролей и активные сессии будут находиться здесь.	User creation, role changes, password resets and active sessions will be available here.
+Список пользователей	User list
+Роли и права	Roles and permissions
+Сессии	Sessions
+Правила, триггеры и сценарии системы будут собраны здесь.	System rules, triggers and scenarios will be available here.
+Правила	Rules
+Триггеры	Triggers
+Сценарии	Scenarios
+История выполнения	Execution history
+Управление KVM, виртуальными машинами, сетями и снапшотами.	Manage KVM, virtual machines, networks and snapshots.
+Виртуальные машины	Virtual machines
+Диски VM	VM disks
+Сети VM	VM networks
+Основные настройки	General settings
+Название ядра	Core name
+Уровень журналирования	Log level
+Изменение настроек доступно только администратору.	Only administrators can change settings.
+Требуется перезапуск	Restart required
+wg-quick не найден. Установите wireguard-tools.	wg-quick was not found. Install wireguard-tools.
+WireGuard готов.	WireGuard is ready.
+Профили не найдены. Добавьте *.conf в runtime/wireguard/	No profiles found. Add *.conf to runtime/wireguard/
+Отключить	Disconnect
+Подключить	Connect
+Операция завершена.	Operation completed.
+Ошибка WireGuard: 	WireGuard error:
+Зависимости: 	Dependencies:
+Модули не зарегистрированы.	No modules registered.
+Не удалось получить системную статистику.	Unable to retrieve system statistics.
+Критически высокая загрузка RAM.	Critically high memory usage.
+Системный диск заполнен более чем на 95%.	System disk usage exceeds 95%.
+Не удалось получить состояние хранилищ.	Unable to retrieve storage status.
+Хранилище OFFLINE: 	Storage OFFLINE:
+неизвестно	unknown
+Хранилище заполнено более чем на 95%: 	Storage usage exceeds 95%:
+Хранилище доступно только для чтения: 	Storage is read-only:
+Не удалось получить состояние модулей ядра.	Unable to retrieve core module status.
+Ошибка модуля 	Module error:
+Предупреждение модуля 	Module warning:
+Ошибка проверки состояния: 	Health check error:
+Активных ошибок не обнаружено.	No active errors detected.
+Видео	Video
+Личные файлы	Personal files
+Видео + личные файлы	Video + personal files
+Системный	System
+Не назначен	Unassigned
+Для монтирования, форматирования и размонтирования нужно установить привилегированный Storage Helper.	Mounting, formatting and unmounting require the privileged Storage Helper.
+Не удалось получить информацию об устройстве 	Unable to retrieve information about device
+. Обновите список дисков.	. Refresh the disk list.
+Устройство: 	Device:
+Размер: 	Size:
+Статус: 	Status:
+смонтирован в 	mounted at
+используется системой	in use by the system
+не смонтирован	unmounted
+Устройство больше не найдено.	Device is no longer available.
+ОПАСНАЯ ОПЕРАЦИЯ. Данные могут быть уничтожены. 	DANGEROUS OPERATION. Data may be destroyed.
+Для подтверждения введите точное имя устройства: 	Type the exact device name to confirm:
+Операция отменена: подтверждение не совпало.	Operation cancelled: confirmation did not match.
+Метка EXT4 (латиница, цифры, -, _, .):	EXT4 label (Latin letters, digits, -, _, .):
+Выполняется операция...	Operation in progress...
+Ошибка выполнения операции: 	Operation error:
+НОВЫЙ / НЕ СМОНТИРОВАН	NEW / UNMOUNTED
+Тип: 	Type:
+раздел	partition
+диск	disk
+Пока не использовать	Ignore for now
+Откройте управление диском для стандартных операций и выбора назначения.	Open disk management for standard operations and assignment.
+Обнаружен новый диск: 	New disk detected:
+Доступных дисков: 	Available disks:
+Новых неиспользуемых дисков не обнаружено.	No new unused disks detected.
+Новых неиспользуемых дисков нет.	No new unused disks.
+Блочные хранилища не обнаружены.	No block storage detected.
+не смонтировано	not mounted
+Точка: 	Mount point:
+ФС: 	Filesystem:
+Занято: 	Used:
+%), свободно 	%), free
+Ёмкость недоступна	Capacity unavailable
+Обновить репозиторий с GitHub, собрать новую версию и запустить тесты?	Update the repository from GitHub, build the new version and run tests?
+Перезапустить Home AI Core и применить новую сборку?	Restart Home AI Core and apply the new build?
+Сервер перезапускается...	Server is restarting...
+Выберите видеокарту для AI. Выбор сохраняется в конфигурации; совместимость с AI требует отдельной проверки. Драйверы автоматически не устанавливаются.	Select a GPU for AI. The selection is saved in configuration; AI compatibility requires a separate check. Drivers are not installed automatically.
+Снять назначение GPU	Clear GPU assignment
+Назначение GPU сохранено.	GPU assignment saved.
+Информация PCI недоступна.	PCI information is unavailable.
+Назначенная GPU отсутствует: 	Selected GPU is missing:
+Обнаружена GPU, доступна настройка AI: 	GPU detected, AI configuration available:
+Видеокарты не обнаружены.	No GPUs detected.
+Драйвер: 	Driver:
+не загружен	not loaded
+Назначена для AI	Assigned to AI
+Назначить для AI	Assign to AI
+Назначенная GPU: 	Selected GPU:
+Не назначена	Not assigned
+Не удалось получить сведения о GPU.	Unable to retrieve GPU information.
+Первоначальная настройка	Initial setup
+Создайте первого администратора Home AI Core.	Create the first Home AI Core administrator.
+Пароли не совпадают.	Passwords do not match.
+Вход в Home AI Core	Sign in to Home AI Core
+Введите данные локального пользователя.	Enter your local user credentials.
+Имя пользователя	Username
+Пароль	Password
+Повторите пароль	Repeat password
+Создать администратора	Create administrator
+Войти	Sign in
+Требуются права администратора.	Administrator access required.
+Работает	RUNNING
+Зарегистрирован	REGISTERED
+Инициализирован	INITIALIZED
+Остановлен	STOPPED
+Сбой	FAILED
+Исправен	HEALTHY
+Есть предупреждения	DEGRADED
+Неисправен	UNHEALTHY
+В сети	ONLINE
+Не в сети	OFFLINE
+Только чтение	READ ONLY
+Подключено	CONNECTED
+Отключено	DISCONNECTED
+Запланировано	PLANNED
+Следующий этап	NEXT
+Активна	ACTIVE
+Время работы	Uptime
+Средняя нагрузка	Load Average
+Процессор	CPU
+Оперативная память	RAM
+Веб-интерфейс	Web Core
+Ядро безопасности	Security Core
+Менеджер обновлений	Update Manager
+Монитор системы	System Monitor
+Монитор хранилищ	Storage Monitor
+Отладка	Debug
+Информация	Info
+Предупреждение	Warning
+Ошибка	Error
+Интервал цикла, мс	Runtime Tick, ms
+Адрес прослушивания	Bind address
+Порт	Port
+Снимки состояния	Snapshots
+GPU / ускоритель AI	GPU / AI accelerator
+Администратор	admin
+Оператор	operator
+Наблюдатель	viewer
+Ожидание	idle
+Проверка	checking
+Доступно	available
+Обновлений нет	up_to_date
+Обновление	updating
+Сборка	building
+Тестирование	testing
+Готово к перезапуску	ready_to_restart
+Ошибка запроса	request_failed
+Видеокарта не найдена	gpu_not_found
+Не удалось сохранить конфигурацию	config_save_failed
+Неверный идентификатор GPU	invalid_gpu
+Требуются права администратора	admin_required
+Требуется вход	authentication_required
+Включена проверка запросов	request_header_required
+Продолжить	Continue
+Ожидание проверки обновлений.	Waiting to check for updates.
+Обновление уже выполняется.	An update is already in progress.
+Новая версия не обнаружена.	No new version found.
+Перезапуск доступен только после успешного обновления.	Restart is available only after a successful update.
+Проверка GitHub...	Checking GitHub...
+Ветка сервера не совпадает с настроенной веткой обновлений. Ожидается: 	Server branch differs from the configured update branch. Expected:
+, текущая: 	, current:
+Не удалось проверить обновления. Проверьте доступ Git/SSH.	Unable to check for updates. Check Git/SSH access.
+Доступна новая версия в GitHub.	A new version is available on GitHub.
+Сервер использует актуальную версию.	The server is up to date.
+Обновление отменено: сервер находится не в ветке 	Update cancelled: server is not on branch
+Обновление отменено: в репозитории есть локальные изменения.	Update cancelled: the repository contains local changes.
+Не удалось определить текущую Git-версию.	Unable to determine the current Git revision.
+Получение изменений из GitHub...	Pulling changes from GitHub...
+Git pull завершился ошибкой.	Git pull failed.
+После обновления не удалось определить Git-версию.	Unable to determine the Git revision after updating.
+Сборка новой версии...	Building the new version...
+CMake configuration failed. Репозиторий возвращён к предыдущей версии.	CMake configuration failed. The repository was restored to the previous version.
+Сборка завершилась ошибкой. Репозиторий возвращён к предыдущей версии.	Build failed. The repository was restored to the previous version.
+Запуск тестов новой версии...	Testing the new version...
+Тесты новой версии не прошли. Репозиторий возвращён к предыдущей версии.	Tests failed. The repository was restored to the previous version.
+Не удалось сохранить предыдущую сборку.	Unable to preserve the previous build.
+Не удалось активировать новую сборку.	Unable to activate the new build.
+Обновление установлено и протестировано. Требуется перезапуск.	Update installed and tested. Restart required.
+Имя пользователя должно содержать от 3 до 32 символов	Username must be 3-32 characters
+Пароль должен содержать не менее 12 символов	Password must contain at least 12 characters
+Слишком длинный пароль	Password is too long
+Не удалось создать соль пароля	Unable to generate salt
+Ошибка хеширования пароля	Password hashing failed
+Пользователь уже существует	User already exists
+Не удалось сохранить пользователей	Unable to save users
+Слишком много неудачных попыток	Too many failed attempts
+Неверное имя пользователя или пароль	Invalid username or password
+Не удалось создать сессию	Unable to create session
+Устройство не найдено.	Device not found.
+Сначала смонтируйте диск.	Mount the disk first.
+Не удалось сохранить назначение диска.	Unable to save disk assignment.
+Назначение диска обновлено.	Disk assignment updated.
+Для форматирования нужно подтвердить точное имя устройства.	Formatting requires confirmation of the exact device name.
+Для удаления сигнатур нужно подтвердить точное имя устройства.	Erasing signatures requires confirmation of the exact device name.
+Неизвестная операция с диском.	Unknown disk operation.
+VPN недоступен.	VPN is unavailable.
+Неизвестная VPN-операция.	Unknown VPN operation.
+Проверка обновлений запущена.	Update check started.
+Для обновления требуется подтверждение UPDATE.	An update requires confirmation with UPDATE.
+Обновление запущено.	Update started.
+Перезапуск запрошен.	Restart requested.
+Привилегированный модуль управления дисками не установлен.	The privileged storage helper is not installed.
+Не удалось создать канал для операции.	Unable to create the operation pipe.
+Не удалось запустить операцию.	Unable to start the operation.
+Не удалось получить результат операции.	Unable to retrieve the operation result.
+Операция выполнена.	Operation completed.
+Операция завершилась ошибкой.	Operation failed.
+Неизвестное назначение диска.	Unknown disk assignment.
+Некорректное имя профиля.	Invalid profile name.
+Конфигурация WireGuard некорректна.	Invalid WireGuard configuration.
+WireGuard Manager не инициализирован.	WireGuard manager is not initialized.
+Не удалось сохранить конфигурацию WireGuard.	Unable to save WireGuard configuration.
+Не удалось активировать конфигурацию WireGuard.	Unable to activate WireGuard configuration.
+Профиль WireGuard сохранён.	WireGuard profile saved.
+Сначала отключите WireGuard.	Disconnect WireGuard first.
+Не удалось удалить профиль WireGuard.	Unable to remove WireGuard profile.
+Профиль WireGuard удалён.	WireGuard profile removed.
+Неизвестная операция WireGuard.	Unsupported WireGuard action.
+wg-quick не найден. Установите wireguard-tools.	wg-quick not found. Install wireguard-tools.
+Профиль WireGuard не найден.	WireGuard profile not found.
+Не удалось создать канал процесса WireGuard.	Unable to create WireGuard process pipe.
+Не удалось запустить wg-quick.	Unable to start wg-quick.
+Не удалось получить результат wg-quick.	Unable to obtain wg-quick result.
+WireGuard подключён.	WireGuard connected.
+Не удалось подключить WireGuard.	Unable to connect WireGuard.
+WireGuard отключён.	WireGuard disconnected.
+Не удалось отключить WireGuard.	Unable to disconnect WireGuard.
+Сервис VPN не инициализирован.	VPN service is not initialized.
+Аутентификация и сессии готовы.	Authentication and sessions are ready.
+Мониторинг процессора, памяти, нагрузки и корневой файловой системы.	CPU, RAM, load and root filesystem monitoring.
+Веб-интерфейс принимает подключения.	HTTP interface is accepting connections.
+Веб-интерфейс остановлен.	HTTP interface is stopped.
+Управляемые хранилища: 	Managed storage:
+, проблем: 	, problems:
+GitHub → сборка → тесты → перезапуск	GitHub → build → tests → restart
+Среда выполнения ядра	Core Runtime
+Жизненный цикл и состояние модулей	Module Manager lifecycle / health
+Адрес веб-интерфейса	Web bind address
+Порт веб-интерфейса	Web port
+Прямой эфир	Live View
+Ядро AI	AI Brain
+Ядро памяти	Memory Core
+Планировщик	Planner
+Навыки	Skills
+Аудит	Audit
+Неизвестно	UNKNOWN
+Ошибка	ERROR
+Обнаружены GPU: 	Detected GPUs:
+д	day
+ч	hr
+мин	min
+Жизненный цикл: 	Lifecycle:
+Состояние здоровья: 	Health:
+работает	running
+зарегистрирован	registered
+инициализирован	initialized
+остановлен	stopped
+сбой	failed
+ошибка	error
+Ошибка конфигурации CMake.	CMake configuration failed.

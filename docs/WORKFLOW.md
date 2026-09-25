@@ -42,10 +42,12 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-If all tests pass, run the core manually for functional verification:
+If all tests pass, use the non-root systemd service for normal server operation
+(see [service installation](SERVICE.md)):
 
 ```bash
-./build/home-ai-core
+sudo bash scripts/home-ai-service.sh restart
+bash scripts/home-ai-service.sh status
 ```
 
 ## Stable release workflow

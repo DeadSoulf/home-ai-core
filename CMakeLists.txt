@@ -20,6 +20,11 @@ find_package(
     REQUIRED
 )
 
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/web/ui/translations.tsv" HOMEAI_TRANSLATIONS)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/web/ui/localization.js" HOMEAI_LOCALIZATION_JS)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS web/ui/translations.tsv web/ui/localization.js)
+configure_file(web/ui/Localization.cpp.in "${CMAKE_CURRENT_BINARY_DIR}/Localization.cpp" @ONLY)
+
 file(
     GLOB HOMEAI_NETWORK_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/server/network/*.cpp"
@@ -36,6 +41,7 @@ add_library(
     core/runtime/CoreRuntime.cpp
 
     server/system/SystemMonitor.cpp
+    server/hardware/GpuMonitor.cpp
     ${HOMEAI_NETWORK_SOURCES}
     server/storage/StorageMonitor.cpp
     server/storage/DiskOperations.cpp
@@ -45,6 +51,7 @@ add_library(
 
     web/server/WebServer.cpp
     web/ui/WebUi.cpp
+    ${CMAKE_CURRENT_BINARY_DIR}/Localization.cpp
 )
 
 target_include_directories(
@@ -86,6 +93,14 @@ target_link_libraries(
 )
 
 enable_testing()
+
+add_executable(test-gpu-monitor tests/test_gpu_monitor.cpp)
+target_link_libraries(test-gpu-monitor PRIVATE homeai-core-lib)
+add_test(NAME gpu_monitor COMMAND test-gpu-monitor)
+add_executable(test-admin-api tests/test_admin_api.cpp)
+target_link_libraries(test-admin-api PRIVATE homeai-core-lib)
+add_test(NAME admin_api COMMAND test-admin-api)
+set_tests_properties(admin_api PROPERTIES TIMEOUT 30)
 
 add_executable(
     test-event-bus

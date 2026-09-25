@@ -2,6 +2,8 @@
 
 #include <iostream>
 #include <string>
+#include <filesystem>
+#include <fstream>
 
 int main()
 {
@@ -121,6 +123,7 @@ int main()
         "/users",
         "/hypervisor",
         "/settings"
+        ,"/files", "/admin"
     };
 
     for (const auto& route : routes) {
@@ -186,6 +189,19 @@ int main()
 
     std::cout
         << "Web UI test passed\n";
+
+    std::filesystem::create_directories("ui-fixtures");
+    for (const auto& route : routes) {
+        context.page = route;
+        const auto html = homeai::renderWebUi(context);
+        if (html.find("/assets/i18n.js") == std::string::npos || html.find("Copyright © TexNik") == std::string::npos) return 1;
+        std::ofstream("ui-fixtures/" + (route == "/" ? std::string("home") : route.substr(1)) + ".html") << html;
+    }
+    context.page = "/admin";
+    if (homeai::renderWebUi(context).find("gpu-clear") == std::string::npos) return 1;
+    context.admin = false;
+    const auto viewer = homeai::renderWebUi(context);
+    if (viewer.find("id=\"gpu-list\"") != std::string::npos || viewer.find("href=\"/admin\"") != std::string::npos) return 1;
 
     return 0;
 }

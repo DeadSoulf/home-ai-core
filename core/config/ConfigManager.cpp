@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <fstream>
+#include <filesystem>
 #include <vector>
 
 namespace homeai {
@@ -102,11 +103,27 @@ bool ConfigManager::save() const
     std::lock_guard<std::mutex>
         lock(mutex_);
 
+    return saveLocked();
+}
+
+bool ConfigManager::setAndSave(const std::string& key, const std::string& value)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto previous = values_;
+    values_[key] = value;
+    if (saveLocked()) return true;
+    values_ = std::move(previous);
+    return false;
+}
+
+bool ConfigManager::saveLocked() const
+{
+
     if (filename_.empty())
         return false;
 
     std::ofstream file(
-        filename_,
+        filename_ + ".tmp",
         std::ios::trunc
     );
 
@@ -136,6 +153,15 @@ bool ConfigManager::save() const
             << '\n';
     }
 
+    file.flush();
+    const bool written = file.good();
+    file.close();
+    std::error_code error;
+    if (written) std::filesystem::rename(filename_ + ".tmp", filename_, error);
+    if (!written || error) {
+        std::filesystem::remove(filename_ + ".tmp", error);
+        return false;
+    }
     return true;
 }
 

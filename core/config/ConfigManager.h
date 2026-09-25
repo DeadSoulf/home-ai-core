@@ -11,6 +11,8 @@ public:
     bool load(const std::string& filename);
 
     bool save() const;
+    // Persist a single setting atomically; leave memory unchanged on failure.
+    bool setAndSave(const std::string& key, const std::string& value);
 
     std::string get(
         const std::string& key,
@@ -33,6 +35,7 @@ public:
     );
 
 private:
+    bool saveLocked() const;
     mutable std::mutex mutex_;
 
     std::unordered_map<

@@ -103,6 +103,9 @@ std::string pageTitle(
     if (page == "/system")
         return "Система";
 
+    if (page == "/admin")
+        return "Администрирование";
+
     if (page == "/settings")
         return "Настройки";
 
@@ -223,7 +226,7 @@ bool isWebUiPath(
         ||
         path == "/hypervisor"
         ||
-        path == "/settings";
+        path == "/settings" || path == "/admin";
 }
 
 std::string renderWebUi(
@@ -239,6 +242,7 @@ std::string renderWebUi(
 <!doctype html>
 <html lang="ru">
 <head>
+<script src="/assets/i18n.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>)HTML";
@@ -246,9 +250,7 @@ std::string renderWebUi(
     page
         << htmlEscape(title)
         << " — "
-        << htmlEscape(
-            context.core_name
-        );
+        << htmlEscape(context.core_name);
 
     page << R"HTML(</title>
 <style>
@@ -747,9 +749,7 @@ button:disabled {
 <strong>)HTML";
 
     page
-        << htmlEscape(
-            context.core_name
-        )
+        << "<span data-i18n-skip>" << htmlEscape(context.core_name) << "</span>"
         << "</strong><small>v"
         << htmlEscape(
             context.version
@@ -781,6 +781,7 @@ button:disabled {
 
     page << "<div class=\"nav-group\">";
     page << "<div class=\"nav-caption\">Администрирование</div>";
+    if (context.admin) navLink(page, context, "/admin", "Администрирование", "⚒");
     navLink(page, context, "/users", "Пользователи", "♙");
     navLink(page, context, "/hypervisor", "Виртуализация", "▤");
     navLink(page, context, "/settings", "Настройки", "⚙");
@@ -789,9 +790,7 @@ button:disabled {
     page
         << "<div class=\"sidebar-user\">"
         << "<div><strong>"
-        << htmlEscape(
-            context.username
-        )
+        << "<span data-i18n-skip>" << htmlEscape(context.username) << "</span>"
         << "</strong><small>"
         << htmlEscape(
             context.role
@@ -813,9 +812,7 @@ button:disabled {
         << htmlEscape(title)
         << "</h1>"
         << "<div class=\"topbar-meta\">"
-        << htmlEscape(
-            context.core_name
-        )
+        << "<span data-i18n-skip>" << htmlEscape(context.core_name) << "</span>"
         << " · "
         << htmlEscape(
             context.version
@@ -825,9 +822,7 @@ button:disabled {
         << "<a id=\"update-badge\" href=\"/system\" "
            "style=\"display:none;margin-right:14px;color:#f2d784;text-decoration:none;font-weight:700\">"
            "Доступно обновление</a>"
-        << htmlEscape(
-            context.username
-        )
+        << "<span data-i18n-skip>" << htmlEscape(context.username) << "</span>"
         << " · "
         << htmlEscape(
             context.role
@@ -835,7 +830,20 @@ button:disabled {
         << "</div>"
         << "</header><main class=\"page\">";
 
-    if (context.page == "/") {
+    if (context.admin) page << R"HTML(<div id="gpu-notice" role="status" class="section-card" hidden></div>)HTML";
+
+    if (context.page == "/admin" && context.admin) {
+        page << R"HTML(
+<div class="section-card">
+<h2>GPU / AI accelerator</h2>
+<p>Выберите видеокарту для AI. Выбор сохраняется в конфигурации; совместимость с AI требует отдельной проверки. Драйверы автоматически не устанавливаются.</p>
+<div id="gpu-list"></div>
+<p id="gpu-selection"></p>
+<button type="button" id="gpu-clear">Снять назначение GPU</button>
+<p id="gpu-action" role="status"></p>
+</div>)HTML";
+    }
+    else if (context.page == "/") {
         renderSystemStats(
             page,
             true
@@ -1315,9 +1323,7 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
 <div>Имя</div><div>)HTML";
 
         page
-            << htmlEscape(
-                context.username
-            )
+            << "<span data-i18n-skip>" << htmlEscape(context.username) << "</span>"
             << "</div><div>Роль</div><div>"
             << htmlEscape(
                 context.role
@@ -1380,9 +1386,7 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
 <input name="core.name" value=")HTML";
 
             page
-                << htmlEscape(
-                    context.core_name
-                )
+                << "<span data-i18n-skip>" << htmlEscape(context.core_name) << "</span>"
                 << R"HTML(">
 </div>
 
@@ -1472,6 +1476,65 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
 </div>
 
 <script>
+
+let knownGpus = null;
+async function selectGpu(address) {
+    const output = document.getElementById('gpu-action');
+    try {
+        const response = await fetch('/api/admin/accelerator', {
+            method: 'POST', headers: {'X-HomeAI-Request':'1', 'Content-Type':'application/x-www-form-urlencoded'},
+            body: new URLSearchParams({pci_address:address})
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'request_failed');
+        output.textContent = tr('Назначение GPU сохранено.');
+        await updateGpus();
+    } catch (error) { output.textContent = tr(error.message); }
+}
+async function updateGpus() {
+    const notice = document.getElementById('gpu-notice');
+    if (!notice) return;
+    try {
+        const response = await fetch('/api/admin/gpus', {cache:'no-store'});
+        if (response.status === 401) { window.location = '/login'; return; }
+        if (!response.ok) throw new Error('request_failed');
+        const data = await response.json();
+        const addresses = data.devices.map(gpu => gpu.pci_address);
+        const added = addresses.filter(address => knownGpus === null || !knownGpus.has(address));
+        knownGpus = new Set(addresses);
+        notice.hidden = false;
+        if (!data.available) notice.textContent = tr('Информация PCI недоступна.');
+        else if (data.selected && !data.selected_present) notice.textContent = tr('Назначенная GPU отсутствует: ') + data.selected;
+        else if (added.length) {
+            notice.replaceChildren(document.createTextNode(tr('Обнаружена GPU, доступна настройка AI: ') + added.join(', ') + ' '));
+            const link = document.createElement('a'); link.href = '/admin'; link.textContent = tr('Администрирование'); notice.appendChild(link);
+        } else if (!addresses.length) notice.textContent = tr('Видеокарты не обнаружены.');
+        else {
+            notice.replaceChildren(document.createTextNode(tr('Обнаружены GPU: ') + addresses.join(', ') + ' '));
+            const link = document.createElement('a'); link.href = '/admin'; link.textContent = tr('Администрирование'); notice.appendChild(link);
+        }
+        const list = document.getElementById('gpu-list');
+        if (!list) return;
+        list.replaceChildren();
+        for (const gpu of data.devices) {
+            const card = document.createElement('div'); card.className = 'storage-card';
+            const info = document.createElement('p'); info.dataset.i18nSkip = '';
+            info.textContent = gpu.vendor + ' ' + gpu.vendor_id + ':' + gpu.device_id + ' · ' + gpu.pci_address + ' · ' + tr('Драйвер: ') + (gpu.driver || tr('не загружен'));
+            const button = document.createElement('button'); button.type = 'button';
+            button.textContent = tr(gpu.pci_address === data.selected ? 'Назначена для AI' : 'Назначить для AI');
+            button.disabled = gpu.pci_address === data.selected;
+            button.addEventListener('click', () => selectGpu(gpu.pci_address));
+            card.append(info, button); list.appendChild(card);
+        }
+        document.getElementById('gpu-selection').textContent = tr('Назначенная GPU: ') + (data.selected || tr('Не назначена'));
+    } catch (error) { notice.hidden = false; notice.textContent = tr('Не удалось получить сведения о GPU.'); }
+}
+document.addEventListener('DOMContentLoaded', () => {
+    updateGpus(); setInterval(updateGpus, 10000);
+    const clear = document.getElementById('gpu-clear');
+    if (clear) clear.addEventListener('click', () => selectGpu(''));
+});
+
 function formatUptime(seconds) {
     seconds = Number(seconds);
 
@@ -1492,15 +1555,15 @@ function formatUptime(seconds) {
 
     if (days > 0) {
         return (
-            days + "d "
-            + hours + "h "
-            + minutes + "m"
+            days + tr(" д ")
+            + hours + tr(" ч ")
+            + minutes + tr(" мин")
         );
     }
 
     return (
-        hours + "h "
-        + minutes + "m"
+        hours + tr(" ч ")
+        + minutes + tr(" мин")
     );
 }
 
@@ -1792,6 +1855,7 @@ async function updateVpnProfiles() {
 
             title.textContent =
                 profile.name;
+            title.dataset.i18nSkip = '';
 
             card.appendChild(title);
 
@@ -3824,6 +3888,7 @@ document.addEventListener(
 );
 </script>
 
+<footer style="padding:16px;text-align:center">Copyright © TexNik</footer>
 </body>
 </html>
 )HTML";

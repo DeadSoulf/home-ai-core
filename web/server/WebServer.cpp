@@ -1,5 +1,7 @@
 #include "web/server/WebServer.h"
 #include "web/ui/WebUi.h"
+#include "web/ui/Localization.h"
+#include "server/hardware/GpuMonitor.h"
 
 #include "core/logging/Logger.h"
 #include "core/modules/ModuleManager.h"
@@ -598,6 +600,7 @@ std::string renderAuthPage(
 <!doctype html>
 <html lang="ru">
 <head>
+<script src="/assets/i18n.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Home AI Core</title>
@@ -724,6 +727,7 @@ button {
 <button type="submit">Продолжить</button>
 </form>
 </div>
+<footer>Copyright © TexNik</footer>
 </body>
 </html>
 )HTML";
@@ -737,12 +741,14 @@ WebServer::WebServer(
     CoreRuntime& runtime,
     SecurityManager& security,
     UpdateManager& updates,
-    ModuleManager& modules
+    ModuleManager& modules,
+    GpuMonitor gpu_monitor
 )
     : runtime_(runtime),
       security_(security),
       updates_(updates),
-      modules_(modules)
+      modules_(modules),
+      gpu_monitor_(std::move(gpu_monitor))
 {
 }
 
@@ -1032,6 +1038,11 @@ void WebServer::handleClient(
 
     if (query != std::string::npos)
         path.resize(query);
+
+    if (method == "GET" && path == "/assets/i18n.js") {
+        sendResponse(client_fd, "200 OK", "application/javascript; charset=utf-8", localizationScript());
+        return;
+    }
 
     const auto cookie_header =
         headerValue(
@@ -1331,6 +1342,64 @@ void WebServer::handleClient(
             "/login"
         );
 
+        return;
+    }
+
+    if (path == "/admin" || path == "/api/admin/gpus" || path == "/api/admin/accelerator") {
+        if (!security_.isAdmin(session->role)) {
+            sendResponse(client_fd, "403 Forbidden", "application/json; charset=utf-8", "{\"error\":\"admin_required\"}");
+            return;
+        }
+    }
+    if (method == "GET" && path == "/api/admin/gpus") {
+        const auto inventory = gpu_monitor_.snapshot();
+        const auto selected = runtime_.config().get("ai.accelerator.pci_address");
+        bool present = false;
+        std::ostringstream json;
+        json << "{\"available\":" << (inventory.available ? "true" : "false")
+             << ",\"selected\":\"" << jsonEscape(selected) << "\",\"devices\":[";
+        bool first = true;
+        for (const auto& gpu : inventory.devices) {
+            if (!first) json << ',';
+            first = false;
+            present = present || selected == gpu.pci_address;
+            json << "{\"pci_address\":\"" << jsonEscape(gpu.pci_address)
+                 << "\",\"vendor\":\"" << jsonEscape(gpu.vendor)
+                 << "\",\"vendor_id\":\"" << jsonEscape(gpu.vendor_id)
+                 << "\",\"device_id\":\"" << jsonEscape(gpu.device_id)
+                 << "\",\"driver\":\"" << jsonEscape(gpu.driver) << "\"}";
+        }
+        json << "],\"selected_present\":" << (present ? "true" : "false") << '}';
+        sendResponse(client_fd, "200 OK", "application/json; charset=utf-8", json.str());
+        return;
+    }
+    if (method == "POST" && path == "/api/admin/accelerator") {
+        // Custom header prevents cross-origin form submissions; no CORS is enabled.
+        if (headerValue(headers, "X-HomeAI-Request") != "1") {
+            sendResponse(client_fd, "403 Forbidden", "application/json; charset=utf-8", "{\"error\":\"request_header_required\"}");
+            return;
+        }
+        const auto form = parseForm(body);
+        if (!form.contains("pci_address")) {
+            sendResponse(client_fd, "400 Bad Request", "application/json; charset=utf-8", "{\"error\":\"invalid_gpu\"}");
+            return;
+        }
+        const auto selected = form.at("pci_address");
+        if (!selected.empty()) {
+            const auto inventory = gpu_monitor_.snapshot();
+            const bool found = inventory.available && GpuMonitor::validAddress(selected) &&
+                std::any_of(inventory.devices.begin(), inventory.devices.end(), [&](const auto& gpu) { return gpu.pci_address == selected; });
+            if (!found) {
+                sendResponse(client_fd, "400 Bad Request", "application/json; charset=utf-8", "{\"error\":\"gpu_not_found\"}");
+                return;
+            }
+        }
+        if (!runtime_.config().setAndSave("ai.accelerator.pci_address", selected)) {
+            sendResponse(client_fd, "500 Internal Server Error", "application/json; charset=utf-8", "{\"error\":\"config_save_failed\"}");
+            return;
+        }
+        security_.audit("ai.accelerator.select", session->username, selected.empty() ? "none" : selected);
+        sendResponse(client_fd, "200 OK", "application/json; charset=utf-8", "{\"success\":true}");
         return;
     }
 

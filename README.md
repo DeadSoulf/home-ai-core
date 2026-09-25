@@ -61,3 +61,7 @@ The development server should normally track `develop`.
 ## Status
 
 The stable 0.0.5 foundation includes Core Runtime, logging, Event Bus, configuration, integrated Web Core, system monitoring, Security Core, authenticated Web/API access, and storage monitoring for mounted video/personal-data disks.
+# Service, languages and GPU administration
+
+- [Запуск без SSH: systemd-служба / Service installation](docs/SERVICE.md)
+- [Администрирование GPU, русский и English / GPU administration and languages](docs/ADMINISTRATION.md)
