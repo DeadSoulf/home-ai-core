@@ -31,6 +31,11 @@ core/
 ├── runtime/
 │   └── CoreRuntime
 │       Starts and stops the core and coordinates core services.
+├── modules/
+│   ├── Module
+│   │   Common module lifecycle and health interface.
+│   └── ModuleManager
+│       Dependency ordering, lifecycle state, health and reverse shutdown.
 ├── events/
 │   └── EventBus
 │       Internal event exchange between modules.
@@ -223,6 +228,7 @@ docs/
 ├── STORAGE.md
 ├── WEB_UI.md
 ├── UPDATES.md
+├── MODULES.md
 ├── API.md            (planned)
 └── BUILD.md          (planned)
 ```
