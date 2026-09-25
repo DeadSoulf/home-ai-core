@@ -37,8 +37,9 @@ bash scripts/home-ai-service.sh status
 bash scripts/home-ai-service.sh autostart
 ```
 
-`install` создаёт `/etc/systemd/system/home-ai-core.service`, выполняет
-`systemctl enable --now`, проверяет состояние `enabled` и сразу запускает ядро.
+`install` создаёт `/etc/systemd/system/home-ai-core.service`, включает его через
+`systemctl enable`, затем выполняет `systemctl restart`, проверяет состояние
+`enabled` и сразу запускает актуальную сборку ядра.
 Он не меняет владельцев существующих данных
 и не устанавливает зависимости. Путь должен быть абсолютным, без пробелов и спецсимволов.
 Если вы вошли как root, явно укажите существующего обычного владельца проекта вместо `$(id -un)`.
