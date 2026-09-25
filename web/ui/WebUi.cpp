@@ -4476,10 +4476,18 @@ async function updateNetworkInterfaces(
     if (
         !force
         &&
-        document.activeElement
-        &&
-        container.contains(
-            document.activeElement
+        (
+            (
+                document.activeElement
+                &&
+                container.contains(
+                    document.activeElement
+                )
+            )
+            ||
+            container.querySelector(
+                "[data-network-dirty=\"1\"]"
+            )
         )
     ) {
         return;
@@ -4701,6 +4709,9 @@ async function updateNetworkInterfaces(
 
                 config.style.marginTop =
                     "12px";
+
+                config.dataset.networkDirty =
+                    "0";
 
                 const makeField =
                     function(
@@ -4932,10 +4943,29 @@ async function updateNetworkInterfaces(
                 modeField.input.disabled =
                     !data.helper_installed;
 
+                const markDirty =
+                    function() {
+                        config.dataset.networkDirty =
+                            "1";
+                    };
+
                 modeField.input.addEventListener(
                     "change",
-                    refreshMode
+                    function() {
+                        markDirty();
+                        refreshMode();
+                    }
                 );
+
+                for (
+                    const input of
+                    staticInputs
+                ) {
+                    input.addEventListener(
+                        "input",
+                        markDirty
+                    );
+                }
 
                 refreshMode();
 
