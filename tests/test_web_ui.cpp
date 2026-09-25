@@ -109,6 +109,73 @@ int main()
         return 1;
     }
 
+    const std::string routes[] = {
+        "/",
+        "/system",
+        "/network",
+        "/storage",
+        "/cameras",
+        "/smart-home",
+        "/automation",
+        "/ai",
+        "/users",
+        "/hypervisor",
+        "/settings"
+    };
+
+    for (const auto& route : routes) {
+        if (
+            !homeai::isWebUiPath(
+                route
+            )
+        ) {
+            std::cerr
+                << "Sidebar route is not registered: "
+                << route
+                << '\n';
+
+            return 1;
+        }
+    }
+
+    if (
+        homeai::isWebUiPath(
+            "/missing"
+        )
+    ) {
+        std::cerr
+            << "Unknown Web UI route was accepted\n";
+
+        return 1;
+    }
+
+    context.page =
+        "/system";
+
+    const auto system =
+        homeai::renderWebUi(
+            context
+        );
+
+    if (
+        system.find(
+            "Обновление сервера"
+        ) == std::string::npos
+        ||
+        system.find(
+            "update-check-btn"
+        ) == std::string::npos
+        ||
+        system.find(
+            "update-apply-btn"
+        ) == std::string::npos
+    ) {
+        std::cerr
+            << "Update controls are missing from System page\n";
+
+        return 1;
+    }
+
     std::cout
         << "Web UI test passed\n";
 
