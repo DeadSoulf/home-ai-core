@@ -18,6 +18,7 @@
 #include <cctype>
 #include <cerrno>
 #include <cstring>
+#include <cstdint>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -2532,6 +2533,22 @@ void WebServer::handleClient(
         method == "GET" &&
         path == "/api/system"
     ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "system.view"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"error\":\"permission_denied\"}"
+            );
+
+            return;
+        }
+
         static SystemMonitor monitor;
 
         const auto stats =
@@ -2579,6 +2596,22 @@ void WebServer::handleClient(
         method == "GET" &&
         path == "/api/storage"
     ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "storage.view"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"error\":\"permission_denied\"}"
+            );
+
+            return;
+        }
+
         static StorageMonitor monitor;
 
         const auto volumes =
@@ -2655,6 +2688,22 @@ void WebServer::handleClient(
         method == "GET" &&
         path == "/api/storage/devices"
     ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "storage.view"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"error\":\"permission_denied\"}"
+            );
+
+            return;
+        }
+
         static StorageMonitor monitor;
 
         const auto devices =
@@ -2759,8 +2808,9 @@ void WebServer::handleClient(
         path == "/api/storage/action"
     ) {
         if (
-            !security_.isAdmin(
-                session->role
+            !security_.hasPermission(
+                *session,
+                "storage.manage"
             )
         ) {
             sendResponse(
@@ -3138,6 +3188,22 @@ void WebServer::handleClient(
         method == "GET" &&
         path == "/api/network/vpn"
     ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "network.view"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"error\":\"permission_denied\"}"
+            );
+
+            return;
+        }
+
         VpnService vpn;
         const bool initialized =
             vpn.initialize(
@@ -3192,8 +3258,9 @@ void WebServer::handleClient(
         path == "/api/network/vpn/action"
     ) {
         if (
-            !security_.isAdmin(
-                session->role
+            !security_.hasPermission(
+                *session,
+                "network.manage"
             )
         ) {
             sendResponse(
@@ -3291,6 +3358,22 @@ void WebServer::handleClient(
         method == "GET" &&
         path == "/api/modules"
     ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "system.view"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"error\":\"permission_denied\"}"
+            );
+
+            return;
+        }
+
         const auto modules =
             modules_.snapshot();
 
@@ -3372,6 +3455,22 @@ void WebServer::handleClient(
         method == "GET" &&
         path == "/api/update/status"
     ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "system.view"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"error\":\"permission_denied\"}"
+            );
+
+            return;
+        }
+
         const auto status =
             updates_.status();
 
@@ -3444,8 +3543,9 @@ void WebServer::handleClient(
         path == "/api/update/check"
     ) {
         if (
-            !security_.isAdmin(
-                session->role
+            !security_.hasPermission(
+                *session,
+                "system.manage"
             )
         ) {
             sendResponse(
@@ -3481,8 +3581,9 @@ void WebServer::handleClient(
         path == "/api/update/apply"
     ) {
         if (
-            !security_.isAdmin(
-                session->role
+            !security_.hasPermission(
+                *session,
+                "system.manage"
             )
         ) {
             sendResponse(
@@ -3554,8 +3655,9 @@ void WebServer::handleClient(
         path == "/api/update/restart"
     ) {
         if (
-            !security_.isAdmin(
-                session->role
+            !security_.hasPermission(
+                *session,
+                "system.manage"
             )
         ) {
             sendResponse(
@@ -3608,8 +3710,9 @@ void WebServer::handleClient(
         path == "/api/config"
     ) {
         if (
-            !security_.isAdmin(
-                session->role
+            !security_.hasPermission(
+                *session,
+                "system.manage"
             )
         ) {
             sendResponse(
@@ -3716,8 +3819,9 @@ void WebServer::handleClient(
         path == "/api/config"
     ) {
         if (
-            !security_.isAdmin(
-                session->role
+            !security_.hasPermission(
+                *session,
+                "system.manage"
             )
         ) {
             sendResponse(
@@ -3882,6 +3986,24 @@ void WebServer::handleClient(
             security_.isAdmin(
                 session->role
             );
+
+        for (
+            const auto& permission :
+            SecurityManager::
+                permissionCatalog()
+        ) {
+            if (
+                security_.hasPermission(
+                    *session,
+                    permission
+                )
+            ) {
+                context.permissions.
+                    push_back(
+                        permission
+                    );
+            }
+        }
 
         sendResponse(
             client_fd,
