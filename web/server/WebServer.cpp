@@ -6,6 +6,7 @@
 #include "core/runtime/CoreRuntime.h"
 #include "security/auth/SecurityManager.h"
 #include "server/system/SystemMonitor.h"
+#include "server/network/VpnService.h"
 #include "server/storage/StorageMonitor.h"
 #include "server/storage/DiskOperations.h"
 #include "server/update/UpdateManager.h"
@@ -2003,6 +2004,159 @@ void WebServer::handleClient(
         );
 
         sendActionResult(result);
+
+        return;
+    }
+
+    if (
+        method == "GET" &&
+        path == "/api/network/vpn"
+    ) {
+        VpnService vpn;
+        const bool initialized =
+            vpn.initialize(
+                "runtime/wireguard"
+            );
+
+        std::string error;
+        const auto profiles =
+            initialized
+            ? vpn.profiles(error)
+            : std::vector<VpnProfileInfo>{};
+
+        std::ostringstream json;
+        json
+            << "{\"available\":"
+            << (vpn.available() ? "true" : "false")
+            << ",\"profiles\":[";
+
+        bool first = true;
+
+        for (const auto& profile : profiles) {
+            if (!first)
+                json << ",";
+
+            first = false;
+
+            json
+                << "{\"name\":\""
+                << jsonEscape(profile.name)
+                << "\",\"active\":"
+                << (profile.active ? "true" : "false")
+                << "}";
+        }
+
+        json
+            << "],\"error\":\""
+            << jsonEscape(error)
+            << "\"}";
+
+        sendResponse(
+            client_fd,
+            "200 OK",
+            "application/json; charset=utf-8",
+            json.str()
+        );
+
+        return;
+    }
+
+    if (
+        method == "POST" &&
+        path == "/api/network/vpn/action"
+    ) {
+        if (
+            !security_.isAdmin(
+                session->role
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"Требуются права администратора.\"}"
+            );
+
+            return;
+        }
+
+        const auto form =
+            parseForm(body);
+
+        const auto action =
+            form.contains("action")
+            ? form.at("action")
+            : "";
+
+        const auto profile =
+            form.contains("profile")
+            ? form.at("profile")
+            : "";
+
+        VpnService vpn;
+
+        if (
+            !vpn.initialize(
+                "runtime/wireguard"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "500 Internal Server Error",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"VPN недоступен.\"}"
+            );
+
+            return;
+        }
+
+        VpnActionResult result;
+
+        if (action == "connect") {
+            result =
+                vpn.connect(profile);
+        }
+        else if (
+            action == "disconnect"
+        ) {
+            result =
+                vpn.disconnect(profile);
+        }
+        else {
+            result = {
+                false,
+                "unsupported_action",
+                "Неизвестная VPN-операция."
+            };
+        }
+
+        security_.audit(
+            "network.vpn.action",
+            session->username,
+            "action=" +
+            action +
+            " profile=" +
+            profile +
+            " result=" +
+            result.code
+        );
+
+        sendResponse(
+            client_fd,
+            result.success
+                ? "200 OK"
+                : "400 Bad Request",
+            "application/json; charset=utf-8",
+            "{\"success\":" +
+            std::string(
+                result.success
+                ? "true"
+                : "false"
+            ) +
+            ",\"message\":\"" +
+            jsonEscape(result.message) +
+            "\"}"
+        );
 
         return;
     }
