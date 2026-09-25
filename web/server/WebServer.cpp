@@ -7,6 +7,7 @@
 #include "server/system/SystemMonitor.h"
 #include "server/storage/StorageMonitor.h"
 #include "server/storage/DiskOperations.h"
+#include "server/update/UpdateManager.h"
 
 #include <algorithm>
 #include <arpa/inet.h>
@@ -564,34 +565,6 @@ bool isApiPath(
     ) == 0;
 }
 
-bool isUiPath(
-    const std::string& path
-)
-{
-    return
-        path == "/"
-        ||
-        path == "/network"
-        ||
-        path == "/storage"
-        ||
-        path == "/cameras"
-        ||
-        path == "/smart-home"
-        ||
-        path == "/ai"
-        ||
-        path == "/users"
-        ||
-        path == "/automation"
-        ||
-        path == "/hypervisor"
-        ||
-        path == "/system"
-        ||
-        path == "/settings";
-}
-
 std::string sessionCookie(
     const std::string& token
 )
@@ -760,10 +733,12 @@ button {
 
 WebServer::WebServer(
     CoreRuntime& runtime,
-    SecurityManager& security
+    SecurityManager& security,
+    UpdateManager& updates
 )
     : runtime_(runtime),
-      security_(security)
+      security_(security),
+      updates_(updates)
 {
 }
 
@@ -2031,6 +2006,241 @@ void WebServer::handleClient(
 
     if (
         method == "GET" &&
+        path == "/api/update/status"
+    ) {
+        const auto status =
+            updates_.status();
+
+        const std::string response =
+            "{"
+            "\"state\":\"" +
+            jsonEscape(
+                status.state_text
+            ) +
+            "\","
+            "\"local_sha\":\"" +
+            jsonEscape(
+                status.local_sha
+            ) +
+            "\","
+            "\"remote_sha\":\"" +
+            jsonEscape(
+                status.remote_sha
+            ) +
+            "\","
+            "\"branch\":\"" +
+            jsonEscape(
+                status.branch
+            ) +
+            "\","
+            "\"message\":\"" +
+            jsonEscape(
+                status.message
+            ) +
+            "\","
+            "\"last_output\":\"" +
+            jsonEscape(
+                status.last_output
+            ) +
+            "\","
+            "\"update_available\":" +
+            std::string(
+                status.update_available
+                ? "true"
+                : "false"
+            ) +
+            ","
+            "\"busy\":" +
+            std::string(
+                status.busy
+                ? "true"
+                : "false"
+            ) +
+            ","
+            "\"restart_required\":" +
+            std::string(
+                status.restart_required
+                ? "true"
+                : "false"
+            ) +
+            "}";
+
+        sendResponse(
+            client_fd,
+            "200 OK",
+            "application/json; charset=utf-8",
+            response
+        );
+
+        return;
+    }
+
+    if (
+        method == "POST" &&
+        path == "/api/update/check"
+    ) {
+        if (
+            !security_.isAdmin(
+                session->role
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"Требуются права администратора.\"}"
+            );
+
+            return;
+        }
+
+        updates_.requestCheck();
+
+        security_.audit(
+            "update.check",
+            session->username,
+            "manual update check"
+        );
+
+        sendResponse(
+            client_fd,
+            "202 Accepted",
+            "application/json; charset=utf-8",
+            "{\"success\":true,\"message\":\"Проверка обновлений запущена.\"}"
+        );
+
+        return;
+    }
+
+    if (
+        method == "POST" &&
+        path == "/api/update/apply"
+    ) {
+        if (
+            !security_.isAdmin(
+                session->role
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"Требуются права администратора.\"}"
+            );
+
+            return;
+        }
+
+        const auto form =
+            parseForm(body);
+
+        const auto confirm =
+            form.contains("confirm")
+            ? form.at("confirm")
+            : "";
+
+        if (confirm != "UPDATE") {
+            sendResponse(
+                client_fd,
+                "400 Bad Request",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"Для обновления требуется подтверждение UPDATE.\"}"
+            );
+
+            return;
+        }
+
+        std::string error;
+
+        if (
+            !updates_.requestUpdate(
+                error
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "409 Conflict",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"" +
+                jsonEscape(error) +
+                "\"}"
+            );
+
+            return;
+        }
+
+        security_.audit(
+            "update.apply",
+            session->username,
+            "update requested"
+        );
+
+        sendResponse(
+            client_fd,
+            "202 Accepted",
+            "application/json; charset=utf-8",
+            "{\"success\":true,\"message\":\"Обновление запущено.\"}"
+        );
+
+        return;
+    }
+
+    if (
+        method == "POST" &&
+        path == "/api/update/restart"
+    ) {
+        if (
+            !security_.isAdmin(
+                session->role
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"Требуются права администратора.\"}"
+            );
+
+            return;
+        }
+
+        std::string error;
+
+        if (
+            !updates_.requestRestart(
+                error
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "409 Conflict",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"" +
+                jsonEscape(error) +
+                "\"}"
+            );
+
+            return;
+        }
+
+        security_.audit(
+            "update.restart",
+            session->username,
+            "restart requested"
+        );
+
+        sendResponse(
+            client_fd,
+            "202 Accepted",
+            "application/json; charset=utf-8",
+            "{\"success\":true,\"message\":\"Перезапуск запрошен.\"}"
+        );
+
+        return;
+    }
+
+    if (
+        method == "GET" &&
         path == "/api/config"
     ) {
         if (
@@ -2204,7 +2414,7 @@ void WebServer::handleClient(
         if (
             return_it != form.end()
             &&
-            isUiPath(
+            isWebUiPath(
                 return_it->second
             )
         ) {
@@ -2223,7 +2433,7 @@ void WebServer::handleClient(
     if (
         method == "GET"
         &&
-        isUiPath(path)
+        isWebUiPath(path)
     ) {
         auto& config =
             runtime_.config();
