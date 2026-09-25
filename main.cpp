@@ -1,15 +1,16 @@
+#include "core/logging/Logger.h"
+#include "core/runtime/CoreRuntime.h"
+
 #include <atomic>
 #include <chrono>
 #include <csignal>
-#include <iostream>
 #include <thread>
 
-static std::atomic<bool> running{true};
+static std::atomic<bool> stop_requested{false};
 
-void signal_handler(int signal)
+static void signal_handler(int)
 {
-    std::cout << "\n[CORE] Received signal: " << signal << '\n';
-    running = false;
+    stop_requested = true;
 }
 
 int main()
@@ -17,20 +18,31 @@ int main()
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
-    std::cout << "=====================================\n";
-    std::cout << "       Home AI Core 0.0.1\n";
-    std::cout << "=====================================\n";
-    std::cout << "[CORE] Starting...\n";
-    std::cout << "[CORE] Runtime initialized\n";
-    std::cout << "[CORE] Status: RUNNING\n";
+    homeai::CoreRuntime runtime;
 
-    while (running)
-    {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+    if (!runtime.initialize("config/home-ai.conf")) {
+        homeai::Logger::instance().error(
+            "Core initialization failed"
+        );
+
+        return 1;
     }
 
-    std::cout << "[CORE] Shutting down...\n";
-    std::cout << "[CORE] Shutdown complete\n";
+    runtime.start();
+
+    const int tick_ms =
+        runtime.config().getInt(
+            "runtime.tick_ms",
+            250
+        );
+
+    while (!stop_requested) {
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds(tick_ms)
+        );
+    }
+
+    runtime.stop();
 
     return 0;
 }
