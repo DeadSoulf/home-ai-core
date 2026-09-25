@@ -9,8 +9,8 @@
 | 0.0.3 | Integrated Web Core | DONE |
 | 0.0.4 | System Monitor and live Dashboard metrics | DONE |
 | 0.0.5 | Security Core + protected Web/API + storage monitoring foundation | DONE |
-| 0.0.6 | Module Manager + hot-plug storage integration | IN DEVELOPMENT |
-| 0.0.7 | Full Storage Core: health, pools, quotas, retention | PLANNED |
+| 0.0.6 | Module Manager + hot-plug storage integration + Storage Pool foundation | IN DEVELOPMENT |
+| 0.0.7 | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
 | 0.0.8 | Device Core | PLANNED |
 | 0.0.9 | Automation Core | PLANNED |
 | 0.1.0 | First AI Brain runtime | PLANNED |
@@ -74,6 +74,13 @@ Completed in the current development branch:
 - role defaults plus per-user allow/deny permission overrides
 - backend permission enforcement by subsystem
 - complete Users page: CRUD, roles, passwords, permissions, sessions and audit
+- live Web update progress with real Ninja/CTest counters and expandable logs
+- filesystem UUID discovery and UUID-based mount paths for newly managed disks
+- multi-disk video and home-files pools
+- one physical disk can belong to both storage roles
+- most-free, sequential, balanced and pinned pool placement policies
+- per-volume reserve thresholds by percentage and GB
+- automatic best-effort remount of UUID-managed storage after server restart
 
 Module Manager implemented in the current development branch:
 
