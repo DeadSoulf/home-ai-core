@@ -20,6 +20,11 @@ find_package(
     REQUIRED
 )
 
+find_package(
+    SQLite3
+    REQUIRED
+)
+
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/web/ui/translations.tsv" HOMEAI_TRANSLATIONS)
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/web/ui/localization.js" HOMEAI_LOCALIZATION_JS)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS web/ui/translations.tsv web/ui/localization.js)
@@ -48,6 +53,7 @@ add_library(
     server/update/UpdateManager.cpp
 
     security/auth/SecurityManager.cpp
+    security/auth/UserDatabase.cpp
 
     web/server/WebServer.cpp
     web/ui/WebUi.cpp
@@ -79,6 +85,7 @@ target_link_libraries(
     PUBLIC
     Threads::Threads
     OpenSSL::Crypto
+    SQLite::SQLite3
 )
 
 add_executable(
