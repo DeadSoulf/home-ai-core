@@ -210,7 +210,7 @@ docs/
 ├── ROADMAP.md
 ├── WORKFLOW.md
 ├── ARCHITECTURE.md   (planned)
-├── SECURITY.md       (planned)
+├── SECURITY.md
 ├── API.md            (planned)
 └── BUILD.md          (planned)
 ```
