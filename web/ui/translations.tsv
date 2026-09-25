@@ -573,3 +573,5 @@ IP-адрес	IP address
 Некорректный основной DNS.	Invalid primary DNS.
 Некорректный дополнительный DNS.	Invalid secondary DNS.
 Не удалось применить статический IPv4.	Unable to apply static IPv4.
+Network Helper готов.	Network Helper is ready.
+Для изменения IPv4 установите Network Helper.	Install Network Helper to change IPv4 settings.
