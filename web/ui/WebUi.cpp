@@ -1814,6 +1814,1594 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
 
 <script>
 
+let usersPermissionCatalog = [];
+let auditOffset = 0;
+const auditLimit = 50;
+
+function userCanManage() {
+    const root =
+        document.getElementById(
+            "users-root"
+        );
+
+    return (
+        root
+        &&
+        root.dataset.canManage === "1"
+    );
+}
+
+function userRoleLabel(role) {
+    if (role === "admin")
+        return tr("Администратор");
+
+    if (role === "operator")
+        return tr("Оператор");
+
+    return tr("Наблюдатель");
+}
+
+function permissionLabel(permission) {
+    const labels = {
+        "files.read": "Файлы: чтение",
+        "files.write": "Файлы: запись",
+        "files.manage": "Файлы: управление",
+        "cameras.view": "Камеры: просмотр",
+        "cameras.manage": "Камеры: управление",
+        "smart_home.view": "Умный дом: просмотр",
+        "smart_home.control": "Умный дом: управление устройствами",
+        "smart_home.manage": "Умный дом: настройка",
+        "ai.use": "AI: использование",
+        "ai.manage": "AI: управление",
+        "users.view": "Пользователи: просмотр",
+        "users.manage": "Пользователи: управление",
+        "system.view": "Система: просмотр",
+        "system.manage": "Система: управление",
+        "storage.view": "Диски: просмотр",
+        "storage.manage": "Диски: управление",
+        "network.view": "Сеть: просмотр",
+        "network.manage": "Сеть: управление",
+        "hypervisor.view": "Виртуализация: просмотр",
+        "hypervisor.manage": "Виртуализация: управление",
+        "automation.view": "Автоматизация: просмотр",
+        "automation.manage": "Автоматизация: управление"
+    };
+
+    return tr(
+        labels[permission]
+        || permission
+    );
+}
+
+function formatUserTime(value) {
+    const timestamp =
+        Number(value);
+
+    if (
+        !Number.isFinite(timestamp)
+        ||
+        timestamp <= 0
+    ) {
+        return tr("Никогда");
+    }
+
+    return new Date(
+        timestamp * 1000
+    ).toLocaleString();
+}
+
+function setUserActionMessage(
+    message,
+    isError = false
+) {
+    const output =
+        document.getElementById(
+            "user-action-message"
+        );
+
+    if (!output)
+        return;
+
+    output.textContent =
+        tr(
+            message || ""
+        );
+
+    output.className =
+        isError
+        ? "status-error"
+        : "muted";
+}
+
+async function userApiPost(
+    url,
+    values
+) {
+    const response =
+        await fetch(
+            url,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type":
+                        "application/x-www-form-urlencoded",
+                    "X-HomeAI-Request":
+                        "1"
+                },
+                body:
+                    new URLSearchParams(
+                        values
+                    ).toString()
+            }
+        );
+
+    if (response.status === 401) {
+        window.location =
+            "/login";
+
+        return null;
+    }
+
+    const data =
+        await response.json();
+
+    if (!response.ok) {
+        throw new Error(
+            data.message
+            || data.error
+            || "Операция не выполнена."
+        );
+    }
+
+    return data;
+}
+
+function appendUserMeta(
+    card,
+    label,
+    value,
+    skipTranslation = false
+) {
+    const item =
+        document.createElement(
+            "div"
+        );
+
+    const strong =
+        document.createElement(
+            "strong"
+        );
+
+    strong.textContent =
+        tr(label) + ": ";
+
+    item.appendChild(strong);
+
+    const span =
+        document.createElement(
+            "span"
+        );
+
+    span.textContent =
+        value;
+
+    if (skipTranslation)
+        span.dataset.i18nSkip = "";
+
+    item.appendChild(span);
+
+    card.appendChild(item);
+}
+
+function renderPermissionEditor(
+    user,
+    container
+) {
+    const details =
+        document.createElement(
+            "details"
+        );
+
+    details.style.marginTop =
+        "14px";
+
+    const summary =
+        document.createElement(
+            "summary"
+        );
+
+    summary.textContent =
+        tr(
+            "Индивидуальные права"
+        );
+
+    details.appendChild(
+        summary
+    );
+
+    const grid =
+        document.createElement(
+            "div"
+        );
+
+    grid.className =
+        "permission-grid";
+
+    for (
+        const permission of
+        usersPermissionCatalog
+    ) {
+        const row =
+            document.createElement(
+                "div"
+            );
+
+        row.className =
+            "permission-row";
+
+        const label =
+            document.createElement(
+                "span"
+            );
+
+        label.textContent =
+            permissionLabel(
+                permission
+            );
+
+        row.appendChild(label);
+
+        const select =
+            document.createElement(
+                "select"
+            );
+
+        for (
+            const [
+                value,
+                text
+            ] of [
+                ["0", "Наследовать"],
+                ["1", "Разрешить"],
+                ["-1", "Запретить"]
+            ]
+        ) {
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+            option.value =
+                value;
+
+            option.textContent =
+                tr(text);
+
+            select.appendChild(
+                option
+            );
+        }
+
+        const current =
+            Object.prototype.
+                hasOwnProperty.call(
+                    user.permission_overrides
+                        || {},
+                    permission
+                )
+            ? String(
+                user.permission_overrides[
+                    permission
+                ]
+              )
+            : "0";
+
+        select.value =
+            current;
+
+        select.addEventListener(
+            "change",
+            async function() {
+                select.disabled =
+                    true;
+
+                try {
+                    const result =
+                        await userApiPost(
+                            "/api/users/permission",
+                            {
+                                user_id:
+                                    String(
+                                        user.id
+                                    ),
+                                permission:
+                                    permission,
+                                decision:
+                                    select.value
+                            }
+                        );
+
+                    if (result) {
+                        setUserActionMessage(
+                            result.message
+                            || "Permission updated"
+                        );
+
+                        await updateUsers();
+                    }
+                }
+                catch (error) {
+                    setUserActionMessage(
+                        error.message,
+                        true
+                    );
+                }
+                finally {
+                    select.disabled =
+                        false;
+                }
+            }
+        );
+
+        row.appendChild(
+            select
+        );
+
+        grid.appendChild(
+            row
+        );
+    }
+
+    details.appendChild(
+        grid
+    );
+
+    container.appendChild(
+        details
+    );
+}
+
+function renderUserCard(
+    user
+) {
+    const card =
+        document.createElement(
+            "div"
+        );
+
+    card.className =
+        "user-card";
+
+    const header =
+        document.createElement(
+            "div"
+        );
+
+    header.className =
+        "user-card-header";
+
+    const title =
+        document.createElement(
+            "h3"
+        );
+
+    title.textContent =
+        user.username;
+
+    title.dataset.i18nSkip =
+        "";
+
+    header.appendChild(
+        title
+    );
+
+    const state =
+        document.createElement(
+            "strong"
+        );
+
+    state.className =
+        user.enabled
+        ? "status-ok"
+        : "status-error";
+
+    state.textContent =
+        tr(
+            user.enabled
+            ? "ACTIVE"
+            : "DISABLED"
+        );
+
+    header.appendChild(
+        state
+    );
+
+    card.appendChild(
+        header
+    );
+
+    const meta =
+        document.createElement(
+            "div"
+        );
+
+    meta.className =
+        "user-meta";
+
+    appendUserMeta(
+        meta,
+        "Роль",
+        userRoleLabel(
+            user.role
+        )
+    );
+
+    appendUserMeta(
+        meta,
+        "Создан",
+        formatUserTime(
+            user.created_at
+        ),
+        true
+    );
+
+    appendUserMeta(
+        meta,
+        "Последний вход",
+        formatUserTime(
+            user.last_login_at
+        ),
+        true
+    );
+
+    card.appendChild(
+        meta
+    );
+
+    const permissionsTitle =
+        document.createElement(
+            "div"
+        );
+
+    permissionsTitle.className =
+        "muted";
+
+    permissionsTitle.style.marginTop =
+        "12px";
+
+    permissionsTitle.textContent =
+        tr(
+            "Эффективные права"
+        );
+
+    card.appendChild(
+        permissionsTitle
+    );
+
+    const chips =
+        document.createElement(
+            "div"
+        );
+
+    chips.className =
+        "permission-chip-list";
+
+    for (
+        const permission of
+        (
+            Array.isArray(
+                user.effective_permissions
+            )
+            ? user.effective_permissions
+            : []
+        )
+    ) {
+        const chip =
+            document.createElement(
+                "span"
+            );
+
+        chip.className =
+            "permission-chip";
+
+        chip.textContent =
+            permissionLabel(
+                permission
+            );
+
+        chips.appendChild(
+            chip
+        );
+    }
+
+    if (!chips.childNodes.length) {
+        const chip =
+            document.createElement(
+                "span"
+            );
+
+        chip.className =
+            "permission-chip";
+
+        chip.textContent =
+            tr("Нет разрешений");
+
+        chips.appendChild(
+            chip
+        );
+    }
+
+    card.appendChild(
+        chips
+    );
+
+    if (userCanManage()) {
+        const controls =
+            document.createElement(
+                "div"
+            );
+
+        controls.className =
+            "form-grid";
+
+        controls.style.marginTop =
+            "14px";
+
+        const roleBox =
+            document.createElement(
+                "div"
+            );
+
+        const roleLabel =
+            document.createElement(
+                "label"
+            );
+
+        roleLabel.textContent =
+            tr("Роль");
+
+        const roleSelect =
+            document.createElement(
+                "select"
+            );
+
+        for (
+            const [
+                value,
+                label
+            ] of [
+                ["viewer", "Наблюдатель"],
+                ["operator", "Оператор"],
+                ["admin", "Администратор"]
+            ]
+        ) {
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+            option.value =
+                value;
+
+            option.textContent =
+                tr(label);
+
+            option.selected =
+                value === user.role;
+
+            roleSelect.appendChild(
+                option
+            );
+        }
+
+        roleBox.append(
+            roleLabel,
+            roleSelect
+        );
+
+        controls.appendChild(
+            roleBox
+        );
+
+        const enabledBox =
+            document.createElement(
+                "div"
+            );
+
+        const enabledLabel =
+            document.createElement(
+                "label"
+            );
+
+        enabledLabel.textContent =
+            tr("Учётная запись");
+
+        const enabledSelect =
+            document.createElement(
+                "select"
+            );
+
+        for (
+            const [
+                value,
+                label
+            ] of [
+                ["1", "Активна"],
+                ["0", "Отключена"]
+            ]
+        ) {
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+            option.value =
+                value;
+
+            option.textContent =
+                tr(label);
+
+            option.selected =
+                (
+                    value === "1"
+                ) === Boolean(
+                    user.enabled
+                );
+
+            enabledSelect.appendChild(
+                option
+            );
+        }
+
+        enabledBox.append(
+            enabledLabel,
+            enabledSelect
+        );
+
+        controls.appendChild(
+            enabledBox
+        );
+
+        card.appendChild(
+            controls
+        );
+
+        const actions =
+            document.createElement(
+                "div"
+            );
+
+        actions.className =
+            "button-row";
+
+        const save =
+            document.createElement(
+                "button"
+            );
+
+        save.type = "button";
+        save.textContent =
+            tr("Сохранить");
+
+        save.addEventListener(
+            "click",
+            async function() {
+                save.disabled = true;
+
+                try {
+                    const result =
+                        await userApiPost(
+                            "/api/users/update",
+                            {
+                                user_id:
+                                    String(
+                                        user.id
+                                    ),
+                                role:
+                                    roleSelect.value,
+                                enabled:
+                                    enabledSelect.value
+                            }
+                        );
+
+                    if (result) {
+                        setUserActionMessage(
+                            result.message
+                            || "User updated"
+                        );
+
+                        await updateUsers();
+                        await updateUserSessions();
+                    }
+                }
+                catch (error) {
+                    setUserActionMessage(
+                        error.message,
+                        true
+                    );
+                }
+                finally {
+                    save.disabled = false;
+                }
+            }
+        );
+
+        actions.appendChild(
+            save
+        );
+
+        const password =
+            document.createElement(
+                "button"
+            );
+
+        password.type =
+            "button";
+
+        password.className =
+            "secondary";
+
+        password.textContent =
+            tr("Сменить пароль");
+
+        password.addEventListener(
+            "click",
+            async function() {
+                const next =
+                    window.prompt(
+                        "Введите новый пароль (минимум 12 символов)"
+                    );
+
+                if (next === null)
+                    return;
+
+                try {
+                    const result =
+                        await userApiPost(
+                            "/api/users/password",
+                            {
+                                user_id:
+                                    String(
+                                        user.id
+                                    ),
+                                password:
+                                    next
+                            }
+                        );
+
+                    if (result) {
+                        setUserActionMessage(
+                            result.message
+                            || "Password changed"
+                        );
+
+                        await updateUserSessions();
+                    }
+                }
+                catch (error) {
+                    setUserActionMessage(
+                        error.message,
+                        true
+                    );
+                }
+            }
+        );
+
+        actions.appendChild(
+            password
+        );
+
+        const revoke =
+            document.createElement(
+                "button"
+            );
+
+        revoke.type =
+            "button";
+
+        revoke.className =
+            "secondary";
+
+        revoke.textContent =
+            tr(
+                "Завершить все сессии"
+            );
+
+        revoke.addEventListener(
+            "click",
+            async function() {
+                if (
+                    !window.confirm(
+                        "Завершить все активные сессии этого пользователя?"
+                    )
+                ) {
+                    return;
+                }
+
+                try {
+                    const result =
+                        await userApiPost(
+                            "/api/users/sessions/revoke",
+                            {
+                                user_id:
+                                    String(
+                                        user.id
+                                    )
+                            }
+                        );
+
+                    if (result) {
+                        setUserActionMessage(
+                            result.message
+                            || "User sessions revoked"
+                        );
+
+                        await updateUserSessions();
+                    }
+                }
+                catch (error) {
+                    setUserActionMessage(
+                        error.message,
+                        true
+                    );
+                }
+            }
+        );
+
+        actions.appendChild(
+            revoke
+        );
+
+        const remove =
+            document.createElement(
+                "button"
+            );
+
+        remove.type =
+            "button";
+
+        remove.className =
+            "danger";
+
+        remove.textContent =
+            tr(
+                "Удалить пользователя"
+            );
+
+        remove.addEventListener(
+            "click",
+            async function() {
+                if (
+                    !window.confirm(
+                        "Удалить пользователя и все его активные сессии?"
+                    )
+                ) {
+                    return;
+                }
+
+                try {
+                    const result =
+                        await userApiPost(
+                            "/api/users/delete",
+                            {
+                                user_id:
+                                    String(
+                                        user.id
+                                    )
+                            }
+                        );
+
+                    if (result) {
+                        setUserActionMessage(
+                            result.message
+                            || "User deleted"
+                        );
+
+                        await updateUsers();
+                        await updateUserSessions();
+                        await updateAuditLog();
+                    }
+                }
+                catch (error) {
+                    setUserActionMessage(
+                        error.message,
+                        true
+                    );
+                }
+            }
+        );
+
+        actions.appendChild(
+            remove
+        );
+
+        card.appendChild(
+            actions
+        );
+
+        renderPermissionEditor(
+            user,
+            card
+        );
+    }
+
+    return card;
+}
+
+async function updateUsers() {
+    const container =
+        document.getElementById(
+            "users-list"
+        );
+
+    if (!container)
+        return;
+
+    try {
+        const response =
+            await fetch(
+                "/api/users",
+                {
+                    cache: "no-store"
+                }
+            );
+
+        if (response.status === 401) {
+            window.location =
+                "/login";
+
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error(
+                "Не удалось получить список пользователей."
+            );
+        }
+
+        const data =
+            await response.json();
+
+        usersPermissionCatalog =
+            Array.isArray(
+                data.permission_catalog
+            )
+            ? data.permission_catalog
+            : [];
+
+        container.replaceChildren();
+
+        const users =
+            Array.isArray(
+                data.users
+            )
+            ? data.users
+            : [];
+
+        for (const user of users) {
+            container.appendChild(
+                renderUserCard(
+                    user
+                )
+            );
+        }
+
+        if (users.length === 0) {
+            const empty =
+                document.createElement(
+                    "div"
+                );
+
+            empty.className =
+                "user-card";
+
+            empty.textContent =
+                tr(
+                    "Пользователи не найдены."
+                );
+
+            container.appendChild(
+                empty
+            );
+        }
+    }
+    catch (error) {
+        container.textContent =
+            tr(error.message);
+    }
+}
+
+async function updateUserSessions() {
+    const container =
+        document.getElementById(
+            "sessions-list"
+        );
+
+    if (!container)
+        return;
+
+    try {
+        const response =
+            await fetch(
+                "/api/users/sessions",
+                {
+                    cache: "no-store"
+                }
+            );
+
+        if (response.status === 401) {
+            window.location =
+                "/login";
+
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error(
+                "Не удалось получить активные сессии."
+            );
+        }
+
+        const data =
+            await response.json();
+
+        const sessions =
+            Array.isArray(
+                data.sessions
+            )
+            ? data.sessions
+            : [];
+
+        container.replaceChildren();
+
+        for (
+            const session of
+            sessions
+        ) {
+            const card =
+                document.createElement(
+                    "div"
+                );
+
+            card.className =
+                "user-card";
+
+            const header =
+                document.createElement(
+                    "div"
+                );
+
+            header.className =
+                "user-card-header";
+
+            const username =
+                document.createElement(
+                    "strong"
+                );
+
+            username.textContent =
+                session.username;
+
+            username.dataset.i18nSkip =
+                "";
+
+            header.appendChild(
+                username
+            );
+
+            const id =
+                document.createElement(
+                    "span"
+                );
+
+            id.className =
+                "muted";
+
+            id.textContent =
+                "Session #"
+                + session.id;
+
+            id.dataset.i18nSkip =
+                "";
+
+            header.appendChild(id);
+            card.appendChild(header);
+
+            const meta =
+                document.createElement(
+                    "div"
+                );
+
+            meta.className =
+                "user-meta";
+
+            appendUserMeta(
+                meta,
+                "Создана",
+                formatUserTime(
+                    session.created_at
+                ),
+                true
+            );
+
+            appendUserMeta(
+                meta,
+                "Последняя активность",
+                formatUserTime(
+                    session.last_seen_at
+                ),
+                true
+            );
+
+            appendUserMeta(
+                meta,
+                "Истекает",
+                formatUserTime(
+                    session.expires_at
+                ),
+                true
+            );
+
+            card.appendChild(meta);
+
+            const actions =
+                document.createElement(
+                    "div"
+                );
+
+            actions.className =
+                "button-row";
+
+            const revoke =
+                document.createElement(
+                    "button"
+                );
+
+            revoke.type =
+                "button";
+
+            revoke.className =
+                "danger";
+
+            revoke.textContent =
+                tr("Завершить сессию");
+
+            revoke.addEventListener(
+                "click",
+                async function() {
+                    try {
+                        const result =
+                            await userApiPost(
+                                "/api/users/session/revoke",
+                                {
+                                    user_id:
+                                        String(
+                                            session.user_id
+                                        ),
+                                    session_id:
+                                        String(
+                                            session.id
+                                        )
+                                }
+                            );
+
+                        if (result) {
+                            setUserActionMessage(
+                                result.message
+                                || "Session revoked"
+                            );
+
+                            await updateUserSessions();
+                        }
+                    }
+                    catch (error) {
+                        setUserActionMessage(
+                            error.message,
+                            true
+                        );
+                    }
+                }
+            );
+
+            actions.appendChild(
+                revoke
+            );
+
+            card.appendChild(
+                actions
+            );
+
+            container.appendChild(
+                card
+            );
+        }
+
+        if (sessions.length === 0) {
+            const empty =
+                document.createElement(
+                    "div"
+                );
+
+            empty.className =
+                "user-card";
+
+            empty.textContent =
+                tr(
+                    "Активных сессий нет."
+                );
+
+            container.appendChild(
+                empty
+            );
+        }
+    }
+    catch (error) {
+        container.textContent =
+            tr(error.message);
+    }
+}
+
+async function updateAuditLog() {
+    const container =
+        document.getElementById(
+            "audit-list"
+        );
+
+    if (!container)
+        return;
+
+    const username =
+        document.getElementById(
+            "audit-user-filter"
+        )?.value || "";
+
+    const event =
+        document.getElementById(
+            "audit-event-filter"
+        )?.value || "";
+
+    const query =
+        new URLSearchParams(
+            {
+                limit:
+                    String(
+                        auditLimit
+                    ),
+                offset:
+                    String(
+                        auditOffset
+                    ),
+                username:
+                    username,
+                event:
+                    event
+            }
+        );
+
+    try {
+        const response =
+            await fetch(
+                "/api/users/audit?"
+                + query.toString(),
+                {
+                    cache: "no-store"
+                }
+            );
+
+        if (response.status === 401) {
+            window.location =
+                "/login";
+
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error(
+                "Не удалось получить журнал безопасности."
+            );
+        }
+
+        const data =
+            await response.json();
+
+        const entries =
+            Array.isArray(
+                data.entries
+            )
+            ? data.entries
+            : [];
+
+        container.replaceChildren();
+
+        for (const entry of entries) {
+            const card =
+                document.createElement(
+                    "div"
+                );
+
+            card.className =
+                "audit-entry";
+
+            const header =
+                document.createElement(
+                    "div"
+                );
+
+            const time =
+                document.createElement(
+                    "strong"
+                );
+
+            time.textContent =
+                formatUserTime(
+                    entry.created_at
+                );
+
+            time.dataset.i18nSkip =
+                "";
+
+            header.appendChild(time);
+
+            const eventName =
+                document.createElement(
+                    "span"
+                );
+
+            eventName.textContent =
+                entry.event;
+
+            eventName.dataset.i18nSkip =
+                "";
+
+            header.appendChild(
+                eventName
+            );
+
+            card.appendChild(
+                header
+            );
+
+            const userLine =
+                document.createElement(
+                    "div"
+                );
+
+            userLine.className =
+                "muted";
+
+            userLine.textContent =
+                tr("Пользователь")
+                + ": "
+                + entry.username;
+
+            userLine.dataset.i18nSkip =
+                "";
+
+            card.appendChild(
+                userLine
+            );
+
+            const details =
+                document.createElement(
+                    "div"
+                );
+
+            details.textContent =
+                entry.details;
+
+            details.dataset.i18nSkip =
+                "";
+
+            card.appendChild(
+                details
+            );
+
+            container.appendChild(
+                card
+            );
+        }
+
+        if (entries.length === 0) {
+            const empty =
+                document.createElement(
+                    "div"
+                );
+
+            empty.className =
+                "user-card";
+
+            empty.textContent =
+                tr(
+                    "События не найдены."
+                );
+
+            container.appendChild(
+                empty
+            );
+        }
+
+        const previous =
+            document.getElementById(
+                "audit-prev-btn"
+            );
+
+        const next =
+            document.getElementById(
+                "audit-next-btn"
+            );
+
+        if (previous)
+            previous.disabled =
+                auditOffset <= 0;
+
+        if (next)
+            next.disabled =
+                entries.length <
+                auditLimit;
+    }
+    catch (error) {
+        container.textContent =
+            tr(error.message);
+    }
+}
+
+document.addEventListener(
+    "DOMContentLoaded",
+    function() {
+        updateUsers();
+        updateUserSessions();
+        updateAuditLog();
+
+        const refresh =
+            document.getElementById(
+                "users-refresh-btn"
+            );
+
+        if (refresh) {
+            refresh.addEventListener(
+                "click",
+                updateUsers
+            );
+        }
+
+        const sessionsRefresh =
+            document.getElementById(
+                "sessions-refresh-btn"
+            );
+
+        if (sessionsRefresh) {
+            sessionsRefresh.addEventListener(
+                "click",
+                updateUserSessions
+            );
+        }
+
+        const create =
+            document.getElementById(
+                "user-create-btn"
+            );
+
+        if (create) {
+            create.addEventListener(
+                "click",
+                async function() {
+                    const username =
+                        document.getElementById(
+                            "new-user-name"
+                        ).value;
+
+                    const password =
+                        document.getElementById(
+                            "new-user-password"
+                        ).value;
+
+                    const role =
+                        document.getElementById(
+                            "new-user-role"
+                        ).value;
+
+                    create.disabled = true;
+
+                    try {
+                        const result =
+                            await userApiPost(
+                                "/api/users/create",
+                                {
+                                    username:
+                                        username,
+                                    password:
+                                        password,
+                                    role:
+                                        role
+                                }
+                            );
+
+                        if (result) {
+                            document.getElementById(
+                                "new-user-name"
+                            ).value = "";
+
+                            document.getElementById(
+                                "new-user-password"
+                            ).value = "";
+
+                            setUserActionMessage(
+                                result.message
+                                || "User created"
+                            );
+
+                            await updateUsers();
+                            await updateAuditLog();
+                        }
+                    }
+                    catch (error) {
+                        setUserActionMessage(
+                            error.message,
+                            true
+                        );
+                    }
+                    finally {
+                        create.disabled = false;
+                    }
+                }
+            );
+        }
+
+        const auditFilter =
+            document.getElementById(
+                "audit-filter-btn"
+            );
+
+        if (auditFilter) {
+            auditFilter.addEventListener(
+                "click",
+                function() {
+                    auditOffset = 0;
+                    updateAuditLog();
+                }
+            );
+        }
+
+        const auditPrevious =
+            document.getElementById(
+                "audit-prev-btn"
+            );
+
+        if (auditPrevious) {
+            auditPrevious.addEventListener(
+                "click",
+                function() {
+                    auditOffset =
+                        Math.max(
+                            0,
+                            auditOffset
+                            - auditLimit
+                        );
+
+                    updateAuditLog();
+                }
+            );
+        }
+
+        const auditNext =
+            document.getElementById(
+                "audit-next-btn"
+            );
+
+        if (auditNext) {
+            auditNext.addEventListener(
+                "click",
+                function() {
+                    auditOffset +=
+                        auditLimit;
+
+                    updateAuditLog();
+                }
+            );
+        }
+    }
+);
+
 let knownGpus = null;
 async function selectGpu(address) {
     const output = document.getElementById('gpu-action');
