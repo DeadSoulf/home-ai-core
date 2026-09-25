@@ -366,3 +366,89 @@ GitHub → сборка → тесты → перезапуск	GitHub → build
 сбой	failed
 ошибка	error
 Ошибка конфигурации CMake.	CMake configuration failed.
+Создать пользователя	Create user
+Наблюдатель	Viewer
+Оператор	Operator
+Администратор	Administrator
+Обновить	Refresh
+Загрузка пользователей...	Loading users...
+Активные сессии	Active sessions
+Загрузка активных сессий...	Loading active sessions...
+Журнал безопасности	Security audit
+Последние события Security Core	Latest Security Core events
+Пользователь	User
+Событие	Event
+Применить фильтр	Apply filter
+Назад	Previous
+Далее	Next
+Индивидуальные права	Individual permissions
+Наследовать	Inherit
+Разрешить	Allow
+Запретить	Deny
+Эффективные права	Effective permissions
+Нет разрешений	No permissions
+Создан	Created
+Последний вход	Last login
+Учётная запись	Account
+Активна	Active
+Отключена	Disabled
+Отключена	DISABLED
+Сменить пароль	Change password
+Завершить все сессии	Revoke all sessions
+Удалить пользователя	Delete user
+Введите новый пароль (минимум 12 символов)	Enter a new password (minimum 12 characters)
+Завершить все активные сессии этого пользователя?	Revoke all active sessions for this user?
+Удалить пользователя и все его активные сессии?	Delete the user and all active sessions?
+Завершить сессию	Revoke session
+Создана	Created
+Последняя активность	Last activity
+Истекает	Expires
+Никогда	Never
+Пользователи не найдены.	No users found.
+Активных сессий нет.	No active sessions.
+События не найдены.	No events found.
+Не удалось получить список пользователей.	Unable to load users.
+Не удалось получить активные сессии.	Unable to load active sessions.
+Не удалось получить журнал безопасности.	Unable to load security audit.
+Операция не выполнена.	Operation failed.
+Файлы: чтение	Files: read
+Файлы: запись	Files: write
+Файлы: управление	Files: manage
+Камеры: просмотр	Cameras: view
+Камеры: управление	Cameras: manage
+Умный дом: просмотр	Smart home: view
+Умный дом: управление устройствами	Smart home: control
+Умный дом: настройка	Smart home: manage
+AI: использование	AI: use
+AI: управление	AI: manage
+Пользователи: просмотр	Users: view
+Пользователи: управление	Users: manage
+Система: просмотр	System: view
+Система: управление	System: manage
+Диски: просмотр	Storage: view
+Диски: управление	Storage: manage
+Сеть: просмотр	Network: view
+Сеть: управление	Network: manage
+Виртуализация: просмотр	Virtualization: view
+Виртуализация: управление	Virtualization: manage
+Автоматизация: просмотр	Automation: view
+Автоматизация: управление	Automation: manage
+Пользователь создан	User created
+Пользователь обновлён	User updated
+Пароль изменён	Password changed
+Пользователь удалён	User deleted
+Право обновлено	Permission updated
+Сессия завершена	Session revoked
+Сессии пользователя завершены	User sessions revoked
+Некорректная роль	Invalid role
+Некорректный ID пользователя	Invalid user ID
+Некорректное значение права	Invalid permission decision
+Некорректный ID сессии	Invalid session ID
+Неизвестная операция с пользователем	Unknown user operation
+Имя пользователя должно содержать 3–32 символа	Username must be 3-32 characters
+Пароль должен содержать минимум 12 символов	Password must contain at least 12 characters
+Пароль слишком длинный	Password is too long
+Последнего активного администратора нельзя отключить или понизить роль.	The last enabled administrator cannot be disabled or demoted.
+Последнего активного администратора нельзя удалить.	The last enabled administrator cannot be deleted.
+Нельзя запретить users.manage последнему активному администратору.	users.manage cannot be denied for the last enabled administrator.
+Неизвестное право	Unknown permission
