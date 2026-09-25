@@ -8,6 +8,12 @@ int main()
     const std::string directory =
         "/tmp/home-ai-security-test";
 
+    const std::string users_file =
+        directory + "/users.db";
+
+    const std::string audit_file =
+        directory + "/audit.log";
+
     std::filesystem::remove_all(
         directory
     );
@@ -16,12 +22,18 @@ int main()
 
     if (
         !security.initialize(
-            directory + "/users.db",
-            directory + "/audit.log"
+            users_file,
+            audit_file
         )
     ) {
         std::cerr
             << "Security initialization failed\n";
+        return 1;
+    }
+
+    if (security.hasUsers()) {
+        std::cerr
+            << "Fresh security store should be empty\n";
         return 1;
     }
 
@@ -39,6 +51,28 @@ int main()
             << "User creation failed: "
             << error
             << '\n';
+        return 1;
+    }
+
+    if (!security.hasUsers()) {
+        std::cerr
+            << "Created user was not stored\n";
+        return 1;
+    }
+
+    homeai::SessionInfo bad_info;
+
+    auto bad_token =
+        security.login(
+            "admin",
+            "wrong-password-123!",
+            bad_info,
+            error
+        );
+
+    if (bad_token) {
+        std::cerr
+            << "Invalid password was accepted\n";
         return 1;
     }
 
@@ -61,7 +95,9 @@ int main()
     }
 
     auto session =
-        security.validateSession(*token);
+        security.validateSession(
+            *token
+        );
 
     if (
         !session
@@ -79,10 +115,50 @@ int main()
     security.logout(*token);
 
     if (
-        security.validateSession(*token)
+        security.validateSession(
+            *token
+        )
     ) {
         std::cerr
             << "Logout failed\n";
+        return 1;
+    }
+
+    homeai::SecurityManager reloaded;
+
+    if (
+        !reloaded.initialize(
+            users_file,
+            audit_file
+        )
+    ) {
+        std::cerr
+            << "Reload initialization failed\n";
+        return 1;
+    }
+
+    if (!reloaded.hasUsers()) {
+        std::cerr
+            << "User persistence failed\n";
+        return 1;
+    }
+
+    homeai::SessionInfo reloaded_info;
+    std::string reloaded_error;
+
+    auto reloaded_token =
+        reloaded.login(
+            "admin",
+            "HomeAI-Test-Password-123!",
+            reloaded_info,
+            reloaded_error
+        );
+
+    if (!reloaded_token) {
+        std::cerr
+            << "Persisted user login failed: "
+            << reloaded_error
+            << '\n';
         return 1;
     }
 
