@@ -1725,6 +1725,26 @@ void WebServer::handleClient(
                     << "\"";
             }
 
+            json
+                << "],\"dns_servers\":[";
+
+            bool first_dns = true;
+
+            for (
+                const auto& dns :
+                interface_info.dns_servers
+            ) {
+                if (!first_dns)
+                    json << ",";
+
+                first_dns = false;
+
+                json
+                    << "\""
+                    << jsonEscape(dns)
+                    << "\"";
+            }
+
             json << "]}";
         }
 
@@ -3638,6 +3658,16 @@ void WebServer::handleClient(
                     interface_info.oper_state
                 )
                 << "\","
+                << "\"ipv4_method\":\""
+                << jsonEscape(
+                    interface_info.ipv4_method
+                )
+                << "\","
+                << "\"gateway\":\""
+                << jsonEscape(
+                    interface_info.gateway
+                )
+                << "\","
                 << "\"mtu\":"
                 << interface_info.mtu
                 << ",\"up\":"
@@ -3695,6 +3725,145 @@ void WebServer::handleClient(
             "200 OK",
             "application/json; charset=utf-8",
             json.str()
+        );
+
+        return;
+    }
+
+    if (
+        method == "POST"
+        &&
+        path == "/api/network/ipv4"
+    ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "network.manage"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"Требуются права управления сетью.\"}"
+            );
+
+            return;
+        }
+
+        if (
+            headerValue(
+                headers,
+                "X-HomeAI-Request"
+            ) != "1"
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"Включена проверка запросов.\"}"
+            );
+
+            return;
+        }
+
+        const auto form =
+            parseForm(body);
+
+        const auto interface_name =
+            form.contains("interface")
+            ? form.at("interface")
+            : "";
+
+        const auto mode =
+            form.contains("mode")
+            ? form.at("mode")
+            : "";
+
+        NetworkInterfaceManager network;
+
+        NetworkActionResult result;
+
+        if (mode == "dhcp") {
+            result =
+                network.requestDhcp(
+                    interface_name
+                );
+        }
+        else if (mode == "static") {
+            NetworkStaticConfig config;
+
+            config.address =
+                form.contains("address")
+                ? form.at("address")
+                : "";
+
+            config.netmask =
+                form.contains("netmask")
+                ? form.at("netmask")
+                : "";
+
+            config.gateway =
+                form.contains("gateway")
+                ? form.at("gateway")
+                : "";
+
+            config.dns_primary =
+                form.contains("dns_primary")
+                ? form.at("dns_primary")
+                : "";
+
+            config.dns_secondary =
+                form.contains("dns_secondary")
+                ? form.at("dns_secondary")
+                : "";
+
+            result =
+                network.setStaticIpv4(
+                    interface_name,
+                    config
+                );
+        }
+        else {
+            result = {
+                false,
+                "invalid_mode",
+                "Выберите DHCP или статический IPv4."
+            };
+        }
+
+        security_.audit(
+            "network.ipv4.configure",
+            session->username,
+            "interface=" +
+                interface_name +
+                " mode=" +
+                mode +
+                " result=" +
+                result.code
+        );
+
+        sendResponse(
+            client_fd,
+            result.success
+                ? "200 OK"
+                : "400 Bad Request",
+            "application/json; charset=utf-8",
+            "{\"success\":" +
+            std::string(
+                result.success
+                ? "true"
+                : "false"
+            ) +
+            ",\"code\":\"" +
+            jsonEscape(
+                result.code
+            ) +
+            "\",\"message\":\"" +
+            jsonEscape(
+                result.message
+            ) +
+            "\"}"
         );
 
         return;
