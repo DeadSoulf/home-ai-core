@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
+#include <map>
 #include <mntent.h>
 #include <set>
 #include <string>
@@ -50,6 +53,166 @@ bool isBlockDeviceSource(
         "/dev/",
         0
     ) == 0;
+}
+
+bool ignoredKernelDevice(
+    const std::string& name
+)
+{
+    const char* prefixes[] = {
+        "loop",
+        "ram",
+        "zram",
+        "fd",
+        "sr",
+        "dm-",
+        "md"
+    };
+
+    for (const auto* prefix : prefixes) {
+        if (
+            name.rfind(
+                prefix,
+                0
+            ) == 0
+        ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+std::string readTextFile(
+    const std::filesystem::path& path
+)
+{
+    std::ifstream file(path);
+
+    if (!file.is_open())
+        return {};
+
+    std::string value;
+
+    std::getline(
+        file,
+        value
+    );
+
+    return trimCopy(value);
+}
+
+std::uint64_t readUnsigned(
+    const std::filesystem::path& path
+)
+{
+    const auto value =
+        readTextFile(path);
+
+    if (value.empty())
+        return 0;
+
+    try {
+        return static_cast<std::uint64_t>(
+            std::stoull(value)
+        );
+    }
+    catch (...) {
+        return 0;
+    }
+}
+
+std::map<std::string, std::string>
+mountedDevices()
+{
+    std::map<std::string, std::string>
+        mounted;
+
+    FILE* mounts =
+        setmntent(
+            "/proc/self/mounts",
+            "r"
+        );
+
+    if (mounts == nullptr)
+        return mounted;
+
+    mntent entry{};
+    char buffer[4096];
+
+    while (
+        getmntent_r(
+            mounts,
+            &entry,
+            buffer,
+            sizeof(buffer)
+        ) != nullptr
+    ) {
+        const std::string source =
+            entry.mnt_fsname
+            ? entry.mnt_fsname
+            : "";
+
+        const std::string mount_point =
+            entry.mnt_dir
+            ? entry.mnt_dir
+            : "";
+
+        if (
+            isBlockDeviceSource(source)
+            &&
+            !mount_point.empty()
+        ) {
+            mounted[source] =
+                mount_point;
+        }
+    }
+
+    endmntent(mounts);
+
+    return mounted;
+}
+
+std::set<std::string>
+swapDevices()
+{
+    std::set<std::string> result;
+
+    std::ifstream file(
+        "/proc/swaps"
+    );
+
+    if (!file.is_open())
+        return result;
+
+    std::string line;
+
+    std::getline(
+        file,
+        line
+    );
+
+    while (
+        std::getline(
+            file,
+            line
+        )
+    ) {
+        std::istringstream stream(line);
+        std::string source;
+
+        if (stream >> source) {
+            if (
+                isBlockDeviceSource(
+                    source
+                )
+            ) {
+                result.insert(source);
+            }
+        }
+    }
+
+    return result;
 }
 
 }
@@ -439,6 +602,235 @@ StorageMonitor::snapshot(
     );
 
     return volumes;
+}
+
+std::vector<BlockDeviceInfo>
+StorageMonitor::blockDevices() const
+{
+    std::vector<BlockDeviceInfo>
+        devices;
+
+    const std::filesystem::path sys_block =
+        "/sys/class/block";
+
+    if (
+        !std::filesystem::exists(
+            sys_block
+        )
+    ) {
+        return devices;
+    }
+
+    const auto mounted =
+        mountedDevices();
+
+    const auto swaps =
+        swapDevices();
+
+    std::set<std::string>
+        partition_parents;
+
+    for (
+        const auto& entry :
+        std::filesystem::directory_iterator(
+            sys_block
+        )
+    ) {
+        const auto name =
+            entry.path().filename().string();
+
+        if (
+            ignoredKernelDevice(name)
+        ) {
+            continue;
+        }
+
+        const auto partition_value =
+            readTextFile(
+                entry.path() /
+                "partition"
+            );
+
+        if (partition_value.empty())
+            continue;
+
+        std::error_code error;
+
+        const auto canonical =
+            std::filesystem::canonical(
+                entry.path(),
+                error
+            );
+
+        if (error)
+            continue;
+
+        const auto parent =
+            canonical.parent_path()
+                .filename()
+                .string();
+
+        if (!parent.empty())
+            partition_parents.insert(
+                parent
+            );
+    }
+
+    for (
+        const auto& entry :
+        std::filesystem::directory_iterator(
+            sys_block
+        )
+    ) {
+        const auto name =
+            entry.path().filename().string();
+
+        if (
+            ignoredKernelDevice(name)
+        ) {
+            continue;
+        }
+
+        BlockDeviceInfo device;
+
+        device.name =
+            name;
+
+        device.device =
+            "/dev/" + name;
+
+        const bool partition =
+            !readTextFile(
+                entry.path() /
+                "partition"
+            ).empty();
+
+        device.type =
+            partition
+            ? "partition"
+            : "disk";
+
+        if (partition) {
+            std::error_code error;
+
+            const auto canonical =
+                std::filesystem::canonical(
+                    entry.path(),
+                    error
+                );
+
+            if (!error) {
+                device.parent =
+                    canonical.parent_path()
+                        .filename()
+                        .string();
+            }
+        }
+
+        const auto metadata_name =
+            partition
+            && !device.parent.empty()
+            ? device.parent
+            : name;
+
+        const auto metadata_path =
+            sys_block /
+            metadata_name;
+
+        device.model =
+            readTextFile(
+                metadata_path /
+                "device/model"
+            );
+
+        device.vendor =
+            readTextFile(
+                metadata_path /
+                "device/vendor"
+            );
+
+        device.serial =
+            readTextFile(
+                metadata_path /
+                "device/serial"
+            );
+
+        device.size_bytes =
+            readUnsigned(
+                entry.path() /
+                "size"
+            ) * 512ULL;
+
+        device.removable =
+            readUnsigned(
+                metadata_path /
+                "removable"
+            ) != 0;
+
+        device.has_partitions =
+            partition_parents.contains(
+                name
+            );
+
+        const auto mounted_it =
+            mounted.find(
+                device.device
+            );
+
+        if (
+            mounted_it !=
+            mounted.end()
+        ) {
+            device.mounted = true;
+
+            device.mount_point =
+                mounted_it->second;
+        }
+
+        const bool is_swap =
+            swaps.contains(
+                device.device
+            );
+
+        device.candidate =
+            !device.mounted
+            &&
+            !is_swap
+            &&
+            device.size_bytes > 0
+            &&
+            (
+                partition
+                ||
+                !device.has_partitions
+            );
+
+        devices.push_back(
+            std::move(device)
+        );
+    }
+
+    std::sort(
+        devices.begin(),
+        devices.end(),
+        [](const BlockDeviceInfo& a,
+           const BlockDeviceInfo& b) {
+            if (
+                a.candidate !=
+                b.candidate
+            ) {
+                return
+                    a.candidate >
+                    b.candidate;
+            }
+
+            return
+                a.device <
+                b.device;
+        }
+    );
+
+    return devices;
 }
 
 }
