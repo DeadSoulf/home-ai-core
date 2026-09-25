@@ -103,6 +103,36 @@ std::string readTextFile(
     return trimCopy(value);
 }
 
+bool directoryHasEntries(
+    const std::filesystem::path& path
+)
+{
+    std::error_code error;
+
+    if (
+        !std::filesystem::exists(
+            path,
+            error
+        )
+        ||
+        error
+    ) {
+        return false;
+    }
+
+    const auto begin =
+        std::filesystem::directory_iterator(
+            path,
+            error
+        );
+
+    if (error)
+        return false;
+
+    return begin !=
+        std::filesystem::directory_iterator();
+}
+
 std::uint64_t readUnsigned(
     const std::filesystem::path& path
 )
@@ -166,6 +196,20 @@ mountedDevices()
         ) {
             mounted[source] =
                 mount_point;
+
+            std::error_code error;
+
+            const auto canonical =
+                std::filesystem::canonical(
+                    source,
+                    error
+                );
+
+            if (!error) {
+                mounted[
+                    canonical.string()
+                ] = mount_point;
+            }
         }
     }
 
@@ -773,10 +817,30 @@ StorageMonitor::blockDevices() const
                 name
             );
 
-        const auto mounted_it =
+        auto mounted_it =
             mounted.find(
                 device.device
             );
+
+        if (
+            mounted_it ==
+            mounted.end()
+        ) {
+            std::error_code error;
+
+            const auto canonical =
+                std::filesystem::canonical(
+                    device.device,
+                    error
+                );
+
+            if (!error) {
+                mounted_it =
+                    mounted.find(
+                        canonical.string()
+                    );
+            }
+        }
 
         if (
             mounted_it !=
@@ -793,10 +857,18 @@ StorageMonitor::blockDevices() const
                 device.device
             );
 
+        device.in_use =
+            device.mounted
+            ||
+            is_swap
+            ||
+            directoryHasEntries(
+                entry.path() /
+                "holders"
+            );
+
         device.candidate =
-            !device.mounted
-            &&
-            !is_swap
+            !device.in_use
             &&
             device.size_bytes > 0
             &&
