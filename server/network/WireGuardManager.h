@@ -18,10 +18,25 @@ struct WireGuardResult {
 
 class WireGuardManager {
 public:
-    bool helperInstalled() const;
+    bool initialize(
+        const std::string& config_directory
+    );
+
+    bool available() const;
 
     std::vector<WireGuardProfile>
-    profiles(std::string& error) const;
+    profiles(
+        std::string& error
+    ) const;
+
+    WireGuardResult saveProfile(
+        const std::string& profile,
+        const std::string& config
+    ) const;
+
+    WireGuardResult removeProfile(
+        const std::string& profile
+    ) const;
 
     WireGuardResult connect(
         const std::string& profile
@@ -41,9 +56,16 @@ private:
         std::string output;
     };
 
-    CommandResult runHelper(
-        const std::vector<std::string>& arguments
+    CommandResult runWgQuick(
+        const std::string& action,
+        const std::string& profile
     ) const;
+
+    std::string profilePath(
+        const std::string& profile
+    ) const;
+
+    std::string config_directory_;
 };
 
 }
