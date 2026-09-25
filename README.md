@@ -18,7 +18,7 @@ Home AI Core is a local-first autonomous server platform designed for:
 
 ## Current development target
 
-0.0.6 — Module Manager
+0.0.6 — Module Manager + hot-plug storage integration
 
 ## Platform
 
