@@ -52,33 +52,33 @@ For a new or currently unused block device the UI shows:
 
 ## Disk management menu
 
-The disk-management dialog contains standard storage actions.
+The disk-management dialog uses role checkboxes rather than separate mount/assign actions.
+A disk can be assigned to:
 
-### Non-destructive role actions
+- video
+- home files
+- both video and home files
 
-For mounted filesystems:
-
-- assign as camera-video storage
-- assign as personal-file storage
-- remove Home AI storage assignment
-- refresh information
+For an unused unmounted disk, Home AI Core mounts it once and adds the resulting mount point
+to every selected pool. For an already mounted disk, only the Home AI role assignment changes.
 
 ### Privileged storage actions
 
 When the Storage Helper is installed:
 
-- mount for camera video
-- mount for personal files
+- mount a new managed disk
 - unmount a Home AI managed filesystem
 - format the selected unused device as EXT4
 - remove filesystem/partition signatures with `wipefs`
 
-Home AI mounts managed disks below:
+New managed mount points use the filesystem UUID when available:
 
 ```text
-/mnt/home-ai/video/
-/mnt/home-ai/files/
+/mnt/home-ai/video/<filesystem-uuid>
+/mnt/home-ai/files/<filesystem-uuid>
 ```
+
+Legacy device-name mount points remain readable for compatibility.
 
 Mounted filesystems use conservative options:
 
@@ -131,21 +131,39 @@ The installer:
 
 The helper itself performs the block-device safety checks again before every privileged action.
 
-## Storage roles
+## Storage roles and pools
 
-Two configuration keys track active mount points:
+Two comma-separated configuration keys track all mount points in each pool:
 
 ```text
 storage.video_mounts=
 storage.personal_mounts=
 ```
 
-Example:
+The same mount point may exist in both keys, so one physical disk can serve both roles.
+
+Placement policies are configured independently for video and files:
 
 ```text
-storage.video_mounts=/mnt/home-ai/video/sdb1
-storage.personal_mounts=/mnt/home-ai/files/sdc1
+storage.video_policy=most_free
+storage.files_policy=most_free
+storage.video_reserve_percent=10
+storage.files_reserve_percent=10
+storage.video_reserve_gb=0
+storage.files_reserve_gb=0
+storage.video_pinned_mount=
+storage.files_pinned_mount=
 ```
+
+Supported policies:
+
+- `most_free` — choose the eligible disk with the most usable free space
+- `sequential` — fill eligible disks in deterministic order
+- `balanced` — choose the disk with the lowest used percentage
+- `pinned` — prefer the configured mount point, then fall back safely if it is unavailable
+
+The effective reserve on each volume is the larger of the configured percentage and GB reserve.
+Volumes that have reached that reserve are excluded from new-write selection.
 
 ## Offline detection
 
@@ -177,18 +195,16 @@ Administrator disk actions use:
 POST /api/storage/action
 ```
 
-Supported action names currently include:
+Supported action names include the current role-based action:
 
 ```text
-mount-video
-mount-personal
-assign-video
-assign-personal
-unassign
+apply-roles
 unmount
 format-ext4
 wipefs
 ```
+
+Legacy mount/assign action names remain accepted for compatibility with older clients.
 
 ## Safety filtering
 
@@ -200,11 +216,23 @@ A device is not offered as a new storage candidate when Home AI Core can see tha
 
 Whole disks that already contain partitions are not offered directly; eligible unused partitions are considered instead.
 
+## Implemented storage-pool foundation
+
+The current development branch includes:
+
+- persistent filesystem UUID discovery
+- UUID-based mount paths for newly managed disks
+- automatic best-effort remount of UUID-managed volumes after service startup
+- multi-disk video and files pools
+- dual-role disks
+- pool write-target selection
+- percent/GB reserve thresholds
+- most-free, sequential, balanced and pinned placement policies
+
 ## Planned extensions
 
 The full Storage Core will later add:
 
-- persistent disk identity by UUID
 - filesystem type detection before mounting
 - GPT/partition creation wizard
 - disk labels and rename operations
@@ -231,11 +259,8 @@ rules, including backspace, form-feed, ESC and every other byte below `0x20`.
 This prevents disk-format results from breaking `response.json()` in the Web UI.
 
 
-## Disk action wording
+## Disk role workflow
 
-The Web UI distinguishes two cases explicitly:
-
-- `Подключить и использовать для видео/личных файлов` — for an unmounted disk. Home AI Core mounts it in its managed directory and assigns the resulting mount point.
-- `Использовать текущую точку для видео/личных файлов` — for a disk that is already mounted. Home AI Core only assigns the existing mount point and does not remount it.
-
-The dialog only shows the actions that make sense for the current disk state.
+The Web UI now exposes two role checkboxes and one `Применить назначение` action.
+This removes the ambiguous distinction between "mount" and "assign" buttons while still
+preserving the same safe backend behavior.
