@@ -54,9 +54,13 @@ Completed in the current development branch:
 - manual "Проверить новые диски" control
 - automatic hot-plug polling in the Web UI
 - notification when a new unused disk appears
-- action proposals for video / personal files / ignore
+- disk-management menu in the Web UI
+- role assignment for video / personal files
+- privileged mount and unmount through a validated helper
+- guarded EXT4 format and signature removal operations
 - filtering for mounted, swap and Linux-holder-backed devices
 - `GET /api/storage/devices`
+- `POST /api/storage/action`
 
 Still planned for 0.0.6:
 
