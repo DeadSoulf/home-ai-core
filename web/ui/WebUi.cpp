@@ -4291,6 +4291,26 @@ async function applyIpv4Configuration(
     const mode =
         controls.mode.value;
 
+    if (
+        mode !== "dhcp"
+        &&
+        mode !== "static"
+    ) {
+        const message =
+            document.getElementById(
+                "network-helper-message"
+            );
+
+        if (message) {
+            message.textContent =
+                tr(
+                    "Выберите режим IPv4."
+                );
+        }
+
+        return;
+    }
+
     let warning =
         tr(
             "Применить сетевые настройки для интерфейса "
@@ -4420,7 +4440,11 @@ async function applyIpv4Configuration(
             return;
 
         window.setTimeout(
-            updateNetworkInterfaces,
+            function() {
+                updateNetworkInterfaces(
+                    true
+                );
+            },
             1500
         );
     }
@@ -4438,7 +4462,9 @@ async function applyIpv4Configuration(
     }
 }
 
-async function updateNetworkInterfaces() {
+async function updateNetworkInterfaces(
+    force
+) {
     const container =
         document.getElementById(
             "network-interface-list"
@@ -4446,6 +4472,18 @@ async function updateNetworkInterfaces() {
 
     if (!container)
         return;
+
+    if (
+        !force
+        &&
+        document.activeElement
+        &&
+        container.contains(
+            document.activeElement
+        )
+    ) {
+        return;
+    }
 
     const canManage =
         container.dataset.canManage ===
@@ -4715,23 +4753,47 @@ async function updateNetworkInterfaces() {
                         "select"
                     );
 
-                for (
-                    const optionData of [
+                const modeOptions = [];
+
+                if (
+                    item.ipv4_method !==
+                        "dhcp"
+                    &&
+                    item.ipv4_method !==
+                        "static"
+                ) {
+                    modeOptions.push(
                         {
                             value:
-                                "dhcp",
-                            label:
-                                tr("DHCP")
-                        },
-                        {
-                            value:
-                                "static",
+                                "",
                             label:
                                 tr(
-                                    "Статический IP"
+                                    "Выберите режим"
                                 )
                         }
-                    ]
+                    );
+                }
+
+                modeOptions.push(
+                    {
+                        value:
+                            "dhcp",
+                        label:
+                            tr("DHCP")
+                    },
+                    {
+                        value:
+                            "static",
+                        label:
+                            tr(
+                                "Статический IP"
+                            )
+                    }
+                );
+
+                for (
+                    const optionData of
+                    modeOptions
                 ) {
                     const option =
                         document.createElement(
@@ -4753,7 +4815,12 @@ async function updateNetworkInterfaces() {
                     item.ipv4_method ===
                         "static"
                     ? "static"
-                    : "dhcp";
+                    : (
+                        item.ipv4_method ===
+                            "dhcp"
+                        ? "dhcp"
+                        : ""
+                    );
 
                 config.appendChild(
                     modeField.wrapper
