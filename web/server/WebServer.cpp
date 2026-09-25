@@ -9,6 +9,7 @@
 #include "core/runtime/CoreRuntime.h"
 #include "security/auth/SecurityManager.h"
 #include "server/system/SystemMonitor.h"
+#include "server/network/NetworkInterfaceManager.h"
 #include "server/network/VpnService.h"
 #include "server/storage/StorageMonitor.h"
 #include "server/storage/StoragePool.h"
@@ -3571,6 +3572,217 @@ void WebServer::handleClient(
         );
 
         sendActionResult(result);
+
+        return;
+    }
+
+    if (
+        method == "GET"
+        &&
+        path == "/api/network/interfaces"
+    ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "network.view"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"error\":\"permission_denied\"}"
+            );
+
+            return;
+        }
+
+        NetworkInterfaceManager network;
+
+        const auto interfaces =
+            network.interfaces();
+
+        std::ostringstream json;
+
+        json
+            << "{\"helper_installed\":"
+            << (
+                network.helperInstalled()
+                ? "true"
+                : "false"
+            )
+            << ",\"interfaces\":[";
+
+        bool first = true;
+
+        for (const auto& interface_info : interfaces) {
+            if (!first)
+                json << ",";
+
+            first = false;
+
+            json
+                << "{"
+                << "\"name\":\""
+                << jsonEscape(
+                    interface_info.name
+                )
+                << "\","
+                << "\"mac_address\":\""
+                << jsonEscape(
+                    interface_info.mac_address
+                )
+                << "\","
+                << "\"oper_state\":\""
+                << jsonEscape(
+                    interface_info.oper_state
+                )
+                << "\","
+                << "\"mtu\":"
+                << interface_info.mtu
+                << ",\"up\":"
+                << (
+                    interface_info.up
+                    ? "true"
+                    : "false"
+                )
+                << ",\"carrier\":"
+                << (
+                    interface_info.carrier
+                    ? "true"
+                    : "false"
+                )
+                << ",\"loopback\":"
+                << (
+                    interface_info.loopback
+                    ? "true"
+                    : "false"
+                )
+                << ",\"default_route\":"
+                << (
+                    interface_info.default_route
+                    ? "true"
+                    : "false"
+                )
+                << ",\"ipv4_addresses\":[";
+
+            bool first_address = true;
+
+            for (
+                const auto& address :
+                interface_info.ipv4_addresses
+            ) {
+                if (!first_address)
+                    json << ",";
+
+                first_address = false;
+
+                json
+                    << "\""
+                    << jsonEscape(
+                        address
+                    )
+                    << "\"";
+            }
+
+            json << "]}";
+        }
+
+        json << "]}";
+
+        sendResponse(
+            client_fd,
+            "200 OK",
+            "application/json; charset=utf-8",
+            json.str()
+        );
+
+        return;
+    }
+
+    if (
+        method == "POST"
+        &&
+        path == "/api/network/dhcp"
+    ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "network.manage"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"Требуются права управления сетью.\"}"
+            );
+
+            return;
+        }
+
+        if (
+            headerValue(
+                headers,
+                "X-HomeAI-Request"
+            ) != "1"
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"Включена проверка запросов.\"}"
+            );
+
+            return;
+        }
+
+        const auto form =
+            parseForm(body);
+
+        const auto interface_name =
+            form.contains("interface")
+            ? form.at("interface")
+            : "";
+
+        NetworkInterfaceManager network;
+
+        const auto result =
+            network.requestDhcp(
+                interface_name
+            );
+
+        security_.audit(
+            "network.dhcp.request",
+            session->username,
+            "interface=" +
+                interface_name +
+                " result=" +
+                result.code
+        );
+
+        sendResponse(
+            client_fd,
+            result.success
+                ? "200 OK"
+                : "400 Bad Request",
+            "application/json; charset=utf-8",
+            "{\"success\":" +
+            std::string(
+                result.success
+                ? "true"
+                : "false"
+            ) +
+            ",\"code\":\"" +
+            jsonEscape(
+                result.code
+            ) +
+            "\",\"message\":\"" +
+            jsonEscape(
+                result.message
+            ) +
+            "\"}"
+        );
 
         return;
     }
