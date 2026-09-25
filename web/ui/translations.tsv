@@ -452,3 +452,4 @@ AI: управление	AI: manage
 Последнего активного администратора нельзя удалить.	The last enabled administrator cannot be deleted.
 Нельзя запретить users.manage последнему активному администратору.	users.manage cannot be denied for the last enabled administrator.
 Неизвестное право	Unknown permission
+Загрузка журнала безопасности...	Loading security audit...
