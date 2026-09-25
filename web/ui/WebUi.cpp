@@ -1373,6 +1373,35 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
         page << R"HTML(
 <div class="section-card">
 <div class="section-title">
+<h2>Сетевые интерфейсы</h2>
+<span class="section-hint">IPv4 и получение адреса по DHCP</span>
+</div>
+
+<p class="muted">
+Home AI Core показывает текущие IPv4-адреса интерфейсов.
+Кнопка DHCP запрашивает или обновляет адрес у DHCP-сервера.
+Если этот интерфейс используется для Web, адрес сервера может измениться.
+</p>
+
+<div id="network-helper-message" class="muted" style="margin-bottom:12px"></div>
+<div id="network-interface-list" class="storage-grid" data-can-manage=")HTML";
+
+        page
+            << (
+                uiHasPermission(
+                    context,
+                    "network.manage"
+                )
+                ? "1"
+                : "0"
+            )
+            << R"HTML(">
+<div class="storage-card">Загрузка сетевых интерфейсов...</div>
+</div>
+</div>
+
+<div class="section-card">
+<div class="section-title">
 <h2>WireGuard</h2>
 <span class="section-hint">VPN-подключения сервера</span>
 </div>
@@ -1401,8 +1430,8 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
         renderPlaceholder(
             page,
             "Network Core",
-            "Здесь будет управление интерфейсами, адресами, маршрутами, DNS и диагностикой сети.",
-            "<div class=\"placeholder-card\">Интерфейсы — NEXT</div>"
+            "Интерфейсы и DHCP уже доступны. Следующие этапы — маршруты, DNS и диагностика сети.",
+            "<div class=\"placeholder-card\">Интерфейсы / DHCP — READY</div>"
             "<div class=\"placeholder-card\">Маршруты — PLANNED</div>"
             "<div class=\"placeholder-card\">DNS — PLANNED</div>"
             "<div class=\"placeholder-card\">Диагностика — PLANNED</div>"
@@ -4185,6 +4214,374 @@ async function updateServerUpdateStatus() {
     }
 }
 
+async function requestDhcpAddress(
+    interfaceName,
+    button
+) {
+    const accepted =
+        window.confirm(
+            tr(
+                "Запросить IP-адрес по DHCP для интерфейса "
+            )
+            + interfaceName
+            + tr(
+                "? Если Web работает через этот интерфейс, адрес сервера может измениться."
+            )
+        );
+
+    if (!accepted)
+        return;
+
+    const message =
+        document.getElementById(
+            "network-helper-message"
+        );
+
+    if (button)
+        button.disabled = true;
+
+    if (message) {
+        message.textContent =
+            tr(
+                "Запрос DHCP выполняется..."
+            );
+    }
+
+    try {
+        const response =
+            await fetch(
+                "/api/network/dhcp",
+                {
+                    method: "POST",
+                    headers: {
+                        "X-HomeAI-Request":
+                            "1",
+                        "Content-Type":
+                            "application/x-www-form-urlencoded"
+                    },
+                    body:
+                        new URLSearchParams(
+                            {
+                                interface:
+                                    interfaceName
+                            }
+                        ).toString()
+                }
+            );
+
+        if (
+            response.status ===
+            401
+        ) {
+            window.location =
+                "/login";
+
+            return;
+        }
+
+        const data =
+            await response.json();
+
+        if (message) {
+            message.textContent =
+                data.message
+                || tr(
+                    "DHCP-операция завершена."
+                );
+        }
+
+        if (!response.ok)
+            return;
+
+        window.setTimeout(
+            updateNetworkInterfaces,
+            1000
+        );
+    }
+    catch (error) {
+        if (message) {
+            message.textContent =
+                tr(
+                    "Ошибка DHCP: "
+                )
+                + error;
+        }
+    }
+    finally {
+        if (button)
+            button.disabled = false;
+    }
+}
+
+async function updateNetworkInterfaces() {
+    const container =
+        document.getElementById(
+            "network-interface-list"
+        );
+
+    if (!container)
+        return;
+
+    const canManage =
+        container.dataset.canManage ===
+        "1";
+
+    const message =
+        document.getElementById(
+            "network-helper-message"
+        );
+
+    try {
+        const response =
+            await fetch(
+                "/api/network/interfaces",
+                {
+                    cache: "no-store"
+                }
+            );
+
+        if (
+            response.status ===
+            401
+        ) {
+            window.location =
+                "/login";
+
+            return;
+        }
+
+        if (!response.ok)
+            return;
+
+        const data =
+            await response.json();
+
+        if (message) {
+            message.textContent =
+                data.helper_installed
+                ? tr(
+                    "DHCP Network Helper готов."
+                )
+                : tr(
+                    "Для получения IP по DHCP установите Network Helper."
+                );
+        }
+
+        const interfaces =
+            Array.isArray(
+                data.interfaces
+            )
+            ? data.interfaces
+            : [];
+
+        container.replaceChildren();
+
+        if (interfaces.length === 0) {
+            const empty =
+                document.createElement(
+                    "div"
+                );
+
+            empty.className =
+                "storage-card";
+
+            empty.textContent =
+                tr(
+                    "Сетевые интерфейсы не обнаружены."
+                );
+
+            container.appendChild(
+                empty
+            );
+
+            return;
+        }
+
+        for (const item of interfaces) {
+            const card =
+                document.createElement(
+                    "div"
+                );
+
+            card.className =
+                "storage-card";
+
+            const title =
+                document.createElement(
+                    "strong"
+                );
+
+            title.textContent =
+                item.name;
+
+            title.dataset.i18nSkip =
+                "";
+
+            card.appendChild(title);
+
+            const state =
+                document.createElement(
+                    "div"
+                );
+
+            state.className =
+                item.up
+                ? "status-ok"
+                : "muted";
+
+            state.textContent =
+                tr("Состояние")
+                + ": "
+                + (
+                    item.up
+                    ? "UP"
+                    : "DOWN"
+                )
+                + (
+                    item.carrier
+                    ? " · LINK"
+                    : ""
+                );
+
+            card.appendChild(state);
+
+            const addresses =
+                document.createElement(
+                    "div"
+                );
+
+            const ipv4 =
+                Array.isArray(
+                    item.ipv4_addresses
+                )
+                ? item.ipv4_addresses
+                : [];
+
+            addresses.textContent =
+                "IPv4: "
+                + (
+                    ipv4.length > 0
+                    ? ipv4.join(", ")
+                    : tr(
+                        "адрес не назначен"
+                    )
+                );
+
+            addresses.dataset.i18nSkip =
+                "";
+
+            card.appendChild(
+                addresses
+            );
+
+            const mac =
+                document.createElement(
+                    "div"
+                );
+
+            mac.textContent =
+                "MAC: "
+                + (
+                    item.mac_address
+                    || "-"
+                );
+
+            mac.dataset.i18nSkip =
+                "";
+
+            card.appendChild(mac);
+
+            const details =
+                document.createElement(
+                    "div"
+                );
+
+            details.className =
+                "muted";
+
+            details.textContent =
+                "MTU "
+                + Number(
+                    item.mtu
+                    || 0
+                )
+                + (
+                    item.default_route
+                    ? " · "
+                        + tr(
+                            "маршрут по умолчанию"
+                        )
+                    : ""
+                );
+
+            card.appendChild(
+                details
+            );
+
+            if (
+                canManage
+                &&
+                !item.loopback
+            ) {
+                const actions =
+                    document.createElement(
+                        "div"
+                    );
+
+                actions.className =
+                    "button-row";
+
+                const dhcp =
+                    document.createElement(
+                        "button"
+                    );
+
+                dhcp.type =
+                    "button";
+
+                dhcp.textContent =
+                    tr(
+                        "Получить IP по DHCP"
+                    );
+
+                dhcp.disabled =
+                    !data.helper_installed;
+
+                dhcp.addEventListener(
+                    "click",
+                    function() {
+                        requestDhcpAddress(
+                            item.name,
+                            dhcp
+                        );
+                    }
+                );
+
+                actions.appendChild(
+                    dhcp
+                );
+
+                card.appendChild(
+                    actions
+                );
+            }
+
+            container.appendChild(
+                card
+            );
+        }
+    }
+    catch (error) {
+        if (message) {
+            message.textContent =
+                tr(
+                    "Ошибка получения сетевых интерфейсов: "
+                )
+                + error;
+        }
+    }
+}
+
 async function updateVpnProfiles() {
     const container =
         document.getElementById(
@@ -6613,6 +7010,7 @@ document.addEventListener(
         updateStorageStats();
         updateStorageCandidates();
         updateServerUpdateStatus();
+        updateNetworkInterfaces();
         updateVpnProfiles();
 
         const updateCheckButton =
@@ -6874,6 +7272,11 @@ document.addEventListener(
         setInterval(
             updateServerUpdateStatus,
             1000
+        );
+
+        setInterval(
+            updateNetworkInterfaces,
+            5000
         );
 
         setInterval(
