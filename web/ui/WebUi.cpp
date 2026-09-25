@@ -4989,6 +4989,9 @@ let knownStorageCandidates =
 let storageDeviceInventory =
     [];
 
+let storageVolumeInventory =
+    [];
+
 let storageHelperInstalled =
     false;
 
@@ -5091,40 +5094,6 @@ function updateDiskMenuState(device) {
         result.style.display =
             "none";
 
-    if (warning) {
-        warning.textContent =
-            storageHelperInstalled
-            ? ""
-            : "Для монтирования, форматирования и размонтирования нужно установить привилегированный Storage Helper.";
-    }
-
-    const setDisabled =
-        function(id, disabled) {
-            const button =
-                document.getElementById(
-                    id
-                );
-
-            if (button)
-                button.disabled =
-                    disabled;
-        };
-
-    const setVisible =
-        function(id, visible) {
-            const button =
-                document.getElementById(
-                    id
-                );
-
-            if (button) {
-                button.style.display =
-                    visible
-                    ? ""
-                    : "none";
-            }
-        };
-
     const canPrivileged =
         storageHelperInstalled;
 
@@ -5139,6 +5108,16 @@ function updateDiskMenuState(device) {
             device &&
             device.mounted
         );
+
+    if (warning) {
+        warning.textContent =
+            !mounted &&
+            !canPrivileged
+            ? tr(
+                "Для подключения нового диска нужно установить привилегированный Storage Helper."
+            )
+            : "";
+    }
 
     const assignmentHelp =
         document.getElementById(
@@ -5158,13 +5137,13 @@ function updateDiskMenuState(device) {
                     )
                 )
                 + tr(
-                    ". Выберите, для чего Home AI Core должен использовать эту точку. Диск перемонтирован не будет."
+                    ". Можно выбрать одно или оба назначения. Диск перемонтирован не будет."
                 );
         }
         else if (candidate) {
             assignmentHelp.textContent =
                 tr(
-                    "Диск ещё не подключён. Выберите назначение — Home AI Core сам смонтирует его в свою папку и сразу назначит для выбранной задачи."
+                    "Диск ещё не подключён. Выберите одно или оба назначения — Home AI Core смонтирует его один раз и добавит в выбранные пулы."
                 );
         }
         else {
@@ -5175,60 +5154,91 @@ function updateDiskMenuState(device) {
         }
     }
 
-    // Показываем только действия, которые имеют смысл в текущем состоянии.
-    // Для несмонтированного диска предлагаем подключение + назначение.
-    // Для уже смонтированного — только назначение существующей точки.
-    setVisible(
-        "disk-mount-video",
-        !mounted
-    );
-
-    setVisible(
-        "disk-mount-personal",
-        !mounted
-    );
-
-    setVisible(
-        "disk-assign-video",
+    const assignedVolume =
         mounted
-    );
+        ? storageVolumeInventory.find(
+            function(volume) {
+                return (
+                    volume.mount_point ===
+                    device.mount_point
+                );
+            }
+        )
+        : null;
 
-    setVisible(
-        "disk-assign-personal",
-        mounted
-    );
+    const videoRole =
+        document.getElementById(
+            "disk-role-video"
+        );
 
-    setVisible(
-        "disk-unassign",
-        mounted
-    );
+    const personalRole =
+        document.getElementById(
+            "disk-role-personal"
+        );
 
-    setDisabled(
-        "disk-mount-video",
-        !candidate ||
-        !canPrivileged
-    );
+    if (videoRole) {
+        videoRole.checked =
+            Boolean(
+                assignedVolume
+                &&
+                (
+                    assignedVolume.role ===
+                        "video"
+                    ||
+                    assignedVolume.role ===
+                        "video+personal"
+                )
+            );
 
-    setDisabled(
-        "disk-mount-personal",
-        !candidate ||
-        !canPrivileged
-    );
+        videoRole.disabled =
+            !mounted
+            &&
+            (
+                !candidate
+                ||
+                !canPrivileged
+            );
+    }
 
-    setDisabled(
-        "disk-assign-video",
-        !mounted
-    );
+    if (personalRole) {
+        personalRole.checked =
+            Boolean(
+                assignedVolume
+                &&
+                (
+                    assignedVolume.role ===
+                        "personal"
+                    ||
+                    assignedVolume.role ===
+                        "video+personal"
+                )
+            );
 
-    setDisabled(
-        "disk-assign-personal",
-        !mounted
-    );
+        personalRole.disabled =
+            !mounted
+            &&
+            (
+                !candidate
+                ||
+                !canPrivileged
+            );
+    }
 
-    setDisabled(
-        "disk-unassign",
-        !mounted
-    );
+    const applyRoles =
+        document.getElementById(
+            "disk-apply-roles"
+        );
+
+    if (applyRoles) {
+        applyRoles.disabled =
+            !mounted
+            &&
+            (
+                !candidate
+                ||
+                !canPrivileged
+            );
+    }
 
     const managedMount =
         mounted
@@ -5243,7 +5253,24 @@ function updateDiskMenuState(device) {
                 .startsWith(
                     "/mnt/home-ai/files/"
                 )
+            ||
+            device.mount_point
+                .startsWith(
+                    "/mnt/home-ai/storage/"
+                )
         );
+
+    const setDisabled =
+        function(id, disabled) {
+            const button =
+                document.getElementById(
+                    id
+                );
+
+            if (button)
+                button.disabled =
+                    disabled;
+        };
 
     setDisabled(
         "disk-unmount",
@@ -5316,6 +5343,12 @@ function openDiskMenu(devicePath) {
                 )
             )
             + (
+                device.uuid
+                ? "\nUUID: "
+                    + device.uuid
+                : ""
+            )
+            + (
                 device.serial
                 ? "\nSerial: "
                     + device.serial
@@ -5362,6 +5395,36 @@ async function runDiskAction(action) {
         "device",
         device.device
     );
+
+    if (
+        action === "apply-roles"
+    ) {
+        const videoRole =
+            document.getElementById(
+                "disk-role-video"
+            );
+
+        const personalRole =
+            document.getElementById(
+                "disk-role-personal"
+            );
+
+        parameters.set(
+            "video",
+            videoRole &&
+            videoRole.checked
+            ? "1"
+            : "0"
+        );
+
+        parameters.set(
+            "personal",
+            personalRole &&
+            personalRole.checked
+            ? "1"
+            : "0"
+        );
+    }
 
     if (
         action === "format-ext4"
@@ -6242,16 +6305,8 @@ document.addEventListener(
         }
 
         const actionMap = {
-            "disk-mount-video":
-                "mount-video",
-            "disk-mount-personal":
-                "mount-personal",
-            "disk-assign-video":
-                "assign-video",
-            "disk-assign-personal":
-                "assign-personal",
-            "disk-unassign":
-                "unassign",
+            "disk-apply-roles":
+                "apply-roles",
             "disk-unmount":
                 "unmount",
             "disk-format-ext4":
