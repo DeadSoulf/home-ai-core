@@ -20,6 +20,7 @@ struct StorageVolume {
 
     double used_percent{0.0};
 
+    bool capacity_available{false};
     bool read_only{false};
 };
 
