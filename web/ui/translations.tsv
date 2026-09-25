@@ -459,3 +459,16 @@ AI: управление	AI: manage
 Не удалось защитить токен сессии	Unable to protect session token
 Размер диска:	Disk size:
 Использование ФС: данные временно недоступны	Filesystem usage: temporarily unavailable
+Как использовать диск	How to use this disk
+Выберите назначение диска.	Choose how this disk should be used.
+Подключить и использовать для видео	Mount and use for video
+Подключить и использовать для личных файлов	Mount and use for personal files
+Использовать текущую точку для видео	Use current mount point for video
+Использовать текущую точку для личных файлов	Use current mount point for personal files
+Снять назначение Home AI Core	Remove Home AI Core assignment
+Размонтировать диск	Unmount disk
+Диск уже подключён к Linux в 	The disk is already mounted in Linux at 
+текущей точке	the current mount point
+. Выберите, для чего Home AI Core должен использовать эту точку. Диск перемонтирован не будет.	. Choose how Home AI Core should use this mount point. The disk will not be remounted.
+Диск ещё не подключён. Выберите назначение — Home AI Core сам смонтирует его в свою папку и сразу назначит для выбранной задачи.	The disk is not mounted yet. Choose a purpose — Home AI Core will mount it in its managed folder and assign it to that purpose.
+Этот диск сейчас используется системой или недоступен для безопасного подключения.	This disk is currently used by the system or is unavailable for safe mounting.
