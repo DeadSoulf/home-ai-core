@@ -30,6 +30,7 @@ add_library(
 
     server/system/SystemMonitor.cpp
     server/storage/StorageMonitor.cpp
+    server/storage/DiskOperations.cpp
 
     security/auth/SecurityManager.cpp
 
@@ -116,4 +117,16 @@ target_link_libraries(
 add_test(
     NAME storage_monitor
     COMMAND test-storage-monitor
+)
+
+
+add_executable(
+    home-ai-storage-helper
+    server/storage/StorageHelperMain.cpp
+)
+
+target_link_libraries(
+    home-ai-storage-helper
+    PRIVATE
+    homeai-core-lib
 )
