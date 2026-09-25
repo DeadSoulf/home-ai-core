@@ -45,6 +45,47 @@ bool validInterfaceName(
     );
 }
 
+std::string trimCopy(
+    std::string value
+)
+{
+    while (
+        !value.empty()
+        &&
+        (
+            value.back() == '\n'
+            ||
+            value.back() == '\r'
+            ||
+            value.back() == ' '
+            ||
+            value.back() == '\t'
+        )
+    ) {
+        value.pop_back();
+    }
+
+    std::size_t start = 0;
+
+    while (
+        start < value.size()
+        &&
+        (
+            value[start] == ' '
+            ||
+            value[start] == '\t'
+            ||
+            value[start] == '\n'
+            ||
+            value[start] == '\r'
+        )
+    ) {
+        ++start;
+    }
+
+    return value.substr(start);
+}
+
 std::string findExecutable(
     const std::vector<std::string>& paths
 )
@@ -278,6 +319,96 @@ int main(
                 << link_up.output;
 
             return 1;
+        }
+    }
+
+    const auto nmcli =
+        findExecutable(
+            {
+                "/usr/bin/nmcli",
+                "/bin/nmcli"
+            }
+        );
+
+    if (!nmcli.empty()) {
+        const auto connection =
+            runCommand(
+                nmcli,
+                {
+                    "-g",
+                    "GENERAL.CONNECTION",
+                    "device",
+                    "show",
+                    interface_name
+                }
+            );
+
+        const auto connection_name =
+            trimCopy(
+                connection.output
+            );
+
+        if (
+            succeeded(connection)
+            &&
+            !connection_name.empty()
+            &&
+            connection_name != "--"
+        ) {
+            const auto configure =
+                runCommand(
+                    nmcli,
+                    {
+                        "connection",
+                        "modify",
+                        connection_name,
+                        "ipv4.method",
+                        "auto",
+                        "ipv4.addresses",
+                        "",
+                        "ipv4.gateway",
+                        ""
+                    }
+                );
+
+            if (succeeded(configure)) {
+                const auto activate =
+                    runCommand(
+                        nmcli,
+                        {
+                            "connection",
+                            "up",
+                            connection_name,
+                            "ifname",
+                            interface_name
+                        }
+                    );
+
+                if (succeeded(activate)) {
+                    std::cout
+                        << "DHCP включён через NetworkManager. IP-адрес обновлён.";
+
+                    return 0;
+                }
+            }
+        }
+        else {
+            const auto connect =
+                runCommand(
+                    nmcli,
+                    {
+                        "device",
+                        "connect",
+                        interface_name
+                    }
+                );
+
+            if (succeeded(connect)) {
+                std::cout
+                    << "DHCP-подключение создано через NetworkManager.";
+
+                return 0;
+            }
         }
     }
 
