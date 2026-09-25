@@ -47,7 +47,8 @@ WantedBy=multi-user.target
 EOF
     install -m 644 "$temp" "$unit"
     systemctl daemon-reload
-    systemctl enable --now home-ai-core.service
+    systemctl enable home-ai-core.service
+    systemctl restart home-ai-core.service
     systemctl is-enabled --quiet home-ai-core.service || {
       echo 'Failed to enable Home AI Core autostart.' >&2
       exit 1
