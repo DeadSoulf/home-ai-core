@@ -26,6 +26,8 @@ add_library(
     core/logging/Logger.cpp
     core/config/ConfigManager.cpp
     core/events/EventBus.cpp
+    core/modules/Module.cpp
+    core/modules/ModuleManager.cpp
     core/runtime/CoreRuntime.cpp
 
     server/system/SystemMonitor.cpp
@@ -187,4 +189,21 @@ target_link_libraries(
 add_test(
     NAME update_manager
     COMMAND test-update-manager
+)
+
+
+add_executable(
+    test-module-manager
+    tests/test_module_manager.cpp
+)
+
+target_link_libraries(
+    test-module-manager
+    PRIVATE
+    homeai-core-lib
+)
+
+add_test(
+    NAME module_manager
+    COMMAND test-module-manager
 )
