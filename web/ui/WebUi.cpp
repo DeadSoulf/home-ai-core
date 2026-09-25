@@ -1038,7 +1038,9 @@ button:disabled {
         << "<span data-i18n-skip>" << htmlEscape(context.username) << "</span>"
         << " · "
         << htmlEscape(
-            context.role
+            roleDisplay(
+                context.role
+            )
         )
         << "</div>"
         << "</header><main class=\"page\">";
