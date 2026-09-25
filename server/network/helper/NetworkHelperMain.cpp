@@ -562,6 +562,128 @@ bool reloadNetworkd(
     return true;
 }
 
+bool applyNetworkd(
+    const std::string& interface_name,
+    bool dhcp,
+    const std::string& address,
+    const std::string& prefix,
+    const std::string& gateway,
+    const std::string& dns_primary,
+    const std::string& dns_secondary,
+    std::string& error
+)
+{
+    const auto path =
+        networkdPath(
+            interface_name
+        );
+
+    const auto backup =
+        path.string()
+        +
+        ".home-ai.bak";
+
+    std::error_code fs_error;
+
+    const bool existed =
+        std::filesystem::exists(
+            path,
+            fs_error
+        )
+        &&
+        !fs_error;
+
+    if (existed) {
+        fs_error.clear();
+
+        std::filesystem::copy_file(
+            path,
+            backup,
+            std::filesystem::
+                copy_options::overwrite_existing,
+            fs_error
+        );
+
+        if (fs_error) {
+            error =
+                "Не удалось создать резервную копию конфигурации systemd-networkd.";
+
+            return false;
+        }
+    }
+
+    if (
+        !writeNetworkdProfile(
+            interface_name,
+            dhcp,
+            address,
+            prefix,
+            gateway,
+            dns_primary,
+            dns_secondary,
+            error
+        )
+    ) {
+        return false;
+    }
+
+    if (
+        reloadNetworkd(
+            interface_name,
+            error
+        )
+    ) {
+        return true;
+    }
+
+    fs_error.clear();
+
+    if (
+        existed
+        &&
+        std::filesystem::exists(
+            backup,
+            fs_error
+        )
+        &&
+        !fs_error
+    ) {
+        fs_error.clear();
+
+        std::filesystem::copy_file(
+            backup,
+            path,
+            std::filesystem::
+                copy_options::overwrite_existing,
+            fs_error
+        );
+    }
+    else {
+        fs_error.clear();
+
+        std::filesystem::remove(
+            path,
+            fs_error
+        );
+    }
+
+    std::string rollback_error;
+
+    reloadNetworkd(
+        interface_name,
+        rollback_error
+    );
+
+    if (!rollback_error.empty()) {
+        error +=
+            " Откат: "
+            +
+            rollback_error;
+    }
+
+    return false;
+}
+
 bool lineDefinesInterface(
     const std::string& line,
     const std::string& interface_name
@@ -654,6 +776,7 @@ bool rewriteIfupdown(
     const std::string& gateway,
     const std::string& dns_primary,
     const std::string& dns_secondary,
+    std::filesystem::path& changed_file,
     std::string& error
 )
 {
@@ -1045,6 +1168,9 @@ bool rewriteIfupdown(
         return false;
     }
 
+    changed_file =
+        target;
+
     return true;
 }
 
@@ -1089,6 +1215,8 @@ bool applyIfupdown(
         return false;
     }
 
+    std::filesystem::path changed_file;
+
     if (
         !rewriteIfupdown(
             interface_name,
@@ -1098,6 +1226,7 @@ bool applyIfupdown(
             gateway,
             dns_primary,
             dns_secondary,
+            changed_file,
             error
         )
     ) {
@@ -1125,6 +1254,43 @@ bool applyIfupdown(
             up.output.empty()
             ? "ifup не смог применить сетевую конфигурацию."
             : up.output;
+
+        if (!changed_file.empty()) {
+            const auto backup =
+                changed_file.string()
+                +
+                ".home-ai.bak";
+
+            std::error_code restore_error;
+
+            if (
+                std::filesystem::exists(
+                    backup,
+                    restore_error
+                )
+                &&
+                !restore_error
+            ) {
+                restore_error.clear();
+
+                std::filesystem::copy_file(
+                    backup,
+                    changed_file,
+                    std::filesystem::
+                        copy_options::overwrite_existing,
+                    restore_error
+                );
+
+                if (!restore_error) {
+                    runCommand(
+                        ifup,
+                        {
+                            interface_name
+                        }
+                    );
+                }
+            }
+        }
 
         return false;
     }
@@ -1255,7 +1421,7 @@ int configureDhcp(
         std::string error;
 
         if (
-            writeNetworkdProfile(
+            applyNetworkd(
                 interface_name,
                 true,
                 "",
@@ -1263,11 +1429,6 @@ int configureDhcp(
                 "-",
                 "-",
                 "-",
-                error
-            )
-            &&
-            reloadNetworkd(
-                interface_name,
                 error
             )
         ) {
@@ -1526,7 +1687,7 @@ int configureStatic(
         std::string error;
 
         if (
-            writeNetworkdProfile(
+            applyNetworkd(
                 interface_name,
                 false,
                 address,
@@ -1534,11 +1695,6 @@ int configureStatic(
                 gateway,
                 dns_primary,
                 dns_secondary,
-                error
-            )
-            &&
-            reloadNetworkd(
-                interface_name,
                 error
             )
         ) {
@@ -1729,7 +1885,7 @@ int configureStatic(
     }
 
     std::cout
-        << "Статический IPv4 применён для текущего запуска. Для постоянной настройки нужен NetworkManager или systemd-networkd.";
+        << "Статический IPv4 применён для текущего запуска. Для постоянной настройки нужен NetworkManager, systemd-networkd или ifupdown.";
 
     return 0;
 }
