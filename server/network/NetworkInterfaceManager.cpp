@@ -789,7 +789,7 @@ std::string detectedIpv4Method(
         return method;
 
     method =
-        ifupdownMethod(
+        managedNetworkdMethod(
             interface_name
         );
 
@@ -797,7 +797,7 @@ std::string detectedIpv4Method(
         return method;
 
     method =
-        managedNetworkdMethod(
+        ifupdownMethod(
             interface_name
         );
 
