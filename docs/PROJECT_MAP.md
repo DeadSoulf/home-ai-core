@@ -127,8 +127,10 @@ server/
 ├── storage/
 │   ├── StorageMonitor
 │   │   mounted storage, hot-plug discovery, capacity, roles and online/offline state
+│   ├── StoragePool
+│   │   multi-disk placement policies, reserves and write-target selection
 │   ├── DiskOperations
-│   │   unprivileged client for guarded disk actions
+│   │   unprivileged client for guarded disk actions and UUID remounts
 │   └── StorageHelperMain
 │       privileged validated mount/unmount/format helper
 ├── processes/
