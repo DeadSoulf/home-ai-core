@@ -1,4 +1,5 @@
 #include "web/server/WebServer.h"
+#include "web/server/JsonUtils.h"
 #include "web/ui/WebUi.h"
 #include "web/ui/Localization.h"
 #include "server/hardware/GpuMonitor.h"
@@ -46,24 +47,6 @@ std::string htmlEscape(const std::string& value)
             case '"': result += "&quot;"; break;
             case '\'': result += "&#39;"; break;
             default: result += c; break;
-        }
-    }
-
-    return result;
-}
-
-std::string jsonEscape(const std::string& value)
-{
-    std::string result;
-
-    for (char c : value) {
-        switch (c) {
-            case '\\': result += "\\\\"; break;
-            case '"':  result += "\\\""; break;
-            case '\n': result += "\\n"; break;
-            case '\r': result += "\\r"; break;
-            case '\t': result += "\\t"; break;
-            default:   result += c; break;
         }
     }
 
