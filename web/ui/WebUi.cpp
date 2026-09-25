@@ -5871,6 +5871,207 @@ async function updateStorageCandidates(
     }
 }
 
+function storagePolicyLabel(policy) {
+    if (policy === "sequential")
+        return tr("Заполнять диски по очереди");
+
+    if (policy === "balanced")
+        return tr("Равномерная загрузка");
+
+    if (policy === "pinned")
+        return tr("Закрепление за диском");
+
+    return tr("Больше всего свободного места");
+}
+
+function renderStoragePools(data) {
+    const container =
+        document.getElementById(
+            "storage-pools"
+        );
+
+    if (!container)
+        return;
+
+    const volumes =
+        Array.isArray(
+            data.volumes
+        )
+        ? data.volumes
+        : [];
+
+    const renderPool =
+        function(
+            title,
+            role,
+            policy,
+            target
+        ) {
+            const matching =
+                volumes.filter(
+                    function(volume) {
+                        return (
+                            volume.role === role
+                            ||
+                            volume.role ===
+                                "video+personal"
+                        );
+                    }
+                );
+
+            const online =
+                matching.filter(
+                    function(volume) {
+                        return (
+                            volume.status ===
+                                "online"
+                            &&
+                            volume.capacity_available
+                        );
+                    }
+                );
+
+            const total =
+                online.reduce(
+                    function(sum, volume) {
+                        return (
+                            sum
+                            +
+                            Number(
+                                volume.total_bytes
+                                || 0
+                            )
+                        );
+                    },
+                    0
+                );
+
+            const free =
+                online.reduce(
+                    function(sum, volume) {
+                        return (
+                            sum
+                            +
+                            Number(
+                                volume.free_bytes
+                                || 0
+                            )
+                        );
+                    },
+                    0
+                );
+
+            const card =
+                document.createElement(
+                    "div"
+                );
+
+            card.className =
+                "storage-card";
+
+            const heading =
+                document.createElement(
+                    "strong"
+                );
+
+            heading.textContent =
+                title;
+
+            card.appendChild(
+                heading
+            );
+
+            const count =
+                document.createElement(
+                    "div"
+                );
+
+            count.textContent =
+                tr("Дисков в пуле")
+                + ": "
+                + matching.length;
+
+            card.appendChild(
+                count
+            );
+
+            const policyLine =
+                document.createElement(
+                    "div"
+                );
+
+            policyLine.textContent =
+                tr("Стратегия")
+                + ": "
+                + storagePolicyLabel(
+                    policy
+                );
+
+            card.appendChild(
+                policyLine
+            );
+
+            const capacity =
+                document.createElement(
+                    "div"
+                );
+
+            capacity.textContent =
+                tr("Общая ёмкость")
+                + ": "
+                + formatBytes(total)
+                + ", "
+                + tr("свободно")
+                + " "
+                + formatBytes(free);
+
+            card.appendChild(
+                capacity
+            );
+
+            const targetLine =
+                document.createElement(
+                    "div"
+                );
+
+            targetLine.className =
+                target
+                ? "status-ok"
+                : "status-warn";
+
+            targetLine.textContent =
+                tr("Следующая запись")
+                + ": "
+                + (
+                    target
+                    || tr(
+                        "нет доступного диска"
+                    )
+                );
+
+            card.appendChild(
+                targetLine
+            );
+
+            return card;
+        };
+
+    container.replaceChildren(
+        renderPool(
+            tr("Видео-пул"),
+            "video",
+            data.video_policy,
+            data.video_target
+        ),
+        renderPool(
+            tr("Пул домашних файлов"),
+            "personal",
+            data.files_policy,
+            data.files_target
+        )
+    );
+}
+
 async function updateStorageStats() {
     const container =
         document.getElementById(
@@ -5906,6 +6107,10 @@ async function updateStorageStats() {
         const data =
             await response.json();
 
+        renderStoragePools(
+            data
+        );
+
         container.replaceChildren();
 
         const volumes =
@@ -5914,6 +6119,9 @@ async function updateStorageStats() {
             )
             ? data.volumes
             : [];
+
+        storageVolumeInventory =
+            volumes;
 
         if (
             volumes.length === 0
@@ -6032,6 +6240,24 @@ async function updateStorageStats() {
             card.appendChild(
                 filesystem
             );
+
+            if (volume.uuid) {
+                const uuid =
+                    document.createElement(
+                        "div"
+                    );
+
+                uuid.textContent =
+                    "UUID: "
+                    + volume.uuid;
+
+                uuid.dataset.i18nSkip =
+                    "";
+
+                card.appendChild(
+                    uuid
+                );
+            }
 
             const physicalSize =
                 document.createElement(
