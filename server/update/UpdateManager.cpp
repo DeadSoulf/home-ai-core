@@ -8,6 +8,7 @@
 #include <regex>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <utility>
 #include <vector>
 
 namespace homeai {
@@ -1132,7 +1133,7 @@ UpdateManager::runCommand(
     std::array<char, 2048>
         buffer{};
 
-    while (output.size() < 65536) {
+    while (true) {
         const auto count =
             ::read(
                 pipe_fd[0],
@@ -1149,6 +1150,13 @@ UpdateManager::runCommand(
                 count
             )
         );
+
+        if (output.size() > 65536) {
+            output.erase(
+                0,
+                output.size() - 65536
+            );
+        }
 
         if (output_callback) {
             output_callback(
