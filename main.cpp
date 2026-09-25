@@ -101,6 +101,12 @@ int main()
     );
 #endif
 
+    const auto security_database =
+        runtime.config().get(
+            "security.database_file",
+            "runtime/security/security.db"
+        );
+
     const auto users_file =
         runtime.config().get(
             "security.users_file",
@@ -181,6 +187,7 @@ int main()
                 [&](std::string& error) {
                     if (
                         security.initialize(
+                            security_database,
                             users_file,
                             audit_file
                         )
