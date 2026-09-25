@@ -15,6 +15,12 @@ struct WebUiContext {
     std::string web_port;
     std::string storage_video_mounts;
     std::string storage_personal_mounts;
+    std::string storage_video_policy;
+    std::string storage_files_policy;
+    std::string storage_video_reserve_percent;
+    std::string storage_files_reserve_percent;
+    std::string storage_video_reserve_gb;
+    std::string storage_files_reserve_gb;
     std::string files_root;
     std::string username;
     std::string role;
