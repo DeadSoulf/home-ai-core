@@ -461,60 +461,81 @@ dnsServers()
 {
     std::vector<std::string> result;
 
-    std::ifstream file(
+    const std::filesystem::path paths[] = {
+        "/run/systemd/resolve/resolv.conf",
         "/etc/resolv.conf"
-    );
+    };
 
-    if (!file.is_open())
-        return result;
+    for (const auto& path : paths) {
+        std::ifstream file(path);
 
-    std::string line;
-
-    while (
-        std::getline(
-            file,
-            line
-        )
-    ) {
-        std::istringstream stream(line);
-
-        std::string key;
-        std::string value;
-
-        if (
-            !(stream >> key >> value)
-            ||
-            key != "nameserver"
-        ) {
+        if (!file.is_open())
             continue;
-        }
 
-        in_addr address{};
+        std::string line;
 
-        if (
-            inet_pton(
-                AF_INET,
-                value.c_str(),
-                &address
-            ) != 1
+        while (
+            std::getline(
+                file,
+                line
+            )
         ) {
-            continue;
-        }
+            std::istringstream stream(line);
 
-        if (
-            std::find(
-                result.begin(),
-                result.end(),
-                value
-            ) == result.end()
-        ) {
-            result.push_back(
-                value
-            );
-        }
+            std::string key;
+            std::string value;
 
-        if (result.size() >= 2)
-            break;
+            if (
+                !(stream >> key >> value)
+                ||
+                key != "nameserver"
+            ) {
+                continue;
+            }
+
+            in_addr address{};
+
+            if (
+                inet_pton(
+                    AF_INET,
+                    value.c_str(),
+                    &address
+                ) != 1
+            ) {
+                continue;
+            }
+
+            const auto host =
+                ntohl(
+                    address.s_addr
+                );
+
+            if (
+                (
+                    host
+                    &
+                    0xff000000U
+                ) ==
+                0x7f000000U
+            ) {
+                continue;
+            }
+
+            if (
+                std::find(
+                    result.begin(),
+                    result.end(),
+                    value
+                ) == result.end()
+            ) {
+                result.push_back(
+                    value
+                );
+            }
+
+            if (result.size() >= 2)
+                return result;
+        }
     }
 
     return result;
