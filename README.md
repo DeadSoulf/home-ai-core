@@ -14,11 +14,11 @@ Home AI Core is a local-first autonomous server platform designed for:
 
 ## Current stable version
 
-0.0.4
+0.0.5
 
 ## Current development target
 
-0.0.5 — Security Core
+0.0.6 — Module Manager
 
 ## Platform
 
@@ -45,6 +45,8 @@ Home AI Core is a local-first autonomous server platform designed for:
 - [Project Map](docs/PROJECT_MAP.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Development Workflow](docs/WORKFLOW.md)
+- [Security](docs/SECURITY.md)
+- [Storage Monitoring](docs/STORAGE.md)
 
 ## Branches
 
@@ -55,4 +57,4 @@ The development server should normally track `develop`.
 
 ## Status
 
-Early development. The current working foundation includes Core Runtime, logging, Event Bus, configuration, integrated Web Core, system monitoring and the live dashboard.
+The stable 0.0.5 foundation includes Core Runtime, logging, Event Bus, configuration, integrated Web Core, system monitoring, Security Core, authenticated Web/API access, and storage monitoring for mounted video/personal-data disks.
