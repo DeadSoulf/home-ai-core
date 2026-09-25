@@ -69,15 +69,19 @@ Completed in the current development branch:
 - rollback when build/tests fail
 - restart into the updated binary after confirmation
 
-Still planned for 0.0.6:
+Module Manager implemented in the current development branch:
 
 - common module interface
 - module registration
 - lifecycle state tracking
 - dependency ordering
 - health reporting
-- clean shutdown ordering
-- module status exposure in the Web UI
+- clean reverse shutdown ordering
+- authenticated `GET /api/modules`
+- module status exposure in the System page
+- degraded/unhealthy module reporting on the Home page
+
+0.0.6 now needs integration testing on the Debian development server.
 
 The Module Manager lifecycle will be:
 
