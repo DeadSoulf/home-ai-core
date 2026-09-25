@@ -632,10 +632,34 @@ std::string ifupdownMethod(
                     error
                 )
         ) {
+            if (error)
+                break;
+
+            std::error_code type_error;
+
             if (
-                error
+                !entry.is_regular_file(
+                    type_error
+                )
                 ||
-                !entry.is_regular_file()
+                type_error
+            ) {
+                continue;
+            }
+
+            const auto filename =
+                entry.path()
+                    .filename()
+                    .string();
+
+            if (
+                filename.ends_with(
+                    ".home-ai.bak"
+                )
+                ||
+                filename.ends_with(
+                    ".home-ai.tmp"
+                )
             ) {
                 continue;
             }
