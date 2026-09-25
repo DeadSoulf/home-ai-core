@@ -80,6 +80,19 @@ void navLink(
         << "</a>";
 }
 
+std::string roleDisplay(
+    const std::string& role
+)
+{
+    if (role == "admin")
+        return "Администратор";
+
+    if (role == "operator")
+        return "Оператор";
+
+    return "Наблюдатель";
+}
+
 std::string pageTitle(
     const std::string& page
 )
@@ -991,7 +1004,9 @@ button:disabled {
         << "<span data-i18n-skip>" << htmlEscape(context.username) << "</span>"
         << "</strong><small>"
         << htmlEscape(
-            context.role
+            roleDisplay(
+                context.role
+            )
         )
         << "</small></div>"
         << "<form method=\"POST\" action=\"/logout\">"
@@ -1576,7 +1591,9 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
             << "</span>"
             << "</div><div>Роль</div><div>"
             << htmlEscape(
-                context.role
+                roleDisplay(
+                    context.role
+                )
             )
             << R"HTML(</div>
 <div>Сессия</div><div class="status-ok">ACTIVE</div>
