@@ -4523,10 +4523,10 @@ async function updateNetworkInterfaces(
             message.textContent =
                 data.helper_installed
                 ? tr(
-                    "DHCP Network Helper готов."
+                    "Network Helper готов."
                 )
                 : tr(
-                    "Для получения IP по DHCP установите Network Helper."
+                    "Для изменения IPv4 установите Network Helper."
                 );
         }
 
