@@ -3079,10 +3079,15 @@ void WebServer::handleClient(
 
                 DiskOperations role_operations;
 
+                const std::string mount_role =
+                    use_video
+                    ? "video"
+                    : "personal";
+
                 const auto mount_result =
                     role_operations.mount(
                         device,
-                        "storage",
+                        mount_role,
                         false
                     );
 
@@ -3098,7 +3103,7 @@ void WebServer::handleClient(
                     DiskOperations::
                         defaultMountPoint(
                             device,
-                            "storage"
+                            mount_role
                         );
             }
 
