@@ -222,6 +222,7 @@ docs/
 ├── SECURITY.md
 ├── STORAGE.md
 ├── WEB_UI.md
+├── UPDATES.md
 ├── API.md            (planned)
 └── BUILD.md          (planned)
 ```
