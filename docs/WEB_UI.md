@@ -73,13 +73,15 @@ Current content:
 - Linux interface inventory
 - current IPv4 addresses
 - MAC, MTU, link state and default-route marker
-- DHCP request/renew action through a constrained privileged helper
+- DHCP/static IPv4 selector per interface
+- static IP, netmask, gateway and DNS fields
+- constrained privileged Network Helper
+- persistent NetworkManager, systemd-networkd and Debian ifupdown configuration
 - WireGuard profile status and connect/disconnect
 
 Future content:
 
-- static IPv4 configuration
-- routes
+- advanced routes
 - DNS
 - diagnostics
 
