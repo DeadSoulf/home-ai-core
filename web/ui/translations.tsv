@@ -453,3 +453,7 @@ AI: управление	AI: manage
 Нельзя запретить users.manage последнему активному администратору.	users.manage cannot be denied for the last enabled administrator.
 Неизвестное право	Unknown permission
 Загрузка журнала безопасности...	Loading security audit...
+Пользователь не найден	User not found
+Ошибка базы аутентификации	Authentication database error
+Некорректная роль пользователя	Invalid user role
+Не удалось защитить токен сессии	Unable to protect session token
