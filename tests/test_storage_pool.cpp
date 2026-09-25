@@ -40,6 +40,71 @@ int main()
         c
     };
 
+    const auto video_summary =
+        StoragePoolSelector::summarize(
+            volumes,
+            "video"
+        );
+
+    if (
+        video_summary.assigned_volumes != 2
+        ||
+        video_summary.online_volumes != 2
+        ||
+        video_summary.total_bytes != 3000
+        ||
+        video_summary.free_bytes != 1700
+        ||
+        !video_summary.free_bytes_complete
+    ) {
+        std::cerr
+            << "Video pool summary failed\n";
+
+        return 1;
+    }
+
+    StorageVolume pending;
+    pending.mount_point =
+        "/pool/pending";
+    pending.role =
+        "video";
+    pending.status =
+        "online";
+    pending.device_size_bytes =
+        4000;
+    pending.capacity_available =
+        false;
+
+    auto volumes_with_pending =
+        volumes;
+
+    volumes_with_pending.push_back(
+        pending
+    );
+
+    const auto expanded_summary =
+        StoragePoolSelector::summarize(
+            volumes_with_pending,
+            "video"
+        );
+
+    if (
+        expanded_summary.assigned_volumes != 3
+        ||
+        expanded_summary.online_volumes != 3
+        ||
+        expanded_summary.total_bytes != 7000
+        ||
+        expanded_summary.free_bytes != 1700
+        ||
+        expanded_summary.free_bytes_complete
+    ) {
+        std::cerr
+            << "Pool capacity fallback failed\n";
+
+        return 1;
+    }
+
     StoragePoolOptions options;
     options.reserve_percent = 10;
 
