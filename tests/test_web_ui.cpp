@@ -104,11 +104,19 @@ int main()
         ) == std::string::npos
         ||
         storage.find(
-            "Подключить и использовать для видео"
+            "Пулы хранения"
         ) == std::string::npos
         ||
         storage.find(
-            "Использовать текущую точку для видео"
+            "Применить назначение"
+        ) == std::string::npos
+        ||
+        storage.find(
+            "Использовать для видео"
+        ) == std::string::npos
+        ||
+        storage.find(
+            "storage-pools"
         ) == std::string::npos
         ||
         storage.find(
@@ -243,6 +251,14 @@ int main()
         ||
         system.find(
             "update-apply-btn"
+        ) == std::string::npos
+        ||
+        system.find(
+            "update-progress-bar"
+        ) == std::string::npos
+        ||
+        system.find(
+            "data-update-stage=\"build\""
         ) == std::string::npos
     ) {
         std::cerr
