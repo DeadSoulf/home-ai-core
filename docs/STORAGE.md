@@ -223,6 +223,7 @@ The current development branch includes:
 - persistent filesystem UUID discovery
 - UUID-based mount paths for newly managed disks
 - automatic best-effort remount of UUID-managed volumes after service startup
+- backward-compatible startup remount for existing legacy device-name mount paths
 - multi-disk video and files pools
 - dual-role disks
 - pool write-target selection
