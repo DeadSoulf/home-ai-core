@@ -161,7 +161,17 @@ bool SecurityManager::hasUsers() const
 {
     std::string error;
 
-    return database_.hasUsers(error);
+    const bool result =
+        database_.hasUsers(
+            error
+        );
+
+    // Fail closed: a database read failure must never
+    // reopen first-run administrator bootstrap.
+    if (!error.empty())
+        return true;
+
+    return result;
 }
 
 bool SecurityManager::createUser(
