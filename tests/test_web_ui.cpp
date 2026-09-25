@@ -159,7 +159,23 @@ int main()
         ) == std::string::npos
         ||
         network.find(
-            "/api/network/dhcp"
+            "/api/network/ipv4"
+        ) == std::string::npos
+        ||
+        network.find(
+            "Режим IPv4"
+        ) == std::string::npos
+        ||
+        network.find(
+            "Статический IP"
+        ) == std::string::npos
+        ||
+        network.find(
+            "Маска сети"
+        ) == std::string::npos
+        ||
+        network.find(
+            "Основной DNS"
         ) == std::string::npos
     ) {
         std::cerr
