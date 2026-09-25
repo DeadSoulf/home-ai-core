@@ -40,6 +40,38 @@ int main()
         return 1;
     }
 
+    if (
+        !NetworkInterfaceManager::
+            validIpv4Address(
+                "192.168.10.25"
+            )
+        ||
+        NetworkInterfaceManager::
+            validIpv4Address(
+                "192.168.999.25"
+            )
+        ||
+        NetworkInterfaceManager::
+            netmaskPrefix(
+                "255.255.255.0"
+            ) != 24
+        ||
+        NetworkInterfaceManager::
+            netmaskPrefix(
+                "24"
+            ) != 24
+        ||
+        NetworkInterfaceManager::
+            netmaskPrefix(
+                "255.0.255.0"
+            ) != -1
+    ) {
+        std::cerr
+            << "IPv4 validation failed\n";
+
+        return 1;
+    }
+
     NetworkInterfaceManager manager;
 
     const auto interfaces =
