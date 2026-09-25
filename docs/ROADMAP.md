@@ -15,7 +15,8 @@
 | 0.0.9 | Responsive mobile Web UI and off-canvas navigation | DEVELOPMENT SNAPSHOT |
 | 0.0.10 | Refined phone/tablet Web UI and touch ergonomics | DEVELOPMENT SNAPSHOT |
 | 0.0.11 | Camera Core foundation: secure RTSP registry and health monitoring | DEVELOPMENT SNAPSHOT |
-| 0.0.12 | ONVIF discovery + real RTSP media probe + snapshots | IN DEVELOPMENT |
+| 0.0.12 | ONVIF discovery + real RTSP media probe + snapshots | DEVELOPMENT SNAPSHOT |
+| 0.0.13 | Fix camera inventory projection after ONVIF migration | IN DEVELOPMENT |
 | next 0.0.x | ONVIF profiles/PTZ + Live View | PLANNED |
 | next 0.0.x | Recorder + archive + event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |

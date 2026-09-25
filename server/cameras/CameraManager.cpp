@@ -1810,7 +1810,7 @@ CameraManager::cameras(
 
     Statement statement(
         impl_->database,
-        "SELECT id,name,rtsp_url,username,password_cipher,"
+        "SELECT id,name,rtsp_url,onvif_xaddr,username,password_cipher,"
         "enabled,status,last_error,last_seen_at,created_at,updated_at "
         "FROM cameras ORDER BY name COLLATE NOCASE,id;"
     );
