@@ -171,3 +171,20 @@ add_test(
     NAME web_ui
     COMMAND test-web-ui
 )
+
+
+add_executable(
+    test-update-manager
+    tests/test_update_manager.cpp
+)
+
+target_link_libraries(
+    test-update-manager
+    PRIVATE
+    homeai-core-lib
+)
+
+add_test(
+    NAME update_manager
+    COMMAND test-update-manager
+)
