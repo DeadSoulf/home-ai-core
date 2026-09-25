@@ -7,12 +7,16 @@
 #include <thread>
 #include <vector>
 
+#include "server/cameras/CameraMediaTools.h"
+#include "server/cameras/OnvifDiscovery.h"
+
 namespace homeai {
 
 struct CameraInfo {
     std::int64_t id{0};
     std::string name;
     std::string rtsp_url;
+    std::string onvif_xaddr;
     std::string username;
     bool has_password{false};
     bool enabled{true};
@@ -26,6 +30,7 @@ struct CameraInfo {
 struct CameraInput {
     std::string name;
     std::string rtsp_url;
+    std::string onvif_xaddr;
     std::string username;
     std::string password;
     bool update_password{false};
@@ -89,6 +94,20 @@ public:
     CameraResult probe(
         std::int64_t id
     );
+
+    CameraMediaProbe mediaProbe(
+        std::int64_t id
+    );
+
+    CameraSnapshot snapshot(
+        std::int64_t id
+    );
+
+    std::vector<OnvifDevice>
+    discoverOnvif(
+        int timeout_ms,
+        std::string& error
+    ) const;
 
 private:
     struct Impl;

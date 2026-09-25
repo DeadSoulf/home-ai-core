@@ -156,18 +156,21 @@ Current content:
 - Camera Core status overview
 - persistent RTSP camera registry
 - create, edit and delete cameras
-- separate RTSP URL, username and password fields
+- separate RTSP URL, ONVIF XAddr, username and password fields
 - local encrypted password storage
-- ONLINE/OFFLINE/disabled state
-- manual camera connectivity check
-- automatic periodic connectivity checks
+- ONLINE/OFFLINE/disabled network state
+- lightweight RTSP endpoint checks
+- ONVIF WS-Discovery
+- real RTSP media probe through ffprobe
+- video codec, resolution, FPS and audio codec diagnostics
+- JPEG snapshots through ffmpeg
 - permission-aware controls using `cameras.view` and `cameras.manage`
 
 The camera list never returns camera passwords through the normal Web API.
 
 Next stages:
 
-- ONVIF discovery and media profiles
+- ONVIF media profiles and PTZ
 - browser Live View
 - continuous/event recording
 - archive and timeline

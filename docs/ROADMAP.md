@@ -14,8 +14,9 @@
 | 0.0.8 | Logical permission-aware Web sidebar and navigation | DEVELOPMENT SNAPSHOT |
 | 0.0.9 | Responsive mobile Web UI and off-canvas navigation | DEVELOPMENT SNAPSHOT |
 | 0.0.10 | Refined phone/tablet Web UI and touch ergonomics | DEVELOPMENT SNAPSHOT |
-| 0.0.11 | Camera Core foundation: secure RTSP registry and health monitoring | IN DEVELOPMENT |
-| next 0.0.x | ONVIF discovery + Live View | PLANNED |
+| 0.0.11 | Camera Core foundation: secure RTSP registry and health monitoring | DEVELOPMENT SNAPSHOT |
+| 0.0.12 | ONVIF discovery + real RTSP media probe + snapshots | IN DEVELOPMENT |
+| next 0.0.x | ONVIF profiles/PTZ + Live View | PLANNED |
 | next 0.0.x | Recorder + archive + event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
@@ -173,26 +174,32 @@ Implemented in the 0.0.10 snapshot:
 - improved touch behavior and reduced accidental zoom/highlight effects
 - expanded Web UI tests for mobile layout guarantees
 
-## Current focus: 0.0.11
+## Development snapshot: 0.0.11
 
-Current Camera Core foundation:
+Implemented in the 0.0.11 snapshot:
 
-- CameraManager registered in Module Manager
-- dedicated SQLite camera database under `runtime/cameras`
-- per-installation 256-bit camera secret key with mode `0600`
-- AES-256-GCM protection for stored camera passwords
-- RTSP URL validation that rejects embedded credentials
-- camera CRUD with `cameras.view` / `cameras.manage`
-- password-preserving camera edits when the password field is left empty
-- manual and periodic RTSP host/port connectivity checks
-- ONLINE / OFFLINE / disabled state and last successful contact time
-- Camera Core health surfaced through the module status API
-- Web UI overview, add/edit form, camera cards, probe and delete actions
-- camera passwords excluded from list API responses and security audit details
-- CameraManager test covering CRUD, password preservation and plaintext-secret absence
+- secure persistent RTSP camera registry
+- encrypted camera passwords
+- camera CRUD and permissions
+- lightweight endpoint health checks
+- Web camera management
 
-0.0.11 establishes the camera inventory/security/health layer. ONVIF, actual media probing,
-Live View, recording, archive and analytics are intentionally layered on top of this base.
+## Current focus: 0.0.12
+
+Current Camera Core work:
+
+- persistent ONVIF XAddr with automatic database migration
+- WS-Discovery for ONVIF NetworkVideoTransmitter devices
+- ONVIF discovery results in Web UI
+- real RTSP media diagnostics through ffprobe
+- codec, resolution, FPS and audio codec reporting
+- JPEG snapshots through ffmpeg
+- internal credential decryption for media access
+- redacted media-tool errors
+- parser tests for ONVIF XML and ffprobe output
+
+0.0.12 keeps background health checks lightweight. Live View and recording remain separate
+future processes.
 
 ## Later major capabilities
 

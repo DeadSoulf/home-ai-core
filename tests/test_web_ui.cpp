@@ -361,7 +361,27 @@ int main()
         ) == std::string::npos
         ||
         cameras.find(
-            "Camera Core 0.0.11"
+            "/api/cameras/media-probe"
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "/api/cameras/snapshot"
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "/api/cameras/discover"
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "id=\"camera-onvif-xaddr\""
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "id=\"camera-discover-btn\""
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "Camera Core 0.0.12"
         ) == std::string::npos
         ||
         cameras.find(

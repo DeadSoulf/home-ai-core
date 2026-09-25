@@ -402,3 +402,20 @@ add_test(
     NAME camera_manager
     COMMAND test-camera-manager
 )
+
+
+add_executable(
+    test-camera-support
+    tests/test_camera_support.cpp
+)
+
+target_link_libraries(
+    test-camera-support
+    PRIVATE
+    homeai-core-lib
+)
+
+add_test(
+    NAME camera_support
+    COMMAND test-camera-support
+)

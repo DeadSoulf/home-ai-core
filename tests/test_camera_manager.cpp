@@ -55,6 +55,8 @@ int main()
     input.name = "Front door";
     input.rtsp_url =
         "rtsp://192.0.2.10:8554/main";
+    input.onvif_xaddr =
+        "http://192.0.2.10/onvif/device_service";
     input.username = "viewer";
     input.password = secret;
     input.enabled = true;
@@ -87,6 +89,9 @@ int main()
             input.name
         ||
         !list.front().has_password
+        ||
+        list.front().onvif_xaddr !=
+            input.onvif_xaddr
         ||
         list.front().username !=
             input.username
@@ -145,6 +150,7 @@ int main()
             CameraInput{
                 "Bad",
                 "rtsp://user:password@192.0.2.1/live",
+                "",
                 "",
                 "",
                 false,

@@ -2,10 +2,10 @@
 
 ## Scope
 
-Camera Core 0.0.11 introduces the persistent camera inventory and health layer used by the
+Camera Core 0.0.12 introduces the persistent camera inventory and health layer used by the
 future NVR stack.
 
-This version intentionally does not decode video in the Web UI yet. Media discovery,
+0.0.12 adds ONVIF discovery, on-demand RTSP media inspection and JPEG snapshots. Continuous
 Live View, recording, archive and analytics will build on the same camera IDs and database.
 
 ## Runtime data
@@ -97,10 +97,34 @@ X-HomeAI-Request: 1
 id=1
 ```
 
+ONVIF discovery:
+
+```text
+POST /api/cameras/discover
+X-HomeAI-Request: 1
+
+timeout_ms=2000
+```
+
+Real RTSP media probe:
+
+```text
+POST /api/cameras/media-probe
+X-HomeAI-Request: 1
+
+id=1
+```
+
+JPEG snapshot:
+
+```text
+GET /api/cameras/snapshot?id=1
+```
+
 ## Health checks
 
-Camera Core periodically checks enabled cameras. In 0.0.11 this is a bounded TCP reachability
-check against the RTSP host and port with a short timeout.
+Camera Core periodically performs a lightweight bounded TCP reachability check against the
+configured RTSP host and port. This remains cheaper than launching ffprobe for every health cycle.
 
 The state is one of:
 
@@ -111,27 +135,40 @@ offline
 disabled
 ```
 
-`online` in 0.0.11 means the configured RTSP endpoint is reachable at the network layer.
-The next media layer will perform RTSP/codec probing and distinguish authentication,
-stream-path and codec failures.
+`online` means the configured RTSP endpoint is reachable at the network layer.
+
+An on-demand media probe uses `ffprobe` and reports the real video codec, resolution, FPS and
+audio codec. Snapshot capture uses `ffmpeg` to decode one frame as JPEG.
+
+These runtime tools are optional for Core startup. On Debian install them with:
+
+```bash
+sudo apt update
+sudo apt install -y ffmpeg
+```
+
+Home AI Core launches these tools directly rather than through a shell and does not log camera
+credentials. Media-tool error text is redacted before it is returned by the API.
 
 ## Web UI
 
 The Cameras page provides:
 
 - total / online / offline / disabled counters
-- add camera form
+- add/edit form with RTSP and ONVIF endpoints
 - edit without exposing the stored password
 - enable/disable control
-- manual connectivity check
+- ONVIF WS-Discovery results
+- fast RTSP endpoint check
+- real media probe with codec / resolution / FPS
+- JPEG snapshot preview
 - delete action
 - automatic status refresh
 
 ## Next stages
 
-1. ONVIF discovery and media profiles.
-2. RTSP/codec probing and snapshots.
-3. Live View with main/sub streams.
-4. Recorder integrated with the video Storage Pool.
-5. Archive/timeline and event metadata.
-6. Motion/object analytics and Automation Core integration.
+1. ONVIF authenticated media profiles and PTZ.
+2. Live View with main/sub streams.
+3. Recorder integrated with the video Storage Pool.
+4. Archive/timeline and event metadata.
+5. Motion/object analytics and Automation Core integration.

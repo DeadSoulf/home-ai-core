@@ -1,5 +1,6 @@
 #include "server/cameras/CameraManager.h"
 
+#include <openssl/crypto.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <sqlite3.h>
@@ -267,6 +268,33 @@ bool validateInput(
     ) {
         error =
             "Некорректный RTSP URL. Используйте rtsp:// или rtsps:// без логина и пароля в URL.";
+
+        return false;
+    }
+
+    if (
+        !validText(
+            input.onvif_xaddr,
+            2048,
+            true
+        )
+        ||
+        (
+            !input.onvif_xaddr.empty()
+            &&
+            input.onvif_xaddr.rfind(
+                "http://",
+                0
+            ) != 0
+            &&
+            input.onvif_xaddr.rfind(
+                "https://",
+                0
+            ) != 0
+        )
+    ) {
+        error =
+            "Некорректный ONVIF XAddr.";
 
         return false;
     }
@@ -618,6 +646,324 @@ bool encryptSecret(
     return true;
 }
 
+bool decryptSecret(
+    const std::vector<unsigned char>& key,
+    const std::vector<unsigned char>& nonce,
+    const std::vector<unsigned char>& cipher,
+    const std::vector<unsigned char>& tag,
+    std::string& plaintext
+)
+{
+    plaintext.clear();
+
+    if (cipher.empty())
+        return true;
+
+    if (
+        key.size() != secret_key_size
+        ||
+        nonce.size() != gcm_nonce_size
+        ||
+        tag.size() != gcm_tag_size
+    ) {
+        return false;
+    }
+
+    std::vector<unsigned char>
+        output(
+            cipher.size()
+        );
+
+    EVP_CIPHER_CTX* context =
+        EVP_CIPHER_CTX_new();
+
+    if (!context)
+        return false;
+
+    int length = 0;
+    int final_length = 0;
+
+    const bool success =
+        EVP_DecryptInit_ex(
+            context,
+            EVP_aes_256_gcm(),
+            nullptr,
+            nullptr,
+            nullptr
+        ) == 1
+        &&
+        EVP_CIPHER_CTX_ctrl(
+            context,
+            EVP_CTRL_GCM_SET_IVLEN,
+            static_cast<int>(
+                nonce.size()
+            ),
+            nullptr
+        ) == 1
+        &&
+        EVP_DecryptInit_ex(
+            context,
+            nullptr,
+            nullptr,
+            key.data(),
+            nonce.data()
+        ) == 1
+        &&
+        EVP_DecryptUpdate(
+            context,
+            output.data(),
+            &length,
+            cipher.data(),
+            static_cast<int>(
+                cipher.size()
+            )
+        ) == 1
+        &&
+        EVP_CIPHER_CTX_ctrl(
+            context,
+            EVP_CTRL_GCM_SET_TAG,
+            static_cast<int>(
+                tag.size()
+            ),
+            const_cast<
+                unsigned char*
+            >(
+                tag.data()
+            )
+        ) == 1
+        &&
+        EVP_DecryptFinal_ex(
+            context,
+            output.data() +
+                length,
+            &final_length
+        ) == 1;
+
+    EVP_CIPHER_CTX_free(
+        context
+    );
+
+    if (!success) {
+        OPENSSL_cleanse(
+            output.data(),
+            output.size()
+        );
+
+        return false;
+    }
+
+    plaintext.assign(
+        reinterpret_cast<
+            const char*
+        >(
+            output.data()
+        ),
+        static_cast<
+            std::size_t
+        >(
+            length +
+            final_length
+        )
+    );
+
+    OPENSSL_cleanse(
+        output.data(),
+        output.size()
+    );
+
+    return true;
+}
+
+std::string percentEncodeUserInfo(
+    const std::string& value
+)
+{
+    static constexpr char hex[] =
+        "0123456789ABCDEF";
+
+    std::string result;
+
+    for (
+        const unsigned char character :
+        value
+    ) {
+        const bool safe =
+            (
+                character >= 'A'
+                &&
+                character <= 'Z'
+            )
+            ||
+            (
+                character >= 'a'
+                &&
+                character <= 'z'
+            )
+            ||
+            (
+                character >= '0'
+                &&
+                character <= '9'
+            )
+            ||
+            character == '-'
+            ||
+            character == '.'
+            ||
+            character == '_'
+            ||
+            character == '~';
+
+        if (safe) {
+            result.push_back(
+                static_cast<char>(
+                    character
+                )
+            );
+        }
+        else {
+            result.push_back('%');
+            result.push_back(
+                hex[
+                    (
+                        character >> 4
+                    ) & 0x0f
+                ]
+            );
+            result.push_back(
+                hex[
+                    character & 0x0f
+                ]
+            );
+        }
+    }
+
+    return result;
+}
+
+std::string authenticatedRtspUrl(
+    const std::string& url,
+    const std::string& username,
+    const std::string& password
+)
+{
+    if (username.empty())
+        return url;
+
+    const auto scheme_end =
+        url.find("://");
+
+    if (
+        scheme_end ==
+        std::string::npos
+    ) {
+        return url;
+    }
+
+    std::string credentials =
+        percentEncodeUserInfo(
+            username
+        );
+
+    if (!password.empty()) {
+        credentials +=
+            ":"
+            +
+            percentEncodeUserInfo(
+                password
+            );
+    }
+
+    credentials += "@";
+
+    return
+        url.substr(
+            0,
+            scheme_end + 3
+        )
+        +
+        credentials
+        +
+        url.substr(
+            scheme_end + 3
+        );
+}
+
+void cleanseString(
+    std::string& value
+)
+{
+    if (!value.empty()) {
+        OPENSSL_cleanse(
+            value.data(),
+            value.size()
+        );
+    }
+
+    value.clear();
+}
+
+std::string sanitizeMediaError(
+    std::string message,
+    const std::string& authenticated_url,
+    const std::string& password
+)
+{
+    auto replace_all =
+        [](
+            std::string& target,
+            const std::string& needle,
+            const std::string& replacement
+        ) {
+            if (needle.empty())
+                return;
+
+            std::size_t position = 0;
+
+            while (
+                (
+                    position =
+                        target.find(
+                            needle,
+                            position
+                        )
+                ) !=
+                std::string::npos
+            ) {
+                target.replace(
+                    position,
+                    needle.size(),
+                    replacement
+                );
+
+                position +=
+                    replacement.size();
+            }
+        };
+
+    replace_all(
+        message,
+        authenticated_url,
+        "<camera-stream>"
+    );
+
+    replace_all(
+        message,
+        password,
+        "***"
+    );
+
+    replace_all(
+        message,
+        percentEncodeUserInfo(
+            password
+        ),
+        "***"
+    );
+
+    return message;
+}
+
 bool connectEndpoint(
     const RtspEndpoint& endpoint,
     std::string& error
@@ -907,6 +1253,7 @@ struct CameraManager::Impl {
             "id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "name TEXT NOT NULL UNIQUE,"
             "rtsp_url TEXT NOT NULL,"
+            "onvif_xaddr TEXT NOT NULL DEFAULT '',"
             "username TEXT NOT NULL DEFAULT '',"
             "password_nonce BLOB,"
             "password_cipher BLOB,"
@@ -942,6 +1289,68 @@ struct CameraManager::Impl {
             return false;
         }
 
+        bool has_onvif_xaddr = false;
+
+        {
+            Statement columns(
+                database,
+                "PRAGMA table_info(cameras);"
+            );
+
+            if (!columns) {
+                error =
+                    "Unable to inspect camera database schema.";
+
+                return false;
+            }
+
+            while (
+                sqlite3_step(
+                    columns.get()
+                ) == SQLITE_ROW
+            ) {
+                if (
+                    columnText(
+                        columns.get(),
+                        1
+                    ) == "onvif_xaddr"
+                ) {
+                    has_onvif_xaddr =
+                        true;
+
+                    break;
+                }
+            }
+        }
+
+        if (!has_onvif_xaddr) {
+            char* migration_message =
+                nullptr;
+
+            if (
+                sqlite3_exec(
+                    database,
+                    "ALTER TABLE cameras "
+                    "ADD COLUMN onvif_xaddr "
+                    "TEXT NOT NULL DEFAULT '';",
+                    nullptr,
+                    nullptr,
+                    &migration_message
+                ) != SQLITE_OK
+            ) {
+                error =
+                    migration_message
+                    ? migration_message
+                    : "Unable to migrate camera database.";
+
+                sqlite3_free(
+                    migration_message
+                );
+
+                return false;
+            }
+        }
+
         ::chmod(
             database_file.c_str(),
             0600
@@ -974,57 +1383,63 @@ struct CameraManager::Impl {
                 2
             );
 
-        camera.username =
+        camera.onvif_xaddr =
             columnText(
                 statement,
                 3
             );
 
+        camera.username =
+            columnText(
+                statement,
+                4
+            );
+
         camera.has_password =
             sqlite3_column_type(
                 statement,
-                4
+                5
             ) != SQLITE_NULL
             &&
             sqlite3_column_bytes(
                 statement,
-                4
+                5
             ) > 0;
 
         camera.enabled =
             sqlite3_column_int(
                 statement,
-                5
+                6
             ) != 0;
 
         camera.status =
             columnText(
                 statement,
-                6
+                7
             );
 
         camera.last_error =
             columnText(
                 statement,
-                7
+                8
             );
 
         camera.last_seen_at =
             sqlite3_column_int64(
                 statement,
-                8
+                9
             );
 
         camera.created_at =
             sqlite3_column_int64(
                 statement,
-                9
+                10
             );
 
         camera.updated_at =
             sqlite3_column_int64(
                 statement,
-                10
+                11
             );
 
         return camera;
@@ -1038,7 +1453,7 @@ struct CameraManager::Impl {
     {
         Statement statement(
             database,
-            "SELECT id,name,rtsp_url,username,password_cipher,"
+            "SELECT id,name,rtsp_url,onvif_xaddr,username,password_cipher,"
             "enabled,status,last_error,last_seen_at,created_at,updated_at "
             "FROM cameras WHERE id=?;"
         );
@@ -1118,6 +1533,112 @@ struct CameraManager::Impl {
             sqlite3_step(
                 statement.get()
             ) == SQLITE_DONE;
+    }
+
+    bool streamAccess(
+        std::int64_t id,
+        std::string& public_url,
+        std::string& authenticated_url,
+        std::string& password,
+        std::string& error
+    ) const
+    {
+        Statement statement(
+            database,
+            "SELECT rtsp_url,username,"
+            "password_nonce,password_cipher,password_tag,enabled "
+            "FROM cameras WHERE id=?;"
+        );
+
+        if (!statement) {
+            error =
+                "Unable to prepare camera credential query.";
+
+            return false;
+        }
+
+        sqlite3_bind_int64(
+            statement.get(),
+            1,
+            id
+        );
+
+        if (
+            sqlite3_step(
+                statement.get()
+            ) != SQLITE_ROW
+        ) {
+            error =
+                "Камера не найдена.";
+
+            return false;
+        }
+
+        if (
+            sqlite3_column_int(
+                statement.get(),
+                5
+            ) == 0
+        ) {
+            error =
+                "Камера отключена.";
+
+            return false;
+        }
+
+        public_url =
+            columnText(
+                statement.get(),
+                0
+            );
+
+        const auto username =
+            columnText(
+                statement.get(),
+                1
+            );
+
+        const auto nonce =
+            readBlob(
+                statement.get(),
+                2
+            );
+
+        const auto cipher =
+            readBlob(
+                statement.get(),
+                3
+            );
+
+        const auto tag =
+            readBlob(
+                statement.get(),
+                4
+            );
+
+        if (
+            !decryptSecret(
+                key,
+                nonce,
+                cipher,
+                tag,
+                password
+            )
+        ) {
+            error =
+                "Не удалось расшифровать пароль камеры.";
+
+            return false;
+        }
+
+        authenticated_url =
+            authenticatedRtspUrl(
+                public_url,
+                username,
+                password
+            );
+
+        return true;
     }
 };
 
@@ -1368,10 +1889,10 @@ CameraResult CameraManager::create(
     Statement statement(
         impl_->database,
         "INSERT INTO cameras("
-        "name,rtsp_url,username,"
+        "name,rtsp_url,onvif_xaddr,username,"
         "password_nonce,password_cipher,password_tag,"
         "enabled,status,last_error,last_seen_at,created_at,updated_at"
-        ") VALUES(?,?,?,?,?,?,?,?,'',0,?,?);"
+        ") VALUES(?,?,?,?,?,?,?,?,?,'',0,?,?);"
     );
 
     if (!statement) {
@@ -1401,30 +1922,36 @@ CameraResult CameraManager::create(
         bindText(
             statement.get(),
             3,
+            input.onvif_xaddr
+        )
+        &&
+        bindText(
+            statement.get(),
+            4,
             input.username
         )
         &&
         bindBlob(
             statement.get(),
-            4,
+            5,
             password.nonce
         )
         &&
         bindBlob(
             statement.get(),
-            5,
+            6,
             password.cipher
         )
         &&
         bindBlob(
             statement.get(),
-            6,
+            7,
             password.tag
         )
         &&
         sqlite3_bind_int(
             statement.get(),
-            7,
+            8,
             input.enabled
                 ? 1
                 : 0
@@ -1432,7 +1959,7 @@ CameraResult CameraManager::create(
         &&
         bindText(
             statement.get(),
-            8,
+            9,
             input.enabled
                 ? "unknown"
                 : "disabled"
@@ -1440,13 +1967,13 @@ CameraResult CameraManager::create(
         &&
         sqlite3_bind_int64(
             statement.get(),
-            9,
+            10,
             now
         ) == SQLITE_OK
         &&
         sqlite3_bind_int64(
             statement.get(),
-            10,
+            11,
             now
         ) == SQLITE_OK;
 
@@ -1556,7 +2083,7 @@ CameraResult CameraManager::update(
         Statement statement(
             impl_->database,
             "UPDATE cameras SET "
-            "name=?,rtsp_url=?,username=?,"
+            "name=?,rtsp_url=?,onvif_xaddr=?,username=?,"
             "password_nonce=?,password_cipher=?,password_tag=?,"
             "enabled=?,status=?,last_error='',updated_at=? "
             "WHERE id=?;"
@@ -1587,30 +2114,36 @@ CameraResult CameraManager::update(
             bindText(
                 statement.get(),
                 3,
+                input.onvif_xaddr
+            )
+            &&
+            bindText(
+                statement.get(),
+                4,
                 input.username
             )
             &&
             bindBlob(
                 statement.get(),
-                4,
+                5,
                 password.nonce
             )
             &&
             bindBlob(
                 statement.get(),
-                5,
+                6,
                 password.cipher
             )
             &&
             bindBlob(
                 statement.get(),
-                6,
+                7,
                 password.tag
             )
             &&
             sqlite3_bind_int(
                 statement.get(),
-                7,
+                8,
                 input.enabled
                     ? 1
                     : 0
@@ -1618,7 +2151,7 @@ CameraResult CameraManager::update(
             &&
             bindText(
                 statement.get(),
-                8,
+                9,
                 input.enabled
                     ? "unknown"
                     : "disabled"
@@ -1626,13 +2159,13 @@ CameraResult CameraManager::update(
             &&
             sqlite3_bind_int64(
                 statement.get(),
-                9,
+                10,
                 now
             ) == SQLITE_OK
             &&
             sqlite3_bind_int64(
                 statement.get(),
-                10,
+                11,
                 id
             ) == SQLITE_OK;
 
@@ -1655,7 +2188,7 @@ CameraResult CameraManager::update(
         Statement statement(
             impl_->database,
             "UPDATE cameras SET "
-            "name=?,rtsp_url=?,username=?,enabled=?,"
+            "name=?,rtsp_url=?,onvif_xaddr=?,username=?,enabled=?,"
             "status=?,last_error='',updated_at=? "
             "WHERE id=?;"
         );
@@ -1685,12 +2218,18 @@ CameraResult CameraManager::update(
             bindText(
                 statement.get(),
                 3,
+                input.onvif_xaddr
+            )
+            &&
+            bindText(
+                statement.get(),
+                4,
                 input.username
             )
             &&
             sqlite3_bind_int(
                 statement.get(),
-                4,
+                5,
                 input.enabled
                     ? 1
                     : 0
@@ -1698,7 +2237,7 @@ CameraResult CameraManager::update(
             &&
             bindText(
                 statement.get(),
-                5,
+                6,
                 input.enabled
                     ? "unknown"
                     : "disabled"
@@ -1706,13 +2245,13 @@ CameraResult CameraManager::update(
             &&
             sqlite3_bind_int64(
                 statement.get(),
-                6,
+                7,
                 now
             ) == SQLITE_OK
             &&
             sqlite3_bind_int64(
                 statement.get(),
-                7,
+                8,
                 id
             ) == SQLITE_OK;
 
@@ -1917,6 +2456,147 @@ CameraResult CameraManager::probe(
             : probe_error,
         id
     };
+}
+
+CameraMediaProbe
+CameraManager::mediaProbe(
+    std::int64_t id
+)
+{
+    std::string public_url;
+    std::string authenticated_url;
+    std::string password;
+    std::string error;
+
+    {
+        std::lock_guard<std::mutex>
+            lock(impl_->mutex);
+
+        if (!impl_->initialized) {
+            return {
+                false,
+                "not_initialized",
+                "Camera Manager is not initialized.",
+                "",
+                "",
+                0,
+                0,
+                0.0
+            };
+        }
+
+        if (
+            !impl_->streamAccess(
+                id,
+                public_url,
+                authenticated_url,
+                password,
+                error
+            )
+        ) {
+            return {
+                false,
+                "camera_unavailable",
+                error,
+                "",
+                "",
+                0,
+                0,
+                0.0
+            };
+        }
+    }
+
+    auto result =
+        CameraMediaTools::probe(
+            authenticated_url
+        );
+
+    result.message =
+        sanitizeMediaError(
+            result.message,
+            authenticated_url,
+            password
+        );
+
+    cleanseString(password);
+    cleanseString(authenticated_url);
+
+    return result;
+}
+
+CameraSnapshot
+CameraManager::snapshot(
+    std::int64_t id
+)
+{
+    std::string public_url;
+    std::string authenticated_url;
+    std::string password;
+    std::string error;
+
+    {
+        std::lock_guard<std::mutex>
+            lock(impl_->mutex);
+
+        if (!impl_->initialized) {
+            return {
+                false,
+                "not_initialized",
+                "Camera Manager is not initialized.",
+                ""
+            };
+        }
+
+        if (
+            !impl_->streamAccess(
+                id,
+                public_url,
+                authenticated_url,
+                password,
+                error
+            )
+        ) {
+            return {
+                false,
+                "camera_unavailable",
+                error,
+                ""
+            };
+        }
+    }
+
+    auto result =
+        CameraMediaTools::snapshot(
+            authenticated_url
+        );
+
+    result.message =
+        sanitizeMediaError(
+            result.message,
+            authenticated_url,
+            password
+        );
+
+    cleanseString(password);
+    cleanseString(authenticated_url);
+
+    return result;
+}
+
+std::vector<OnvifDevice>
+CameraManager::discoverOnvif(
+    int timeout_ms,
+    std::string& error
+) const
+{
+    OnvifDiscovery discovery;
+
+    return
+        discovery.discover(
+            timeout_ms,
+            error
+        );
 }
 
 void CameraManager::workerLoop()

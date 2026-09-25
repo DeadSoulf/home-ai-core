@@ -2622,6 +2622,8 @@ void WebServer::handleClient(
                 << jsonEscape(camera.name)
                 << "\",\"rtsp_url\":\""
                 << jsonEscape(camera.rtsp_url)
+                << "\",\"onvif_xaddr\":\""
+                << jsonEscape(camera.onvif_xaddr)
                 << "\",\"username\":\""
                 << jsonEscape(camera.username)
                 << "\",\"has_password\":"
@@ -2662,6 +2664,110 @@ void WebServer::handleClient(
     }
 
     if (
+        method == "GET"
+        &&
+        path == "/api/cameras/snapshot"
+    ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "cameras.view"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"error\":\"permission_denied\"}"
+            );
+
+            return;
+        }
+
+        if (
+            !cameras_
+            ||
+            !cameras_->healthy()
+        ) {
+            sendResponse(
+                client_fd,
+                "503 Service Unavailable",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"error\":\"camera_core_unavailable\"}"
+            );
+
+            return;
+        }
+
+        const auto values =
+            parseForm(
+                query_string
+            );
+
+        std::int64_t id = 0;
+
+        if (
+            values.contains("id")
+        ) {
+            const auto parsed =
+                parseInt64(
+                    values.at("id")
+                );
+
+            if (
+                parsed
+                &&
+                *parsed > 0
+            ) {
+                id = *parsed;
+            }
+        }
+
+        if (id <= 0) {
+            sendResponse(
+                client_fd,
+                "400 Bad Request",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"Некорректный ID камеры.\"}"
+            );
+
+            return;
+        }
+
+        auto result =
+            cameras_->snapshot(id);
+
+        if (!result.success) {
+            sendResponse(
+                client_fd,
+                result.code ==
+                    "camera_unavailable"
+                    ? "404 Not Found"
+                    : "400 Bad Request",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"code\":\"" +
+                jsonEscape(result.code)
+                +
+                "\",\"message\":\"" +
+                jsonEscape(result.message)
+                +
+                "\"}"
+            );
+
+            return;
+        }
+
+        sendResponse(
+            client_fd,
+            "200 OK",
+            "image/jpeg",
+            result.jpeg
+        );
+
+        return;
+    }
+
+    if (
         method == "POST"
         &&
         (
@@ -2670,6 +2776,10 @@ void WebServer::handleClient(
             path == "/api/cameras/delete"
             ||
             path == "/api/cameras/probe"
+            ||
+            path == "/api/cameras/media-probe"
+            ||
+            path == "/api/cameras/discover"
         )
     ) {
         if (
@@ -2722,6 +2832,113 @@ void WebServer::handleClient(
         const auto form =
             parseForm(body);
 
+        if (
+            path ==
+                "/api/cameras/discover"
+        ) {
+            int timeout_ms = 1800;
+
+            if (
+                form.contains(
+                    "timeout_ms"
+                )
+            ) {
+                try {
+                    timeout_ms =
+                        std::stoi(
+                            form.at(
+                                "timeout_ms"
+                            )
+                        );
+                }
+                catch (...) {
+                    timeout_ms = 1800;
+                }
+            }
+
+            std::string error;
+
+            const auto devices =
+                cameras_->discoverOnvif(
+                    timeout_ms,
+                    error
+                );
+
+            if (!error.empty()) {
+                sendResponse(
+                    client_fd,
+                    "500 Internal Server Error",
+                    "application/json; charset=utf-8",
+                    "{\"success\":false,\"message\":\"" +
+                    jsonEscape(error)
+                    +
+                    "\"}"
+                );
+
+                return;
+            }
+
+            security_.audit(
+                "camera.onvif.discover",
+                session->username,
+                "devices=" +
+                std::to_string(
+                    devices.size()
+                )
+            );
+
+            std::ostringstream json;
+            json
+                << "{\"success\":true,\"devices\":[";
+
+            bool first = true;
+
+            for (
+                const auto& device :
+                devices
+            ) {
+                if (!first)
+                    json << ",";
+
+                first = false;
+
+                json
+                    << "{"
+                    << "\"endpoint_reference\":\""
+                    << jsonEscape(
+                        device.endpoint_reference
+                    )
+                    << "\",\"xaddr\":\""
+                    << jsonEscape(
+                        device.xaddr
+                    )
+                    << "\",\"types\":\""
+                    << jsonEscape(
+                        device.types
+                    )
+                    << "\",\"scopes\":\""
+                    << jsonEscape(
+                        device.scopes
+                    )
+                    << "\",\"remote_address\":\""
+                    << jsonEscape(
+                        device.remote_address
+                    )
+                    << "\"}";
+            }
+
+            json << "]}";
+
+            sendResponse(
+                client_fd,
+                "200 OK",
+                "application/json; charset=utf-8",
+                json.str()
+            );
+
+            return;
+        }
+
         auto parse_id =
             [&]() -> std::int64_t {
                 const auto it =
@@ -2735,30 +2952,95 @@ void WebServer::handleClient(
                     return 0;
                 }
 
-                try {
-                    std::size_t consumed = 0;
+                const auto parsed =
+                    parseInt64(
+                        it->second
+                    );
 
-                    const auto value =
-                        std::stoll(
-                            it->second,
-                            &consumed
-                        );
-
-                    if (
-                        consumed !=
-                            it->second.size()
-                        ||
-                        value <= 0
-                    ) {
-                        return 0;
-                    }
-
-                    return value;
-                }
-                catch (...) {
-                    return 0;
-                }
+                return
+                    (
+                        parsed
+                        &&
+                        *parsed > 0
+                    )
+                    ? *parsed
+                    : 0;
             };
+
+        if (
+            path ==
+                "/api/cameras/media-probe"
+        ) {
+            const auto id =
+                parse_id();
+
+            if (id <= 0) {
+                sendResponse(
+                    client_fd,
+                    "400 Bad Request",
+                    "application/json; charset=utf-8",
+                    "{\"success\":false,\"message\":\"Некорректный ID камеры.\"}"
+                );
+
+                return;
+            }
+
+            auto result =
+                cameras_->mediaProbe(id);
+
+            security_.audit(
+                "camera.media.probe",
+                session->username,
+                "camera_id=" +
+                std::to_string(id)
+                +
+                " result=" +
+                result.code
+            );
+
+            std::ostringstream json;
+            json
+                << "{\"success\":"
+                << (
+                    result.success
+                    ? "true"
+                    : "false"
+                )
+                << ",\"code\":\""
+                << jsonEscape(
+                    result.code
+                )
+                << "\",\"message\":\""
+                << jsonEscape(
+                    result.message
+                )
+                << "\",\"video_codec\":\""
+                << jsonEscape(
+                    result.video_codec
+                )
+                << "\",\"audio_codec\":\""
+                << jsonEscape(
+                    result.audio_codec
+                )
+                << "\",\"width\":"
+                << result.width
+                << ",\"height\":"
+                << result.height
+                << ",\"fps\":"
+                << result.fps
+                << "}";
+
+            sendResponse(
+                client_fd,
+                result.success
+                    ? "200 OK"
+                    : "400 Bad Request",
+                "application/json; charset=utf-8",
+                json.str()
+            );
+
+            return;
+        }
 
         CameraResult result;
 
@@ -2775,6 +3057,15 @@ void WebServer::handleClient(
             input.rtsp_url =
                 form.contains("rtsp_url")
                 ? form.at("rtsp_url")
+                : "";
+
+            input.onvif_xaddr =
+                form.contains(
+                    "onvif_xaddr"
+                )
+                ? form.at(
+                    "onvif_xaddr"
+                )
                 : "";
 
             input.username =

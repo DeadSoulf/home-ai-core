@@ -2579,7 +2579,7 @@ PrivateKey отображается в редакторе и сохраняет�
 <div class="section-card">
 <div class="section-title">
 <h2>Камеры</h2>
-<span class="section-hint">Camera Core 0.0.11</span>
+<span class="section-hint">Camera Core 0.0.12</span>
 </div>
 
 <div class="stats-grid">
@@ -2607,8 +2607,35 @@ PrivateKey отображается в редакторе и сохраняет�
             page << R"HTML(
 <div class="section-card">
 <div class="section-title">
+<h2>Поиск ONVIF</h2>
+<button
+    id="camera-discover-btn"
+    type="button"
+    class="secondary">
+Найти ONVIF камеры
+</button>
+</div>
+
+<p class="muted">
+Поиск выполняется в локальной сети через WS-Discovery.
+Найденный XAddr можно перенести в форму камеры.
+</p>
+
+<div
+    id="camera-discovery-message"
+    class="muted"
+    role="status"></div>
+
+<div
+    id="camera-discovery-list"
+    class="placeholder-grid"
+    style="margin-top:14px"></div>
+</div>
+
+<div class="section-card">
+<div class="section-title">
 <h2 id="camera-form-title">Добавить камеру</h2>
-<span class="section-hint">RTSP</span>
+<span class="section-hint">RTSP / ONVIF</span>
 </div>
 
 <input id="camera-id" type="hidden">
@@ -2631,6 +2658,16 @@ PrivateKey отображается в редакторе и сохраняет�
     autocomplete="off"
     inputmode="url"
     placeholder="rtsp://192.168.1.50:554/stream1">
+</div>
+
+<div>
+<label for="camera-onvif-xaddr">ONVIF XAddr</label>
+<input
+    id="camera-onvif-xaddr"
+    maxlength="2048"
+    autocomplete="off"
+    inputmode="url"
+    placeholder="http://192.168.1.50/onvif/device_service">
 </div>
 
 <div>
@@ -2673,6 +2710,7 @@ PrivateKey отображается в редакторе и сохраняет�
 <p class="muted">
 Логин и пароль указываются отдельно от RTSP URL.
 Пароль шифруется локальным ключом и не возвращается через API.
+ONVIF XAddr необязателен.
 </p>
 
 <div class="button-row">
@@ -2705,6 +2743,12 @@ PrivateKey отображается в редакторе и сохраняет�
 </button>
 </div>
 
+<p class="muted">
+«Проверить» — быстрая проверка RTSP-порта.
+«Поток» запускает ffprobe и показывает реальный видеокодек,
+разрешение и FPS. Snapshot создаётся через ffmpeg.
+</p>
+
 <div
     id="camera-list"
     class="placeholder-grid">
@@ -2720,7 +2764,7 @@ PrivateKey отображается в редакторе и сохраняет�
 <span class="section-hint">Video / NVR</span>
 </div>
 <div class="placeholder-grid">
-<div class="placeholder-card">ONVIF discovery — NEXT</div>
+<div class="placeholder-card">ONVIF media profiles / PTZ — NEXT</div>
 <div class="placeholder-card">Live View — NEXT</div>
 <div class="placeholder-card">Запись и архив — NEXT</div>
 <div class="placeholder-card">Аналитика — NEXT</div>
@@ -4869,6 +4913,11 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 let cameraCache = [];
+const cameraMediaCache =
+    new Map();
+const cameraSnapshotCache =
+    new Map();
+let onvifDiscoveryCache = [];
 
 function cameraCanManage() {
     const root =
@@ -4926,6 +4975,10 @@ function clearCameraForm() {
 
     document.getElementById(
         "camera-rtsp-url"
+    ).value = "";
+
+    document.getElementById(
+        "camera-onvif-xaddr"
     ).value = "";
 
     document.getElementById(
@@ -4991,6 +5044,11 @@ function editCamera(id) {
     ).value = camera.rtsp_url || "";
 
     document.getElementById(
+        "camera-onvif-xaddr"
+    ).value =
+        camera.onvif_xaddr || "";
+
+    document.getElementById(
         "camera-username"
     ).value = camera.username || "";
 
@@ -5045,7 +5103,7 @@ function editCamera(id) {
 
 async function cameraPost(
     path,
-    parameters
+    parameters = new URLSearchParams()
 ) {
     const response =
         await fetch(
@@ -5072,11 +5130,15 @@ async function cameraPost(
         await response.json();
 
     if (!response.ok) {
-        throw new Error(
-            data.message
-            || data.error
-            || "Camera operation failed"
-        );
+        const error =
+            new Error(
+                data.message
+                || data.error
+                || "Camera operation failed"
+            );
+
+        error.data = data;
+        throw error;
     }
 
     return data;
@@ -5099,6 +5161,11 @@ async function saveCamera() {
     const rtspUrl =
         document.getElementById(
             "camera-rtsp-url"
+        ).value.trim();
+
+    const onvifXaddr =
+        document.getElementById(
+            "camera-onvif-xaddr"
         ).value.trim();
 
     const username =
@@ -5147,6 +5214,10 @@ async function saveCamera() {
 
     parameters.set("name", name);
     parameters.set("rtsp_url", rtspUrl);
+    parameters.set(
+        "onvif_xaddr",
+        onvifXaddr
+    );
     parameters.set("username", username);
     parameters.set("password", password);
     parameters.set(
@@ -5204,7 +5275,7 @@ async function saveCamera() {
         if (message) {
             message.textContent =
                 tr("Ошибка камеры: ")
-                + error;
+                + error.message;
         }
     }
     finally {
@@ -5229,10 +5300,541 @@ async function probeCamera(id) {
         );
     }
     catch (_) {
-        // Status and detailed error are refreshed from the camera list.
     }
 
     await updateCameras();
+}
+
+async function mediaProbeCamera(id) {
+    const output =
+        document.getElementById(
+            "camera-media-"
+            + id
+        );
+
+    if (output) {
+        output.className =
+            "muted";
+        output.textContent =
+            tr("Проверка видеопотока...");
+    }
+
+    const parameters =
+        new URLSearchParams();
+
+    parameters.set(
+        "id",
+        String(id)
+    );
+
+    try {
+        const result =
+            await cameraPost(
+                "/api/cameras/media-probe",
+                parameters
+            );
+
+        if (!result)
+            return;
+
+        cameraMediaCache.set(
+            Number(id),
+            result
+        );
+
+        renderCameraMedia(
+            id
+        );
+    }
+    catch (error) {
+        const data =
+            error.data || {
+                success: false,
+                message: error.message
+            };
+
+        cameraMediaCache.set(
+            Number(id),
+            data
+        );
+
+        renderCameraMedia(
+            id
+        );
+    }
+}
+
+function renderCameraMedia(id) {
+    const output =
+        document.getElementById(
+            "camera-media-"
+            + id
+        );
+
+    if (!output)
+        return;
+
+    const result =
+        cameraMediaCache.get(
+            Number(id)
+        );
+
+    if (!result) {
+        output.textContent = "";
+        return;
+    }
+
+    if (!result.success) {
+        output.className =
+            "status-error";
+        output.textContent =
+            result.message
+            || tr("Не удалось проверить видеопоток.");
+
+        return;
+    }
+
+    const video =
+        (
+            result.video_codec
+            || "-"
+        )
+        +
+        (
+            result.width
+            &&
+            result.height
+            ? (
+                " · "
+                + result.width
+                + "×"
+                + result.height
+            )
+            : ""
+        )
+        +
+        (
+            Number(result.fps) > 0
+            ? (
+                " · "
+                + Number(
+                    result.fps
+                ).toFixed(2)
+                + " FPS"
+            )
+            : ""
+        );
+
+    const audio =
+        result.audio_codec
+        ? (
+            " · "
+            + tr("Аудио")
+            + ": "
+            + result.audio_codec
+        )
+        : "";
+
+    output.className =
+        "status-ok";
+    output.textContent =
+        tr("Поток")
+        + ": "
+        + video
+        + audio;
+}
+
+async function loadCameraSnapshot(id) {
+    const output =
+        document.getElementById(
+            "camera-snapshot-"
+            + id
+        );
+
+    if (output) {
+        output.replaceChildren();
+
+        const loading =
+            document.createElement(
+                "div"
+            );
+
+        loading.className =
+            "muted";
+        loading.textContent =
+            tr("Получение snapshot...");
+
+        output.appendChild(
+            loading
+        );
+    }
+
+    try {
+        const response =
+            await fetch(
+                "/api/cameras/snapshot?id="
+                + encodeURIComponent(
+                    String(id)
+                ),
+                {
+                    cache: "no-store"
+                }
+            );
+
+        if (response.status === 401) {
+            window.location = "/login";
+            return;
+        }
+
+        if (!response.ok) {
+            let message =
+                tr("Не удалось получить snapshot.");
+
+            try {
+                const data =
+                    await response.json();
+
+                message =
+                    data.message
+                    || message;
+            }
+            catch (_) {
+            }
+
+            throw new Error(message);
+        }
+
+        const blob =
+            await response.blob();
+
+        const dataUrl =
+            await new Promise(
+                function(resolve, reject) {
+                    const reader =
+                        new FileReader();
+
+                    reader.onload =
+                        function() {
+                            resolve(
+                                reader.result
+                            );
+                        };
+
+                    reader.onerror =
+                        reject;
+
+                    reader.readAsDataURL(
+                        blob
+                    );
+                }
+            );
+
+        cameraSnapshotCache.set(
+            Number(id),
+            dataUrl
+        );
+
+        renderCameraSnapshot(
+            id
+        );
+    }
+    catch (error) {
+        if (output) {
+            output.replaceChildren();
+
+            const message =
+                document.createElement(
+                    "div"
+                );
+
+            message.className =
+                "status-error";
+            message.textContent =
+                error.message;
+
+            output.appendChild(
+                message
+            );
+        }
+    }
+}
+
+function renderCameraSnapshot(id) {
+    const output =
+        document.getElementById(
+            "camera-snapshot-"
+            + id
+        );
+
+    if (!output)
+        return;
+
+    const dataUrl =
+        cameraSnapshotCache.get(
+            Number(id)
+        );
+
+    if (!dataUrl)
+        return;
+
+    output.replaceChildren();
+
+    const image =
+        document.createElement(
+            "img"
+        );
+
+    image.src = dataUrl;
+    image.alt =
+        tr("Snapshot камеры");
+    image.style.width =
+        "100%";
+    image.style.maxHeight =
+        "320px";
+    image.style.objectFit =
+        "contain";
+    image.style.marginTop =
+        "12px";
+    image.style.borderRadius =
+        "8px";
+    image.style.background =
+        "#0f1217";
+
+    output.appendChild(
+        image
+    );
+}
+
+async function discoverOnvifCameras() {
+    const message =
+        document.getElementById(
+            "camera-discovery-message"
+        );
+
+    const list =
+        document.getElementById(
+            "camera-discovery-list"
+        );
+
+    const button =
+        document.getElementById(
+            "camera-discover-btn"
+        );
+
+    if (
+        !message
+        ||
+        !list
+    ) {
+        return;
+    }
+
+    if (button)
+        button.disabled = true;
+
+    message.textContent =
+        tr("Поиск ONVIF камер...");
+
+    list.replaceChildren();
+
+    const parameters =
+        new URLSearchParams();
+
+    parameters.set(
+        "timeout_ms",
+        "2000"
+    );
+
+    try {
+        const result =
+            await cameraPost(
+                "/api/cameras/discover",
+                parameters
+            );
+
+        if (!result)
+            return;
+
+        onvifDiscoveryCache =
+            Array.isArray(
+                result.devices
+            )
+            ? result.devices
+            : [];
+
+        message.textContent =
+            onvifDiscoveryCache.length
+            ? (
+                tr("Найдено ONVIF устройств: ")
+                + onvifDiscoveryCache.length
+            )
+            : tr("ONVIF устройства не найдены.");
+
+        for (
+            let index = 0;
+            index <
+                onvifDiscoveryCache.length;
+            ++index
+        ) {
+            const device =
+                onvifDiscoveryCache[
+                    index
+                ];
+
+            const card =
+                document.createElement(
+                    "div"
+                );
+
+            card.className =
+                "placeholder-card";
+
+            const title =
+                document.createElement(
+                    "strong"
+                );
+
+            title.textContent =
+                device.remote_address
+                || tr("ONVIF устройство");
+
+            title.dataset.i18nSkip = "";
+
+            card.appendChild(title);
+
+            const xaddr =
+                document.createElement(
+                    "div"
+                );
+
+            xaddr.className =
+                "muted";
+            xaddr.style.marginTop =
+                "8px";
+            xaddr.textContent =
+                device.xaddr || "-";
+            xaddr.dataset.i18nSkip = "";
+
+            card.appendChild(xaddr);
+
+            if (device.scopes) {
+                const scopes =
+                    document.createElement(
+                        "div"
+                    );
+
+                scopes.className =
+                    "muted";
+                scopes.style.marginTop =
+                    "6px";
+                scopes.textContent =
+                    device.scopes;
+                scopes.dataset.i18nSkip =
+                    "";
+
+                card.appendChild(
+                    scopes
+                );
+            }
+
+            const actions =
+                document.createElement(
+                    "div"
+                );
+
+            actions.className =
+                "button-row";
+
+            const use =
+                document.createElement(
+                    "button"
+                );
+
+            use.type = "button";
+            use.textContent =
+                tr("Использовать");
+
+            use.addEventListener(
+                "click",
+                function() {
+                    const current =
+                        onvifDiscoveryCache[
+                            index
+                        ];
+
+                    if (!current)
+                        return;
+
+                    const onvif =
+                        document.getElementById(
+                            "camera-onvif-xaddr"
+                        );
+
+                    const name =
+                        document.getElementById(
+                            "camera-name"
+                        );
+
+                    if (onvif) {
+                        onvif.value =
+                            current.xaddr
+                            || "";
+                    }
+
+                    if (
+                        name
+                        &&
+                        !name.value.trim()
+                    ) {
+                        name.value =
+                            current.remote_address
+                            ? (
+                                "ONVIF "
+                                + current.remote_address
+                            )
+                            : tr("ONVIF камера");
+                    }
+
+                    const form =
+                        document.getElementById(
+                            "camera-form-title"
+                        );
+
+                    if (form) {
+                        form.scrollIntoView(
+                            {
+                                behavior:
+                                    "smooth",
+                                block:
+                                    "start"
+                            }
+                        );
+                    }
+                }
+            );
+
+            actions.appendChild(
+                use
+            );
+
+            card.appendChild(
+                actions
+            );
+
+            list.appendChild(
+                card
+            );
+        }
+    }
+    catch (error) {
+        message.textContent =
+            tr("Ошибка ONVIF discovery: ")
+            + error.message;
+    }
+    finally {
+        if (button)
+            button.disabled = false;
+    }
 }
 
 async function deleteCamera(id, name) {
@@ -5261,6 +5863,14 @@ async function deleteCamera(id, name) {
             parameters
         );
 
+        cameraMediaCache.delete(
+            Number(id)
+        );
+
+        cameraSnapshotCache.delete(
+            Number(id)
+        );
+
         clearCameraForm();
         await updateCameras();
     }
@@ -5273,7 +5883,7 @@ async function deleteCamera(id, name) {
         if (message) {
             message.textContent =
                 tr("Ошибка камеры: ")
-                + error;
+                + error.message;
         }
     }
 }
@@ -5294,7 +5904,6 @@ function renderCameraCard(camera) {
 
     title.textContent =
         camera.name;
-
     title.dataset.i18nSkip = "";
 
     card.appendChild(title);
@@ -5326,16 +5935,31 @@ function renderCameraCard(camera) {
 
     address.className =
         "muted";
-
     address.style.marginTop =
         "8px";
-
     address.textContent =
         camera.rtsp_url;
-
     address.dataset.i18nSkip = "";
 
     card.appendChild(address);
+
+    if (camera.onvif_xaddr) {
+        const onvif =
+            document.createElement(
+                "div"
+            );
+
+        onvif.className =
+            "muted";
+        onvif.style.marginTop =
+            "6px";
+        onvif.textContent =
+            "ONVIF: "
+            + camera.onvif_xaddr;
+        onvif.dataset.i18nSkip = "";
+
+        card.appendChild(onvif);
+    }
 
     if (camera.username) {
         const user =
@@ -5364,10 +5988,8 @@ function renderCameraCard(camera) {
 
         error.className =
             "status-error";
-
         error.style.marginTop =
             "8px";
-
         error.textContent =
             camera.last_error;
 
@@ -5386,7 +6008,6 @@ function renderCameraCard(camera) {
 
         lastSeen.className =
             "muted";
-
         lastSeen.style.marginTop =
             "6px";
 
@@ -5402,15 +6023,66 @@ function renderCameraCard(camera) {
         card.appendChild(lastSeen);
     }
 
-    if (cameraCanManage()) {
-        const actions =
-            document.createElement(
-                "div"
+    const media =
+        document.createElement(
+            "div"
+        );
+
+    media.id =
+        "camera-media-"
+        + camera.id;
+    media.className =
+        "muted";
+    media.style.marginTop =
+        "8px";
+
+    card.appendChild(media);
+
+    const snapshot =
+        document.createElement(
+            "div"
+        );
+
+    snapshot.id =
+        "camera-snapshot-"
+        + camera.id;
+
+    card.appendChild(snapshot);
+
+    const actions =
+        document.createElement(
+            "div"
+        );
+
+    actions.className =
+        "button-row";
+
+    const snapshotButton =
+        document.createElement(
+            "button"
+        );
+
+    snapshotButton.type =
+        "button";
+    snapshotButton.className =
+        "secondary";
+    snapshotButton.textContent =
+        tr("Snapshot");
+
+    snapshotButton.addEventListener(
+        "click",
+        function() {
+            loadCameraSnapshot(
+                camera.id
             );
+        }
+    );
 
-        actions.className =
-            "button-row";
+    actions.appendChild(
+        snapshotButton
+    );
 
+    if (cameraCanManage()) {
         const probe =
             document.createElement(
                 "button"
@@ -5433,6 +6105,31 @@ function renderCameraCard(camera) {
 
         actions.appendChild(
             probe
+        );
+
+        const mediaProbe =
+            document.createElement(
+                "button"
+            );
+
+        mediaProbe.type =
+            "button";
+        mediaProbe.className =
+            "secondary";
+        mediaProbe.textContent =
+            tr("Поток");
+
+        mediaProbe.addEventListener(
+            "click",
+            function() {
+                mediaProbeCamera(
+                    camera.id
+                );
+            }
+        );
+
+        actions.appendChild(
+            mediaProbe
         );
 
         const edit =
@@ -5483,11 +6180,24 @@ function renderCameraCard(camera) {
         actions.appendChild(
             remove
         );
-
-        card.appendChild(
-            actions
-        );
     }
+
+    card.appendChild(
+        actions
+    );
+
+    window.setTimeout(
+        function() {
+            renderCameraMedia(
+                camera.id
+            );
+
+            renderCameraSnapshot(
+                camera.id
+            );
+        },
+        0
+    );
 
     return card;
 }
@@ -5530,6 +6240,33 @@ async function updateCameras() {
             )
             ? data.cameras
             : [];
+
+        const ids =
+            new Set(
+                cameraCache.map(
+                    item =>
+                        Number(item.id)
+                )
+            );
+
+        for (
+            const id of
+            cameraMediaCache.keys()
+        ) {
+            if (!ids.has(id))
+                cameraMediaCache.delete(id);
+        }
+
+        for (
+            const id of
+            cameraSnapshotCache.keys()
+        ) {
+            if (!ids.has(id)) {
+                cameraSnapshotCache.delete(
+                    id
+                );
+            }
+        }
 
         let online = 0;
         let offline = 0;
@@ -5575,9 +6312,10 @@ async function updateCameras() {
                     id
                 );
 
-            if (element)
+            if (element) {
                 element.textContent =
                     String(value);
+            }
         }
 
         container.replaceChildren();
@@ -5659,6 +6397,18 @@ document.addEventListener(
             refresh.addEventListener(
                 "click",
                 updateCameras
+            );
+        }
+
+        const discover =
+            document.getElementById(
+                "camera-discover-btn"
+            );
+
+        if (discover) {
+            discover.addEventListener(
+                "click",
+                discoverOnvifCameras
             );
         }
 

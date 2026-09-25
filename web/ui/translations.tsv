@@ -614,3 +614,32 @@ RTSP-порт камеры недоступен.	Camera RTSP port is unreachable
 Камера отключена.	Camera is disabled.
 Требуются права управления камерами.	Camera management permission is required.
 Удалить сохранённый пароль	Remove stored password
+Поиск ONVIF	ONVIF discovery
+Найти ONVIF камеры	Find ONVIF cameras
+ONVIF XAddr	ONVIF XAddr
+ONVIF XAddr необязателен.	ONVIF XAddr is optional.
+Проверка видеопотока...	Checking video stream...
+Не удалось проверить видеопоток.	Unable to probe video stream.
+Поток	Stream
+Аудио	Audio
+Snapshot	Snapshot
+Получение snapshot...	Capturing snapshot...
+Не удалось получить snapshot.	Unable to capture snapshot.
+Snapshot камеры	Camera snapshot
+Поиск ONVIF камер...	Searching for ONVIF cameras...
+Найдено ONVIF устройств: 	ONVIF devices found: 
+ONVIF устройства не найдены.	No ONVIF devices found.
+ONVIF устройство	ONVIF device
+Использовать	Use
+ONVIF камера	ONVIF camera
+Ошибка ONVIF discovery: 	ONVIF discovery error: 
+Некорректный ONVIF XAddr.	Invalid ONVIF XAddr.
+RTSP-видеопоток доступен.	RTSP video stream is available.
+Видеопоток не найден.	Video stream was not found.
+Не удалось запустить медиа-инструмент.	Unable to start media tool.
+Медиа-проверка превысила таймаут.	Media probe timed out.
+Медиа-инструмент завершился с ошибкой.	Media tool failed.
+FFmpeg не вернул JPEG-кадр.	FFmpeg did not return a JPEG frame.
+Не удалось открыть сокет ONVIF discovery.	Unable to open ONVIF discovery socket.
+Не удалось отправить ONVIF discovery probe.	Unable to send ONVIF discovery probe.
+Некорректный ID камеры.	Invalid camera ID.
