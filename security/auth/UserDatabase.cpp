@@ -1767,6 +1767,44 @@ UserDatabase::countEnabledAdmins(
         );
 }
 
+std::int64_t
+UserDatabase::countManagingAdmins(
+    std::string& error
+) const
+{
+    Statement statement(
+        database_,
+        "SELECT COUNT(*) "
+        "FROM users u "
+        "LEFT JOIN user_permissions p "
+        "ON p.user_id=u.id AND p.permission='users.manage' "
+        "WHERE u.role='admin' AND u.enabled=1 "
+        "AND COALESCE(p.decision,1)=1;"
+    );
+
+    if (
+        !statement
+        ||
+        sqlite3_step(
+            statement.get()
+        ) != SQLITE_ROW
+    ) {
+        error =
+            sqliteError(
+                database_,
+                "Unable to count user-managing administrators"
+            );
+
+        return -1;
+    }
+
+    return
+        sqlite3_column_int64(
+            statement.get(),
+            0
+        );
+}
+
 bool UserDatabase::updateLastLogin(
     std::int64_t user_id,
     std::int64_t timestamp,
