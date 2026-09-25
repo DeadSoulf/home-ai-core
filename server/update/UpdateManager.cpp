@@ -671,6 +671,15 @@ void UpdateManager::performUpdate()
                 "--ff-only",
                 remote_,
                 branch_
+            },
+            [&](const std::string& output) {
+                setProgress(
+                    "download",
+                    15,
+                    0,
+                    0,
+                    output
+                );
             }
         );
 
@@ -733,6 +742,11 @@ void UpdateManager::performUpdate()
         "Сборка новой версии..."
     );
 
+    setProgress(
+        "configure",
+        20
+    );
+
     const auto configure =
         runCommand(
             "/usr/bin/cmake",
@@ -743,6 +757,15 @@ void UpdateManager::performUpdate()
                 next_build.string(),
                 "-G",
                 "Ninja"
+            },
+            [&](const std::string& output) {
+                setProgress(
+                    "configure",
+                    25,
+                    0,
+                    0,
+                    output
+                );
             }
         );
 
@@ -765,12 +788,41 @@ void UpdateManager::performUpdate()
         return;
     }
 
+    setProgress(
+        "build",
+        30
+    );
+
+    const std::regex ninja_progress(
+        R"(\[([0-9]+)\/([0-9]+)\])"
+    );
+
     const auto build =
         runCommand(
             "/usr/bin/cmake",
             {
                 "--build",
                 next_build.string()
+            },
+            [&](const std::string& output) {
+                const auto [current, total] =
+                    lastProgressFraction(
+                        output,
+                        ninja_progress
+                    );
+
+                setProgress(
+                    "build",
+                    scaledProgress(
+                        30,
+                        70,
+                        current,
+                        total
+                    ),
+                    current,
+                    total,
+                    output
+                );
             }
         );
 
@@ -798,6 +850,10 @@ void UpdateManager::performUpdate()
         "Запуск тестов новой версии..."
     );
 
+    const std::regex ctest_progress(
+        R"(([0-9]+)\/([0-9]+) Test)"
+    );
+
     const auto tests =
         runCommand(
             "/usr/bin/ctest",
@@ -805,6 +861,26 @@ void UpdateManager::performUpdate()
                 "--test-dir",
                 next_build.string(),
                 "--output-on-failure"
+            },
+            [&](const std::string& output) {
+                const auto [current, total] =
+                    lastProgressFraction(
+                        output,
+                        ctest_progress
+                    );
+
+                setProgress(
+                    "tests",
+                    scaledProgress(
+                        70,
+                        90,
+                        current,
+                        total
+                    ),
+                    current,
+                    total,
+                    output
+                );
             }
         );
 
@@ -826,6 +902,14 @@ void UpdateManager::performUpdate()
 
         return;
     }
+
+    setProgress(
+        "activation",
+        92,
+        0,
+        0,
+        tests.output
+    );
 
     std::filesystem::remove_all(
         previous_build,
