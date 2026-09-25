@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 
 project(
     HomeAICore
-    VERSION 0.0.4
+    VERSION 0.0.5
     LANGUAGES CXX
 )
 
@@ -15,6 +15,11 @@ find_package(
     REQUIRED
 )
 
+find_package(
+    OpenSSL
+    REQUIRED
+)
+
 add_library(
     homeai-core-lib
 
@@ -24,6 +29,9 @@ add_library(
     core/runtime/CoreRuntime.cpp
 
     server/system/SystemMonitor.cpp
+    server/storage/StorageMonitor.cpp
+
+    security/auth/SecurityManager.cpp
 
     web/server/WebServer.cpp
 )
@@ -46,6 +54,7 @@ target_link_libraries(
     homeai-core-lib
     PUBLIC
     Threads::Threads
+    OpenSSL::Crypto
 )
 
 add_executable(
@@ -75,4 +84,36 @@ target_link_libraries(
 add_test(
     NAME event_bus
     COMMAND test-event-bus
+)
+
+add_executable(
+    test-security
+    tests/test_security.cpp
+)
+
+target_link_libraries(
+    test-security
+    PRIVATE
+    homeai-core-lib
+)
+
+add_test(
+    NAME security_core
+    COMMAND test-security
+)
+
+add_executable(
+    test-storage-monitor
+    tests/test_storage_monitor.cpp
+)
+
+target_link_libraries(
+    test-storage-monitor
+    PRIVATE
+    homeai-core-lib
+)
+
+add_test(
+    NAME storage_monitor
+    COMMAND test-storage-monitor
 )

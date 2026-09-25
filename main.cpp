@@ -1,5 +1,6 @@
 #include "core/logging/Logger.h"
 #include "core/runtime/CoreRuntime.h"
+#include "security/auth/SecurityManager.h"
 #include "web/server/WebServer.h"
 
 #include <atomic>
@@ -42,9 +43,39 @@ int main()
         return 1;
     }
 
+    homeai::SecurityManager security;
+
+    const auto users_file =
+        runtime.config().get(
+            "security.users_file",
+            "runtime/security/users.db"
+        );
+
+    const auto audit_file =
+        runtime.config().get(
+            "security.audit_file",
+            "runtime/security/audit.log"
+        );
+
+    if (
+        !security.initialize(
+            users_file,
+            audit_file
+        )
+    ) {
+        homeai::Logger::instance().error(
+            "Security Core initialization failed"
+        );
+
+        return 1;
+    }
+
     runtime.start();
 
-    homeai::WebServer web(runtime);
+    homeai::WebServer web(
+        runtime,
+        security
+    );
 
     const auto web_bind =
         runtime.config().get(
