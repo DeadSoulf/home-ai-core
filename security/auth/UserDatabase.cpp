@@ -2423,7 +2423,7 @@ UserDatabase::listSessions(
           "s.token_hash,s.created_at,s.expires_at,s.last_seen_at "
           "FROM sessions s JOIN users u ON u.id=s.user_id "
           "WHERE s.expires_at>CAST(strftime('%s','now') AS INTEGER) "
-          "ORDER BY s.last_seen_at DESC;"
+          "ORDER BY s.last_seen_at DESC;";
 
     Statement statement(
         database_,
