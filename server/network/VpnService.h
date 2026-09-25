@@ -18,6 +18,17 @@ struct VpnActionResult {
 
 class VpnService {
 public:
+    VpnService();
+    ~VpnService();
+
+    VpnService(
+        const VpnService&
+    ) = delete;
+
+    VpnService& operator=(
+        const VpnService&
+    ) = delete;
+
     bool initialize(
         const std::string& config_directory
     );
