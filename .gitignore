@@ -1,0 +1,32 @@
+# Build
+build/
+*.o
+*.a
+*.so
+
+# Runtime
+*.log
+*.pid
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Secrets
+.env
+*.key
+*.pem
+
+# AI models
+models/
+*.gguf
+
+# Video/archive
+recordings/
+storage/
+backups/
+
+# Editors
+.vscode/
+.idea/
