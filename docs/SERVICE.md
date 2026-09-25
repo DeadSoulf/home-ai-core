@@ -33,17 +33,20 @@ ctest --test-dir build --output-on-failure
 
 ```bash
 sudo bash scripts/home-ai-service.sh install "$(id -un)" /srv/home-ai-core
-sudo bash scripts/home-ai-service.sh start
 bash scripts/home-ai-service.sh status
+bash scripts/home-ai-service.sh autostart
 ```
 
-`install` создаёт `/etc/systemd/system/home-ai-core.service` и включает автозапуск.
-Он не запускает ядро до команды `start`, не меняет владельцев существующих данных
+`install` создаёт `/etc/systemd/system/home-ai-core.service`, выполняет
+`systemctl enable --now`, проверяет состояние `enabled` и сразу запускает ядро.
+Он не меняет владельцев существующих данных
 и не устанавливает зависимости. Путь должен быть абсолютным, без пробелов и спецсимволов.
 Если вы вошли как root, явно укажите существующего обычного владельца проекта вместо `$(id -un)`.
 
-После статуса `active (running)` можно закрыть SSH. Проверьте Web UI с другого компьютера,
-подключитесь снова и повторите `status`. После перезагрузки сервера служба запускается автоматически.
+После статуса `active (running)` можно закрыть SSH. Команда
+`bash scripts/home-ai-service.sh autostart` должна вывести `Autostart: enabled`.
+После перезагрузки сервера systemd автоматически запускает службу через
+`WantedBy=multi-user.target`.
 
 ## Управление
 
@@ -52,6 +55,7 @@ sudo bash scripts/home-ai-service.sh stop
 sudo bash scripts/home-ai-service.sh start
 sudo bash scripts/home-ai-service.sh restart
 bash scripts/home-ai-service.sh status
+bash scripts/home-ai-service.sh autostart
 sudo journalctl -u home-ai-core.service -n 100 --no-pager
 sudo journalctl -u home-ai-core.service -f
 sudo bash scripts/home-ai-service.sh uninstall
