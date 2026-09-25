@@ -1,8 +1,10 @@
-# Home AI Core — Network / DHCP
+# Home AI Core — Network / IPv4
 
 ## Purpose
 
-The Network section exposes Linux network interfaces and allows an authorized administrator to request an IPv4 address from a DHCP server without running the main Home AI Core process as root.
+The Network section exposes Linux network interfaces and allows an authorized administrator
+to switch an interface between DHCP and static IPv4 configuration without running the main
+Home AI Core process as root.
 
 ## Web UI
 
@@ -12,7 +14,7 @@ Open:
 Сеть
 ```
 
-The interface cards show:
+Each interface card shows:
 
 - interface name
 - UP / DOWN state
@@ -20,55 +22,129 @@ The interface cards show:
 - current IPv4 addresses
 - MAC address
 - MTU
-- whether the interface owns the default route
+- default-route marker
+- detected IPv4 mode when it can be determined
+- current default gateway
+- current upstream IPv4 DNS servers when available
 
-Users with `network.manage` see:
+Users with `network.manage` can choose:
 
 ```text
-Получить IP по DHCP
+Режим IPv4:
+  DHCP
+  Статический IP
 ```
 
-The Web UI warns that the current Web connection can be interrupted if the selected interface changes address.
+Static mode provides:
 
-## DHCP backends
+```text
+IP-адрес
+Маска сети
+Шлюз
+Основной DNS
+Дополнительный DNS
+```
 
-The privileged helper tries supported Linux networking backends in this order:
+The netmask accepts either dotted notation such as `255.255.255.0` or a prefix such as `24`.
 
-1. NetworkManager via `nmcli`
-2. systemd-networkd via `networkctl renew`
-3. `dhclient`
-4. `udhcpc`
+The Web UI warns before applying changes because changing the address of the interface used by
+the current Web session can immediately disconnect the browser.
 
-When NetworkManager owns the interface, Home AI Core changes the active connection profile to `ipv4.method auto`, clears the manual IPv4 address/gateway fields and reactivates it. This makes DHCP persistent in that NetworkManager profile.
+## Validation
 
-For systemd-networkd, `networkctl renew` renews DHCP when DHCP is already enabled in the system network configuration.
+Before the privileged helper is called, Home AI Core validates:
 
-With `dhclient` or `udhcpc`, Home AI Core requests an address for the current runtime session. Persistence after reboot remains the responsibility of the host network configuration.
+- interface-name syntax
+- interface existence
+- IPv4 address
+- contiguous IPv4 netmask / prefix
+- gateway address
+- gateway belonging to the configured subnet
+- primary and secondary DNS addresses
+
+The privileged helper validates the received values again.
+
+## Persistent backends
+
+The helper prefers host-native persistent configuration.
+
+### NetworkManager
+
+When NetworkManager owns the interface, Home AI Core updates the active connection profile with
+`nmcli`:
+
+- DHCP: `ipv4.method auto`
+- static: `ipv4.method manual`
+- static address/prefix
+- gateway
+- DNS
+- automatic DNS disabled for static mode
+
+The profile is reactivated after saving.
+
+### systemd-networkd
+
+When `systemd-networkd` is active, Home AI Core writes a dedicated managed configuration:
+
+```text
+/etc/systemd/network/00-home-ai-<interface>.network
+```
+
+and applies it with:
+
+```text
+networkctl reload
+networkctl reconfigure <interface>
+```
+
+This configuration survives reboot.
+
+### Debian ifupdown
+
+When `/etc/network/interfaces` and `ifup/ifdown` are available, Home AI Core updates the
+existing IPv4 stanza for the selected interface, preserving unrelated interface options where
+possible. If no stanza exists, it adds a Home AI managed stanza.
+
+Before replacement, the affected file is copied to:
+
+```text
+<interfaces-file>.home-ai.bak
+```
+
+The interface is then cycled with `ifdown --force` and `ifup`.
+
+### Runtime fallback
+
+If none of the persistent backends is available:
+
+- DHCP falls back to `dhclient` or `udhcpc`
+- static IPv4 falls back to `ip addr`, `ip route`, and `resolvectl` when available
+
+The helper explicitly reports that this fallback is runtime-only.
 
 ## Privileged Network Helper
 
-The main server remains unprivileged. DHCP changes are delegated to:
+The main server remains unprivileged. Network changes are delegated to:
 
 ```text
 /usr/local/libexec/home-ai-network-helper
 ```
 
-After building the new version, install the helper once:
+After building a new helper version, install or refresh it with:
 
 ```bash
 sudo sh scripts/install-network-helper.sh texnik
 ```
 
-The installer creates a narrowly scoped sudo rule for only the validated Home AI network helper.
-
 The helper:
 
-- accepts only the `dhcp` action
-- validates the interface name
+- accepts only validated `dhcp` and `static` actions
+- validates interface names
 - rejects loopback
 - verifies the interface exists in `/sys/class/net`
-- executes networking tools directly without a shell
-- does not accept arbitrary commands
+- validates static IPv4 values
+- executes system utilities directly without a shell
+- does not accept arbitrary command text
 
 ## API
 
@@ -84,16 +160,29 @@ Requires:
 network.view
 ```
 
-Request DHCP:
+Configure IPv4:
 
 ```text
-POST /api/network/dhcp
+POST /api/network/ipv4
 ```
 
-Form field:
+Common form fields:
 
 ```text
 interface=ens18
+mode=dhcp
+```
+
+Static mode:
+
+```text
+interface=ens18
+mode=static
+address=192.168.1.20
+netmask=255.255.255.0
+gateway=192.168.1.1
+dns_primary=1.1.1.1
+dns_secondary=8.8.8.8
 ```
 
 Requires:
@@ -103,4 +192,6 @@ network.manage
 X-HomeAI-Request: 1
 ```
 
-Every DHCP request is written to the central security audit.
+The older `POST /api/network/dhcp` route remains available for compatibility.
+
+Every IPv4 configuration request is written to the central security audit.
