@@ -65,3 +65,8 @@ The stable 0.0.5 foundation includes Core Runtime, logging, Event Bus, configura
 
 - [Запуск без SSH: systemd-служба / Service installation](docs/SERVICE.md)
 - [Администрирование GPU, русский и English / GPU administration and languages](docs/ADMINISTRATION.md)
+
+
+## Development Security Core
+
+The current `develop` branch uses a central SQLite identity/security database with roles, granular per-user permissions, persistent sessions, session revocation, audit history and a complete Users administration page. Existing legacy users are migrated without changing their password hashes.
