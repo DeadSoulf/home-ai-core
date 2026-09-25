@@ -124,6 +124,12 @@ server/
 ├── system/
 │   └── SystemMonitor
 ├── network/
+│   ├── NetworkInterfaceManager
+│   │   interface inventory and unprivileged DHCP action client
+│   ├── helper/NetworkHelperMain
+│   │   privileged validated DHCP helper
+│   ├── WireGuardManager
+│   └── VpnService
 ├── storage/
 │   ├── StorageMonitor
 │   │   mounted storage, hot-plug discovery, capacity, roles and online/offline state
@@ -230,6 +236,7 @@ docs/
 ├── WEB_UI.md
 ├── UPDATES.md
 ├── MODULES.md
+├── NETWORK.md
 ├── API.md            (planned)
 └── BUILD.md          (planned)
 ```
