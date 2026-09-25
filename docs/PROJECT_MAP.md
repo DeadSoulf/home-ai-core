@@ -174,19 +174,22 @@ data/
 ```text
 web/
 ├── server/
-│   └── integrated HTTP server
+│   └── integrated HTTP server and API routing
 ├── api/
 └── ui/
-    ├── Dashboard
-    ├── AI
-    ├── Smart Home
-    ├── Cameras
-    ├── Hypervisor
+    ├── WebUi
+    │   shared sidebar shell and section rendering
+    ├── Home
+    │   statistics and active errors only
+    ├── Network
     ├── Storage
-    ├── Memory
+    ├── Cameras
+    ├── Smart Home
     ├── Automation
+    ├── AI
+    ├── Users
+    ├── Hypervisor
     ├── System
-    ├── Security
     └── Settings
 ```
 
@@ -218,6 +221,7 @@ docs/
 ├── ARCHITECTURE.md   (planned)
 ├── SECURITY.md
 ├── STORAGE.md
+├── WEB_UI.md
 ├── API.md            (planned)
 └── BUILD.md          (planned)
 ```
