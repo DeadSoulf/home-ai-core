@@ -81,17 +81,20 @@ Future content:
 
 ## Disks
 
-All existing storage functionality has been moved here:
+Current storage UI includes:
 
-- mounted storage status
-- hot-plug discovery
-- new-disk scan
-- storage roles
+- mounted storage status with filesystem UUID and capacity
+- hot-plug discovery and new-disk scan
+- separate Video and Home Files pool summaries
+- aggregate pool capacity and current next-write target
+- one or both roles selectable per physical disk
 - Disk Management menu
 - mount/unmount
 - EXT4 formatting
 - signature removal
-- video/personal storage configuration
+- storage placement policies: most-free, sequential, balanced and pinned
+- configurable percentage/GB reserves
+- pinned-disk selectors
 
 ## Cameras
 
@@ -163,3 +166,10 @@ Reserved for KVM:
 Contains general Core settings only.
 
 Subsystem-specific settings should live inside their own sections rather than accumulating on the home page.
+
+
+## System update UI
+
+The System page shows server update state as a live percentage progress view with explicit
+GitHub, CMake, build, test, activation and restart stages. Ninja and CTest counters are shown
+when available, and the detailed command log can be expanded on demand.
