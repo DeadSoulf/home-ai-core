@@ -1534,27 +1534,60 @@ void WebServer::handleClient(
         method == "GET" &&
         path == "/api/session"
     ) {
-        const std::string response =
-            "{"
-            "\"username\":\"" +
-            jsonEscape(
+        std::ostringstream json;
+
+        json
+            << "{"
+            << "\"user_id\":"
+            << session->user_id
+            << ",\"username\":\""
+            << jsonEscape(
                 session->username
-            ) +
-            "\","
-            "\"role\":\"" +
-            jsonEscape(
+            )
+            << "\",\"role\":\""
+            << jsonEscape(
                 SecurityManager::roleToString(
                     session->role
                 )
-            ) +
-            "\""
-            "}";
+            )
+            << "\",\"permissions\":[";
+
+        bool first = true;
+
+        for (
+            const auto& permission :
+            SecurityManager::
+                permissionCatalog()
+        ) {
+            if (
+                !security_.hasPermission(
+                    *session,
+                    permission
+                )
+            ) {
+                continue;
+            }
+
+            if (!first)
+                json << ",";
+
+            first = false;
+
+            json
+                << "\""
+                << jsonEscape(
+                    permission
+                )
+                << "\"";
+        }
+
+        json << "]}";
 
         sendResponse(
             client_fd,
             "200 OK",
             "application/json; charset=utf-8",
-            response
+            json.str()
         );
 
         return;
