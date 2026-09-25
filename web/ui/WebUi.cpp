@@ -5916,6 +5916,111 @@ function storagePolicyLabel(policy) {
     return tr("Больше всего свободного места");
 }
 
+function populatePinnedStorageSelects(volumes) {
+    const populate =
+        function(id, role) {
+            const select =
+                document.getElementById(
+                    id
+                );
+
+            if (!select)
+                return;
+
+            const selected =
+                select.dataset.selected
+                || select.value
+                || "";
+
+            const options =
+                [
+                    {
+                        value: "",
+                        label:
+                            tr("Автоматически")
+                    }
+                ];
+
+            for (const volume of volumes) {
+                const matches =
+                    volume.role === role
+                    ||
+                    volume.role ===
+                        "video+personal";
+
+                if (
+                    !matches
+                    ||
+                    !volume.mount_point
+                ) {
+                    continue;
+                }
+
+                options.push(
+                    {
+                        value:
+                            volume.mount_point,
+                        label:
+                            (
+                                volume.uuid
+                                ? volume.uuid
+                                : (
+                                    volume.source
+                                    || volume.mount_point
+                                )
+                            )
+                            + " · "
+                            + formatBytes(
+                                volume.total_bytes
+                                || volume.device_size_bytes
+                                || 0
+                            )
+                    }
+                );
+            }
+
+            select.replaceChildren();
+
+            for (const item of options) {
+                const option =
+                    document.createElement(
+                        "option"
+                    );
+
+                option.value =
+                    item.value;
+
+                option.textContent =
+                    item.label;
+
+                option.dataset.i18nSkip =
+                    "";
+
+                if (
+                    item.value ===
+                    selected
+                ) {
+                    option.selected =
+                        true;
+                }
+
+                select.appendChild(
+                    option
+                );
+            }
+        };
+
+    populate(
+        "storage-video-pinned",
+        "video"
+    );
+
+    populate(
+        "storage-files-pinned",
+        "personal"
+    );
+}
+
 function renderStoragePools(data) {
     const container =
         document.getElementById(
@@ -5931,6 +6036,10 @@ function renderStoragePools(data) {
         )
         ? data.volumes
         : [];
+
+    populatePinnedStorageSelects(
+        volumes
+    );
 
     const renderPool =
         function(
