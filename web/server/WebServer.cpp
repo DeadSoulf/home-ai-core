@@ -3715,6 +3715,28 @@ void WebServer::handleClient(
                     << "\"";
             }
 
+            json
+                << "],\"dns_servers\":[";
+
+            bool first_dns = true;
+
+            for (
+                const auto& dns :
+                interface_info.dns_servers
+            ) {
+                if (!first_dns)
+                    json << ",";
+
+                first_dns = false;
+
+                json
+                    << "\""
+                    << jsonEscape(
+                        dns
+                    )
+                    << "\"";
+            }
+
             json << "]}";
         }
 
