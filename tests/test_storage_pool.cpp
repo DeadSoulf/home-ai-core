@@ -145,6 +145,47 @@ int main()
         return 1;
     }
 
+    StoragePoolOptions reserve_options;
+    reserve_options.reserve_percent = 95;
+
+    const auto reserved =
+        StoragePoolSelector::select(
+            volumes,
+            "video",
+            reserve_options
+        );
+
+    if (reserved) {
+        std::cerr
+            << "Reserve threshold should exclude full pool\n";
+
+        return 1;
+    }
+
+    StoragePoolOptions pinned_fallback;
+    pinned_fallback.policy =
+        StoragePoolPolicy::Pinned;
+    pinned_fallback.preferred_mount =
+        "/pool/missing";
+
+    const auto fallback =
+        StoragePoolSelector::select(
+            volumes,
+            "video",
+            pinned_fallback
+        );
+
+    if (
+        !fallback
+        ||
+        fallback->mount_point != "/pool/b"
+    ) {
+        std::cerr
+            << "Pinned fallback policy failed\n";
+
+        return 1;
+    }
+
     std::cout
         << "Storage Pool test passed\n";
 
