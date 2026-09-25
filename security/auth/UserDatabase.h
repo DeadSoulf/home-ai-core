@@ -117,6 +117,10 @@ public:
         std::string& error
     ) const;
 
+    std::int64_t countManagingAdmins(
+        std::string& error
+    ) const;
+
     bool updateLastLogin(
         std::int64_t user_id,
         std::int64_t timestamp,
