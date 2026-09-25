@@ -2,12 +2,13 @@
 
 ## Scope
 
-Camera Core 0.0.14 introduces the persistent camera inventory and health layer used by the
+Camera Core 0.0.15 introduces the persistent camera inventory and health layer used by the
 future NVR stack.
 
-0.0.14 adds automatic RTSP configuration through authenticated ONVIF Media Profiles on top
-of discovery, media inspection and snapshots. Continuous Live View, recording, archive and
-analytics will build on the same camera IDs and database.
+0.0.15 extends automatic ONVIF setup with GetDeviceInformation. Home AI Core stores and
+shows the camera manufacturer, model, firmware version, serial number and hardware ID together
+with the existing automatically detected RTSP stream. Continuous Live View, recording, archive
+and analytics will build on the same camera IDs and database.
 
 ## Runtime data
 
@@ -118,9 +119,9 @@ username=admin
 password=secret
 ```
 
-The response contains ONVIF Media Profiles and sanitized RTSP URIs. The recommended profile
-is the highest-resolution profile returned by the camera. Credentials are not included in
-the returned RTSP URI and are not written to audit details.
+The response contains ONVIF Media Profiles, sanitized RTSP URIs and GetDeviceInformation
+metadata. The recommended profile is the highest-resolution profile returned by the camera.
+Credentials are not included in the returned RTSP URI and are not written to audit details.
 
 Real RTSP media probe:
 
@@ -175,6 +176,8 @@ The Cameras page provides:
 - edit without exposing the stored password
 - enable/disable control
 - ONVIF WS-Discovery results
+- manufacturer, model, firmware version and serial number
+- persistent device metadata on camera cards
 - automatic RTSP discovery from ONVIF Media Profiles
 - automatic selection of the highest-resolution stream
 - alternate profile selection for substreams
@@ -221,3 +224,26 @@ ONVIF authentication uses WS-Security UsernameToken PasswordDigest. Home AI Core
 send an HTTP Basic Authorization header by default, so the password is not transmitted as
 clear-text HTTP Basic credentials. The current automatic Media client supports HTTP ONVIF
 XAddr endpoints. Manual RTSP entry remains available as a compatibility fallback.
+
+
+## Camera device information
+
+During automatic ONVIF setup Home AI Core calls:
+
+```text
+GetDeviceInformation
+```
+
+When supported by the camera, the following values are stored:
+
+```text
+Manufacturer
+Model
+FirmwareVersion
+SerialNumber
+HardwareId
+```
+
+The metadata is stored separately from credentials and is safe to return through the normal
+camera inventory API. Existing cameras can refresh this information by opening Edit and running
+automatic stream detection again.

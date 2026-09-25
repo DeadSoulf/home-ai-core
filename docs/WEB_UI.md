@@ -162,6 +162,8 @@ Current content:
 - lightweight RTSP endpoint checks
 - ONVIF WS-Discovery
 - automatic ONVIF Media Profile retrieval
+- ONVIF device information: manufacturer, model, firmware version and serial number
+- persistent camera device metadata shown on camera cards
 - automatic RTSP URI selection with the highest-resolution profile preferred
 - alternate ONVIF profiles available for manual main/substream choice
 - real RTSP media probe through ffprobe

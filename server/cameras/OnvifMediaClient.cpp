@@ -1029,6 +1029,46 @@ std::string soapFault(
 
 }
 
+OnvifDeviceInformation
+OnvifMediaClient::parseDeviceInformation(
+    const std::string& xml
+)
+{
+    OnvifDeviceInformation info;
+
+    info.manufacturer =
+        localTagValue(
+            xml,
+            "Manufacturer"
+        );
+
+    info.model =
+        localTagValue(
+            xml,
+            "Model"
+        );
+
+    info.firmware_version =
+        localTagValue(
+            xml,
+            "FirmwareVersion"
+        );
+
+    info.serial_number =
+        localTagValue(
+            xml,
+            "SerialNumber"
+        );
+
+    info.hardware_id =
+        localTagValue(
+            xml,
+            "HardwareId"
+        );
+
+    return info;
+}
+
 std::string
 OnvifMediaClient::parseMediaXAddr(
     const std::string& xml
@@ -1237,8 +1277,39 @@ OnvifMediaClient::profiles(
             "Сначала выберите найденную ONVIF камеру.",
             "",
             {},
+            {},
             0
         };
+    }
+
+    OnvifDeviceInformation
+        device_info;
+
+    const auto information_body =
+        soapEnvelope(
+            "<tds:GetDeviceInformation/>",
+            username,
+            password
+        );
+
+    const auto information_response =
+        httpPost(
+            device_xaddr,
+            "http://www.onvif.org/ver10/device/wsdl/GetDeviceInformation",
+            information_body
+        );
+
+    if (
+        information_response.error.empty()
+        &&
+        soapFault(
+            information_response.body
+        ).empty()
+    ) {
+        device_info =
+            parseDeviceInformation(
+                information_response.body
+            );
     }
 
     const auto capabilities_body =
@@ -1263,6 +1334,7 @@ OnvifMediaClient::profiles(
             "capabilities_failed",
             capabilities.error,
             "",
+            device_info,
             {},
             0
         };
@@ -1279,6 +1351,7 @@ OnvifMediaClient::profiles(
             "onvif_fault",
             fault,
             "",
+            device_info,
             {},
             0
         };
@@ -1295,6 +1368,7 @@ OnvifMediaClient::profiles(
             "media_service_missing",
             "Камера не сообщила адрес ONVIF Media Service.",
             "",
+            device_info,
             {},
             0
         };
@@ -1320,6 +1394,7 @@ OnvifMediaClient::profiles(
             "profiles_failed",
             profile_response.error,
             media_xaddr,
+            device_info,
             {},
             0
         };
@@ -1336,6 +1411,7 @@ OnvifMediaClient::profiles(
             "profiles_missing",
             "ONVIF Media Profiles не найдены.",
             media_xaddr,
+            device_info,
             {},
             0
         };
@@ -1396,6 +1472,7 @@ OnvifMediaClient::profiles(
             "stream_uri_missing",
             "Камера не вернула RTSP URI для ONVIF профилей.",
             media_xaddr,
+            device_info,
             {},
             0
         };
@@ -1411,6 +1488,7 @@ OnvifMediaClient::profiles(
         "ok",
         "RTSP поток определён автоматически.",
         media_xaddr,
+        device_info,
         std::move(
             result_profiles
         ),

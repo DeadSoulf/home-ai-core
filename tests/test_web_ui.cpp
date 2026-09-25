@@ -385,6 +385,18 @@ int main()
         ) == std::string::npos
         ||
         cameras.find(
+            "id=\"camera-device-info\""
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "id=\"camera-manufacturer\""
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "Версия прошивки"
+        ) == std::string::npos
+        ||
+        cameras.find(
             "id=\"camera-onvif-xaddr\""
         ) == std::string::npos
         ||
@@ -393,7 +405,7 @@ int main()
         ) == std::string::npos
         ||
         cameras.find(
-            "Camera Core 0.0.14"
+            "Camera Core 0.0.15"
         ) == std::string::npos
         ||
         cameras.find(

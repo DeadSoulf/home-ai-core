@@ -2579,7 +2579,7 @@ PrivateKey отображается в редакторе и сохраняет�
 <div class="section-card">
 <div class="section-title">
 <h2>Камеры</h2>
-<span class="section-hint">Camera Core 0.0.14</span>
+<span class="section-hint">Camera Core 0.0.15</span>
 </div>
 
 <div class="stats-grid">
@@ -2639,6 +2639,11 @@ PrivateKey отображается в редакторе и сохраняет�
 </div>
 
 <input id="camera-id" type="hidden">
+<input id="camera-manufacturer" type="hidden">
+<input id="camera-model" type="hidden">
+<input id="camera-firmware-version" type="hidden">
+<input id="camera-serial-number" type="hidden">
+<input id="camera-hardware-id" type="hidden">
 
 <div class="form-grid">
 <div>
@@ -2732,6 +2737,25 @@ PrivateKey отображается в редакторе и сохраняет�
     id="camera-profile-list"
     class="placeholder-grid"
     style="margin-top:12px"></div>
+
+<div
+    id="camera-device-info"
+    class="placeholder-card"
+    style="display:none;margin-top:12px">
+<strong>Информация о камере</strong>
+<div class="kv" style="margin-top:10px">
+<div>Производитель</div>
+<div id="camera-info-manufacturer">—</div>
+<div>Модель</div>
+<div id="camera-info-model">—</div>
+<div>Версия прошивки</div>
+<div id="camera-info-firmware">—</div>
+<div>Серийный номер</div>
+<div id="camera-info-serial">—</div>
+<div>Hardware ID</div>
+<div id="camera-info-hardware">—</div>
+</div>
+</div>
 
 <div class="button-row">
 <button id="camera-save-btn" type="button">
@@ -4979,6 +5003,79 @@ function cameraStatusClass(camera) {
     return "status-warn";
 }
 
+function setCameraDeviceInfo(info) {
+    const fields = {
+        "camera-manufacturer":
+            info?.manufacturer || "",
+        "camera-model":
+            info?.model || "",
+        "camera-firmware-version":
+            info?.firmware_version || "",
+        "camera-serial-number":
+            info?.serial_number || "",
+        "camera-hardware-id":
+            info?.hardware_id || ""
+    };
+
+    for (
+        const [id, value] of
+        Object.entries(fields)
+    ) {
+        const element =
+            document.getElementById(
+                id
+            );
+
+        if (element)
+            element.value = value;
+    }
+
+    const values = {
+        "camera-info-manufacturer":
+            fields["camera-manufacturer"],
+        "camera-info-model":
+            fields["camera-model"],
+        "camera-info-firmware":
+            fields["camera-firmware-version"],
+        "camera-info-serial":
+            fields["camera-serial-number"],
+        "camera-info-hardware":
+            fields["camera-hardware-id"]
+    };
+
+    let hasInfo = false;
+
+    for (
+        const [id, value] of
+        Object.entries(values)
+    ) {
+        const element =
+            document.getElementById(
+                id
+            );
+
+        if (element) {
+            element.textContent =
+                value || "—";
+
+            if (value)
+                hasInfo = true;
+        }
+    }
+
+    const container =
+        document.getElementById(
+            "camera-device-info"
+        );
+
+    if (container) {
+        container.style.display =
+            hasInfo
+            ? "block"
+            : "none";
+    }
+}
+
 function clearCameraForm() {
     const id =
         document.getElementById(
@@ -5009,6 +5106,8 @@ function clearCameraForm() {
     document.getElementById(
         "camera-password"
     ).value = "";
+
+    setCameraDeviceInfo({});
 
     document.getElementById(
         "camera-enabled"
@@ -5094,6 +5193,21 @@ function editCamera(id) {
     document.getElementById(
         "camera-password"
     ).value = "";
+
+    setCameraDeviceInfo(
+        {
+            manufacturer:
+                camera.manufacturer || "",
+            model:
+                camera.model || "",
+            firmware_version:
+                camera.firmware_version || "",
+            serial_number:
+                camera.serial_number || "",
+            hardware_id:
+                camera.hardware_id || ""
+        }
+    );
 
     document.getElementById(
         "camera-enabled"
@@ -5472,6 +5586,45 @@ async function autoDetectCameraStream() {
             ? result.profiles
             : [];
 
+        const deviceInfo =
+            result.device_info
+            || {};
+
+        setCameraDeviceInfo(
+            deviceInfo
+        );
+
+        const cameraName =
+            document.getElementById(
+                "camera-name"
+            );
+
+        if (
+            cameraName
+            &&
+            (
+                !cameraName.value.trim()
+                ||
+                cameraName.value.startsWith(
+                    "ONVIF "
+                )
+            )
+        ) {
+            const detectedName =
+                [
+                    deviceInfo.manufacturer,
+                    deviceInfo.model
+                ]
+                .filter(Boolean)
+                .join(" ")
+                .trim();
+
+            if (detectedName) {
+                cameraName.value =
+                    detectedName;
+            }
+        }
+
         const recommended =
             Math.max(
                 0,
@@ -5509,6 +5662,16 @@ async function autoDetectCameraStream() {
     }
     catch (error) {
         onvifProfileCache = [];
+
+        if (
+            error.data
+            &&
+            error.data.device_info
+        ) {
+            setCameraDeviceInfo(
+                error.data.device_info
+            );
+        }
 
         const list =
             document.getElementById(
@@ -5554,6 +5717,31 @@ async function saveCamera() {
     const onvifXaddr =
         document.getElementById(
             "camera-onvif-xaddr"
+        ).value.trim();
+
+    const manufacturer =
+        document.getElementById(
+            "camera-manufacturer"
+        ).value.trim();
+
+    const model =
+        document.getElementById(
+            "camera-model"
+        ).value.trim();
+
+    const firmwareVersion =
+        document.getElementById(
+            "camera-firmware-version"
+        ).value.trim();
+
+    const serialNumber =
+        document.getElementById(
+            "camera-serial-number"
+        ).value.trim();
+
+    const hardwareId =
+        document.getElementById(
+            "camera-hardware-id"
         ).value.trim();
 
     const username =
@@ -5605,6 +5793,26 @@ async function saveCamera() {
     parameters.set(
         "onvif_xaddr",
         onvifXaddr
+    );
+    parameters.set(
+        "manufacturer",
+        manufacturer
+    );
+    parameters.set(
+        "model",
+        model
+    );
+    parameters.set(
+        "firmware_version",
+        firmwareVersion
+    );
+    parameters.set(
+        "serial_number",
+        serialNumber
+    );
+    parameters.set(
+        "hardware_id",
+        hardwareId
     );
     parameters.set("username", username);
     parameters.set("password", password);
@@ -6179,6 +6387,7 @@ async function discoverOnvifCameras() {
                     }
 
                     onvifProfileCache = [];
+                    setCameraDeviceInfo({});
 
                     const profileList =
                         document.getElementById(
@@ -6379,6 +6588,59 @@ function renderCameraCard(camera) {
         onvif.dataset.i18nSkip = "";
 
         card.appendChild(onvif);
+    }
+
+    const deviceDetails = [];
+
+    if (camera.manufacturer) {
+        deviceDetails.push(
+            tr("Производитель")
+            + ": "
+            + camera.manufacturer
+        );
+    }
+
+    if (camera.model) {
+        deviceDetails.push(
+            tr("Модель")
+            + ": "
+            + camera.model
+        );
+    }
+
+    if (camera.firmware_version) {
+        deviceDetails.push(
+            tr("Версия прошивки")
+            + ": "
+            + camera.firmware_version
+        );
+    }
+
+    if (camera.serial_number) {
+        deviceDetails.push(
+            tr("Серийный номер")
+            + ": "
+            + camera.serial_number
+        );
+    }
+
+    if (deviceDetails.length) {
+        const info =
+            document.createElement(
+                "div"
+            );
+
+        info.className =
+            "muted";
+        info.style.marginTop =
+            "8px";
+        info.style.whiteSpace =
+            "pre-line";
+        info.textContent =
+            deviceDetails.join("\n");
+        info.dataset.i18nSkip = "";
+
+        card.appendChild(info);
     }
 
     if (camera.username) {

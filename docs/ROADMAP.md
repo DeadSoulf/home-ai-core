@@ -17,7 +17,8 @@
 | 0.0.11 | Camera Core foundation: secure RTSP registry and health monitoring | DEVELOPMENT SNAPSHOT |
 | 0.0.12 | ONVIF discovery + real RTSP media probe + snapshots | DEVELOPMENT SNAPSHOT |
 | 0.0.13 | Fix camera inventory projection after ONVIF migration | DEVELOPMENT SNAPSHOT |
-| 0.0.14 | Automatic RTSP discovery from ONVIF Media Profiles | IN DEVELOPMENT |
+| 0.0.14 | Automatic RTSP discovery from ONVIF Media Profiles | DEVELOPMENT SNAPSHOT |
+| 0.0.15 | ONVIF manufacturer/model/firmware/serial metadata | IN DEVELOPMENT |
 | next 0.0.x | ONVIF PTZ + Live View | PLANNED |
 | next 0.0.x | Recorder + archive + event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |
@@ -205,23 +206,35 @@ Implemented in the 0.0.13 snapshot:
 - corrected the camera inventory SQL projection after adding ONVIF XAddr
 - restored CameraManager list/test consistency after the schema migration
 
-## Current focus: 0.0.14
+## Development snapshot: 0.0.14
+
+Implemented in the 0.0.14 snapshot:
+
+- ONVIF GetCapabilities support
+- ONVIF GetProfiles parsing
+- ONVIF GetStreamUri retrieval
+- WS-Security UsernameToken PasswordDigest
+- automatic highest-resolution RTSP stream selection
+- alternate ONVIF profile selection
+- automatic RTSP URL fill in Web UI
+- sanitized RTSP URIs without embedded credentials
+
+## Current focus: 0.0.15
 
 Current Camera Core work:
 
-- ONVIF GetCapabilities support for the Media Service address
-- ONVIF GetProfiles parsing
-- ONVIF GetStreamUri retrieval for each profile
-- WS-Security UsernameToken PasswordDigest authentication
-- automatic selection of the highest-resolution stream
-- alternate profile selection for main/substream workflows
-- automatic RTSP URL fill in the Web camera form
-- removal of embedded credentials from returned RTSP URIs
-- no HTTP Basic credential fallback by default
-- Web API and parser tests for automatic ONVIF stream discovery
+- ONVIF GetDeviceInformation during automatic camera setup
+- manufacturer persistence and display
+- model persistence and display
+- firmware version persistence and display
+- serial number persistence and display
+- hardware ID persistence for diagnostics
+- camera metadata stored in a separate SQLite table
+- existing cameras can refresh metadata by rerunning automatic detection
+- parser and persistence tests for device information
 
-0.0.14 removes the need for the user to know vendor-specific RTSP paths on compatible ONVIF
-cameras. Manual RTSP entry remains only as a compatibility fallback.
+0.0.15 keeps credentials isolated from descriptive camera metadata and exposes only safe device
+information through the normal camera inventory API.
 
 ## Later major capabilities
 

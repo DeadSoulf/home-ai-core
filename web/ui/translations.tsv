@@ -668,3 +668,11 @@ ONVIF камера не ответила вовремя.	ONVIF camera did not re
 Ответ ONVIF слишком большой.	ONVIF response is too large.
 Не удалось декодировать ONVIF HTTP ответ.	Unable to decode ONVIF HTTP response.
 Сначала выберите найденную ONVIF камеру.	Select a discovered ONVIF camera first.
+Информация о камере	Camera information
+Производитель	Manufacturer
+Модель	Model
+Версия прошивки	Firmware version
+Серийный номер	Serial number
+Некорректная ONVIF информация камеры.	Invalid ONVIF camera information.
+Камера добавлена, но не удалось сохранить ONVIF информацию.	Camera was added, but ONVIF information could not be saved.
+Камера сохранена, но не удалось сохранить ONVIF информацию.	Camera was saved, but ONVIF information could not be saved.

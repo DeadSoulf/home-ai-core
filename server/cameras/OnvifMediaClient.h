@@ -16,11 +16,20 @@ struct OnvifMediaProfile {
     std::string rtsp_uri;
 };
 
+struct OnvifDeviceInformation {
+    std::string manufacturer;
+    std::string model;
+    std::string firmware_version;
+    std::string serial_number;
+    std::string hardware_id;
+};
+
 struct OnvifMediaResult {
     bool success{false};
     std::string code;
     std::string message;
     std::string media_xaddr;
+    OnvifDeviceInformation device_info;
     std::vector<OnvifMediaProfile> profiles;
     std::size_t recommended_index{0};
 };
@@ -32,6 +41,11 @@ public:
         const std::string& username,
         const std::string& password
     ) const;
+
+    static OnvifDeviceInformation
+    parseDeviceInformation(
+        const std::string& xml
+    );
 
     static std::string
     parseMediaXAddr(

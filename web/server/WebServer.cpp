@@ -2624,6 +2624,16 @@ void WebServer::handleClient(
                 << jsonEscape(camera.rtsp_url)
                 << "\",\"onvif_xaddr\":\""
                 << jsonEscape(camera.onvif_xaddr)
+                << "\",\"manufacturer\":\""
+                << jsonEscape(camera.manufacturer)
+                << "\",\"model\":\""
+                << jsonEscape(camera.model)
+                << "\",\"firmware_version\":\""
+                << jsonEscape(camera.firmware_version)
+                << "\",\"serial_number\":\""
+                << jsonEscape(camera.serial_number)
+                << "\",\"hardware_id\":\""
+                << jsonEscape(camera.hardware_id)
                 << "\",\"username\":\""
                 << jsonEscape(camera.username)
                 << "\",\"has_password\":"
@@ -3013,7 +3023,28 @@ void WebServer::handleClient(
                 << jsonEscape(
                     result.media_xaddr
                 )
-                << "\",\"recommended_index\":"
+                << "\",\"device_info\":{"
+                << "\"manufacturer\":\""
+                << jsonEscape(
+                    result.device_info.manufacturer
+                )
+                << "\",\"model\":\""
+                << jsonEscape(
+                    result.device_info.model
+                )
+                << "\",\"firmware_version\":\""
+                << jsonEscape(
+                    result.device_info.firmware_version
+                )
+                << "\",\"serial_number\":\""
+                << jsonEscape(
+                    result.device_info.serial_number
+                )
+                << "\",\"hardware_id\":\""
+                << jsonEscape(
+                    result.device_info.hardware_id
+                )
+                << "\"},\"recommended_index\":"
                 << result.recommended_index
                 << ",\"profiles\":[";
 
@@ -3195,6 +3226,47 @@ void WebServer::handleClient(
                 )
                 ? form.at(
                     "onvif_xaddr"
+                )
+                : "";
+
+            input.manufacturer =
+                form.contains(
+                    "manufacturer"
+                )
+                ? form.at(
+                    "manufacturer"
+                )
+                : "";
+
+            input.model =
+                form.contains("model")
+                ? form.at("model")
+                : "";
+
+            input.firmware_version =
+                form.contains(
+                    "firmware_version"
+                )
+                ? form.at(
+                    "firmware_version"
+                )
+                : "";
+
+            input.serial_number =
+                form.contains(
+                    "serial_number"
+                )
+                ? form.at(
+                    "serial_number"
+                )
+                : "";
+
+            input.hardware_id =
+                form.contains(
+                    "hardware_id"
+                )
+                ? form.at(
+                    "hardware_id"
                 )
                 : "";
 

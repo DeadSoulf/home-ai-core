@@ -57,6 +57,11 @@ int main()
         "rtsp://192.0.2.10:8554/main";
     input.onvif_xaddr =
         "http://192.0.2.10/onvif/device_service";
+    input.manufacturer = "Acme";
+    input.model = "Cam-X1";
+    input.firmware_version = "1.2.3";
+    input.serial_number = "SN-42";
+    input.hardware_id = "HW-A";
     input.username = "viewer";
     input.password = secret;
     input.enabled = true;
@@ -92,6 +97,21 @@ int main()
         ||
         list.front().onvif_xaddr !=
             input.onvif_xaddr
+        ||
+        list.front().manufacturer !=
+            input.manufacturer
+        ||
+        list.front().model !=
+            input.model
+        ||
+        list.front().firmware_version !=
+            input.firmware_version
+        ||
+        list.front().serial_number !=
+            input.serial_number
+        ||
+        list.front().hardware_id !=
+            input.hardware_id
         ||
         list.front().username !=
             input.username
@@ -145,17 +165,15 @@ int main()
         return 1;
     }
 
+    CameraInput invalid_input;
+    invalid_input.name = "Bad";
+    invalid_input.rtsp_url =
+        "rtsp://user:password@192.0.2.1/live";
+    invalid_input.enabled = true;
+
     const auto invalid =
         cameras.create(
-            CameraInput{
-                "Bad",
-                "rtsp://user:password@192.0.2.1/live",
-                "",
-                "",
-                "",
-                false,
-                true
-            }
+            invalid_input
         );
 
     if (invalid.success) {

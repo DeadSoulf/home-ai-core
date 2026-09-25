@@ -112,6 +112,44 @@ int main()
         return 1;
     }
 
+    const std::string deviceInformation =
+        "<s:Envelope><s:Body>"
+        "<tds:GetDeviceInformationResponse>"
+        "<tds:Manufacturer>Acme Vision</tds:Manufacturer>"
+        "<tds:Model>VX-4K</tds:Model>"
+        "<tds:FirmwareVersion>5.4.2</tds:FirmwareVersion>"
+        "<tds:SerialNumber>ABC12345</tds:SerialNumber>"
+        "<tds:HardwareId>HW-7</tds:HardwareId>"
+        "</tds:GetDeviceInformationResponse>"
+        "</s:Body></s:Envelope>";
+
+    const auto information =
+        OnvifMediaClient::parseDeviceInformation(
+            deviceInformation
+        );
+
+    if (
+        information.manufacturer !=
+            "Acme Vision"
+        ||
+        information.model !=
+            "VX-4K"
+        ||
+        information.firmware_version !=
+            "5.4.2"
+        ||
+        information.serial_number !=
+            "ABC12345"
+        ||
+        information.hardware_id !=
+            "HW-7"
+    ) {
+        std::cerr
+            << "ONVIF device information parser failed\n";
+
+        return 1;
+    }
+
     const std::string capabilities =
         "<s:Envelope><s:Body>"
         "<tds:GetCapabilitiesResponse>"

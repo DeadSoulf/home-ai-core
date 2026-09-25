@@ -18,6 +18,11 @@ struct CameraInfo {
     std::string name;
     std::string rtsp_url;
     std::string onvif_xaddr;
+    std::string manufacturer;
+    std::string model;
+    std::string firmware_version;
+    std::string serial_number;
+    std::string hardware_id;
     std::string username;
     bool has_password{false};
     bool enabled{true};
@@ -32,6 +37,11 @@ struct CameraInput {
     std::string name;
     std::string rtsp_url;
     std::string onvif_xaddr;
+    std::string manufacturer;
+    std::string model;
+    std::string firmware_version;
+    std::string serial_number;
+    std::string hardware_id;
     std::string username;
     std::string password;
     bool update_password{false};

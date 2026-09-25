@@ -301,6 +301,43 @@ bool validateInput(
 
     if (
         !validText(
+            input.manufacturer,
+            256,
+            true
+        )
+        ||
+        !validText(
+            input.model,
+            256,
+            true
+        )
+        ||
+        !validText(
+            input.firmware_version,
+            256,
+            true
+        )
+        ||
+        !validText(
+            input.serial_number,
+            256,
+            true
+        )
+        ||
+        !validText(
+            input.hardware_id,
+            256,
+            true
+        )
+    ) {
+        error =
+            "Некорректная ONVIF информация камеры.";
+
+        return false;
+    }
+
+    if (
+        !validText(
             input.username,
             128,
             true
@@ -1266,7 +1303,16 @@ struct CameraManager::Impl {
             "updated_at INTEGER NOT NULL"
             ");"
             "CREATE INDEX IF NOT EXISTS idx_cameras_enabled "
-            "ON cameras(enabled);";
+            "ON cameras(enabled);"
+            "CREATE TABLE IF NOT EXISTS camera_device_info("
+            "camera_id INTEGER PRIMARY KEY,"
+            "manufacturer TEXT NOT NULL DEFAULT '',"
+            "model TEXT NOT NULL DEFAULT '',"
+            "firmware_version TEXT NOT NULL DEFAULT '',"
+            "serial_number TEXT NOT NULL DEFAULT '',"
+            "hardware_id TEXT NOT NULL DEFAULT '',"
+            "FOREIGN KEY(camera_id) REFERENCES cameras(id) ON DELETE CASCADE"
+            ");";
 
         char* message = nullptr;
 
@@ -1482,10 +1528,139 @@ struct CameraManager::Impl {
             return std::nullopt;
         }
 
-        return
+        auto camera =
             readCamera(
                 statement.get()
             );
+
+        loadDeviceInfo(
+            camera
+        );
+
+        return camera;
+    }
+
+    void loadDeviceInfo(
+        CameraInfo& camera
+    ) const
+    {
+        Statement statement(
+            database,
+            "SELECT manufacturer,model,firmware_version,"
+            "serial_number,hardware_id "
+            "FROM camera_device_info WHERE camera_id=?;"
+        );
+
+        if (!statement)
+            return;
+
+        sqlite3_bind_int64(
+            statement.get(),
+            1,
+            camera.id
+        );
+
+        if (
+            sqlite3_step(
+                statement.get()
+            ) != SQLITE_ROW
+        ) {
+            return;
+        }
+
+        camera.manufacturer =
+            columnText(
+                statement.get(),
+                0
+            );
+
+        camera.model =
+            columnText(
+                statement.get(),
+                1
+            );
+
+        camera.firmware_version =
+            columnText(
+                statement.get(),
+                2
+            );
+
+        camera.serial_number =
+            columnText(
+                statement.get(),
+                3
+            );
+
+        camera.hardware_id =
+            columnText(
+                statement.get(),
+                4
+            );
+    }
+
+    bool saveDeviceInfo(
+        std::int64_t camera_id,
+        const CameraInput& input
+    )
+    {
+        Statement statement(
+            database,
+            "INSERT INTO camera_device_info("
+            "camera_id,manufacturer,model,firmware_version,"
+            "serial_number,hardware_id"
+            ") VALUES(?,?,?,?,?,?) "
+            "ON CONFLICT(camera_id) DO UPDATE SET "
+            "manufacturer=excluded.manufacturer,"
+            "model=excluded.model,"
+            "firmware_version=excluded.firmware_version,"
+            "serial_number=excluded.serial_number,"
+            "hardware_id=excluded.hardware_id;"
+        );
+
+        if (!statement)
+            return false;
+
+        return
+            sqlite3_bind_int64(
+                statement.get(),
+                1,
+                camera_id
+            ) == SQLITE_OK
+            &&
+            bindText(
+                statement.get(),
+                2,
+                input.manufacturer
+            )
+            &&
+            bindText(
+                statement.get(),
+                3,
+                input.model
+            )
+            &&
+            bindText(
+                statement.get(),
+                4,
+                input.firmware_version
+            )
+            &&
+            bindText(
+                statement.get(),
+                5,
+                input.serial_number
+            )
+            &&
+            bindText(
+                statement.get(),
+                6,
+                input.hardware_id
+            )
+            &&
+            sqlite3_step(
+                statement.get()
+            ) == SQLITE_DONE;
     }
 
     bool setStatus(
@@ -1827,10 +2002,17 @@ CameraManager::cameras(
             statement.get()
         ) == SQLITE_ROW
     ) {
-        result.push_back(
+        auto camera =
             impl_->readCamera(
                 statement.get()
-            )
+            );
+
+        impl_->loadDeviceInfo(
+            camera
+        );
+
+        result.push_back(
+            std::move(camera)
         );
     }
 
@@ -1992,13 +2174,30 @@ CameraResult CameraManager::create(
         };
     }
 
+    const auto camera_id =
+        sqlite3_last_insert_rowid(
+            impl_->database
+        );
+
+    if (
+        !impl_->saveDeviceInfo(
+            camera_id,
+            input
+        )
+    ) {
+        return {
+            false,
+            "database_error",
+            "Камера добавлена, но не удалось сохранить ONVIF информацию.",
+            camera_id
+        };
+    }
+
     return {
         true,
         "ok",
         "Камера добавлена.",
-        sqlite3_last_insert_rowid(
-            impl_->database
-        )
+        camera_id
     };
 }
 
@@ -2269,6 +2468,20 @@ CameraResult CameraManager::update(
                 id
             };
         }
+    }
+
+    if (
+        !impl_->saveDeviceInfo(
+            id,
+            input
+        )
+    ) {
+        return {
+            false,
+            "database_error",
+            "Камера сохранена, но не удалось сохранить ONVIF информацию.",
+            id
+        };
     }
 
     return {

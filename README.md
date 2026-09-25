@@ -18,7 +18,7 @@ Home AI Core is a local-first autonomous server platform designed for:
 
 ## Current development version
 
-0.0.14 — automatic RTSP stream discovery from ONVIF Media Profiles
+0.0.15 — ONVIF camera manufacturer, model, firmware and serial metadata
 
 The repository root `VERSION` file is the single source of the compiled Core version.
 
