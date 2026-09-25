@@ -547,3 +547,29 @@ DHCP-запрос выполнен.	DHCP request completed.
 Некорректный сетевой интерфейс.	Invalid network interface.
 Сетевой интерфейс не найден.	Network interface not found.
 Требуются права управления сетью.	Network management permission is required.
+DHCP / статический IPv4	DHCP / static IPv4
+Home AI Core показывает текущие IPv4-адреса интерфейсов. Для каждого интерфейса можно выбрать DHCP или статический IPv4 с адресом, маской, шлюзом и DNS. Если этот интерфейс используется для Web, после применения настроек адрес сервера может измениться.	Home AI Core shows the current IPv4 addresses of interfaces. For each interface you can choose DHCP or static IPv4 with address, netmask, gateway and DNS. If Web uses this interface, the server address may change after applying settings.
+Режим IPv4	IPv4 mode
+Выберите режим	Choose mode
+Статический IP	Static IP
+IP-адрес	IP address
+Маска сети	Netmask
+Шлюз	Gateway
+Основной DNS	Primary DNS
+Дополнительный DNS	Secondary DNS
+Применить IPv4	Apply IPv4
+Применить сетевые настройки для интерфейса 	Apply network settings for interface 
+Это интерфейс маршрута по умолчанию. Текущее Web-подключение может быть потеряно.	This interface owns the default route. The current Web connection may be lost.
+Если Web использует этот интерфейс, адрес сервера может измениться.	If Web uses this interface, the server address may change.
+Применяется статический IPv4...	Applying static IPv4...
+Сетевая конфигурация применена.	Network configuration applied.
+Ошибка настройки IPv4: 	IPv4 configuration error: 
+Выберите режим IPv4.	Choose an IPv4 mode.
+Выберите DHCP или статический IPv4.	Choose DHCP or static IPv4.
+Некорректный IPv4-адрес.	Invalid IPv4 address.
+Некорректная маска сети.	Invalid netmask.
+Некорректный шлюз.	Invalid gateway.
+Шлюз должен находиться в той же IPv4-подсети.	The gateway must be in the same IPv4 subnet.
+Некорректный основной DNS.	Invalid primary DNS.
+Некорректный дополнительный DNS.	Invalid secondary DNS.
+Не удалось применить статический IPv4.	Unable to apply static IPv4.
