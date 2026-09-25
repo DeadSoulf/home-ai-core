@@ -14,6 +14,7 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <utility>
 #include <vector>
 
 namespace homeai {
@@ -25,6 +26,11 @@ constexpr const char* helper_path =
 
 constexpr const char* sudo_path =
     "/usr/bin/sudo";
+
+struct CommandResult {
+    int exit_code{-1};
+    std::string output;
+};
 
 std::string trimCopy(
     std::string value
@@ -192,14 +198,193 @@ std::string ipv4Address(
         );
 }
 
-std::string defaultRouteInterface()
+std::string findExecutable(
+    const std::vector<std::string>& paths
+)
 {
+    for (const auto& path : paths) {
+        if (
+            ::access(
+                path.c_str(),
+                X_OK
+            ) == 0
+        ) {
+            return path;
+        }
+    }
+
+    return {};
+}
+
+CommandResult runCommand(
+    const std::string& executable,
+    const std::vector<std::string>& arguments
+)
+{
+    CommandResult result;
+
+    int pipe_fd[2]{};
+
+    if (::pipe(pipe_fd) != 0)
+        return result;
+
+    const pid_t child =
+        ::fork();
+
+    if (child < 0) {
+        ::close(pipe_fd[0]);
+        ::close(pipe_fd[1]);
+
+        return result;
+    }
+
+    if (child == 0) {
+        ::close(pipe_fd[0]);
+
+        ::dup2(
+            pipe_fd[1],
+            STDOUT_FILENO
+        );
+
+        ::dup2(
+            pipe_fd[1],
+            STDERR_FILENO
+        );
+
+        ::close(pipe_fd[1]);
+
+        std::vector<std::string>
+            storage;
+
+        storage.push_back(
+            executable
+        );
+
+        for (const auto& argument : arguments)
+            storage.push_back(argument);
+
+        std::vector<char*> argv;
+
+        for (auto& item : storage)
+            argv.push_back(item.data());
+
+        argv.push_back(nullptr);
+
+        ::execv(
+            executable.c_str(),
+            argv.data()
+        );
+
+        _exit(127);
+    }
+
+    ::close(pipe_fd[1]);
+
+    std::array<char, 2048>
+        buffer{};
+
+    while (true) {
+        const auto count =
+            ::read(
+                pipe_fd[0],
+                buffer.data(),
+                buffer.size()
+            );
+
+        if (count <= 0)
+            break;
+
+        result.output.append(
+            buffer.data(),
+            static_cast<std::size_t>(
+                count
+            )
+        );
+
+        if (result.output.size() > 16384) {
+            result.output.erase(
+                0,
+                result.output.size() - 16384
+            );
+        }
+    }
+
+    ::close(pipe_fd[0]);
+
+    int status = 0;
+
+    if (
+        ::waitpid(
+            child,
+            &status,
+            0
+        ) >= 0
+        &&
+        WIFEXITED(status)
+    ) {
+        result.exit_code =
+            WEXITSTATUS(status);
+    }
+
+    result.output =
+        trimCopy(
+            result.output
+        );
+
+    return result;
+}
+
+std::string gatewayHexToIpv4(
+    const std::string& value
+)
+{
+    if (value.size() != 8)
+        return {};
+
+    try {
+        const auto raw =
+            static_cast<std::uint32_t>(
+                std::stoul(
+                    value,
+                    nullptr,
+                    16
+                )
+            );
+
+        std::array<unsigned int, 4>
+            octets{
+                raw & 0xffU,
+                (raw >> 8U) & 0xffU,
+                (raw >> 16U) & 0xffU,
+                (raw >> 24U) & 0xffU
+            };
+
+        return
+            std::to_string(octets[0])
+            + "."
+            + std::to_string(octets[1])
+            + "."
+            + std::to_string(octets[2])
+            + "."
+            + std::to_string(octets[3]);
+    }
+    catch (...) {
+        return {};
+    }
+}
+
+std::map<std::string, std::string>
+defaultGateways()
+{
+    std::map<std::string, std::string>
+        gateways;
+
     std::ifstream file(
         "/proc/net/route"
     );
 
     if (!file.is_open())
-        return {};
+        return gateways;
 
     std::string line;
 
@@ -256,14 +441,294 @@ std::string defaultRouteInterface()
             continue;
         }
 
-        return interface_name;
+        const auto address =
+            gatewayHexToIpv4(
+                gateway
+            );
+
+        if (!address.empty()) {
+            gateways[
+                interface_name
+            ] = address;
+        }
+    }
+
+    return gateways;
+}
+
+std::vector<std::string>
+dnsServers()
+{
+    std::vector<std::string> result;
+
+    std::ifstream file(
+        "/etc/resolv.conf"
+    );
+
+    if (!file.is_open())
+        return result;
+
+    std::string line;
+
+    while (
+        std::getline(
+            file,
+            line
+        )
+    ) {
+        std::istringstream stream(line);
+
+        std::string key;
+        std::string value;
+
+        if (
+            !(stream >> key >> value)
+            ||
+            key != "nameserver"
+        ) {
+            continue;
+        }
+
+        in_addr address{};
+
+        if (
+            inet_pton(
+                AF_INET,
+                value.c_str(),
+                &address
+            ) != 1
+        ) {
+            continue;
+        }
+
+        if (
+            std::find(
+                result.begin(),
+                result.end(),
+                value
+            ) == result.end()
+        ) {
+            result.push_back(
+                value
+            );
+        }
+
+        if (result.size() >= 2)
+            break;
+    }
+
+    return result;
+}
+
+std::string networkManagerMethod(
+    const std::string& interface_name
+)
+{
+    const auto nmcli =
+        findExecutable(
+            {
+                "/usr/bin/nmcli",
+                "/bin/nmcli"
+            }
+        );
+
+    if (nmcli.empty())
+        return {};
+
+    const auto connection =
+        runCommand(
+            nmcli,
+            {
+                "-g",
+                "GENERAL.CONNECTION",
+                "device",
+                "show",
+                interface_name
+            }
+        );
+
+    if (
+        connection.exit_code != 0
+        ||
+        connection.output.empty()
+        ||
+        connection.output == "--"
+    ) {
+        return {};
+    }
+
+    const auto method =
+        runCommand(
+            nmcli,
+            {
+                "-g",
+                "ipv4.method",
+                "connection",
+                "show",
+                connection.output
+            }
+        );
+
+    if (method.exit_code != 0)
+        return {};
+
+    if (method.output == "auto")
+        return "dhcp";
+
+    if (method.output == "manual")
+        return "static";
+
+    return {};
+}
+
+std::string ifupdownMethod(
+    const std::string& interface_name
+)
+{
+    std::vector<std::filesystem::path>
+        files{
+            "/etc/network/interfaces"
+        };
+
+    std::error_code error;
+
+    const std::filesystem::path directory =
+        "/etc/network/interfaces.d";
+
+    if (
+        std::filesystem::exists(
+            directory,
+            error
+        )
+        &&
+        !error
+    ) {
+        for (
+            const auto& entry :
+            std::filesystem::
+                directory_iterator(
+                    directory,
+                    error
+                )
+        ) {
+            if (
+                error
+                ||
+                !entry.is_regular_file()
+            ) {
+                continue;
+            }
+
+            files.push_back(
+                entry.path()
+            );
+        }
+    }
+
+    for (const auto& path : files) {
+        std::ifstream file(path);
+
+        if (!file.is_open())
+            continue;
+
+        std::string line;
+
+        while (
+            std::getline(
+                file,
+                line
+            )
+        ) {
+            std::istringstream stream(line);
+
+            std::string keyword;
+            std::string name;
+            std::string family;
+            std::string method;
+
+            if (
+                !(stream
+                    >> keyword
+                    >> name
+                    >> family
+                    >> method)
+            ) {
+                continue;
+            }
+
+            if (
+                keyword != "iface"
+                ||
+                name != interface_name
+                ||
+                family != "inet"
+            ) {
+                continue;
+            }
+
+            if (method == "dhcp")
+                return "dhcp";
+
+            if (method == "static")
+                return "static";
+        }
     }
 
     return {};
 }
 
-NetworkActionResult runHelper(
+std::string detectedIpv4Method(
     const std::string& interface_name
+)
+{
+    auto method =
+        networkManagerMethod(
+            interface_name
+        );
+
+    if (!method.empty())
+        return method;
+
+    method =
+        ifupdownMethod(
+            interface_name
+        );
+
+    if (!method.empty())
+        return method;
+
+    const auto ifindex =
+        readTextFile(
+            std::filesystem::path(
+                "/sys/class/net"
+            )
+            /
+            interface_name
+            /
+            "ifindex"
+        );
+
+    if (
+        !ifindex.empty()
+        &&
+        std::filesystem::exists(
+            std::filesystem::path(
+                "/run/systemd/netif/leases"
+            )
+            /
+            ifindex
+        )
+    ) {
+        return "dhcp";
+    }
+
+    return "unknown";
+}
+
+NetworkActionResult runHelper(
+    const std::vector<std::string>& arguments,
+    const std::string& failure_code,
+    const std::string& failure_message
 )
 {
     NetworkActionResult result;
@@ -283,154 +748,105 @@ NetworkActionResult runHelper(
         return result;
     }
 
-    int pipe_fd[2]{};
+    std::vector<std::string>
+        command_arguments;
 
-    if (::pipe(pipe_fd) != 0) {
-        result.code =
-            "pipe_failed";
-
-        result.message =
-            "Не удалось создать канал сетевой операции.";
-
-        return result;
-    }
-
-    const pid_t child =
-        ::fork();
-
-    if (child < 0) {
-        ::close(pipe_fd[0]);
-        ::close(pipe_fd[1]);
-
-        result.code =
-            "fork_failed";
-
-        result.message =
-            "Не удалось запустить сетевую операцию.";
-
-        return result;
-    }
-
-    if (child == 0) {
-        ::close(pipe_fd[0]);
-
-        ::dup2(
-            pipe_fd[1],
-            STDOUT_FILENO
+    if (::geteuid() != 0) {
+        command_arguments.push_back(
+            "-n"
         );
 
-        ::dup2(
-            pipe_fd[1],
-            STDERR_FILENO
+        command_arguments.push_back(
+            helper_path
         );
-
-        ::close(pipe_fd[1]);
-
-        const bool already_root =
-            ::geteuid() == 0;
-
-        if (already_root) {
-            ::execl(
-                helper_path,
-                helper_path,
-                "dhcp",
-                interface_name.c_str(),
-                static_cast<char*>(nullptr)
-            );
-        }
-        else {
-            ::execl(
-                sudo_path,
-                sudo_path,
-                "-n",
-                helper_path,
-                "dhcp",
-                interface_name.c_str(),
-                static_cast<char*>(nullptr)
-            );
-        }
-
-        _exit(127);
     }
 
-    ::close(pipe_fd[1]);
-
-    std::string output;
-
-    std::array<char, 2048>
-        buffer{};
-
-    while (true) {
-        const auto count =
-            ::read(
-                pipe_fd[0],
-                buffer.data(),
-                buffer.size()
-            );
-
-        if (count <= 0)
-            break;
-
-        output.append(
-            buffer.data(),
-            static_cast<std::size_t>(
-                count
-            )
+    for (const auto& argument : arguments) {
+        command_arguments.push_back(
+            argument
         );
-
-        if (output.size() > 16384) {
-            output.erase(
-                0,
-                output.size() - 16384
-            );
-        }
     }
 
-    ::close(pipe_fd[0]);
-
-    int status = 0;
-
-    if (
-        ::waitpid(
-            child,
-            &status,
-            0
-        ) < 0
-    ) {
-        result.code =
-            "wait_failed";
-
-        result.message =
-            "Не удалось получить результат сетевой операции.";
-
-        return result;
-    }
-
-    output =
-        trimCopy(
-            output
+    const auto command =
+        ::geteuid() == 0
+        ? runCommand(
+            helper_path,
+            arguments
+        )
+        : runCommand(
+            sudo_path,
+            command_arguments
         );
 
     result.success =
-        WIFEXITED(status)
-        &&
-        WEXITSTATUS(status) == 0;
+        command.exit_code == 0;
 
     result.code =
         result.success
         ? "ok"
-        : "dhcp_failed";
+        : failure_code;
 
     result.message =
-        output.empty()
+        command.output.empty()
         ? (
             result.success
-            ? "DHCP-запрос выполнен."
-            : "Не удалось получить IP по DHCP."
+            ? "Сетевая конфигурация применена."
+            : failure_message
         )
-        : output;
+        : command.output;
 
     return result;
+}
+
+bool sameSubnet(
+    const std::string& address,
+    const std::string& gateway,
+    int prefix
+)
+{
+    in_addr ip_address{};
+    in_addr gateway_address{};
+
+    if (
+        inet_pton(
+            AF_INET,
+            address.c_str(),
+            &ip_address
+        ) != 1
+        ||
+        inet_pton(
+            AF_INET,
+            gateway.c_str(),
+            &gateway_address
+        ) != 1
+    ) {
+        return false;
+    }
+
+    const auto ip =
+        ntohl(
+            ip_address.s_addr
+        );
+
+    const auto gw =
+        ntohl(
+            gateway_address.s_addr
+        );
+
+    const std::uint32_t mask =
+        prefix == 0
+        ? 0U
+        : 0xffffffffU
+            << (
+                32 -
+                static_cast<unsigned int>(
+                    prefix
+                )
+            );
+
+    return
+        (ip & mask) ==
+        (gw & mask);
 }
 
 }
@@ -465,6 +881,114 @@ NetworkInterfaceManager::validInterfaceName(
                 c == '.';
         }
     );
+}
+
+bool
+NetworkInterfaceManager::validIpv4Address(
+    const std::string& address
+)
+{
+    if (address.empty())
+        return false;
+
+    in_addr value{};
+
+    return
+        inet_pton(
+            AF_INET,
+            address.c_str(),
+            &value
+        ) == 1;
+}
+
+int
+NetworkInterfaceManager::netmaskPrefix(
+    const std::string& netmask
+)
+{
+    if (netmask.empty())
+        return -1;
+
+    if (
+        netmask.find('.') ==
+        std::string::npos
+    ) {
+        try {
+            std::size_t consumed = 0;
+
+            const int prefix =
+                std::stoi(
+                    netmask,
+                    &consumed,
+                    10
+                );
+
+            if (
+                consumed ==
+                    netmask.size()
+                &&
+                prefix >= 1
+                &&
+                prefix <= 32
+            ) {
+                return prefix;
+            }
+        }
+        catch (...) {
+        }
+
+        return -1;
+    }
+
+    in_addr value{};
+
+    if (
+        inet_pton(
+            AF_INET,
+            netmask.c_str(),
+            &value
+        ) != 1
+    ) {
+        return -1;
+    }
+
+    const std::uint32_t mask =
+        ntohl(
+            value.s_addr
+        );
+
+    int prefix = 0;
+    bool zero_seen = false;
+
+    for (int bit = 31; bit >= 0; --bit) {
+        const bool one =
+            (
+                mask
+                &
+                (
+                    1U
+                    <<
+                    static_cast<unsigned int>(
+                        bit
+                    )
+                )
+            ) != 0;
+
+        if (one) {
+            if (zero_seen)
+                return -1;
+
+            ++prefix;
+        }
+        else {
+            zero_seen = true;
+        }
+    }
+
+    return
+        prefix >= 1
+        ? prefix
+        : -1;
 }
 
 std::vector<NetworkInterfaceInfo>
@@ -619,15 +1143,39 @@ NetworkInterfaceManager::interfaces() const
         }
     }
 
-    const auto default_route =
-        defaultRouteInterface();
+    const auto gateways =
+        defaultGateways();
+
+    const auto dns =
+        dnsServers();
 
     std::vector<NetworkInterfaceInfo>
         result;
 
     for (auto& [name, info] : by_name) {
-        info.default_route =
-            name == default_route;
+        const auto gateway_it =
+            gateways.find(name);
+
+        if (
+            gateway_it !=
+            gateways.end()
+        ) {
+            info.gateway =
+                gateway_it->second;
+
+            info.default_route =
+                true;
+        }
+
+        info.dns_servers =
+            dns;
+
+        if (!info.loopback) {
+            info.ipv4_method =
+                detectedIpv4Method(
+                    name
+                );
+        }
 
         std::sort(
             info.ipv4_addresses.begin(),
@@ -713,10 +1261,148 @@ NetworkInterfaceManager::requestDhcp(
         };
     }
 
-    return
-        runHelper(
+    return runHelper(
+        {
+            "dhcp",
             interface_name
+        },
+        "dhcp_failed",
+        "Не удалось получить IP по DHCP."
+    );
+}
+
+NetworkActionResult
+NetworkInterfaceManager::setStaticIpv4(
+    const std::string& interface_name,
+    const NetworkStaticConfig& config
+) const
+{
+    if (
+        !validInterfaceName(
+            interface_name
+        )
+    ) {
+        return {
+            false,
+            "invalid_interface",
+            "Некорректный сетевой интерфейс."
+        };
+    }
+
+    if (
+        !std::filesystem::exists(
+            std::filesystem::path(
+                "/sys/class/net"
+            )
+            /
+            interface_name
+        )
+    ) {
+        return {
+            false,
+            "interface_not_found",
+            "Сетевой интерфейс не найден."
+        };
+    }
+
+    if (!validIpv4Address(config.address)) {
+        return {
+            false,
+            "invalid_address",
+            "Некорректный IPv4-адрес."
+        };
+    }
+
+    const int prefix =
+        netmaskPrefix(
+            config.netmask
         );
+
+    if (prefix < 1) {
+        return {
+            false,
+            "invalid_netmask",
+            "Некорректная маска сети."
+        };
+    }
+
+    if (
+        !config.gateway.empty()
+        &&
+        !validIpv4Address(
+            config.gateway
+        )
+    ) {
+        return {
+            false,
+            "invalid_gateway",
+            "Некорректный шлюз."
+        };
+    }
+
+    if (
+        !config.gateway.empty()
+        &&
+        !sameSubnet(
+            config.address,
+            config.gateway,
+            prefix
+        )
+    ) {
+        return {
+            false,
+            "gateway_outside_subnet",
+            "Шлюз должен находиться в той же IPv4-подсети."
+        };
+    }
+
+    if (
+        !config.dns_primary.empty()
+        &&
+        !validIpv4Address(
+            config.dns_primary
+        )
+    ) {
+        return {
+            false,
+            "invalid_dns",
+            "Некорректный основной DNS."
+        };
+    }
+
+    if (
+        !config.dns_secondary.empty()
+        &&
+        !validIpv4Address(
+            config.dns_secondary
+        )
+    ) {
+        return {
+            false,
+            "invalid_dns",
+            "Некорректный дополнительный DNS."
+        };
+    }
+
+    return runHelper(
+        {
+            "static",
+            interface_name,
+            config.address,
+            std::to_string(prefix),
+            config.gateway.empty()
+                ? "-"
+                : config.gateway,
+            config.dns_primary.empty()
+                ? "-"
+                : config.dns_primary,
+            config.dns_secondary.empty()
+                ? "-"
+                : config.dns_secondary
+        },
+        "static_failed",
+        "Не удалось применить статический IPv4."
+    );
 }
 
 }
