@@ -10,13 +10,15 @@ namespace homeai {
 class CoreRuntime;
 class SecurityManager;
 class UpdateManager;
+class ModuleManager;
 
 class WebServer {
 public:
     WebServer(
         CoreRuntime& runtime,
         SecurityManager& security,
-        UpdateManager& updates
+        UpdateManager& updates,
+        ModuleManager& modules
     );
 
     ~WebServer();
@@ -37,6 +39,7 @@ private:
     CoreRuntime& runtime_;
     SecurityManager& security_;
     UpdateManager& updates_;
+    ModuleManager& modules_;
 
     std::atomic<bool> running_{false};
 
