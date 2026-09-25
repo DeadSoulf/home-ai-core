@@ -52,16 +52,15 @@ core/
 ```text
 security/
 ├── auth/
-│   ├── users
-│   ├── password hashing
-│   ├── sessions
-│   └── login / logout
+│   ├── SecurityManager
+│   │   authentication, authorization and security operations
+│   └── UserDatabase
+│       central SQLite users, permissions, sessions and audit store
 ├── permissions/
-│   ├── admin
-│   ├── operator
-│   └── viewer
+│   ├── role defaults: admin / operator / viewer
+│   └── per-user inherit / allow / deny overrides
 ├── audit/
-│   └── security and administrative audit log
+│   └── central database-backed security and administrative audit
 └── sandbox/
     └── isolation for dangerous or experimental operations
 ```
