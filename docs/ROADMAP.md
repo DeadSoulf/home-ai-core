@@ -10,7 +10,7 @@
 | 0.0.4 | System Monitor and live Dashboard metrics | DONE |
 | 0.0.5 | Security Core: users, sessions, roles, audit, protected Web/API | TESTING |
 | 0.0.6 | Module Manager | PLANNED |
-| 0.0.7 | Storage Core | PLANNED |
+| 0.0.7 | Full Storage Core: health, pools, quotas, retention | PLANNED |
 | 0.0.8 | Device Core | PLANNED |
 | 0.0.9 | Automation Core | PLANNED |
 | 0.1.0 | First AI Brain runtime | PLANNED |
@@ -42,6 +42,9 @@ The current `develop` branch contains:
 - failed-login throttling
 - audit logging
 - security response headers
+- storage monitoring foundation for mounted video/personal-data disks
+- ONLINE/OFFLINE, filesystem, capacity and read-only reporting
+- authenticated `/api/storage` endpoint and live storage dashboard
 
 Before 0.0.5 moves to `main`, it must pass the automated tests and browser verification on the Debian development server.
 
