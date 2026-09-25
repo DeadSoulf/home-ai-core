@@ -30,6 +30,22 @@ int main()
         return 1;
     }
 
+    homeai::UpdateManager manager;
+
+    const auto status =
+        manager.status();
+
+    if (
+        status.progress_percent != 0
+        ||
+        status.progress_stage != "idle"
+    ) {
+        std::cerr
+            << "Update progress defaults are invalid\n";
+
+        return 1;
+    }
+
     std::cout
         << "Update Manager test passed\n";
 
