@@ -119,6 +119,22 @@ add_test(
     COMMAND test-storage-monitor
 )
 
+add_executable(
+    test-disk-operations
+    tests/test_disk_operations.cpp
+)
+
+target_link_libraries(
+    test-disk-operations
+    PRIVATE
+    homeai-core-lib
+)
+
+add_test(
+    NAME disk_operations
+    COMMAND test-disk-operations
+)
+
 
 add_executable(
     home-ai-storage-helper
