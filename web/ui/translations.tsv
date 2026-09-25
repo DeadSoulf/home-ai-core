@@ -472,3 +472,12 @@ AI: управление	AI: manage
 . Выберите, для чего Home AI Core должен использовать эту точку. Диск перемонтирован не будет.	. Choose how Home AI Core should use this mount point. The disk will not be remounted.
 Диск ещё не подключён. Выберите назначение — Home AI Core сам смонтирует его в свою папку и сразу назначит для выбранной задачи.	The disk is not mounted yet. Choose a purpose — Home AI Core will mount it in its managed folder and assign it to that purpose.
 Этот диск сейчас используется системой или недоступен для безопасного подключения.	This disk is currently used by the system or is unavailable for safe mounting.
+Ожидание...	Waiting...
+Выполнено	Completed
+Получение изменений	Fetching changes
+Подготовка CMake	Preparing CMake
+Сборка	Build
+Тестирование	Testing
+Активация новой версии	Activating new version
+Перезапуск	Restart
+Показать подробный журнал	Show detailed log
