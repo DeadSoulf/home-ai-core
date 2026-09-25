@@ -481,3 +481,40 @@ AI: управление	AI: manage
 Активация новой версии	Activating new version
 Перезапуск	Restart
 Показать подробный журнал	Show detailed log
+Пулы хранения	Storage pools
+Загрузка пулов хранения...	Loading storage pools...
+Настройки пулов хранения	Storage pool settings
+Стратегия видео	Video strategy
+Стратегия файлов	Files strategy
+Больше всего свободного места	Most free space
+Заполнять диски по очереди	Fill disks sequentially
+Равномерная загрузка	Balanced usage
+Закрепление за диском	Pinned to a disk
+Резерв видео, %	Video reserve, %
+Резерв видео, GB	Video reserve, GB
+Резерв файлов, %	Files reserve, %
+Резерв файлов, GB	Files reserve, GB
+Закреплённый диск для видео	Pinned video disk
+Закреплённый диск для файлов	Pinned files disk
+Автоматически	Automatic
+Сохранить настройки пулов	Save pool settings
+Один физический диск можно одновременно добавить в пул видео и в пул домашних файлов.	One physical disk can be added to both the video pool and the home files pool.
+Для новых дисков Home AI Core использует стабильный путь на основе UUID файловой системы.	For new disks, Home AI Core uses a stable path based on the filesystem UUID.
+Выберите одно или несколько назначений.	Choose one or more roles.
+Использовать для видео	Use for video
+Использовать для домашних файлов	Use for home files
+Применить назначение	Apply roles
+Для подключения нового диска нужно установить привилегированный Storage Helper.	The privileged Storage Helper must be installed to mount a new disk.
+. Можно выбрать одно или оба назначения. Диск перемонтирован не будет.	. You can choose one or both roles. The disk will not be remounted.
+Диск ещё не подключён. Выберите одно или оба назначения — Home AI Core смонтирует его один раз и добавит в выбранные пулы.	The disk is not mounted yet. Choose one or both roles — Home AI Core will mount it once and add it to the selected pools.
+Дисков в пуле	Disks in pool
+Стратегия	Strategy
+Общая ёмкость	Total capacity
+свободно	free
+Следующая запись	Next write
+нет доступного диска	no available disk
+Видео-пул	Video pool
+Пул домашних файлов	Home files pool
+Выберите хотя бы одно назначение для нового диска.	Choose at least one role for a new disk.
+Не удалось определить точку монтирования диска.	Unable to determine the disk mount point.
+Назначение Home AI Core снято.	Home AI Core assignment removed.
