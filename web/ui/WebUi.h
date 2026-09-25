@@ -19,6 +19,10 @@ struct WebUiContext {
     bool admin{false};
 };
 
+bool isWebUiPath(
+    const std::string& path
+);
+
 std::string renderWebUi(
     const WebUiContext& context
 );
