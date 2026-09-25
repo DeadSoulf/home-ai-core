@@ -874,6 +874,17 @@ button:disabled {
 
 <div class="section-card">
 <div class="section-title">
+<h2>Модули ядра</h2>
+<span class="section-hint">Module Manager lifecycle / health</span>
+</div>
+
+<div id="module-list" class="placeholder-grid">
+<div class="placeholder-card">Загрузка состояния модулей...</div>
+</div>
+</div>
+
+<div class="section-card">
+<div class="section-title">
 <h2>Обновление сервера</h2>
 <span class="section-hint">GitHub → build → tests → restart</span>
 </div>
@@ -1565,6 +1576,225 @@ async function updateServerUpdateStatus() {
     }
 }
 
+function moduleDisplayName(name) {
+    const names = {
+        "security": "Security Core",
+        "update": "Update Manager",
+        "system-monitor": "System Monitor",
+        "storage-monitor": "Storage Monitor",
+        "web": "Web Core"
+    };
+
+    return names[name] || name;
+}
+
+function moduleHealthLabel(health) {
+    if (health === "healthy")
+        return "HEALTHY";
+
+    if (health === "degraded")
+        return "DEGRADED";
+
+    if (health === "unhealthy")
+        return "UNHEALTHY";
+
+    return "UNKNOWN";
+}
+
+function moduleHealthClass(health) {
+    if (health === "healthy")
+        return "status-ok";
+
+    if (health === "degraded")
+        return "status-warn";
+
+    if (health === "unhealthy")
+        return "status-error";
+
+    return "muted";
+}
+
+async function updateModuleStatus() {
+    const container =
+        document.getElementById(
+            "module-list"
+        );
+
+    if (!container)
+        return;
+
+    try {
+        const response =
+            await fetch(
+                "/api/modules",
+                {
+                    cache: "no-store"
+                }
+            );
+
+        if (
+            response.status === 401
+        ) {
+            window.location =
+                "/login";
+
+            return;
+        }
+
+        if (!response.ok)
+            return;
+
+        const data =
+            await response.json();
+
+        const modules =
+            Array.isArray(
+                data.modules
+            )
+            ? data.modules
+            : [];
+
+        container.replaceChildren();
+
+        for (const module of modules) {
+            const card =
+                document.createElement(
+                    "div"
+                );
+
+            card.className =
+                "placeholder-card";
+
+            const title =
+                document.createElement(
+                    "strong"
+                );
+
+            title.textContent =
+                moduleDisplayName(
+                    module.name
+                );
+
+            card.appendChild(title);
+
+            const lifecycle =
+                document.createElement(
+                    "div"
+                );
+
+            lifecycle.className =
+                "muted";
+
+            lifecycle.textContent =
+                "Lifecycle: "
+                + (
+                    module.state
+                    || "unknown"
+                );
+
+            card.appendChild(
+                lifecycle
+            );
+
+            const health =
+                document.createElement(
+                    "div"
+                );
+
+            health.className =
+                moduleHealthClass(
+                    module.health
+                );
+
+            health.textContent =
+                "Health: "
+                + moduleHealthLabel(
+                    module.health
+                );
+
+            card.appendChild(
+                health
+            );
+
+            if (module.message) {
+                const message =
+                    document.createElement(
+                        "div"
+                    );
+
+                message.className =
+                    "muted";
+
+                message.style.marginTop =
+                    "8px";
+
+                message.textContent =
+                    module.message;
+
+                card.appendChild(
+                    message
+                );
+            }
+
+            if (
+                Array.isArray(
+                    module.dependencies
+                )
+                &&
+                module.dependencies
+                    .length > 0
+            ) {
+                const dependencies =
+                    document.createElement(
+                        "div"
+                    );
+
+                dependencies.className =
+                    "muted";
+
+                dependencies.style.marginTop =
+                    "8px";
+
+                dependencies.textContent =
+                    "Зависимости: "
+                    + module.dependencies
+                        .join(", ");
+
+                card.appendChild(
+                    dependencies
+                );
+            }
+
+            container.appendChild(
+                card
+            );
+        }
+
+        if (modules.length === 0) {
+            const empty =
+                document.createElement(
+                    "div"
+                );
+
+            empty.className =
+                "placeholder-card";
+
+            empty.textContent =
+                "Модули не зарегистрированы.";
+
+            container.appendChild(
+                empty
+            );
+        }
+    }
+    catch (error) {
+        console.error(
+            "Module status error:",
+            error
+        );
+    }
+}
+
 function formatBytes(value) {
     const bytes =
         Number(value);
@@ -1817,6 +2047,70 @@ async function updateHomeErrors() {
                         + (
                             volume.mount_point
                             || volume.source
+                        )
+                    );
+                }
+            }
+        }
+
+        const modulesResponse =
+            await fetch(
+                "/api/modules",
+                {
+                    cache: "no-store"
+                }
+            );
+
+        if (!modulesResponse.ok) {
+            errors.push(
+                "Не удалось получить состояние модулей ядра."
+            );
+        }
+        else {
+            const modulesData =
+                await modulesResponse.json();
+
+            for (
+                const module of
+                (
+                    Array.isArray(
+                        modulesData.modules
+                    )
+                    ? modulesData.modules
+                    : []
+                )
+            ) {
+                if (
+                    module.state === "failed"
+                    ||
+                    module.health === "unhealthy"
+                ) {
+                    errors.push(
+                        "Ошибка модуля "
+                        + moduleDisplayName(
+                            module.name
+                        )
+                        + ": "
+                        + (
+                            module.message
+                            || module.health
+                            || module.state
+                        )
+                    );
+                }
+                else if (
+                    module.health ===
+                    "degraded"
+                ) {
+                    errors.push(
+                        "Предупреждение модуля "
+                        + moduleDisplayName(
+                            module.name
+                        )
+                        + ": "
+                        + (
+                            module.message
+                            || "degraded"
                         )
                     );
                 }
@@ -2893,6 +3187,7 @@ document.addEventListener(
     function() {
         updateSystemStats();
         updateHomeErrors();
+        updateModuleStatus();
         updateStorageStats();
         updateStorageCandidates();
         updateServerUpdateStatus();
@@ -3141,6 +3436,11 @@ document.addEventListener(
 
         setInterval(
             updateHomeErrors,
+            5000
+        );
+
+        setInterval(
+            updateModuleStatus,
             5000
         );
 
