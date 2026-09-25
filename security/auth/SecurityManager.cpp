@@ -1586,7 +1586,7 @@ bool SecurityManager::isLastEnabledAdmin(
 
     const auto count =
         database_.
-            countEnabledAdmins(
+            countManagingAdmins(
                 error
             );
 
