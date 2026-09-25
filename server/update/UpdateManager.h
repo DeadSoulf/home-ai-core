@@ -92,6 +92,7 @@ private:
 
     std::string gitHead() const;
     std::string remoteHead() const;
+    std::string currentBranch() const;
 
     void setState(
         UpdateState state,
