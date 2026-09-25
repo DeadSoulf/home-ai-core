@@ -64,6 +64,10 @@ Completed in the current development branch:
 - persistent sidebar navigation with subsystem sections
 - main page reduced to system statistics and active errors
 - existing disk/network/settings controls moved into their own sections
+- Web-based GitHub update detection
+- fast-forward repository update with automatic build and tests
+- rollback when build/tests fail
+- restart into the updated binary after confirmation
 
 Still planned for 0.0.6:
 
