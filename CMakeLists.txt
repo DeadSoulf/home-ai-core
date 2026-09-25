@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 
 project(
     HomeAICore
-    VERSION 0.0.3
+    VERSION 0.0.4
     LANGUAGES CXX
 )
 
@@ -22,6 +22,8 @@ add_library(
     core/config/ConfigManager.cpp
     core/events/EventBus.cpp
     core/runtime/CoreRuntime.cpp
+
+    server/system/SystemMonitor.cpp
 
     web/server/WebServer.cpp
 )

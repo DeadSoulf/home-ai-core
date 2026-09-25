@@ -2,6 +2,7 @@
 
 #include "core/logging/Logger.h"
 #include "core/runtime/CoreRuntime.h"
+#include "server/system/SystemMonitor.h"
 
 #include <algorithm>
 #include <arpa/inet.h>
@@ -490,6 +491,53 @@ void WebServer::handleClient(int client_fd)
 
     if (
         method == "GET" &&
+        path == "/api/system"
+    ) {
+        static SystemMonitor monitor;
+
+        const auto stats =
+            monitor.snapshot();
+
+        std::ostringstream json;
+
+        json
+            << "{"
+            << "\"cpu_percent\":"
+            << stats.cpu_percent
+            << ",\"memory_percent\":"
+            << stats.memory_percent
+            << ",\"disk_percent\":"
+            << stats.disk_percent
+            << ",\"memory_total_bytes\":"
+            << stats.memory_total_bytes
+            << ",\"memory_available_bytes\":"
+            << stats.memory_available_bytes
+            << ",\"disk_total_bytes\":"
+            << stats.disk_total_bytes
+            << ",\"disk_free_bytes\":"
+            << stats.disk_free_bytes
+            << ",\"uptime_seconds\":"
+            << stats.uptime_seconds
+            << ",\"load_1\":"
+            << stats.load_1
+            << ",\"load_5\":"
+            << stats.load_5
+            << ",\"load_15\":"
+            << stats.load_15
+            << "}";
+
+        sendResponse(
+            client_fd,
+            "200 OK",
+            "application/json; charset=utf-8",
+            json.str()
+        );
+
+        return;
+    }
+
+    if (
+        method == "GET" &&
         path == "/api/config"
     ) {
         const auto& config =
@@ -812,6 +860,31 @@ Web Core<br>
 <span class="status">RUNNING</span>
 </div>
 
+<div class="metric">
+CPU<br>
+<strong id="cpu-value">...</strong>
+</div>
+
+<div class="metric">
+RAM<br>
+<strong id="ram-value">...</strong>
+</div>
+
+<div class="metric">
+Disk<br>
+<strong id="disk-value">...</strong>
+</div>
+
+<div class="metric">
+Uptime<br>
+<strong id="uptime-value">...</strong>
+</div>
+
+<div class="metric">
+Load Average<br>
+<strong id="load-value">...</strong>
+</div>
+
 </div>
 </div>
 
@@ -931,6 +1004,79 @@ value=")HTML";
 </div>
 
 </main>
+
+
+
+
+<script>
+function formatUptime(seconds) {
+    seconds = Number(seconds);
+
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+
+    if (days > 0) {
+        return days + "d " + hours + "h " + minutes + "m";
+    }
+
+    return hours + "h " + minutes + "m";
+}
+
+async function updateSystemStats() {
+    try {
+        const response = await fetch("/api/system", {
+            method: "GET",
+            cache: "no-store"
+        });
+
+        if (!response.ok) {
+            console.error("API HTTP error:", response.status);
+            return;
+        }
+
+        const data = await response.json();
+
+        const cpu = document.getElementById("cpu-value");
+        const ram = document.getElementById("ram-value");
+        const disk = document.getElementById("disk-value");
+        const uptime = document.getElementById("uptime-value");
+        const load = document.getElementById("load-value");
+
+        if (cpu)
+            cpu.textContent =
+                Number(data.cpu_percent).toFixed(1) + "%";
+
+        if (ram)
+            ram.textContent =
+                Number(data.memory_percent).toFixed(1) + "%";
+
+        if (disk)
+            disk.textContent =
+                Number(data.disk_percent).toFixed(1) + "%";
+
+        if (uptime)
+            uptime.textContent =
+                formatUptime(data.uptime_seconds);
+
+        if (load)
+            load.textContent =
+                Number(data.load_1).toFixed(2) +
+                " / " +
+                Number(data.load_5).toFixed(2) +
+                " / " +
+                Number(data.load_15).toFixed(2);
+    }
+    catch (error) {
+        console.error("System monitor error:", error);
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    updateSystemStats();
+    setInterval(updateSystemStats, 2000);
+});
+</script>
 
 </body>
 </html>
