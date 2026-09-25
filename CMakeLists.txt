@@ -332,3 +332,20 @@ add_test(
     NAME network_interfaces
     COMMAND test-network-interfaces
 )
+
+
+add_executable(
+    test-vpn-service
+    tests/test_vpn_service.cpp
+)
+
+target_link_libraries(
+    test-vpn-service
+    PRIVATE
+    homeai-core-lib
+)
+
+add_test(
+    NAME vpn_service
+    COMMAND test-vpn-service
+)

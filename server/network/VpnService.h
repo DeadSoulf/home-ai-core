@@ -16,6 +16,13 @@ struct VpnActionResult {
     std::string message;
 };
 
+struct VpnProfileConfigResult {
+    bool success{false};
+    std::string code;
+    std::string message;
+    std::string config;
+};
+
 class VpnService {
 public:
     VpnService();
@@ -38,6 +45,10 @@ public:
     std::vector<VpnProfileInfo>
     profiles(
         std::string& error
+    ) const;
+
+    VpnProfileConfigResult loadProfile(
+        const std::string& profile
     ) const;
 
     VpnActionResult saveProfile(

@@ -173,6 +173,18 @@ int main()
         network.find(
             "Основной DNS"
         ) == std::string::npos
+        ||
+        network.find(
+            "Редактор WireGuard"
+        ) == std::string::npos
+        ||
+        network.find(
+            "vpn-profile-config"
+        ) == std::string::npos
+        ||
+        network.find(
+            "/api/network/vpn/profile"
+        ) == std::string::npos
     ) {
         std::cerr
             << "Network page structure is invalid\n";

@@ -5,6 +5,7 @@
 #include <cctype>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -235,6 +236,121 @@ WireGuardManager::profiles(
     return result;
 }
 
+WireGuardConfigResult
+WireGuardManager::loadProfile(
+    const std::string& profile
+) const
+{
+    if (!validProfileName(profile)) {
+        return {
+            false,
+            "invalid_profile",
+            "Некорректное имя профиля.",
+            {}
+        };
+    }
+
+    const auto path =
+        profilePath(profile);
+
+    if (path.empty()) {
+        return {
+            false,
+            "not_initialized",
+            "WireGuard Manager не инициализирован.",
+            {}
+        };
+    }
+
+    std::error_code error;
+
+    const auto status =
+        std::filesystem::symlink_status(
+            path,
+            error
+        );
+
+    if (error) {
+        return {
+            false,
+            "read_failed",
+            "Не удалось прочитать профиль WireGuard.",
+            {}
+        };
+    }
+
+    if (
+        !std::filesystem::is_regular_file(
+            status
+        )
+    ) {
+        return {
+            false,
+            "profile_not_found",
+            "Профиль WireGuard не найден.",
+            {}
+        };
+    }
+
+    const auto size =
+        std::filesystem::file_size(
+            path,
+            error
+        );
+
+    if (
+        error
+        ||
+        size > 65536
+    ) {
+        return {
+            false,
+            "read_failed",
+            "Конфигурация WireGuard слишком большая или недоступна.",
+            {}
+        };
+    }
+
+    std::ifstream file(
+        path,
+        std::ios::binary
+    );
+
+    if (!file.is_open()) {
+        return {
+            false,
+            "read_failed",
+            "Не удалось открыть конфигурацию WireGuard.",
+            {}
+        };
+    }
+
+    std::string config(
+        (
+            std::istreambuf_iterator<char>(
+                file
+            )
+        ),
+        std::istreambuf_iterator<char>()
+    );
+
+    if (file.bad()) {
+        return {
+            false,
+            "read_failed",
+            "Не удалось прочитать конфигурацию WireGuard.",
+            {}
+        };
+    }
+
+    return {
+        true,
+        "ok",
+        "Профиль WireGuard загружен.",
+        std::move(config)
+    };
+}
+
 WireGuardResult
 WireGuardManager::saveProfile(
     const std::string& profile,
@@ -253,6 +369,9 @@ WireGuardManager::saveProfile(
         config.empty()
         ||
         config.size() > 65536
+        ||
+        config.find('\0') !=
+            std::string::npos
         ||
         config.find(
             "[Interface]"

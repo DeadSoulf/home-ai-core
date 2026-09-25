@@ -16,6 +16,13 @@ struct WireGuardResult {
     std::string message;
 };
 
+struct WireGuardConfigResult {
+    bool success{false};
+    std::string code;
+    std::string message;
+    std::string config;
+};
+
 class WireGuardManager {
 public:
     bool initialize(
@@ -27,6 +34,10 @@ public:
     std::vector<WireGuardProfile>
     profiles(
         std::string& error
+    ) const;
+
+    WireGuardConfigResult loadProfile(
+        const std::string& profile
     ) const;
 
     WireGuardResult saveProfile(

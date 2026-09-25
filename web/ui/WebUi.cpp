@@ -577,13 +577,31 @@ label {
 }
 
 input,
-select {
+select,
+textarea {
     width: 100%;
     padding: 10px 11px;
     border-radius: 8px;
     border: 1px solid #363d49;
     background: #0f1217;
     color: white;
+}
+
+textarea {
+    resize: vertical;
+}
+
+#vpn-profile-config {
+    min-height: 340px;
+    font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        "Liberation Mono",
+        monospace;
+    line-height: 1.45;
 }
 
 button {
@@ -1427,6 +1445,66 @@ Home AI Core показывает текущие IPv4-адреса интерф�
 </div>
 </div>
 )HTML";
+
+        if (
+            uiHasPermission(
+                context,
+                "network.manage"
+            )
+        ) {
+            page << R"HTML(
+<div class="section-card" id="vpn-editor">
+<div class="section-title">
+<h2>Редактор WireGuard</h2>
+<span class="section-hint">Создание и изменение *.conf</span>
+</div>
+
+<p class="muted">
+Конфигурация загружается только при нажатии «Редактировать».
+PrivateKey отображается в редакторе и сохраняется в runtime/wireguard
+с правами 0600. Для активного туннеля сохранённые изменения вступят
+в силу после переподключения профиля.
+</p>
+
+<div class="form-grid">
+<div>
+<label for="vpn-profile-name">Имя профиля</label>
+<input
+    id="vpn-profile-name"
+    type="text"
+    maxlength="32"
+    autocomplete="off"
+    placeholder="wg0">
+</div>
+</div>
+
+<div style="margin-top:14px">
+<label for="vpn-profile-config">Конфигурация WireGuard</label>
+<textarea
+    id="vpn-profile-config"
+    spellcheck="false"
+    autocomplete="off"
+    placeholder="[Interface]"></textarea>
+</div>
+
+<div class="button-row">
+<button id="vpn-new-btn" type="button" class="secondary">
+Новый профиль
+</button>
+<button id="vpn-save-btn" type="button">
+Сохранить
+</button>
+<button id="vpn-delete-btn" type="button" class="danger" disabled>
+Удалить
+</button>
+</div>
+
+<div id="vpn-editor-message" class="muted" style="margin-top:12px">
+Выберите «Редактировать» у существующего профиля или создайте новый.
+</div>
+</div>
+)HTML";
+        }
 
         renderPlaceholder(
             page,
@@ -5046,6 +5124,456 @@ async function updateNetworkInterfaces(
     }
 }
 
+let vpnEditorProfile = "";
+let vpnEditorWasActive = false;
+
+function newVpnProfile() {
+    const editor =
+        document.getElementById(
+            "vpn-editor"
+        );
+
+    if (!editor)
+        return;
+
+    const name =
+        document.getElementById(
+            "vpn-profile-name"
+        );
+
+    const config =
+        document.getElementById(
+            "vpn-profile-config"
+        );
+
+    const removeButton =
+        document.getElementById(
+            "vpn-delete-btn"
+        );
+
+    const editorMessage =
+        document.getElementById(
+            "vpn-editor-message"
+        );
+
+    vpnEditorProfile = "";
+    vpnEditorWasActive = false;
+
+    if (name) {
+        name.disabled = false;
+        name.value = "";
+    }
+
+    if (config) {
+        config.value =
+            "[Interface]\n"
+            + "PrivateKey = \n"
+            + "Address = \n"
+            + "\n"
+            + "[Peer]\n"
+            + "PublicKey = \n"
+            + "AllowedIPs = \n"
+            + "Endpoint = \n";
+    }
+
+    if (removeButton) {
+        removeButton.disabled =
+            true;
+    }
+
+    if (editorMessage) {
+        editorMessage.textContent =
+            "Новый профиль. Заполните имя и конфигурацию.";
+    }
+
+    if (name) {
+        name.focus();
+    }
+}
+
+async function editVpnProfile(
+    profileName,
+    active
+) {
+    const editor =
+        document.getElementById(
+            "vpn-editor"
+        );
+
+    if (!editor)
+        return;
+
+    const name =
+        document.getElementById(
+            "vpn-profile-name"
+        );
+
+    const config =
+        document.getElementById(
+            "vpn-profile-config"
+        );
+
+    const removeButton =
+        document.getElementById(
+            "vpn-delete-btn"
+        );
+
+    const editorMessage =
+        document.getElementById(
+            "vpn-editor-message"
+        );
+
+    if (editorMessage) {
+        editorMessage.textContent =
+            "Загрузка профиля...";
+    }
+
+    try {
+        const response =
+            await fetch(
+                "/api/network/vpn/profile?profile="
+                + encodeURIComponent(
+                    profileName
+                ),
+                {
+                    cache: "no-store"
+                }
+            );
+
+        if (response.status === 401) {
+            window.location =
+                "/login";
+
+            return;
+        }
+
+        const result =
+            await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                result.message
+                || "Не удалось загрузить профиль."
+            );
+        }
+
+        vpnEditorProfile =
+            profileName;
+
+        vpnEditorWasActive =
+            !!active;
+
+        if (name) {
+            name.value =
+                result.profile
+                || profileName;
+
+            name.disabled =
+                true;
+        }
+
+        if (config) {
+            config.value =
+                result.config
+                || "";
+        }
+
+        if (removeButton) {
+            removeButton.disabled =
+                false;
+        }
+
+        if (editorMessage) {
+            editorMessage.textContent =
+                active
+                ? "Профиль активен. Сохранение не перезапускает туннель."
+                : "Профиль загружен.";
+        }
+
+        editor.scrollIntoView(
+            {
+                behavior: "smooth",
+                block: "start"
+            }
+        );
+    }
+    catch (error) {
+        if (editorMessage) {
+            editorMessage.textContent =
+                "Ошибка WireGuard: "
+                + error;
+        }
+    }
+}
+
+async function saveVpnProfile() {
+    const name =
+        document.getElementById(
+            "vpn-profile-name"
+        );
+
+    const config =
+        document.getElementById(
+            "vpn-profile-config"
+        );
+
+    const saveButton =
+        document.getElementById(
+            "vpn-save-btn"
+        );
+
+    const removeButton =
+        document.getElementById(
+            "vpn-delete-btn"
+        );
+
+    const editorMessage =
+        document.getElementById(
+            "vpn-editor-message"
+        );
+
+    if (
+        !name
+        ||
+        !config
+        ||
+        !saveButton
+    ) {
+        return;
+    }
+
+    const profileName =
+        name.value.trim();
+
+    if (
+        !/^[A-Za-z0-9_-]{1,32}$/.test(
+            profileName
+        )
+    ) {
+        if (editorMessage) {
+            editorMessage.textContent =
+                "Имя профиля: 1–32 символа, только буквы, цифры, - и _.";
+        }
+
+        return;
+    }
+
+    if (
+        !config.value
+        ||
+        !config.value.includes(
+            "[Interface]"
+        )
+    ) {
+        if (editorMessage) {
+            editorMessage.textContent =
+                "Конфигурация должна содержать секцию [Interface].";
+        }
+
+        return;
+    }
+
+    const parameters =
+        new URLSearchParams();
+
+    parameters.set(
+        "action",
+        "save"
+    );
+
+    parameters.set(
+        "profile",
+        profileName
+    );
+
+    parameters.set(
+        "config",
+        config.value
+    );
+
+    saveButton.disabled =
+        true;
+
+    try {
+        const response =
+            await fetch(
+                "/api/network/vpn/profile",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type":
+                            "application/x-www-form-urlencoded",
+                        "X-HomeAI-Request":
+                            "1"
+                    },
+                    body:
+                        parameters.toString()
+                }
+            );
+
+        if (response.status === 401) {
+            window.location =
+                "/login";
+
+            return;
+        }
+
+        const result =
+            await response.json();
+
+        if (editorMessage) {
+            editorMessage.textContent =
+                result.message
+                || (
+                    response.ok
+                    ? "Профиль сохранён."
+                    : "Не удалось сохранить профиль."
+                );
+        }
+
+        if (!response.ok)
+            return;
+
+        vpnEditorProfile =
+            profileName;
+
+        name.disabled =
+            true;
+
+        if (removeButton) {
+            removeButton.disabled =
+                false;
+        }
+
+        if (
+            vpnEditorWasActive
+            &&
+            editorMessage
+        ) {
+            editorMessage.textContent +=
+                " Для применения изменений отключите и снова подключите профиль.";
+        }
+
+        await updateVpnProfiles();
+    }
+    catch (error) {
+        if (editorMessage) {
+            editorMessage.textContent =
+                "Ошибка WireGuard: "
+                + error;
+        }
+    }
+    finally {
+        saveButton.disabled =
+            false;
+    }
+}
+
+async function deleteVpnProfile() {
+    if (!vpnEditorProfile)
+        return;
+
+    const removeButton =
+        document.getElementById(
+            "vpn-delete-btn"
+        );
+
+    const editorMessage =
+        document.getElementById(
+            "vpn-editor-message"
+        );
+
+    if (
+        !window.confirm(
+            "Удалить профиль WireGuard "
+            + vpnEditorProfile
+            + "?"
+        )
+    ) {
+        return;
+    }
+
+    const parameters =
+        new URLSearchParams();
+
+    parameters.set(
+        "action",
+        "remove"
+    );
+
+    parameters.set(
+        "profile",
+        vpnEditorProfile
+    );
+
+    if (removeButton) {
+        removeButton.disabled =
+            true;
+    }
+
+    try {
+        const response =
+            await fetch(
+                "/api/network/vpn/profile",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type":
+                            "application/x-www-form-urlencoded",
+                        "X-HomeAI-Request":
+                            "1"
+                    },
+                    body:
+                        parameters.toString()
+                }
+            );
+
+        if (response.status === 401) {
+            window.location =
+                "/login";
+
+            return;
+        }
+
+        const result =
+            await response.json();
+
+        if (editorMessage) {
+            editorMessage.textContent =
+                result.message
+                || (
+                    response.ok
+                    ? "Профиль удалён."
+                    : "Не удалось удалить профиль."
+                );
+        }
+
+        if (!response.ok)
+            return;
+
+        newVpnProfile();
+
+        await updateVpnProfiles();
+    }
+    catch (error) {
+        if (editorMessage) {
+            editorMessage.textContent =
+                "Ошибка WireGuard: "
+                + error;
+        }
+    }
+    finally {
+        if (
+            removeButton
+            &&
+            vpnEditorProfile
+        ) {
+            removeButton.disabled =
+                false;
+        }
+    }
+}
+
 async function updateVpnProfiles() {
     const container =
         document.getElementById(
@@ -5059,6 +5587,11 @@ async function updateVpnProfiles() {
         document.getElementById(
             "vpn-message"
         );
+
+    const canManage =
+        document.getElementById(
+            "vpn-editor"
+        ) !== null;
 
     try {
         const response =
@@ -5118,7 +5651,9 @@ async function updateVpnProfiles() {
                 "placeholder-card";
 
             empty.textContent =
-                "Профили не найдены. Добавьте *.conf в runtime/wireguard/";
+                canManage
+                ? "Профили не найдены. Создайте профиль в редакторе ниже."
+                : "Профили WireGuard не найдены.";
 
             container.appendChild(
                 empty
@@ -5164,99 +5699,131 @@ async function updateVpnProfiles() {
 
             card.appendChild(state);
 
-            const actions =
-                document.createElement(
-                    "div"
-                );
-
-            actions.className =
-                "button-row";
-
-            const button =
-                document.createElement(
-                    "button"
-                );
-
-            button.type =
-                "button";
-
-            button.textContent =
-                profile.active
-                ? "Отключить"
-                : "Подключить";
-
-            if (profile.active) {
-                button.className =
-                    "secondary";
-            }
-
-            button.addEventListener(
-                "click",
-                async function() {
-                    const parameters =
-                        new URLSearchParams();
-
-                    parameters.set(
-                        "profile",
-                        profile.name
+            if (canManage) {
+                const actions =
+                    document.createElement(
+                        "div"
                     );
 
-                    parameters.set(
-                        "action",
-                        profile.active
-                            ? "disconnect"
-                            : "connect"
+                actions.className =
+                    "button-row";
+
+                const button =
+                    document.createElement(
+                        "button"
                     );
 
-                    button.disabled = true;
+                button.type =
+                    "button";
 
-                    try {
-                        const actionResponse =
-                            await fetch(
-                                "/api/network/vpn/action",
-                                {
-                                    method: "POST",
-                                    headers: {
-                                        "Content-Type":
-                                            "application/x-www-form-urlencoded"
-                                    },
-                                    body:
-                                        parameters.toString()
-                                }
-                            );
+                button.textContent =
+                    profile.active
+                    ? "Отключить"
+                    : "Подключить";
 
-                        const result =
-                            await actionResponse.json();
-
-                        if (message) {
-                            message.textContent =
-                                result.message
-                                || "Операция завершена.";
-                        }
-
-                        await updateVpnProfiles();
-                    }
-                    catch (error) {
-                        if (message) {
-                            message.textContent =
-                                "Ошибка WireGuard: "
-                                + error;
-                        }
-                    }
-                    finally {
-                        button.disabled =
-                            false;
-                    }
+                if (profile.active) {
+                    button.className =
+                        "secondary";
                 }
-            );
 
-            actions.appendChild(
-                button
-            );
+                button.addEventListener(
+                    "click",
+                    async function() {
+                        const parameters =
+                            new URLSearchParams();
 
-            card.appendChild(
-                actions
-            );
+                        parameters.set(
+                            "profile",
+                            profile.name
+                        );
+
+                        parameters.set(
+                            "action",
+                            profile.active
+                                ? "disconnect"
+                                : "connect"
+                        );
+
+                        button.disabled = true;
+
+                        try {
+                            const actionResponse =
+                                await fetch(
+                                    "/api/network/vpn/action",
+                                    {
+                                        method: "POST",
+                                        headers: {
+                                            "Content-Type":
+                                                "application/x-www-form-urlencoded",
+                                            "X-HomeAI-Request":
+                                                "1"
+                                        },
+                                        body:
+                                            parameters.toString()
+                                    }
+                                );
+
+                            const result =
+                                await actionResponse.json();
+
+                            if (message) {
+                                message.textContent =
+                                    result.message
+                                    || "Операция завершена.";
+                            }
+
+                            await updateVpnProfiles();
+                        }
+                        catch (error) {
+                            if (message) {
+                                message.textContent =
+                                    "Ошибка WireGuard: "
+                                    + error;
+                            }
+                        }
+                        finally {
+                            button.disabled =
+                                false;
+                        }
+                    }
+                );
+
+                actions.appendChild(
+                    button
+                );
+
+                const editButton =
+                    document.createElement(
+                        "button"
+                    );
+
+                editButton.type =
+                    "button";
+
+                editButton.className =
+                    "secondary";
+
+                editButton.textContent =
+                    "Редактировать";
+
+                editButton.addEventListener(
+                    "click",
+                    function() {
+                        editVpnProfile(
+                            profile.name,
+                            profile.active
+                        );
+                    }
+                );
+
+                actions.appendChild(
+                    editButton
+                );
+
+                card.appendChild(
+                    actions
+                );
+            }
 
             container.appendChild(
                 card
@@ -7603,6 +8170,42 @@ document.addEventListener(
             vpnRefreshButton.addEventListener(
                 "click",
                 updateVpnProfiles
+            );
+        }
+
+        const vpnNewButton =
+            document.getElementById(
+                "vpn-new-btn"
+            );
+
+        if (vpnNewButton) {
+            vpnNewButton.addEventListener(
+                "click",
+                newVpnProfile
+            );
+        }
+
+        const vpnSaveButton =
+            document.getElementById(
+                "vpn-save-btn"
+            );
+
+        if (vpnSaveButton) {
+            vpnSaveButton.addEventListener(
+                "click",
+                saveVpnProfile
+            );
+        }
+
+        const vpnDeleteButton =
+            document.getElementById(
+                "vpn-delete-btn"
+            );
+
+        if (vpnDeleteButton) {
+            vpnDeleteButton.addEventListener(
+                "click",
+                deleteVpnProfile
             );
         }
 

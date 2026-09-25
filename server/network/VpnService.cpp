@@ -71,6 +71,33 @@ VpnService::profiles(
     return result;
 }
 
+VpnProfileConfigResult
+VpnService::loadProfile(
+    const std::string& profile
+) const
+{
+    if (!impl_) {
+        return {
+            false,
+            "not_initialized",
+            "VPN service is not initialized.",
+            {}
+        };
+    }
+
+    const auto result =
+        impl_->manager.loadProfile(
+            profile
+        );
+
+    return {
+        result.success,
+        result.code,
+        result.message,
+        result.config
+    };
+}
+
 VpnActionResult
 VpnService::saveProfile(
     const std::string& profile,

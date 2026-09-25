@@ -4028,6 +4028,248 @@ void WebServer::handleClient(
     }
 
     if (
+        method == "GET" &&
+        path == "/api/network/vpn/profile"
+    ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "network.manage"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"error\":\"permission_denied\"}"
+            );
+
+            return;
+        }
+
+        const auto query_values =
+            parseForm(
+                query_string
+            );
+
+        const auto profile =
+            query_values.contains(
+                "profile"
+            )
+            ? query_values.at(
+                "profile"
+            )
+            : "";
+
+        VpnService vpn;
+
+        if (
+            !vpn.initialize(
+                "runtime/wireguard"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "500 Internal Server Error",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"VPN недоступен.\"}"
+            );
+
+            return;
+        }
+
+        const auto result =
+            vpn.loadProfile(
+                profile
+            );
+
+        security_.audit(
+            "network.vpn.profile.read",
+            session->username,
+            "result=" +
+                result.code
+        );
+
+        sendResponse(
+            client_fd,
+            result.success
+                ? "200 OK"
+                : (
+                    result.code ==
+                        "profile_not_found"
+                    ? "404 Not Found"
+                    : "400 Bad Request"
+                ),
+            "application/json; charset=utf-8",
+            "{\"success\":" +
+            std::string(
+                result.success
+                    ? "true"
+                    : "false"
+            ) +
+            ",\"code\":\"" +
+            jsonEscape(
+                result.code
+            ) +
+            "\",\"message\":\"" +
+            jsonEscape(
+                result.message
+            ) +
+            "\",\"profile\":\"" +
+            jsonEscape(
+                profile
+            ) +
+            "\",\"config\":\"" +
+            jsonEscape(
+                result.config
+            ) +
+            "\"}"
+        );
+
+        return;
+    }
+
+    if (
+        method == "POST" &&
+        path == "/api/network/vpn/profile"
+    ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "network.manage"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"Требуются права администратора.\"}"
+            );
+
+            return;
+        }
+
+        if (
+            headerValue(
+                headers,
+                "X-HomeAI-Request"
+            ) != "1"
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"error\":\"request_header_required\"}"
+            );
+
+            return;
+        }
+
+        const auto form =
+            parseForm(body);
+
+        const auto action =
+            form.contains("action")
+            ? form.at("action")
+            : "";
+
+        const auto profile =
+            form.contains("profile")
+            ? form.at("profile")
+            : "";
+
+        const auto config =
+            form.contains("config")
+            ? form.at("config")
+            : "";
+
+        VpnService vpn;
+
+        if (
+            !vpn.initialize(
+                "runtime/wireguard"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "500 Internal Server Error",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"VPN недоступен.\"}"
+            );
+
+            return;
+        }
+
+        VpnActionResult result;
+
+        if (action == "save") {
+            result =
+                vpn.saveProfile(
+                    profile,
+                    config
+                );
+        }
+        else if (
+            action == "remove"
+        ) {
+            result =
+                vpn.removeProfile(
+                    profile
+                );
+        }
+        else {
+            result = {
+                false,
+                "unsupported_action",
+                "Неизвестная операция с профилем WireGuard."
+            };
+        }
+
+        std::string audit_details =
+            "action=" +
+            action +
+            " result=" +
+            result.code;
+
+        if (result.success) {
+            audit_details +=
+                " profile=" +
+                profile;
+        }
+
+        security_.audit(
+            "network.vpn.profile",
+            session->username,
+            audit_details
+        );
+
+        sendResponse(
+            client_fd,
+            result.success
+                ? "200 OK"
+                : "400 Bad Request",
+            "application/json; charset=utf-8",
+            "{\"success\":" +
+            std::string(
+                result.success
+                    ? "true"
+                    : "false"
+            ) +
+            ",\"code\":\"" +
+            jsonEscape(
+                result.code
+            ) +
+            "\",\"message\":\"" +
+            jsonEscape(
+                result.message
+            ) +
+            "\"}"
+        );
+
+        return;
+    }
+
+    if (
         method == "POST" &&
         path == "/api/network/vpn/action"
     ) {

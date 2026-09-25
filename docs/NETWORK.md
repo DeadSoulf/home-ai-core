@@ -195,3 +195,61 @@ X-HomeAI-Request: 1
 The older `POST /api/network/dhcp` route remains available for compatibility.
 
 Every IPv4 configuration request is written to the central security audit.
+
+
+## WireGuard profile editor
+
+The Network page includes a WireGuard profile editor for users with:
+
+```text
+network.manage
+```
+
+The normal profile inventory does not include configuration contents or private keys.
+A profile configuration is fetched only when an authorized user explicitly opens it for editing.
+
+Profiles are stored as:
+
+```text
+runtime/wireguard/<profile>.conf
+```
+
+Profile names are limited to 1-32 alphanumeric characters plus `-` and `_`.
+Saved files are written atomically through a temporary file and receive mode `0600`.
+The configuration must contain an `[Interface]` section and is limited to 64 KiB.
+
+Saving an active profile updates the stored configuration file but does not silently restart
+the running WireGuard interface. Disconnect and reconnect the profile to apply the new
+configuration.
+
+Read one profile for editing:
+
+```text
+GET /api/network/vpn/profile?profile=wg0
+```
+
+Requires `network.manage`.
+
+Save a profile:
+
+```text
+POST /api/network/vpn/profile
+X-HomeAI-Request: 1
+
+action=save
+profile=wg0
+config=<urlencoded WireGuard configuration>
+```
+
+Remove an inactive profile:
+
+```text
+POST /api/network/vpn/profile
+X-HomeAI-Request: 1
+
+action=remove
+profile=wg0
+```
+
+Profile reads and mutations are recorded in the central security audit. Configuration
+contents and private keys are never written to the audit log.
