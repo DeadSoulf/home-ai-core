@@ -1,15 +1,15 @@
-# Home AI Core — Storage Monitoring
+# Home AI Core — Storage Monitoring and Disk Operations
 
 ## Purpose
 
-The Storage Monitor provides a live view of filesystems and block devices that Home AI Core can use for:
+The Storage subsystem provides a live view of filesystems and block devices that Home AI Core can use for:
 
 - video surveillance archives
 - personal files
 - system storage
 - future backups and AI data
 
-It also provides the first hot-plug discovery flow for newly attached disks.
+It also supports hot-plug discovery and a guarded disk-management workflow.
 
 ## Mounted storage discovery
 
@@ -26,23 +26,21 @@ The monitor reads mounted block-device filesystems from Linux and reports:
 - used percentage
 - assigned Home AI Core role
 
-Only block-device backed mounts are treated as local disk storage.
-
 ## Hot-plug / new disk discovery
 
-The monitor also scans Linux sysfs under:
+The monitor scans Linux sysfs under:
 
 ```text
 /sys/class/block
 ```
 
-The Web interface checks this list automatically every few seconds and also exposes a manual button:
+The Web interface checks the list automatically every few seconds and also exposes:
 
 ```text
 Проверить новые диски
 ```
 
-For a new or currently unused block device the UI can show:
+For a new or currently unused block device the UI shows:
 
 - device path
 - disk/partition type
@@ -50,55 +48,108 @@ For a new or currently unused block device the UI can show:
 - serial number where available
 - size
 - removable/hot-plug indication
-- suggested actions
+- a button: `Управление диском`
 
-Current suggested actions:
+## Disk management menu
 
-- use for camera video
-- use for personal files
-- do not use for now
+The disk-management dialog contains standard storage actions.
 
-The current implementation intentionally does not format or mount a disk automatically. Selecting a role only records the intended action in the UI. A later Storage Core step will add a privileged preparation workflow with explicit destructive-operation confirmation.
+### Non-destructive role actions
 
-## Safety filtering
+For mounted filesystems:
 
-A device is not offered as a new storage candidate when Home AI Core can see that it is already:
+- assign as camera-video storage
+- assign as personal-file storage
+- remove Home AI storage assignment
+- refresh information
 
-- mounted
-- used as swap
-- held by another Linux block layer such as LVM/device-mapper
+### Privileged storage actions
 
-Whole disks that already contain partitions are not offered directly; eligible unmounted partitions are considered instead.
+When the Storage Helper is installed:
 
-This reduces the risk of presenting an in-use system disk as available storage.
+- mount for camera video
+- mount for personal files
+- unmount a Home AI managed filesystem
+- format the selected unused device as EXT4
+- remove filesystem/partition signatures with `wipefs`
+
+Home AI mounts managed disks below:
+
+```text
+/mnt/home-ai/video/
+/mnt/home-ai/files/
+```
+
+Mounted filesystems use conservative options:
+
+```text
+nodev,nosuid,noexec
+```
+
+## Destructive-operation protection
+
+Formatting and signature removal require all of the following:
+
+1. authenticated administrator session
+2. device must exist in the current Linux block inventory
+3. device must not be mounted
+4. device must not be active swap
+5. device must not be held by LVM/device-mapper or another Linux block layer
+6. device must be an eligible unused disk/partition
+7. the user must type the exact device path, for example `/dev/sdb`, into a confirmation prompt
+
+The Web Core never passes a shell command assembled from user text. The privileged helper receives validated arguments and executes a small fixed allow-list of system utilities.
+
+## Privileged Storage Helper
+
+The main Home AI Core process should remain unprivileged.
+
+Disk mount/format/unmount operations are delegated to:
+
+```text
+/usr/local/libexec/home-ai-storage-helper
+```
+
+The helper must be installed once after building:
+
+```bash
+sudo sh scripts/install-storage-helper.sh
+```
+
+When run through `sudo`, the installer detects the invoking user through `SUDO_USER`. A user can also be supplied explicitly:
+
+```bash
+sudo sh scripts/install-storage-helper.sh texnik
+```
+
+The installer:
+
+- installs the helper as root-owned executable
+- creates `/mnt/home-ai/video`
+- creates `/mnt/home-ai/files`
+- installs a narrowly scoped sudo rule allowing only the Home AI storage helper
+
+The helper itself performs the block-device safety checks again before every privileged action.
 
 ## Storage roles
 
-Two configuration keys assign storage roles:
+Two configuration keys track active mount points:
 
 ```text
 storage.video_mounts=
 storage.personal_mounts=
 ```
 
-Values are comma-separated mount points.
-
 Example:
 
 ```text
-storage.video_mounts=/mnt/video1,/mnt/video2
-storage.personal_mounts=/mnt/files1
+storage.video_mounts=/mnt/home-ai/video/sdb1
+storage.personal_mounts=/mnt/home-ai/files/sdc1
 ```
-
-A mount point may be assigned to both roles.
-
-The system root filesystem is identified as `system`. Mounted disks without an assigned role are shown as `unassigned`.
 
 ## Offline detection
 
-Configured video/personal mount points remain visible even when they are not mounted.
-
-In that case the dashboard reports:
+Configured video/personal mount points remain visible even when not mounted and are shown as:
 
 ```text
 OFFLINE
@@ -114,46 +165,54 @@ Authenticated users can read mounted storage:
 GET /api/storage
 ```
 
-and the block-device inventory / hot-plug candidates:
+and block-device inventory:
 
 ```text
 GET /api/storage/devices
 ```
 
-The block-device response includes fields such as:
+Administrator disk actions use:
 
 ```text
-device
-type
-model
-vendor
-serial
-size_bytes
-removable
-mounted
-in_use
-has_partitions
-candidate
+POST /api/storage/action
 ```
 
-## Dashboard
+Supported action names currently include:
 
-The Web Core refreshes mounted storage every five seconds and new-device discovery every three seconds.
+```text
+mount-video
+mount-personal
+assign-video
+assign-personal
+unassign
+unmount
+format-ext4
+wipefs
+```
 
-When a newly appearing candidate is detected while the page is open, the dashboard displays a notification and offers actions.
+## Safety filtering
+
+A device is not offered as a new storage candidate when Home AI Core can see that it is already:
+
+- mounted
+- used as swap
+- held by another Linux block layer such as LVM/device-mapper
+
+Whole disks that already contain partitions are not offered directly; eligible unused partitions are considered instead.
 
 ## Planned extensions
 
 The full Storage Core will later add:
 
-- privileged disk preparation with explicit confirmation
-- filesystem detection and creation
-- safe mount/unmount workflow
-- persistent storage-role assignment by UUID
+- persistent disk identity by UUID
+- filesystem type detection before mounting
+- GPT/partition creation wizard
+- disk labels and rename operations
+- safe eject / power-off where supported
 - HDD / SSD / NVMe classification
 - SMART health
 - disk temperature
-- wear / lifetime indicators where supported
+- wear / lifetime indicators
 - recording retention limits
 - minimum free-space thresholds
 - NVR disk rotation
