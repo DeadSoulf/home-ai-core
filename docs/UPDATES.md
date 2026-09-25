@@ -75,15 +75,19 @@ The current process shuts down Web/Core services and replaces itself with:
 /srv/home-ai-core/build/home-ai-core
 ```
 
-A separate systemd service is therefore not required for the current development workflow.
+The recommended deployment runs Home AI Core as the `home-ai-core.service` systemd service.
+The in-process restart replaces the running binary while remaining under systemd supervision;
+if the process later fails, `Restart=on-failure` still applies.
 
 ## Security
 
-Only an authenticated `admin` can request:
+An authenticated user with `system.manage` can request:
 
 - manual update check
 - update installation
 - restart
+
+Users with `system.view` can read update status without receiving update-control permission.
 
 The update source and branch are taken from local configuration; the Web API does not accept arbitrary repository URLs or arbitrary shell commands.
 
