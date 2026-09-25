@@ -70,11 +70,15 @@ Current content:
 - Web port
 - Web Core state
 - admin form for bind/port configuration
+- Linux interface inventory
+- current IPv4 addresses
+- MAC, MTU, link state and default-route marker
+- DHCP request/renew action through a constrained privileged helper
+- WireGuard profile status and connect/disconnect
 
 Future content:
 
-- interfaces
-- static/DHCP addresses
+- static IPv4 configuration
 - routes
 - DNS
 - diagnostics
