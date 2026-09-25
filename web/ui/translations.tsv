@@ -520,3 +520,30 @@ AI: управление	AI: manage
 Назначение Home AI Core снято.	Home AI Core assignment removed.
 в сети	online
 данные части дисков недоступны	some disk data unavailable
+Сетевые интерфейсы	Network interfaces
+IPv4 и получение адреса по DHCP	IPv4 and DHCP address acquisition
+Home AI Core показывает текущие IPv4-адреса интерфейсов. Кнопка DHCP запрашивает или обновляет адрес у DHCP-сервера. Если этот интерфейс используется для Web, адрес сервера может измениться.	Home AI Core shows the current IPv4 addresses of interfaces. The DHCP button requests or renews an address from a DHCP server. If Web uses this interface, the server address may change.
+Загрузка сетевых интерфейсов...	Loading network interfaces...
+Интерфейсы и DHCP уже доступны. Следующие этапы — маршруты, DNS и диагностика сети.	Interfaces and DHCP are available. Next stages are routes, DNS and network diagnostics.
+Интерфейсы / DHCP — READY	Interfaces / DHCP — READY
+Запросить IP-адрес по DHCP для интерфейса 	Request a DHCP IP address for interface 
+? Если Web работает через этот интерфейс, адрес сервера может измениться.	? If Web uses this interface, the server address may change.
+Запрос DHCP выполняется...	Requesting DHCP address...
+DHCP-операция завершена.	DHCP operation completed.
+Ошибка DHCP: 	DHCP error: 
+DHCP Network Helper готов.	DHCP Network Helper is ready.
+Для получения IP по DHCP установите Network Helper.	Install Network Helper to obtain an IP address by DHCP.
+Сетевые интерфейсы не обнаружены.	No network interfaces found.
+адрес не назначен	no address assigned
+маршрут по умолчанию	default route
+Получить IP по DHCP	Get IP by DHCP
+Ошибка получения сетевых интерфейсов: 	Network interface error: 
+Network Helper не установлен.	Network Helper is not installed.
+Не удалось создать канал сетевой операции.	Unable to create the network operation pipe.
+Не удалось запустить сетевую операцию.	Unable to start the network operation.
+Не удалось получить результат сетевой операции.	Unable to retrieve the network operation result.
+DHCP-запрос выполнен.	DHCP request completed.
+Не удалось получить IP по DHCP.	Unable to obtain an IP address by DHCP.
+Некорректный сетевой интерфейс.	Invalid network interface.
+Сетевой интерфейс не найден.	Network interface not found.
+Требуются права управления сетью.	Network management permission is required.
