@@ -79,6 +79,9 @@ std::string pageTitle(
     if (page == "/storage")
         return "Диски";
 
+    if (page == "/files")
+        return "Файлы";
+
     if (page == "/cameras")
         return "Камеры";
 
@@ -205,6 +208,8 @@ bool isWebUiPath(
         path == "/network"
         ||
         path == "/storage"
+        ||
+        path == "/files"
         ||
         path == "/cameras"
         ||
@@ -759,6 +764,7 @@ button:disabled {
     navLink(page, context, "/system", "Система", "▣");
     navLink(page, context, "/network", "Сеть", "⇄");
     navLink(page, context, "/storage", "Диски", "◫");
+    navLink(page, context, "/files", "Файлы", "▱");
     page << "</div>";
 
     page << "<div class=\"nav-group\">";
@@ -1146,6 +1152,91 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
 </div>
 </div>
 )HTML";
+    }
+    else if (
+        context.page == "/files"
+    ) {
+        page << R"HTML(
+<div class="section-card">
+<div class="section-title">
+<h2>Домашнее облако</h2>
+<span class="section-hint">Личное файловое хранилище</span>
+</div>
+
+<div class="kv">
+<div>Корневая папка</div><div>)HTML";
+
+        page
+            << htmlEscape(
+                context.files_root
+            )
+            << R"HTML(</div>
+<div>Диски личных файлов</div><div>)HTML";
+
+        page
+            << (
+                context.storage_personal_mounts.empty()
+                ? "Не назначены"
+                : htmlEscape(
+                    context.storage_personal_mounts
+                )
+            )
+            << R"HTML(</div>
+</div>
+
+<p class="muted" style="margin-top:14px">
+Файлы домашнего облака будут храниться только в выбранном каталоге.
+Физические диски для личных данных назначаются в разделе «Диски».
+</p>
+</div>
+)HTML";
+
+        if (context.admin) {
+            page << R"HTML(
+<div class="section-card">
+<h2>Настройки хранения файлов</h2>
+
+<form method="POST" action="/api/config">
+<input type="hidden" name="return_to" value="/files">
+
+<div class="form-grid">
+<div>
+<label>Корневая папка домашнего облака</label>
+<input
+    name="files.root"
+    placeholder="/mnt/home-ai/files"
+    value=")HTML";
+
+            page
+                << htmlEscape(
+                    context.files_root
+                )
+                << R"HTML(">
+</div>
+</div>
+
+<div class="button-row">
+<button type="submit">Сохранить</button>
+</div>
+</form>
+
+<p class="muted">
+Следующим этапом здесь появятся браузер файлов, папки пользователей,
+корзина, квоты, версии файлов и общий доступ внутри домашней сети.
+</p>
+</div>
+)HTML";
+        }
+
+        renderPlaceholder(
+            page,
+            "Файловый сервис",
+            "Раздел подготовлен как центр будущего домашнего облака.",
+            "<div class=\"placeholder-card\">Файловый браузер — NEXT</div>"
+            "<div class=\"placeholder-card\">Папки пользователей — NEXT</div>"
+            "<div class=\"placeholder-card\">Квоты — NEXT</div>"
+            "<div class=\"placeholder-card\">Корзина и версии — NEXT</div>"
+        );
     }
     else if (
         context.page == "/cameras"
