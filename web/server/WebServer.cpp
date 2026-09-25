@@ -11,6 +11,7 @@
 #include "server/system/SystemMonitor.h"
 #include "server/network/VpnService.h"
 #include "server/storage/StorageMonitor.h"
+#include "server/storage/StoragePool.h"
 #include "server/storage/DiskOperations.h"
 #include "server/update/UpdateManager.h"
 
@@ -2630,21 +2631,124 @@ void WebServer::handleClient(
 
         static StorageMonitor monitor;
 
+        auto& storage_config =
+            runtime_.config();
+
         const auto volumes =
             monitor.snapshot(
-                runtime_.config().get(
+                storage_config.get(
                     "storage.video_mounts",
                     ""
                 ),
-                runtime_.config().get(
+                storage_config.get(
                     "storage.personal_mounts",
                     ""
                 )
             );
 
+        const auto makePoolOptions =
+            [&](const std::string& prefix) {
+                StoragePoolOptions options;
+
+                options.policy =
+                    StoragePoolSelector::
+                        policyFromString(
+                            storage_config.get(
+                                prefix + "_policy",
+                                "most_free"
+                            )
+                        );
+
+                options.reserve_percent =
+                    storage_config.getInt(
+                        prefix +
+                            "_reserve_percent",
+                        10
+                    );
+
+                const auto reserve_gb =
+                    std::max(
+                        0,
+                        storage_config.getInt(
+                            prefix +
+                                "_reserve_gb",
+                            0
+                        )
+                    );
+
+                options.reserve_bytes =
+                    static_cast<std::uint64_t>(
+                        reserve_gb
+                    )
+                    *
+                    1024ULL
+                    *
+                    1024ULL
+                    *
+                    1024ULL;
+
+                return options;
+            };
+
+        const auto video_options =
+            makePoolOptions(
+                "storage.video"
+            );
+
+        const auto files_options =
+            makePoolOptions(
+                "storage.files"
+            );
+
+        const auto video_target =
+            StoragePoolSelector::select(
+                volumes,
+                "video",
+                video_options
+            );
+
+        const auto files_target =
+            StoragePoolSelector::select(
+                volumes,
+                "personal",
+                files_options
+            );
+
         std::ostringstream json;
 
-        json << "{\"volumes\":[";
+        json
+            << "{"
+            << "\"video_policy\":\""
+            << jsonEscape(
+                StoragePoolSelector::
+                    policyToString(
+                        video_options.policy
+                    )
+            )
+            << "\","
+            << "\"files_policy\":\""
+            << jsonEscape(
+                StoragePoolSelector::
+                    policyToString(
+                        files_options.policy
+                    )
+            )
+            << "\","
+            << "\"video_target\":\""
+            << jsonEscape(
+                video_target
+                ? video_target->mount_point
+                : ""
+            )
+            << "\","
+            << "\"files_target\":\""
+            << jsonEscape(
+                files_target
+                ? files_target->mount_point
+                : ""
+            )
+            << "\","
+            << "\"volumes\":[";
 
         bool first = true;
 
@@ -2664,6 +2768,9 @@ void WebServer::handleClient(
                 << "\","
                 << "\"filesystem\":\""
                 << jsonEscape(volume.filesystem)
+                << "\","
+                << "\"uuid\":\""
+                << jsonEscape(volume.uuid)
                 << "\","
                 << "\"role\":\""
                 << jsonEscape(volume.role)
@@ -2776,6 +2883,9 @@ void WebServer::handleClient(
                 << "\","
                 << "\"serial\":\""
                 << jsonEscape(device.serial)
+                << "\","
+                << "\"uuid\":\""
+                << jsonEscape(device.uuid)
                 << "\","
                 << "\"mount_point\":\""
                 << jsonEscape(device.mount_point)
