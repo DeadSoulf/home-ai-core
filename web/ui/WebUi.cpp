@@ -3931,6 +3931,12 @@ function renderUpdateProgress(data) {
     ) {
         currentIndex = 0;
     }
+    else if (
+        data.state ===
+        "ready_to_restart"
+    ) {
+        currentIndex = 6;
+    }
 
     const failed =
         data.state === "error";
