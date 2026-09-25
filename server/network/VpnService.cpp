@@ -10,13 +10,21 @@ public:
     WireGuardManager manager;
 };
 
+VpnService::VpnService()
+    : impl_(new Impl())
+{
+}
+
+VpnService::~VpnService()
+{
+    delete impl_;
+    impl_ = nullptr;
+}
+
 bool VpnService::initialize(
     const std::string& config_directory
 )
 {
-    if (!impl_)
-        impl_ = new Impl();
-
     return
         impl_->manager.initialize(
             config_directory
