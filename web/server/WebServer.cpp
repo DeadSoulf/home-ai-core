@@ -3948,6 +3948,54 @@ void WebServer::handleClient(
                 )
             ) +
             "\","
+            "\"storage.video_policy\":\"" +
+            jsonEscape(
+                config.get(
+                    "storage.video_policy",
+                    "most_free"
+                )
+            ) +
+            "\","
+            "\"storage.files_policy\":\"" +
+            jsonEscape(
+                config.get(
+                    "storage.files_policy",
+                    "most_free"
+                )
+            ) +
+            "\","
+            "\"storage.video_reserve_percent\":\"" +
+            jsonEscape(
+                config.get(
+                    "storage.video_reserve_percent",
+                    "10"
+                )
+            ) +
+            "\","
+            "\"storage.files_reserve_percent\":\"" +
+            jsonEscape(
+                config.get(
+                    "storage.files_reserve_percent",
+                    "10"
+                )
+            ) +
+            "\","
+            "\"storage.video_reserve_gb\":\"" +
+            jsonEscape(
+                config.get(
+                    "storage.video_reserve_gb",
+                    "0"
+                )
+            ) +
+            "\","
+            "\"storage.files_reserve_gb\":\"" +
+            jsonEscape(
+                config.get(
+                    "storage.files_reserve_gb",
+                    "0"
+                )
+            ) +
+            "\","
             "\"files.root\":\"" +
             jsonEscape(
                 config.get(
@@ -4007,6 +4055,18 @@ void WebServer::handleClient(
                     key == "storage.video_mounts"
                     ||
                     key == "storage.personal_mounts"
+                    ||
+                    key == "storage.video_policy"
+                    ||
+                    key == "storage.files_policy"
+                    ||
+                    key == "storage.video_reserve_percent"
+                    ||
+                    key == "storage.files_reserve_percent"
+                    ||
+                    key == "storage.video_reserve_gb"
+                    ||
+                    key == "storage.files_reserve_gb"
                 ) {
                     return
                         security_.hasPermission(
@@ -4034,6 +4094,12 @@ void WebServer::handleClient(
             "web.port",
             "storage.video_mounts",
             "storage.personal_mounts",
+            "storage.video_policy",
+            "storage.files_policy",
+            "storage.video_reserve_percent",
+            "storage.files_reserve_percent",
+            "storage.video_reserve_gb",
+            "storage.files_reserve_gb",
             "files.root"
         };
 
@@ -4172,6 +4238,42 @@ void WebServer::handleClient(
             config.get(
                 "storage.personal_mounts",
                 ""
+            );
+
+        context.storage_video_policy =
+            config.get(
+                "storage.video_policy",
+                "most_free"
+            );
+
+        context.storage_files_policy =
+            config.get(
+                "storage.files_policy",
+                "most_free"
+            );
+
+        context.storage_video_reserve_percent =
+            config.get(
+                "storage.video_reserve_percent",
+                "10"
+            );
+
+        context.storage_files_reserve_percent =
+            config.get(
+                "storage.files_reserve_percent",
+                "10"
+            );
+
+        context.storage_video_reserve_gb =
+            config.get(
+                "storage.video_reserve_gb",
+                "0"
+            );
+
+        context.storage_files_reserve_gb =
+            config.get(
+                "storage.files_reserve_gb",
+                "0"
             );
 
         context.files_root =
