@@ -8,8 +8,8 @@
 | 0.0.2 | Logger, Event Bus, Config Manager | DONE |
 | 0.0.3 | Integrated Web Core | DONE |
 | 0.0.4 | System Monitor and live Dashboard metrics | DONE |
-| 0.0.5 | Security Core: users, sessions, roles, audit, protected Web/API | TESTING |
-| 0.0.6 | Module Manager | PLANNED |
+| 0.0.5 | Security Core + protected Web/API + storage monitoring foundation | DONE |
+| 0.0.6 | Module Manager | IN DEVELOPMENT |
 | 0.0.7 | Full Storage Core: health, pools, quotas, retention | PLANNED |
 | 0.0.8 | Device Core | PLANNED |
 | 0.0.9 | Automation Core | PLANNED |
@@ -19,16 +19,15 @@
 
 ## Development priorities
 
-1. Secure the Web Core before exposing administrative actions.
-2. Introduce a Module Manager so major subsystems remain isolated and replaceable.
-3. Build Storage and Device abstractions before higher-level automation.
-4. Keep core operation local-first and independent of Internet availability.
-5. Keep experimental self-development isolated behind tests, sandboxing and rollback.
-6. Preserve portability between the current Proxmox VM and the future physical Debian server.
+1. Introduce a Module Manager so major subsystems remain isolated and replaceable.
+2. Build Storage and Device abstractions before higher-level automation.
+3. Keep core operation local-first and independent of Internet availability.
+4. Keep experimental self-development isolated behind tests, sandboxing and rollback.
+5. Preserve portability between the current Proxmox VM and the future physical Debian server.
 
-## Current focus: 0.0.5 testing
+## Stable: 0.0.5
 
-The current `develop` branch contains:
+Validated on the Debian development server:
 
 - local user storage
 - PBKDF2-HMAC-SHA256 password hashing
@@ -46,9 +45,7 @@ The current `develop` branch contains:
 - ONLINE/OFFLINE, filesystem, capacity and read-only reporting
 - authenticated `/api/storage` endpoint and live storage dashboard
 
-Before 0.0.5 moves to `main`, it must pass the automated tests and browser verification on the Debian development server.
-
-## Next: 0.0.6 Module Manager
+## Current focus: 0.0.6 Module Manager
 
 The Module Manager will define a common lifecycle for subsystems:
 
@@ -67,6 +64,16 @@ Planned initial modules:
 - AI
 - Video
 - Hypervisor
+
+The first 0.0.6 implementation should provide:
+
+- a common module interface
+- module registration
+- lifecycle state tracking
+- dependency ordering
+- health reporting
+- clean shutdown ordering
+- module status exposure in the Web UI
 
 ## Later major capabilities
 
