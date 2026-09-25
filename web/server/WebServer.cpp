@@ -5,6 +5,7 @@
 #include "security/auth/SecurityManager.h"
 #include "server/system/SystemMonitor.h"
 #include "server/storage/StorageMonitor.h"
+#include "server/storage/DiskOperations.h"
 
 #include <algorithm>
 #include <arpa/inet.h>
@@ -303,6 +304,129 @@ parseForm(const std::string& body)
     }
 
     return values;
+}
+
+std::vector<std::string> splitCsv(
+    const std::string& value
+)
+{
+    std::vector<std::string> items;
+
+    std::size_t start = 0;
+
+    while (start <= value.size()) {
+        auto end =
+            value.find(
+                ',',
+                start
+            );
+
+        if (end == std::string::npos)
+            end = value.size();
+
+        auto item =
+            trimCopy(
+                value.substr(
+                    start,
+                    end - start
+                )
+            );
+
+        if (
+            !item.empty()
+            &&
+            std::find(
+                items.begin(),
+                items.end(),
+                item
+            ) == items.end()
+        ) {
+            items.push_back(
+                std::move(item)
+            );
+        }
+
+        if (end == value.size())
+            break;
+
+        start = end + 1;
+    }
+
+    return items;
+}
+
+std::string joinCsv(
+    const std::vector<std::string>& items
+)
+{
+    std::ostringstream stream;
+
+    for (
+        std::size_t i = 0;
+        i < items.size();
+        ++i
+    ) {
+        if (i > 0)
+            stream << ",";
+
+        stream << items[i];
+    }
+
+    return stream.str();
+}
+
+std::string addCsvValue(
+    const std::string& current,
+    const std::string& value
+)
+{
+    auto items =
+        splitCsv(current);
+
+    if (
+        std::find(
+            items.begin(),
+            items.end(),
+            value
+        ) == items.end()
+    ) {
+        items.push_back(value);
+    }
+
+    return joinCsv(items);
+}
+
+std::string removeCsvValue(
+    const std::string& current,
+    const std::string& value
+)
+{
+    auto items =
+        splitCsv(current);
+
+    items.erase(
+        std::remove(
+            items.begin(),
+            items.end(),
+            value
+        ),
+        items.end()
+    );
+
+    return joinCsv(items);
+}
+
+const BlockDeviceInfo* findDeviceInfo(
+    const std::vector<BlockDeviceInfo>& devices,
+    const std::string& device
+)
+{
+    for (const auto& item : devices) {
+        if (item.device == device)
+            return &item;
+    }
+
+    return nullptr;
 }
 
 void sendAll(
@@ -1402,9 +1526,18 @@ void WebServer::handleClient(
         const auto devices =
             monitor.blockDevices();
 
+        DiskOperations operations;
+
         std::ostringstream json;
 
-        json << "{\"devices\":[";
+        json
+            << "{\"helper_installed\":"
+            << (
+                operations.helperInstalled()
+                ? "true"
+                : "false"
+            )
+            << ",\"devices\":[";
 
         bool first = true;
 
@@ -1483,6 +1616,386 @@ void WebServer::handleClient(
             "application/json; charset=utf-8",
             json.str()
         );
+
+        return;
+    }
+
+    if (
+        method == "POST" &&
+        path == "/api/storage/action"
+    ) {
+        if (
+            !security_.isAdmin(
+                session->role
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"code\":\"admin_required\",\"message\":\"Требуются права администратора.\"}"
+            );
+
+            return;
+        }
+
+        const auto form =
+            parseForm(body);
+
+        const auto action =
+            form.contains("action")
+            ? form.at("action")
+            : "";
+
+        const auto device =
+            form.contains("device")
+            ? form.at("device")
+            : "";
+
+        const auto confirm =
+            form.contains("confirm")
+            ? form.at("confirm")
+            : "";
+
+        const auto label =
+            form.contains("label")
+            ? form.at("label")
+            : "homeai-data";
+
+        StorageMonitor monitor;
+
+        const auto devices =
+            monitor.blockDevices();
+
+        const auto* info =
+            findDeviceInfo(
+                devices,
+                device
+            );
+
+        if (info == nullptr) {
+            sendResponse(
+                client_fd,
+                "400 Bad Request",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"code\":\"device_not_found\",\"message\":\"Устройство не найдено.\"}"
+            );
+
+            return;
+        }
+
+        auto& config =
+            runtime_.config();
+
+        auto sendActionResult =
+            [&](const DiskOperationResult& result) {
+                const std::string response =
+                    "{"
+                    "\"success\":" +
+                    std::string(
+                        result.success
+                        ? "true"
+                        : "false"
+                    ) +
+                    ",\"code\":\"" +
+                    jsonEscape(
+                        result.code
+                    ) +
+                    "\","
+                    "\"message\":\"" +
+                    jsonEscape(
+                        result.message
+                    ) +
+                    "\""
+                    "}";
+
+                sendResponse(
+                    client_fd,
+                    result.success
+                        ? "200 OK"
+                        : "400 Bad Request",
+                    "application/json; charset=utf-8",
+                    response
+                );
+            };
+
+        if (
+            action == "assign-video"
+            ||
+            action == "assign-personal"
+            ||
+            action == "unassign"
+        ) {
+            if (
+                !info->mounted
+                ||
+                info->mount_point.empty()
+            ) {
+                sendActionResult(
+                    {
+                        false,
+                        "not_mounted",
+                        "Сначала смонтируйте диск."
+                    }
+                );
+
+                return;
+            }
+
+            const auto video_key =
+                "storage.video_mounts";
+
+            const auto personal_key =
+                "storage.personal_mounts";
+
+            if (
+                action == "assign-video"
+            ) {
+                config.set(
+                    video_key,
+                    addCsvValue(
+                        config.get(
+                            video_key,
+                            ""
+                        ),
+                        info->mount_point
+                    )
+                );
+
+                config.set(
+                    personal_key,
+                    removeCsvValue(
+                        config.get(
+                            personal_key,
+                            ""
+                        ),
+                        info->mount_point
+                    )
+                );
+            }
+            else if (
+                action ==
+                "assign-personal"
+            ) {
+                config.set(
+                    personal_key,
+                    addCsvValue(
+                        config.get(
+                            personal_key,
+                            ""
+                        ),
+                        info->mount_point
+                    )
+                );
+
+                config.set(
+                    video_key,
+                    removeCsvValue(
+                        config.get(
+                            video_key,
+                            ""
+                        ),
+                        info->mount_point
+                    )
+                );
+            }
+            else {
+                config.set(
+                    video_key,
+                    removeCsvValue(
+                        config.get(
+                            video_key,
+                            ""
+                        ),
+                        info->mount_point
+                    )
+                );
+
+                config.set(
+                    personal_key,
+                    removeCsvValue(
+                        config.get(
+                            personal_key,
+                            ""
+                        ),
+                        info->mount_point
+                    )
+                );
+            }
+
+            if (!config.save()) {
+                sendActionResult(
+                    {
+                        false,
+                        "config_save_failed",
+                        "Не удалось сохранить назначение диска."
+                    }
+                );
+
+                return;
+            }
+
+            security_.audit(
+                "storage.role",
+                session->username,
+                action +
+                " device=" +
+                device +
+                " mount=" +
+                info->mount_point
+            );
+
+            sendActionResult(
+                {
+                    true,
+                    "ok",
+                    "Назначение диска обновлено."
+                }
+            );
+
+            return;
+        }
+
+        DiskOperations operations;
+
+        DiskOperationResult result;
+
+        if (
+            action == "mount-video"
+        ) {
+            result =
+                operations.mount(
+                    device,
+                    "video",
+                    false
+                );
+
+            if (result.success) {
+                const auto mount_point =
+                    DiskOperations::
+                    defaultMountPoint(
+                        device,
+                        "video"
+                    );
+
+                config.set(
+                    "storage.video_mounts",
+                    addCsvValue(
+                        config.get(
+                            "storage.video_mounts",
+                            ""
+                        ),
+                        mount_point
+                    )
+                );
+
+                config.save();
+            }
+        }
+        else if (
+            action == "mount-personal"
+        ) {
+            result =
+                operations.mount(
+                    device,
+                    "personal",
+                    false
+                );
+
+            if (result.success) {
+                const auto mount_point =
+                    DiskOperations::
+                    defaultMountPoint(
+                        device,
+                        "personal"
+                    );
+
+                config.set(
+                    "storage.personal_mounts",
+                    addCsvValue(
+                        config.get(
+                            "storage.personal_mounts",
+                            ""
+                        ),
+                        mount_point
+                    )
+                );
+
+                config.save();
+            }
+        }
+        else if (
+            action == "unmount"
+        ) {
+            result =
+                operations.unmount(
+                    device
+                );
+        }
+        else if (
+            action == "format-ext4"
+        ) {
+            if (confirm != device) {
+                sendActionResult(
+                    {
+                        false,
+                        "confirmation_required",
+                        "Для форматирования нужно подтвердить точное имя устройства."
+                    }
+                );
+
+                return;
+            }
+
+            result =
+                operations.formatExt4(
+                    device,
+                    label
+                );
+        }
+        else if (
+            action == "wipefs"
+        ) {
+            if (confirm != device) {
+                sendActionResult(
+                    {
+                        false,
+                        "confirmation_required",
+                        "Для удаления сигнатур нужно подтвердить точное имя устройства."
+                    }
+                );
+
+                return;
+            }
+
+            result =
+                operations.wipeSignatures(
+                    device
+                );
+        }
+        else {
+            sendActionResult(
+                {
+                    false,
+                    "unsupported_action",
+                    "Неизвестная операция с диском."
+                }
+            );
+
+            return;
+        }
+
+        security_.audit(
+            "storage.action",
+            session->username,
+            action +
+            " device=" +
+            device +
+            " result=" +
+            result.code
+        );
+
+        sendActionResult(result);
 
         return;
     }
