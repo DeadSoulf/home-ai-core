@@ -3,6 +3,7 @@
 #include <array>
 #include <cerrno>
 #include <cstring>
+#include <filesystem>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -35,6 +36,71 @@ std::string basenameOf(
     );
 }
 
+std::string filesystemUuid(
+    const std::string& device
+)
+{
+    const std::filesystem::path root =
+        "/dev/disk/by-uuid";
+
+    std::error_code error;
+
+    if (
+        !std::filesystem::exists(
+            root,
+            error
+        )
+        ||
+        error
+    ) {
+        return {};
+    }
+
+    const auto canonical_device =
+        std::filesystem::canonical(
+            device,
+            error
+        );
+
+    if (error)
+        return {};
+
+    error.clear();
+
+    for (
+        const auto& entry :
+        std::filesystem::directory_iterator(
+            root,
+            error
+        )
+    ) {
+        if (error)
+            break;
+
+        std::error_code canonical_error;
+
+        const auto canonical =
+            std::filesystem::canonical(
+                entry.path(),
+                canonical_error
+            );
+
+        if (
+            !canonical_error
+            &&
+            canonical ==
+                canonical_device
+        ) {
+            return
+                entry.path()
+                    .filename()
+                    .string();
+        }
+    }
+
+    return {};
+}
+
 }
 
 bool DiskOperations::helperInstalled() const
@@ -64,6 +130,21 @@ std::string DiskOperations::defaultMountPoint(
         return
             "/mnt/home-ai/files/" +
             name;
+    }
+
+    if (role == "storage") {
+        const auto uuid =
+            filesystemUuid(
+                device
+            );
+
+        return
+            "/mnt/home-ai/storage/" +
+            (
+                uuid.empty()
+                ? name
+                : uuid
+            );
     }
 
     return {};
