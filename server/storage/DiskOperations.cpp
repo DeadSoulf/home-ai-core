@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cerrno>
+#include <cctype>
 #include <cstring>
 #include <filesystem>
 #include <sys/wait.h>
@@ -397,6 +398,104 @@ DiskOperations::mount(
                 : "rw"
         }
     );
+}
+
+DiskOperationResult
+DiskOperations::mountAt(
+    const std::string& device,
+    const std::string& mount_point,
+    bool read_only
+) const
+{
+    if (
+        mount_point.rfind(
+            "/mnt/home-ai/",
+            0
+        ) != 0
+    ) {
+        return {
+            false,
+            "invalid_mount_point",
+            "Некорректная точка монтирования."
+        };
+    }
+
+    return runHelper(
+        {
+            "mount",
+            device,
+            mount_point,
+            read_only
+                ? "ro"
+                : "rw"
+        }
+    );
+}
+
+std::string
+DiskOperations::deviceForUuid(
+    const std::string& uuid
+)
+{
+    if (
+        uuid.empty()
+        ||
+        uuid.find('/') !=
+            std::string::npos
+        ||
+        uuid.find("..") !=
+            std::string::npos
+    ) {
+        return {};
+    }
+
+    for (
+        const unsigned char c :
+        uuid
+    ) {
+        if (
+            std::isalnum(c)
+            ||
+            c == '-'
+            ||
+            c == '_'
+            ||
+            c == '.'
+        ) {
+            continue;
+        }
+
+        return {};
+    }
+
+    std::error_code error;
+
+    const auto canonical =
+        std::filesystem::canonical(
+            std::filesystem::path(
+                "/dev/disk/by-uuid"
+            )
+            /
+            uuid,
+            error
+        );
+
+    if (error)
+        return {};
+
+    const auto value =
+        canonical.string();
+
+    if (
+        value.rfind(
+            "/dev/",
+            0
+        ) != 0
+    ) {
+        return {};
+    }
+
+    return value;
 }
 
 DiskOperationResult
