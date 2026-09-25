@@ -49,6 +49,7 @@ add_library(
     server/hardware/GpuMonitor.cpp
     ${HOMEAI_NETWORK_SOURCES}
     server/storage/StorageMonitor.cpp
+    server/storage/StoragePool.cpp
     server/storage/DiskOperations.cpp
     server/update/UpdateManager.cpp
 
@@ -291,4 +292,21 @@ target_link_libraries(
 add_test(
     NAME json_utils
     COMMAND test-json-utils
+)
+
+
+add_executable(
+    test-storage-pool
+    tests/test_storage_pool.cpp
+)
+
+target_link_libraries(
+    test-storage-pool
+    PRIVATE
+    homeai-core-lib
+)
+
+add_test(
+    NAME storage_pool
+    COMMAND test-storage-pool
 )
