@@ -1,6 +1,10 @@
 #include "core/logging/Logger.h"
+#include "core/modules/Module.h"
+#include "core/modules/ModuleManager.h"
 #include "core/runtime/CoreRuntime.h"
 #include "security/auth/SecurityManager.h"
+#include "server/storage/StorageMonitor.h"
+#include "server/system/SystemMonitor.h"
 #include "server/update/UpdateManager.h"
 #include "web/server/WebServer.h"
 
@@ -9,9 +13,12 @@
 #include <csignal>
 #include <cstdint>
 #include <filesystem>
-#include <thread>
+#include <memory>
+#include <string>
 #include <system_error>
+#include <thread>
 #include <unistd.h>
+#include <vector>
 
 static std::atomic<bool>
     stop_requested{false};
@@ -94,8 +101,6 @@ int main()
     );
 #endif
 
-    homeai::SecurityManager security;
-
     const auto users_file =
         runtime.config().get(
             "security.users_file",
@@ -107,21 +112,6 @@ int main()
             "security.audit_file",
             "runtime/security/audit.log"
         );
-
-    if (
-        !security.initialize(
-            users_file,
-            audit_file
-        )
-    ) {
-        homeai::Logger::instance().error(
-            "Security Core initialization failed"
-        );
-
-        return 1;
-    }
-
-    homeai::UpdateManager updates;
 
     const auto update_repository =
         runtime.config().get(
@@ -147,31 +137,6 @@ int main()
             60
         );
 
-    if (
-        !updates.initialize(
-            update_repository,
-            update_remote,
-            update_branch,
-            update_interval
-        )
-    ) {
-        homeai::Logger::instance().error(
-            "Update Manager initialization failed"
-        );
-
-        return 1;
-    }
-
-    updates.start();
-
-    runtime.start();
-
-    homeai::WebServer web(
-        runtime,
-        security,
-        updates
-    );
-
     const auto web_bind =
         runtime.config().get(
             "web.bind",
@@ -191,17 +156,409 @@ int main()
         web_port = 8080;
     }
 
+    homeai::SecurityManager security;
+    homeai::UpdateManager updates;
+    homeai::SystemMonitor system_monitor;
+    homeai::StorageMonitor storage_monitor;
+    homeai::ModuleManager modules;
+
+    homeai::WebServer web(
+        runtime,
+        security,
+        updates,
+        modules
+    );
+
+    std::string module_error;
+
     if (
-        !web.start(
-            web_bind,
-            static_cast<std::uint16_t>(
-                web_port
-            )
+        !modules.registerModule(
+            std::make_unique<
+                homeai::CallbackModule
+            >(
+                "security",
+                std::vector<std::string>{},
+                [&](std::string& error) {
+                    if (
+                        security.initialize(
+                            users_file,
+                            audit_file
+                        )
+                    ) {
+                        return true;
+                    }
+
+                    error =
+                        "Security Core initialization failed.";
+
+                    return false;
+                },
+                [](std::string&) {
+                    return true;
+                },
+                []() {},
+                []() {
+                    return
+                        homeai::ModuleHealth::
+                            Healthy;
+                },
+                []() {
+                    return
+                        "Authentication and sessions are ready.";
+                }
+            ),
+            module_error
         )
     ) {
         homeai::Logger::instance().error(
-            "Unable to start Web Core"
+            module_error
         );
+
+        return 1;
+    }
+
+    if (
+        !modules.registerModule(
+            std::make_unique<
+                homeai::CallbackModule
+            >(
+                "update",
+                std::vector<std::string>{},
+                [&](std::string& error) {
+                    if (
+                        updates.initialize(
+                            update_repository,
+                            update_remote,
+                            update_branch,
+                            update_interval
+                        )
+                    ) {
+                        return true;
+                    }
+
+                    error =
+                        "Update Manager initialization failed.";
+
+                    return false;
+                },
+                [&](std::string&) {
+                    updates.start();
+                    return true;
+                },
+                [&]() {
+                    updates.stop();
+                },
+                [&]() {
+                    const auto status =
+                        updates.status();
+
+                    if (
+                        status.state ==
+                        homeai::UpdateState::Error
+                    ) {
+                        return
+                            homeai::ModuleHealth::
+                                Degraded;
+                    }
+
+                    return
+                        homeai::ModuleHealth::
+                            Healthy;
+                },
+                [&]() {
+                    return
+                        updates.status()
+                            .message;
+                }
+            ),
+            module_error
+        )
+    ) {
+        homeai::Logger::instance().error(
+            module_error
+        );
+
+        return 1;
+    }
+
+    if (
+        !modules.registerModule(
+            std::make_unique<
+                homeai::CallbackModule
+            >(
+                "system-monitor",
+                std::vector<std::string>{},
+                [](std::string&) {
+                    return true;
+                },
+                [](std::string&) {
+                    return true;
+                },
+                []() {},
+                [&]() {
+                    const auto stats =
+                        system_monitor.snapshot();
+
+                    if (
+                        stats.memory_total_bytes == 0
+                        ||
+                        stats.disk_total_bytes == 0
+                    ) {
+                        return
+                            homeai::ModuleHealth::
+                                Unhealthy;
+                    }
+
+                    if (
+                        stats.memory_percent >= 95.0
+                        ||
+                        stats.disk_percent >= 95.0
+                    ) {
+                        return
+                            homeai::ModuleHealth::
+                                Degraded;
+                    }
+
+                    return
+                        homeai::ModuleHealth::
+                            Healthy;
+                },
+                []() {
+                    return
+                        "CPU, RAM, load and root filesystem monitoring.";
+                }
+            ),
+            module_error
+        )
+    ) {
+        homeai::Logger::instance().error(
+            module_error
+        );
+
+        return 1;
+    }
+
+    if (
+        !modules.registerModule(
+            std::make_unique<
+                homeai::CallbackModule
+            >(
+                "storage-monitor",
+                std::vector<std::string>{},
+                [](std::string&) {
+                    return true;
+                },
+                [](std::string&) {
+                    return true;
+                },
+                []() {},
+                [&]() {
+                    const auto volumes =
+                        storage_monitor.snapshot(
+                            runtime.config().get(
+                                "storage.video_mounts",
+                                ""
+                            ),
+                            runtime.config().get(
+                                "storage.personal_mounts",
+                                ""
+                            )
+                        );
+
+                    for (
+                        const auto& volume :
+                        volumes
+                    ) {
+                        const bool managed =
+                            volume.role ==
+                                "video"
+                            ||
+                            volume.role ==
+                                "personal"
+                            ||
+                            volume.role ==
+                                "video+personal";
+
+                        if (!managed)
+                            continue;
+
+                        if (
+                            volume.status !=
+                                "online"
+                            ||
+                            volume.read_only
+                            ||
+                            volume.used_percent >=
+                                95.0
+                        ) {
+                            return
+                                homeai::ModuleHealth::
+                                    Degraded;
+                        }
+                    }
+
+                    return
+                        homeai::ModuleHealth::
+                            Healthy;
+                },
+                [&]() {
+                    const auto volumes =
+                        storage_monitor.snapshot(
+                            runtime.config().get(
+                                "storage.video_mounts",
+                                ""
+                            ),
+                            runtime.config().get(
+                                "storage.personal_mounts",
+                                ""
+                            )
+                        );
+
+                    int managed = 0;
+                    int problems = 0;
+
+                    for (
+                        const auto& volume :
+                        volumes
+                    ) {
+                        const bool is_managed =
+                            volume.role ==
+                                "video"
+                            ||
+                            volume.role ==
+                                "personal"
+                            ||
+                            volume.role ==
+                                "video+personal";
+
+                        if (!is_managed)
+                            continue;
+
+                        ++managed;
+
+                        if (
+                            volume.status !=
+                                "online"
+                            ||
+                            volume.read_only
+                            ||
+                            volume.used_percent >=
+                                95.0
+                        ) {
+                            ++problems;
+                        }
+                    }
+
+                    return
+                        "Managed storage: "
+                        + std::to_string(
+                            managed
+                        )
+                        + ", problems: "
+                        + std::to_string(
+                            problems
+                        )
+                        + ".";
+                }
+            ),
+            module_error
+        )
+    ) {
+        homeai::Logger::instance().error(
+            module_error
+        );
+
+        return 1;
+    }
+
+    if (
+        !modules.registerModule(
+            std::make_unique<
+                homeai::CallbackModule
+            >(
+                "web",
+                std::vector<std::string>{
+                    "security",
+                    "update",
+                    "system-monitor",
+                    "storage-monitor"
+                },
+                [](std::string&) {
+                    return true;
+                },
+                [&](std::string& error) {
+                    if (
+                        web.start(
+                            web_bind,
+                            static_cast<
+                                std::uint16_t
+                            >(
+                                web_port
+                            )
+                        )
+                    ) {
+                        return true;
+                    }
+
+                    error =
+                        "Unable to start Web Core.";
+
+                    return false;
+                },
+                [&]() {
+                    web.stop();
+                },
+                [&]() {
+                    return
+                        web.isRunning()
+                        ? homeai::ModuleHealth::
+                            Healthy
+                        : homeai::ModuleHealth::
+                            Unhealthy;
+                },
+                [&]() {
+                    return
+                        web.isRunning()
+                        ? "HTTP interface is accepting connections."
+                        : "HTTP interface is stopped.";
+                }
+            ),
+            module_error
+        )
+    ) {
+        homeai::Logger::instance().error(
+            module_error
+        );
+
+        return 1;
+    }
+
+    if (
+        !modules.initializeAll(
+            module_error
+        )
+    ) {
+        homeai::Logger::instance().error(
+            module_error
+        );
+
+        return 1;
+    }
+
+    runtime.start();
+
+    if (
+        !modules.startAll(
+            module_error
+        )
+    ) {
+        homeai::Logger::instance().error(
+            module_error
+        );
+
+        runtime.stop();
+
+        return 1;
     }
 
     int tick_ms =
@@ -230,8 +587,7 @@ int main()
         );
     }
 
-    web.stop();
-    updates.stop();
+    modules.stopAll();
     runtime.stop();
 
     if (restart_requested) {
