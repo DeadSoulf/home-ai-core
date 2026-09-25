@@ -53,6 +53,12 @@ target_compile_options(
     -Wpedantic
 )
 
+target_compile_definitions(
+    homeai-core-lib
+    PUBLIC
+    HOMEAI_VERSION="${PROJECT_VERSION}"
+)
+
 target_link_libraries(
     homeai-core-lib
     PUBLIC
