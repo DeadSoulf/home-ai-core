@@ -1,6 +1,7 @@
 #include "core/logging/Logger.h"
 #include "core/runtime/CoreRuntime.h"
 #include "security/auth/SecurityManager.h"
+#include "server/update/UpdateManager.h"
 #include "web/server/WebServer.h"
 
 #include <atomic>
@@ -8,6 +9,7 @@
 #include <csignal>
 #include <cstdint>
 #include <thread>
+#include <unistd.h>
 
 static std::atomic<bool>
     stop_requested{false};
@@ -70,11 +72,55 @@ int main()
         return 1;
     }
 
+    homeai::UpdateManager updates;
+
+    const auto update_repository =
+        runtime.config().get(
+            "update.repository",
+            "/srv/home-ai-core"
+        );
+
+    const auto update_remote =
+        runtime.config().get(
+            "update.remote",
+            "origin"
+        );
+
+    const auto update_branch =
+        runtime.config().get(
+            "update.branch",
+            "develop"
+        );
+
+    const int update_interval =
+        runtime.config().getInt(
+            "update.check_interval_seconds",
+            60
+        );
+
+    if (
+        !updates.initialize(
+            update_repository,
+            update_remote,
+            update_branch,
+            update_interval
+        )
+    ) {
+        homeai::Logger::instance().error(
+            "Update Manager initialization failed"
+        );
+
+        return 1;
+    }
+
+    updates.start();
+
     runtime.start();
 
     homeai::WebServer web(
         runtime,
-        security
+        security,
+        updates
     );
 
     const auto web_bind =
@@ -118,7 +164,16 @@ int main()
     if (tick_ms < 10)
         tick_ms = 10;
 
+    bool restart_requested = false;
+
     while (!stop_requested) {
+        if (
+            updates.consumeRestartRequest()
+        ) {
+            restart_requested = true;
+            break;
+        }
+
         std::this_thread::sleep_for(
             std::chrono::milliseconds(
                 tick_ms
@@ -127,7 +182,29 @@ int main()
     }
 
     web.stop();
+    updates.stop();
     runtime.stop();
+
+    if (restart_requested) {
+        const auto binary =
+            updates.restartBinaryPath();
+
+        homeai::Logger::instance().info(
+            "Restarting Home AI Core with updated binary"
+        );
+
+        ::execl(
+            binary.c_str(),
+            binary.c_str(),
+            static_cast<char*>(nullptr)
+        );
+
+        homeai::Logger::instance().error(
+            "Unable to restart updated Home AI Core"
+        );
+
+        return 1;
+    }
 
     return 0;
 }
