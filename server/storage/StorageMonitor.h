@@ -10,6 +10,7 @@ struct StorageVolume {
     std::string source;
     std::string mount_point;
     std::string filesystem;
+    std::string uuid;
     std::string role;
     std::string status;
 
@@ -32,6 +33,7 @@ struct BlockDeviceInfo {
     std::string model;
     std::string vendor;
     std::string serial;
+    std::string uuid;
     std::string mount_point;
 
     std::uint64_t size_bytes{0};
