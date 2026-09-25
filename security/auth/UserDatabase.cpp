@@ -1022,12 +1022,10 @@ bool UserDatabase::migrateLegacyUsers(
         rename_error
     );
 
-    if (rename_error) {
-        error =
-            "Users were migrated, but the legacy database could not be archived.";
-
-        return false;
-    }
+    // Archiving the legacy file is best-effort. The SQLite
+    // transaction is already committed, and a remaining legacy
+    // file will not be imported again while users exist.
+    (void)rename_error;
 
     return true;
 }
@@ -1192,12 +1190,9 @@ bool UserDatabase::migrateLegacyAudit(
         rename_error
     );
 
-    if (rename_error) {
-        error =
-            "Audit was migrated, but the legacy audit file could not be archived.";
-
-        return false;
-    }
+    // As with users, archive failure must not invalidate an
+    // already committed migration.
+    (void)rename_error;
 
     return true;
 }
