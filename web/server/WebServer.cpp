@@ -2721,6 +2721,18 @@ void WebServer::handleClient(
                 files_options
             );
 
+        const auto video_summary =
+            StoragePoolSelector::summarize(
+                volumes,
+                "video"
+            );
+
+        const auto files_summary =
+            StoragePoolSelector::summarize(
+                volumes,
+                "personal"
+            );
+
         std::ostringstream json;
 
         json
@@ -2755,6 +2767,38 @@ void WebServer::handleClient(
                 : ""
             )
             << "\","
+            << "\"video_summary\":{"
+            << "\"assigned_volumes\":"
+            << video_summary.assigned_volumes
+            << ",\"online_volumes\":"
+            << video_summary.online_volumes
+            << ",\"total_bytes\":"
+            << video_summary.total_bytes
+            << ",\"free_bytes\":"
+            << video_summary.free_bytes
+            << ",\"free_bytes_complete\":"
+            << (
+                video_summary.free_bytes_complete
+                ? "true"
+                : "false"
+            )
+            << "},"
+            << "\"files_summary\":{"
+            << "\"assigned_volumes\":"
+            << files_summary.assigned_volumes
+            << ",\"online_volumes\":"
+            << files_summary.online_volumes
+            << ",\"total_bytes\":"
+            << files_summary.total_bytes
+            << ",\"free_bytes\":"
+            << files_summary.free_bytes
+            << ",\"free_bytes_complete\":"
+            << (
+                files_summary.free_bytes_complete
+                ? "true"
+                : "false"
+            )
+            << "},"
             << "\"volumes\":[";
 
         bool first = true;
