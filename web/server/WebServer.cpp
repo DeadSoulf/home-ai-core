@@ -3818,27 +3818,59 @@ void WebServer::handleClient(
         method == "POST" &&
         path == "/api/config"
     ) {
-        if (
-            !security_.hasPermission(
-                *session,
-                "system.manage"
-            )
-        ) {
-            sendResponse(
-                client_fd,
-                "403 Forbidden",
-                "application/json; charset=utf-8",
-                "{\"error\":\"admin_required\"}"
-            );
-
-            return;
-        }
-
         const auto form =
             parseForm(body);
 
-        auto& config =
-            runtime_.config();
+        const auto allowed =
+            [&](const std::string& key) {
+                if (
+                    key == "core.name"
+                    ||
+                    key == "log.level"
+                    ||
+                    key == "runtime.tick_ms"
+                ) {
+                    return
+                        security_.hasPermission(
+                            *session,
+                            "system.manage"
+                        );
+                }
+
+                if (
+                    key == "web.bind"
+                    ||
+                    key == "web.port"
+                ) {
+                    return
+                        security_.hasPermission(
+                            *session,
+                            "network.manage"
+                        );
+                }
+
+                if (
+                    key == "storage.video_mounts"
+                    ||
+                    key == "storage.personal_mounts"
+                ) {
+                    return
+                        security_.hasPermission(
+                            *session,
+                            "storage.manage"
+                        );
+                }
+
+                if (key == "files.root") {
+                    return
+                        security_.hasPermission(
+                            *session,
+                            "files.manage"
+                        );
+                }
+
+                return false;
+            };
 
         const char* allowed_keys[] = {
             "core.name",
@@ -3850,6 +3882,26 @@ void WebServer::handleClient(
             "storage.personal_mounts",
             "files.root"
         };
+
+        for (const auto* key : allowed_keys) {
+            if (
+                form.contains(key)
+                &&
+                !allowed(key)
+            ) {
+                sendResponse(
+                    client_fd,
+                    "403 Forbidden",
+                    "application/json; charset=utf-8",
+                    "{\"error\":\"permission_denied\"}"
+                );
+
+                return;
+            }
+        }
+
+        auto& config =
+            runtime_.config();
 
         for (const auto* key : allowed_keys) {
             const auto it =
