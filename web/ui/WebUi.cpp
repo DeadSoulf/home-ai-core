@@ -5928,9 +5928,16 @@ function populatePinnedStorageSelects(volumes) {
                 return;
 
             const selected =
-                select.dataset.selected
-                || select.value
-                || "";
+                select.dataset.selected !==
+                    undefined
+                &&
+                select.dataset.selected !==
+                    ""
+                ? select.dataset.selected
+                : (
+                    select.value
+                    || ""
+                );
 
             const options =
                 [
@@ -6007,6 +6014,17 @@ function populatePinnedStorageSelects(volumes) {
                 select.appendChild(
                     option
                 );
+            }
+
+            // Use the server-rendered value only for the first population.
+            // Afterwards preserve any unsaved selection while periodic
+            // storage refreshes continue in the background.
+            if (
+                select.dataset.selected !==
+                undefined
+            ) {
+                select.dataset.selected =
+                    "";
             }
         };
 
