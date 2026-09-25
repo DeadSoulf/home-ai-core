@@ -2687,6 +2687,13 @@ void WebServer::handleClient(
                     *
                     1024ULL;
 
+                options.preferred_mount =
+                    storage_config.get(
+                        prefix +
+                            "_pinned_mount",
+                        ""
+                    );
+
                 return options;
             };
 
@@ -4158,6 +4165,22 @@ void WebServer::handleClient(
                 )
             ) +
             "\","
+            "\"storage.video_pinned_mount\":\"" +
+            jsonEscape(
+                config.get(
+                    "storage.video_pinned_mount",
+                    ""
+                )
+            ) +
+            "\","
+            "\"storage.files_pinned_mount\":\"" +
+            jsonEscape(
+                config.get(
+                    "storage.files_pinned_mount",
+                    ""
+                )
+            ) +
+            "\","
             "\"files.root\":\"" +
             jsonEscape(
                 config.get(
@@ -4229,6 +4252,10 @@ void WebServer::handleClient(
                     key == "storage.video_reserve_gb"
                     ||
                     key == "storage.files_reserve_gb"
+                    ||
+                    key == "storage.video_pinned_mount"
+                    ||
+                    key == "storage.files_pinned_mount"
                 ) {
                     return
                         security_.hasPermission(
@@ -4262,6 +4289,8 @@ void WebServer::handleClient(
             "storage.files_reserve_percent",
             "storage.video_reserve_gb",
             "storage.files_reserve_gb",
+            "storage.video_pinned_mount",
+            "storage.files_pinned_mount",
             "files.root"
         };
 
@@ -4436,6 +4465,18 @@ void WebServer::handleClient(
             config.get(
                 "storage.files_reserve_gb",
                 "0"
+            );
+
+        context.storage_video_pinned_mount =
+            config.get(
+                "storage.video_pinned_mount",
+                ""
+            );
+
+        context.storage_files_pinned_mount =
+            config.get(
+                "storage.files_pinned_mount",
+                ""
             );
 
         context.files_root =
