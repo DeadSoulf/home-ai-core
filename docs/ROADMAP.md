@@ -9,7 +9,7 @@
 | 0.0.3 | Integrated Web Core | DONE |
 | 0.0.4 | System Monitor and live Dashboard metrics | DONE |
 | 0.0.5 | Security Core + protected Web/API + storage monitoring foundation | DONE |
-| 0.0.6 | Module Manager | IN DEVELOPMENT |
+| 0.0.6 | Module Manager + hot-plug storage integration | IN DEVELOPMENT |
 | 0.0.7 | Full Storage Core: health, pools, quotas, retention | PLANNED |
 | 0.0.8 | Device Core | PLANNED |
 | 0.0.9 | Automation Core | PLANNED |
@@ -20,10 +20,11 @@
 ## Development priorities
 
 1. Introduce a Module Manager so major subsystems remain isolated and replaceable.
-2. Build Storage and Device abstractions before higher-level automation.
-3. Keep core operation local-first and independent of Internet availability.
-4. Keep experimental self-development isolated behind tests, sandboxing and rollback.
-5. Preserve portability between the current Proxmox VM and the future physical Debian server.
+2. Continue the Storage Core safely before allowing destructive disk operations.
+3. Build Device abstractions before higher-level automation.
+4. Keep core operation local-first and independent of Internet availability.
+5. Keep experimental self-development isolated behind tests, sandboxing and rollback.
+6. Preserve portability between the current Proxmox VM and the future physical Debian server.
 
 ## Stable: 0.0.5
 
@@ -45,35 +46,33 @@ Validated on the Debian development server:
 - ONLINE/OFFLINE, filesystem, capacity and read-only reporting
 - authenticated `/api/storage` endpoint and live storage dashboard
 
-## Current focus: 0.0.6 Module Manager
+## Current focus: 0.0.6
 
-The Module Manager will define a common lifecycle for subsystems:
+Completed in the current development branch:
 
-```text
-discover -> initialize -> start -> health -> stop
-```
+- sysfs block-device discovery
+- manual "Проверить новые диски" control
+- automatic hot-plug polling in the Web UI
+- notification when a new unused disk appears
+- action proposals for video / personal files / ignore
+- filtering for mounted, swap and Linux-holder-backed devices
+- `GET /api/storage/devices`
 
-Planned initial modules:
+Still planned for 0.0.6:
 
-- Security
-- Web
-- System Monitor
-- Storage
-- Devices
-- Automation
-- AI
-- Video
-- Hypervisor
-
-The first 0.0.6 implementation should provide:
-
-- a common module interface
+- common module interface
 - module registration
 - lifecycle state tracking
 - dependency ordering
 - health reporting
 - clean shutdown ordering
 - module status exposure in the Web UI
+
+The Module Manager lifecycle will be:
+
+```text
+discover -> initialize -> start -> health -> stop
+```
 
 ## Later major capabilities
 
