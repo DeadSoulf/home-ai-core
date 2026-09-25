@@ -1584,6 +1584,30 @@ bool SecurityManager::isLastEnabledAdmin(
         return false;
     }
 
+    const auto overrides =
+        database_.
+            permissionOverrides(
+                user.id,
+                error
+            );
+
+    if (!error.empty())
+        return false;
+
+    const auto permission =
+        overrides.find(
+            "users.manage"
+        );
+
+    if (
+        permission !=
+            overrides.end()
+        &&
+        permission->second < 0
+    ) {
+        return false;
+    }
+
     const auto count =
         database_.
             countManagingAdmins(
