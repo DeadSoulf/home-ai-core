@@ -3,6 +3,7 @@
 #include "core/modules/ModuleManager.h"
 #include "core/runtime/CoreRuntime.h"
 #include "security/auth/SecurityManager.h"
+#include "server/storage/DiskOperations.h"
 #include "server/storage/StorageMonitor.h"
 #include "server/system/SystemMonitor.h"
 #include "server/update/UpdateManager.h"
@@ -355,7 +356,81 @@ int main()
                 [](std::string&) {
                     return true;
                 },
-                [](std::string&) {
+                [&](std::string&) {
+                    const auto volumes =
+                        storage_monitor.snapshot(
+                            runtime.config().get(
+                                "storage.video_mounts",
+                                ""
+                            ),
+                            runtime.config().get(
+                                "storage.personal_mounts",
+                                ""
+                            )
+                        );
+
+                    homeai::DiskOperations
+                        operations;
+
+                    for (const auto& volume : volumes) {
+                        if (
+                            volume.status != "offline"
+                            ||
+                            volume.mount_point.rfind(
+                                "/mnt/home-ai/storage/",
+                                0
+                            ) != 0
+                        ) {
+                            continue;
+                        }
+
+                        const auto uuid =
+                            std::filesystem::path(
+                                volume.mount_point
+                            )
+                            .filename()
+                            .string();
+
+                        const auto device =
+                            homeai::DiskOperations::
+                                deviceForUuid(
+                                    uuid
+                                );
+
+                        if (device.empty()) {
+                            homeai::Logger::instance().warning(
+                                "Storage UUID not present: "
+                                + uuid
+                            );
+
+                            continue;
+                        }
+
+                        const auto result =
+                            operations.mountAt(
+                                device,
+                                volume.mount_point,
+                                false
+                            );
+
+                        if (!result.success) {
+                            homeai::Logger::instance().warning(
+                                "Unable to restore storage "
+                                + uuid
+                                + ": "
+                                + result.message
+                            );
+                        }
+                        else {
+                            homeai::Logger::instance().info(
+                                "Restored managed storage "
+                                + uuid
+                                + " at "
+                                + volume.mount_point
+                            );
+                        }
+                    }
+
                     return true;
                 },
                 []() {},
