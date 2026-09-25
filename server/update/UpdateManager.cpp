@@ -1342,7 +1342,8 @@ void UpdateManager::setState(
             break;
 
         case UpdateState::Error:
-            status_.progress_stage = "error";
+            // Keep the last active stage so the Web UI can show
+            // exactly where the update failed.
             break;
     }
 
