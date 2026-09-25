@@ -708,6 +708,90 @@ button:disabled {
     color: var(--muted);
 }
 
+.users-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.user-card {
+    background: var(--surface-2);
+    border: 1px solid #242a34;
+    border-radius: 10px;
+    padding: 15px;
+}
+
+.user-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.user-card-header h3 {
+    margin: 0;
+}
+
+.user-meta {
+    display: grid;
+    grid-template-columns:
+        repeat(auto-fit, minmax(170px, 1fr));
+    gap: 8px 14px;
+    margin-top: 12px;
+    color: var(--muted);
+}
+
+.permission-grid {
+    display: grid;
+    grid-template-columns:
+        repeat(auto-fit, minmax(260px, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.permission-row {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 1fr) 120px;
+    gap: 10px;
+    align-items: center;
+    padding: 8px;
+    border-radius: 8px;
+    background: #0f1217;
+}
+
+.permission-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.permission-chip {
+    padding: 4px 7px;
+    border-radius: 999px;
+    background: #202632;
+    color: #c7d0dc;
+    font-size: 0.78rem;
+}
+
+.audit-list {
+    display: grid;
+    gap: 8px;
+}
+
+.audit-entry {
+    border-left: 3px solid #3b4658;
+    background: var(--surface-2);
+    padding: 10px 12px;
+    border-radius: 8px;
+}
+
+.audit-entry strong {
+    display: inline-block;
+    margin-right: 8px;
+}
+
 @media (max-width: 860px) {
     .sidebar {
         position: static;
