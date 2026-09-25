@@ -155,10 +155,6 @@ int main()
         ) == std::string::npos
         ||
         network.find(
-            "Получить IP по DHCP"
-        ) == std::string::npos
-        ||
-        network.find(
             "/api/network/ipv4"
         ) == std::string::npos
         ||
