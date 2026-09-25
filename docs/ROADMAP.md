@@ -10,7 +10,8 @@
 | 0.0.4 | System Monitor and live Dashboard metrics | DONE |
 | 0.0.5 | Security Core + protected Web/API + storage monitoring foundation | DONE |
 | 0.0.6 | Module Manager + hot-plug storage integration + Storage Pool foundation | DONE |
-| 0.0.7 | WireGuard Web editor + centralized versioning | IN DEVELOPMENT |
+| 0.0.7 | WireGuard Web editor + centralized versioning | DEVELOPMENT SNAPSHOT |
+| 0.0.8 | Logical permission-aware Web sidebar and navigation | IN DEVELOPMENT |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
 | next 0.0.x | Device Core | PLANNED |
 | next 0.0.x | Automation Core | PLANNED |
@@ -109,9 +110,9 @@ The Module Manager lifecycle will be:
 discover -> initialize -> start -> health -> stop
 ```
 
-## Current focus: 0.0.7
+## Development snapshot: 0.0.7
 
-Current development work:
+Implemented in the 0.0.7 snapshot:
 
 - editable WireGuard profiles in the Network Web UI
 - create, edit and remove WireGuard `*.conf` profiles
@@ -124,10 +125,25 @@ Current development work:
 - GitHub version guard for Core/runtime code changes
 - VPN profile save/load/remove coverage in the test suite
 
-0.0.7 requires a development-server pull, clean build and the expanded test suite before
-it can be promoted as a stable version.
+## Current focus: 0.0.8
 
-Patch versions after 0.0.7 are intentionally not pre-assigned to individual roadmap items.
+Current development work:
+
+- task-oriented sidebar groups: Overview, Server, Services, AI and Management
+- Home isolated as the single Overview entry
+- System, Network, Storage and Virtualization grouped under Server
+- Files, Cameras, Smart Home and Automation grouped under Services
+- AI runtime and GPU assignment grouped together
+- Users and general Settings grouped under Management
+- empty navigation groups hidden automatically according to user permissions
+- storage navigation label clarified from Disks to Storage
+- ambiguous Administration navigation entry renamed to AI / GPU
+- existing route URLs preserved for backward compatibility
+- Web UI tests cover group ordering and permission-aware visibility
+
+0.0.8 requires a development-server pull, clean build and the test suite before promotion.
+
+Patch versions after 0.0.8 are intentionally not pre-assigned to individual roadmap items.
 Each Core/runtime change advances to the next version, while larger minor milestones such as
 0.1.0 remain roadmap targets.
 

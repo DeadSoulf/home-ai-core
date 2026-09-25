@@ -1,4 +1,9 @@
 Главная	Home
+Сервер	Server
+Сервисы	Services
+Управление	Management
+Хранилище	Storage
+AI / GPU	AI / GPU
 Сеть	Network
 Диски	Disks
 Файлы	Files
@@ -77,7 +82,7 @@ VPN-подключения сервера	Server VPN connections
 Корневая папка	Root directory
 Диски личных файлов	Personal file disks
 Не назначены	Not assigned
-Файлы домашнего облака будут храниться только в выбранном каталоге. Физические диски для личных данных назначаются в разделе «Диски».	Home cloud files will be stored only in the selected directory. Assign physical disks for personal data in Disks.
+Файлы домашнего облака будут храниться только в выбранном каталоге. Физические диски для личных данных назначаются в разделе «Хранилище».	Home cloud files will be stored only in the selected directory. Assign physical disks for personal data in Storage.
 Настройки хранения файлов	File storage settings
 Корневая папка домашнего облака	Home cloud root directory
 Следующим этапом здесь появятся браузер файлов, папки пользователей, корзина, квоты, версии файлов и общий доступ внутри домашней сети.	Future features include a file browser, user folders, trash, quotas, file versions and sharing on the home network.

@@ -73,6 +73,31 @@ int main()
             context
         );
 
+    const auto overview_position =
+        home.find(
+            "<div class=\"nav-caption\">Обзор</div>"
+        );
+
+    const auto server_position =
+        home.find(
+            "<div class=\"nav-caption\">Сервер</div>"
+        );
+
+    const auto services_position =
+        home.find(
+            "<div class=\"nav-caption\">Сервисы</div>"
+        );
+
+    const auto ai_position =
+        home.find(
+            "<div class=\"nav-caption\">AI</div>"
+        );
+
+    const auto management_position =
+        home.find(
+            "<div class=\"nav-caption\">Управление</div>"
+        );
+
     if (
         home.find("Главная") ==
             std::string::npos
@@ -83,6 +108,51 @@ int main()
         ||
         home.find(
             "Диски и хранилища"
+        ) != std::string::npos
+        ||
+        overview_position ==
+            std::string::npos
+        ||
+        server_position ==
+            std::string::npos
+        ||
+        services_position ==
+            std::string::npos
+        ||
+        ai_position ==
+            std::string::npos
+        ||
+        management_position ==
+            std::string::npos
+        ||
+        !(
+            overview_position <
+                server_position
+            &&
+            server_position <
+                services_position
+            &&
+            services_position <
+                ai_position
+            &&
+            ai_position <
+                management_position
+        )
+        ||
+        home.find(
+            "<span>Хранилище</span>"
+        ) == std::string::npos
+        ||
+        home.find(
+            "<span>AI / GPU</span>"
+        ) == std::string::npos
+        ||
+        home.find(
+            "<div class=\"nav-caption\">Дом и сервисы</div>"
+        ) != std::string::npos
+        ||
+        home.find(
+            "<div class=\"nav-caption\">Интеллект</div>"
         ) != std::string::npos
     ) {
         std::cerr
@@ -335,8 +405,69 @@ int main()
         "network.view",
         "automation.view"
     };
-    const auto viewer = homeai::renderWebUi(context);
-    if (viewer.find("id=\"gpu-list\"") != std::string::npos || viewer.find("href=\"/admin\"") != std::string::npos) return 1;
+    const auto viewer =
+        homeai::renderWebUi(
+            context
+        );
+
+    if (
+        viewer.find(
+            "id=\"gpu-list\""
+        ) != std::string::npos
+        ||
+        viewer.find(
+            "href=\"/admin\""
+        ) != std::string::npos
+        ||
+        viewer.find(
+            "<div class=\"nav-caption\">Управление</div>"
+        ) != std::string::npos
+    ) {
+        return 1;
+    }
+
+    context.page =
+        "/network";
+
+    context.permissions = {
+        "network.view"
+    };
+
+    const auto network_only =
+        homeai::renderWebUi(
+            context
+        );
+
+    if (
+        network_only.find(
+            "<div class=\"nav-caption\">Сервер</div>"
+        ) == std::string::npos
+        ||
+        network_only.find(
+            "href=\"/network\""
+        ) == std::string::npos
+        ||
+        network_only.find(
+            "<div class=\"nav-caption\">Обзор</div>"
+        ) != std::string::npos
+        ||
+        network_only.find(
+            "<div class=\"nav-caption\">Сервисы</div>"
+        ) != std::string::npos
+        ||
+        network_only.find(
+            "<div class=\"nav-caption\">AI</div>"
+        ) != std::string::npos
+        ||
+        network_only.find(
+            "<div class=\"nav-caption\">Управление</div>"
+        ) != std::string::npos
+    ) {
+        std::cerr
+            << "Permission-aware sidebar grouping is invalid\n";
+
+        return 1;
+    }
 
     return 0;
 }

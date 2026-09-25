@@ -104,7 +104,7 @@ std::string pageTitle(
         return "Сеть";
 
     if (page == "/storage")
-        return "Диски";
+        return "Хранилище";
 
     if (page == "/files")
         return "Файлы";
@@ -131,7 +131,7 @@ std::string pageTitle(
         return "Система";
 
     if (page == "/admin")
-        return "Администрирование";
+        return "AI / GPU";
 
     if (page == "/settings")
         return "Настройки";
@@ -968,134 +968,300 @@ button:disabled {
 
     page << "<nav>";
 
-    page << "<div class=\"nav-group\">";
-    page << "<div class=\"nav-caption\">Обзор</div>";
+    const bool show_overview =
+        uiHasPermission(
+            context,
+            "system.view"
+        );
 
-    if (
+    const bool show_server =
         uiHasPermission(
             context,
             "system.view"
         )
-    ) {
-        navLink(page, context, "/", "Главная", "⌂");
-        navLink(page, context, "/system", "Система", "▣");
-    }
-
-    if (
+        ||
         uiHasPermission(
             context,
             "network.view"
         )
-    ) {
-        navLink(page, context, "/network", "Сеть", "⇄");
-    }
-
-    if (
+        ||
         uiHasPermission(
             context,
             "storage.view"
         )
-    ) {
-        navLink(page, context, "/storage", "Диски", "◫");
-    }
+        ||
+        uiHasPermission(
+            context,
+            "hypervisor.view"
+        );
 
-    if (
+    const bool show_services =
         uiHasPermission(
             context,
             "files.read"
         )
-    ) {
-        navLink(page, context, "/files", "Файлы", "▱");
-    }
-
-    page << "</div>";
-
-    page << "<div class=\"nav-group\">";
-    page << "<div class=\"nav-caption\">Дом и сервисы</div>";
-
-    if (
+        ||
         uiHasPermission(
             context,
             "cameras.view"
         )
-    ) {
-        navLink(page, context, "/cameras", "Камеры", "◉");
-    }
-
-    if (
+        ||
         uiHasPermission(
             context,
             "smart_home.view"
         )
-    ) {
-        navLink(page, context, "/smart-home", "Умный дом", "⌁");
-    }
-
-    if (
+        ||
         uiHasPermission(
             context,
             "automation.view"
-        )
-    ) {
-        navLink(page, context, "/automation", "Автоматизация", "⚙");
-    }
+        );
 
-    page << "</div>";
-
-    page << "<div class=\"nav-group\">";
-    page << "<div class=\"nav-caption\">Интеллект</div>";
-
-    if (
+    const bool show_ai =
         uiHasPermission(
             context,
             "ai.use"
         )
-    ) {
-        navLink(page, context, "/ai", "AI", "✦");
-    }
-
-    page << "</div>";
-
-    page << "<div class=\"nav-group\">";
-    page << "<div class=\"nav-caption\">Администрирование</div>";
-
-    if (
+        ||
         uiHasPermission(
             context,
             "ai.manage"
-        )
-    ) {
-        navLink(page, context, "/admin", "Администрирование", "⚒");
-    }
+        );
 
-    if (
+    const bool show_management =
         uiHasPermission(
             context,
             "users.view"
         )
-    ) {
-        navLink(page, context, "/users", "Пользователи", "♙");
-    }
-
-    if (
-        uiHasPermission(
-            context,
-            "hypervisor.view"
-        )
-    ) {
-        navLink(page, context, "/hypervisor", "Виртуализация", "▤");
-    }
-
-    if (
+        ||
         uiHasPermission(
             context,
             "system.manage"
-        )
-    ) {
-        navLink(page, context, "/settings", "Настройки", "⚙");
+        );
+
+    if (show_overview) {
+        page << "<div class=\"nav-group\">";
+        page << "<div class=\"nav-caption\">Обзор</div>";
+
+        navLink(
+            page,
+            context,
+            "/",
+            "Главная",
+            "⌂"
+        );
+
+        page << "</div>";
     }
 
-    page << "</div></nav>";
+    if (show_server) {
+        page << "<div class=\"nav-group\">";
+        page << "<div class=\"nav-caption\">Сервер</div>";
+
+        if (
+            uiHasPermission(
+                context,
+                "system.view"
+            )
+        ) {
+            navLink(
+                page,
+                context,
+                "/system",
+                "Система",
+                "▣"
+            );
+        }
+
+        if (
+            uiHasPermission(
+                context,
+                "network.view"
+            )
+        ) {
+            navLink(
+                page,
+                context,
+                "/network",
+                "Сеть",
+                "⇄"
+            );
+        }
+
+        if (
+            uiHasPermission(
+                context,
+                "storage.view"
+            )
+        ) {
+            navLink(
+                page,
+                context,
+                "/storage",
+                "Хранилище",
+                "◫"
+            );
+        }
+
+        if (
+            uiHasPermission(
+                context,
+                "hypervisor.view"
+            )
+        ) {
+            navLink(
+                page,
+                context,
+                "/hypervisor",
+                "Виртуализация",
+                "▤"
+            );
+        }
+
+        page << "</div>";
+    }
+
+    if (show_services) {
+        page << "<div class=\"nav-group\">";
+        page << "<div class=\"nav-caption\">Сервисы</div>";
+
+        if (
+            uiHasPermission(
+                context,
+                "files.read"
+            )
+        ) {
+            navLink(
+                page,
+                context,
+                "/files",
+                "Файлы",
+                "▱"
+            );
+        }
+
+        if (
+            uiHasPermission(
+                context,
+                "cameras.view"
+            )
+        ) {
+            navLink(
+                page,
+                context,
+                "/cameras",
+                "Камеры",
+                "◉"
+            );
+        }
+
+        if (
+            uiHasPermission(
+                context,
+                "smart_home.view"
+            )
+        ) {
+            navLink(
+                page,
+                context,
+                "/smart-home",
+                "Умный дом",
+                "⌁"
+            );
+        }
+
+        if (
+            uiHasPermission(
+                context,
+                "automation.view"
+            )
+        ) {
+            navLink(
+                page,
+                context,
+                "/automation",
+                "Автоматизация",
+                "⚙"
+            );
+        }
+
+        page << "</div>";
+    }
+
+    if (show_ai) {
+        page << "<div class=\"nav-group\">";
+        page << "<div class=\"nav-caption\">AI</div>";
+
+        if (
+            uiHasPermission(
+                context,
+                "ai.use"
+            )
+        ) {
+            navLink(
+                page,
+                context,
+                "/ai",
+                "AI",
+                "✦"
+            );
+        }
+
+        if (
+            uiHasPermission(
+                context,
+                "ai.manage"
+            )
+        ) {
+            navLink(
+                page,
+                context,
+                "/admin",
+                "AI / GPU",
+                "⚒"
+            );
+        }
+
+        page << "</div>";
+    }
+
+    if (show_management) {
+        page << "<div class=\"nav-group\">";
+        page << "<div class=\"nav-caption\">Управление</div>";
+
+        if (
+            uiHasPermission(
+                context,
+                "users.view"
+            )
+        ) {
+            navLink(
+                page,
+                context,
+                "/users",
+                "Пользователи",
+                "♙"
+            );
+        }
+
+        if (
+            uiHasPermission(
+                context,
+                "system.manage"
+            )
+        ) {
+            navLink(
+                page,
+                context,
+                "/settings",
+                "Настройки",
+                "⚙"
+            );
+        }
+
+        page << "</div>";
+    }
+
+    page << "</nav>";
 
     page
         << "<div class=\"sidebar-user\">"
@@ -1867,7 +2033,7 @@ PrivateKey отображается в редакторе и сохраняет�
 
 <p class="muted" style="margin-top:14px">
 Файлы домашнего облака будут храниться только в выбранном каталоге.
-Физические диски для личных данных назначаются в разделе «Диски».
+Физические диски для личных данных назначаются в разделе «Хранилище».
 </p>
 </div>
 )HTML";

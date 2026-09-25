@@ -8,21 +8,37 @@ The home page is intentionally kept minimal: it shows only system statistics and
 
 ## Sidebar
 
-Current sections:
+The sidebar is organized by user task rather than by implementation module. Empty groups are
+not rendered when the current user has no permission for any item in that group.
+
+Current structure:
 
 ```text
-Главная
-Система
-Сеть
-Диски
-Камеры
-Умный дом
-Автоматизация
+Обзор
+└── Главная
+
+Сервер
+├── Система
+├── Сеть
+├── Хранилище
+└── Виртуализация
+
+Сервисы
+├── Файлы
+├── Камеры
+├── Умный дом
+└── Автоматизация
+
 AI
-Пользователи
-Виртуализация
-Настройки
+├── AI
+└── AI / GPU
+
+Управление
+├── Пользователи
+└── Настройки
 ```
+
+The route paths remain stable for backward compatibility.
 
 ## Routes
 
@@ -30,13 +46,15 @@ AI
 /               Главная
 /system         Система
 /network        Сеть
-/storage        Диски
+/storage        Хранилище
+/hypervisor     Виртуализация
+/files          Файлы
 /cameras        Камеры
 /smart-home     Умный дом
 /automation     Автоматизация
 /ai             AI
+/admin          AI / GPU
 /users          Пользователи
-/hypervisor     Виртуализация
 /settings       Настройки
 ```
 
@@ -78,6 +96,7 @@ Current content:
 - constrained privileged Network Helper
 - persistent NetworkManager, systemd-networkd and Debian ifupdown configuration
 - WireGuard profile status and connect/disconnect
+- create, edit, save and remove WireGuard profiles for users with network.manage
 
 Future content:
 
@@ -85,7 +104,7 @@ Future content:
 - DNS
 - diagnostics
 
-## Disks
+## Storage
 
 Current storage UI includes:
 
