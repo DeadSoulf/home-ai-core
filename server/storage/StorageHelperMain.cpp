@@ -77,6 +77,9 @@ bool safeMountPoint(
     const std::string files_prefix =
         "/mnt/home-ai/files/";
 
+    const std::string storage_prefix =
+        "/mnt/home-ai/storage/";
+
     const bool prefix_ok =
         path.rfind(
             video_prefix,
@@ -85,6 +88,11 @@ bool safeMountPoint(
         ||
         path.rfind(
             files_prefix,
+            0
+        ) == 0
+        ||
+        path.rfind(
+            storage_prefix,
             0
         ) == 0;
 
@@ -280,6 +288,11 @@ bool mountedInsideHomeAI(
             ||
             info.mount_point.rfind(
                 "/mnt/home-ai/files/",
+                0
+            ) == 0
+            ||
+            info.mount_point.rfind(
+                "/mnt/home-ai/storage/",
                 0
             ) == 0
         );
