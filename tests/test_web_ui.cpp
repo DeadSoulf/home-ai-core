@@ -145,6 +145,22 @@ int main()
         network.find(
             "name=\"return_to\" value=\"/network\""
         ) == std::string::npos
+        ||
+        network.find(
+            "Сетевые интерфейсы"
+        ) == std::string::npos
+        ||
+        network.find(
+            "network-interface-list"
+        ) == std::string::npos
+        ||
+        network.find(
+            "Получить IP по DHCP"
+        ) == std::string::npos
+        ||
+        network.find(
+            "/api/network/dhcp"
+        ) == std::string::npos
     ) {
         std::cerr
             << "Network page structure is invalid\n";
