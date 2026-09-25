@@ -159,6 +159,14 @@ int main()
 
     if (
         system.find(
+            "Модули ядра"
+        ) == std::string::npos
+        ||
+        system.find(
+            "module-list"
+        ) == std::string::npos
+        ||
+        system.find(
             "Обновление сервера"
         ) == std::string::npos
         ||
