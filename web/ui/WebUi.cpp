@@ -5447,6 +5447,23 @@ async function updateStorageStats() {
                 filesystem
             );
 
+            const physicalSize =
+                document.createElement(
+                    "div"
+                );
+
+            physicalSize.textContent =
+                "Размер диска: "
+                + formatBytes(
+                    volume.device_size_bytes
+                    || volume.total_bytes
+                    || 0
+                );
+
+            card.appendChild(
+                physicalSize
+            );
+
             const capacity =
                 document.createElement(
                     "div"
@@ -5454,7 +5471,9 @@ async function updateStorageStats() {
 
             if (
                 volume.status ===
-                "online"
+                    "online"
+                &&
+                volume.capacity_available
             ) {
                 capacity.textContent =
                     "Занято: "
@@ -5473,6 +5492,13 @@ async function updateStorageStats() {
                     + formatBytes(
                         volume.free_bytes
                     );
+            }
+            else if (
+                volume.status ===
+                "online"
+            ) {
+                capacity.textContent =
+                    "Использование ФС: данные временно недоступны";
             }
             else {
                 capacity.textContent =
