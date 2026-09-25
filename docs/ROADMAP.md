@@ -84,6 +84,9 @@ Completed in the current development branch:
 - network interface inventory in Web UI
 - DHCP address request/renew through a constrained privileged Network Helper
 - NetworkManager, systemd-networkd, dhclient and udhcpc DHCP backend support
+- DHCP / static IPv4 mode per interface with netmask, gateway and DNS
+- persistent IPv4 configuration for NetworkManager, systemd-networkd and Debian ifupdown
+- rollback backups for managed network configuration
 
 Module Manager implemented in the current development branch:
 
