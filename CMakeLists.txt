@@ -29,6 +29,7 @@ add_library(
     core/runtime/CoreRuntime.cpp
 
     server/system/SystemMonitor.cpp
+    server/storage/StorageMonitor.cpp
 
     security/auth/SecurityManager.cpp
 
@@ -99,4 +100,20 @@ target_link_libraries(
 add_test(
     NAME security_core
     COMMAND test-security
+)
+
+add_executable(
+    test-storage-monitor
+    tests/test_storage_monitor.cpp
+)
+
+target_link_libraries(
+    test-storage-monitor
+    PRIVATE
+    homeai-core-lib
+)
+
+add_test(
+    NAME storage_monitor
+    COMMAND test-storage-monitor
 )
