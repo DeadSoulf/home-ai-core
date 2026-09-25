@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace homeai {
 
@@ -17,6 +18,7 @@ struct WebUiContext {
     std::string files_root;
     std::string username;
     std::string role;
+    std::vector<std::string> permissions;
     bool admin{false};
 };
 
