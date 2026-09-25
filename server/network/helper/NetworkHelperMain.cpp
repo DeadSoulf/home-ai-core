@@ -332,7 +332,7 @@ std::filesystem::path networkdPath(
         )
         /
         (
-            "05-home-ai-"
+            "00-home-ai-"
             +
             interface_name
             +
@@ -560,6 +560,576 @@ bool reloadNetworkd(
     return true;
 }
 
+bool lineDefinesInterface(
+    const std::string& line,
+    const std::string& interface_name
+)
+{
+    std::istringstream stream(line);
+
+    std::string keyword;
+    std::string name;
+    std::string family;
+    std::string method;
+
+    return
+        (
+            stream
+            >> keyword
+            >> name
+            >> family
+            >> method
+        )
+        &&
+        keyword == "iface"
+        &&
+        name == interface_name
+        &&
+        family == "inet";
+}
+
+bool lineAutostartsInterface(
+    const std::string& line,
+    const std::string& interface_name
+)
+{
+    std::istringstream stream(line);
+
+    std::string keyword;
+
+    if (!(stream >> keyword))
+        return false;
+
+    if (
+        keyword != "auto"
+        &&
+        keyword != "allow-hotplug"
+    ) {
+        return false;
+    }
+
+    std::string name;
+
+    while (stream >> name) {
+        if (name == interface_name)
+            return true;
+    }
+
+    return false;
+}
+
+bool managedIpv4Option(
+    const std::string& line
+)
+{
+    const auto trimmed =
+        trimCopy(line);
+
+    if (trimmed.empty())
+        return false;
+
+    std::istringstream stream(trimmed);
+
+    std::string key;
+
+    stream >> key;
+
+    return
+        key == "address"
+        ||
+        key == "netmask"
+        ||
+        key == "gateway"
+        ||
+        key == "dns-nameservers";
+}
+
+bool rewriteIfupdown(
+    const std::string& interface_name,
+    bool dhcp,
+    const std::string& address,
+    const std::string& prefix,
+    const std::string& gateway,
+    const std::string& dns_primary,
+    const std::string& dns_secondary,
+    std::string& error
+)
+{
+    const std::filesystem::path main_file =
+        "/etc/network/interfaces";
+
+    if (
+        !std::filesystem::exists(
+            main_file
+        )
+    ) {
+        return false;
+    }
+
+    std::vector<std::filesystem::path>
+        candidates{
+            main_file
+        };
+
+    std::error_code fs_error;
+
+    const std::filesystem::path directory =
+        "/etc/network/interfaces.d";
+
+    if (
+        std::filesystem::exists(
+            directory,
+            fs_error
+        )
+        &&
+        !fs_error
+    ) {
+        for (
+            const auto& entry :
+            std::filesystem::
+                directory_iterator(
+                    directory,
+                    fs_error
+                )
+        ) {
+            if (fs_error)
+                break;
+
+            std::error_code type_error;
+
+            if (
+                entry.is_regular_file(
+                    type_error
+                )
+                &&
+                !type_error
+            ) {
+                candidates.push_back(
+                    entry.path()
+                );
+            }
+        }
+    }
+
+    std::filesystem::path target =
+        main_file;
+
+    std::vector<std::string> lines;
+    std::size_t stanza_index =
+        static_cast<std::size_t>(-1);
+
+    for (const auto& candidate : candidates) {
+        std::ifstream file(candidate);
+
+        if (!file.is_open())
+            continue;
+
+        std::vector<std::string>
+            candidate_lines;
+
+        std::string line;
+
+        while (
+            std::getline(
+                file,
+                line
+            )
+        ) {
+            candidate_lines.push_back(
+                line
+            );
+        }
+
+        for (
+            std::size_t index = 0;
+            index <
+                candidate_lines.size();
+            ++index
+        ) {
+            if (
+                lineDefinesInterface(
+                    candidate_lines[index],
+                    interface_name
+                )
+            ) {
+                target =
+                    candidate;
+
+                lines =
+                    std::move(
+                        candidate_lines
+                    );
+
+                stanza_index =
+                    index;
+
+                break;
+            }
+        }
+
+        if (
+            stanza_index !=
+            static_cast<std::size_t>(
+                -1
+            )
+        ) {
+            break;
+        }
+    }
+
+    if (
+        stanza_index ==
+        static_cast<std::size_t>(-1)
+    ) {
+        std::ifstream file(main_file);
+
+        std::string line;
+
+        while (
+            std::getline(
+                file,
+                line
+            )
+        ) {
+            lines.push_back(line);
+        }
+
+        bool autostart = false;
+
+        for (const auto& existing : lines) {
+            if (
+                lineAutostartsInterface(
+                    existing,
+                    interface_name
+                )
+            ) {
+                autostart = true;
+
+                break;
+            }
+        }
+
+        if (
+            !lines.empty()
+            &&
+            !lines.back().empty()
+        ) {
+            lines.push_back("");
+        }
+
+        lines.push_back(
+            "# Managed by Home AI Core"
+        );
+
+        if (!autostart) {
+            lines.push_back(
+                "auto " +
+                interface_name
+            );
+        }
+
+        stanza_index =
+            lines.size();
+
+        lines.push_back(
+            "iface "
+            +
+            interface_name
+            +
+            " inet "
+            +
+            (
+                dhcp
+                ? "dhcp"
+                : "static"
+            )
+        );
+    }
+    else {
+        lines[stanza_index] =
+            "iface "
+            +
+            interface_name
+            +
+            " inet "
+            +
+            (
+                dhcp
+                ? "dhcp"
+                : "static"
+            );
+
+        std::size_t index =
+            stanza_index + 1;
+
+        while (index < lines.size()) {
+            const auto& line =
+                lines[index];
+
+            const bool indented =
+                !line.empty()
+                &&
+                (
+                    line.front() == ' '
+                    ||
+                    line.front() == '\t'
+                );
+
+            const auto trimmed =
+                trimCopy(line);
+
+            if (
+                !indented
+                &&
+                !trimmed.empty()
+                &&
+                trimmed.front() != '#'
+            ) {
+                break;
+            }
+
+            if (
+                indented
+                &&
+                managedIpv4Option(
+                    line
+                )
+            ) {
+                lines.erase(
+                    lines.begin()
+                    +
+                    static_cast<
+                        std::ptrdiff_t
+                    >(
+                        index
+                    )
+                );
+
+                continue;
+            }
+
+            ++index;
+        }
+    }
+
+    if (!dhcp) {
+        std::vector<std::string>
+            settings;
+
+        settings.push_back(
+            "    address "
+            +
+            address
+            +
+            "/"
+            +
+            prefix
+        );
+
+        if (gateway != "-") {
+            settings.push_back(
+                "    gateway "
+                +
+                gateway
+            );
+        }
+
+        std::string dns;
+
+        if (dns_primary != "-")
+            dns = dns_primary;
+
+        if (dns_secondary != "-") {
+            if (!dns.empty())
+                dns += " ";
+
+            dns += dns_secondary;
+        }
+
+        if (!dns.empty()) {
+            settings.push_back(
+                "    dns-nameservers "
+                +
+                dns
+            );
+        }
+
+        lines.insert(
+            lines.begin()
+            +
+            static_cast<std::ptrdiff_t>(
+                stanza_index + 1
+            ),
+            settings.begin(),
+            settings.end()
+        );
+    }
+
+    const auto backup =
+        target.string()
+        +
+        ".home-ai.bak";
+
+    fs_error.clear();
+
+    std::filesystem::copy_file(
+        target,
+        backup,
+        std::filesystem::
+            copy_options::overwrite_existing,
+        fs_error
+    );
+
+    const auto temp =
+        target.string()
+        +
+        ".home-ai.tmp";
+
+    {
+        std::ofstream file(
+            temp,
+            std::ios::trunc
+        );
+
+        if (!file.is_open()) {
+            error =
+                "Не удалось сохранить конфигурацию ifupdown.";
+
+            return false;
+        }
+
+        for (const auto& line : lines)
+            file << line << "\n";
+    }
+
+    struct stat metadata{};
+
+    mode_t mode =
+        0644;
+
+    if (
+        ::stat(
+            target.c_str(),
+            &metadata
+        ) == 0
+    ) {
+        mode =
+            metadata.st_mode
+            &
+            0777;
+    }
+
+    ::chmod(
+        temp.c_str(),
+        mode
+    );
+
+    fs_error.clear();
+
+    std::filesystem::rename(
+        temp,
+        target,
+        fs_error
+    );
+
+    if (fs_error) {
+        std::filesystem::remove(
+            temp
+        );
+
+        error =
+            "Не удалось активировать конфигурацию ifupdown.";
+
+        return false;
+    }
+
+    return true;
+}
+
+bool applyIfupdown(
+    const std::string& interface_name,
+    bool dhcp,
+    const std::string& address,
+    const std::string& prefix,
+    const std::string& gateway,
+    const std::string& dns_primary,
+    const std::string& dns_secondary,
+    std::string& error
+)
+{
+    const auto ifdown =
+        findExecutable(
+            {
+                "/usr/sbin/ifdown",
+                "/usr/bin/ifdown",
+                "/sbin/ifdown"
+            }
+        );
+
+    const auto ifup =
+        findExecutable(
+            {
+                "/usr/sbin/ifup",
+                "/usr/bin/ifup",
+                "/sbin/ifup"
+            }
+        );
+
+    if (
+        ifdown.empty()
+        ||
+        ifup.empty()
+        ||
+        !std::filesystem::exists(
+            "/etc/network/interfaces"
+        )
+    ) {
+        return false;
+    }
+
+    if (
+        !rewriteIfupdown(
+            interface_name,
+            dhcp,
+            address,
+            prefix,
+            gateway,
+            dns_primary,
+            dns_secondary,
+            error
+        )
+    ) {
+        return false;
+    }
+
+    runCommand(
+        ifdown,
+        {
+            "--force",
+            interface_name
+        }
+    );
+
+    const auto up =
+        runCommand(
+            ifup,
+            {
+                interface_name
+            }
+        );
+
+    if (!succeeded(up)) {
+        error =
+            up.output.empty()
+            ? "ifup не смог применить сетевую конфигурацию."
+            : up.output;
+
+        return false;
+    }
+
+    return true;
+}
+
 int configureDhcp(
     const std::string& interface_name
 )
@@ -710,6 +1280,36 @@ int configureDhcp(
             << "\n";
 
         return 1;
+    }
+
+    {
+        std::string ifupdown_error;
+
+        if (
+            applyIfupdown(
+                interface_name,
+                true,
+                "",
+                "",
+                "-",
+                "-",
+                "-",
+                ifupdown_error
+            )
+        ) {
+            std::cout
+                << "DHCP включён через ifupdown. Конфигурация сохранена.";
+
+            return 0;
+        }
+
+        if (!ifupdown_error.empty()) {
+            std::cerr
+                << ifupdown_error
+                << "\n";
+
+            return 1;
+        }
     }
 
     const auto dhclient =
@@ -951,6 +1551,36 @@ int configureStatic(
             << "\n";
 
         return 1;
+    }
+
+    {
+        std::string ifupdown_error;
+
+        if (
+            applyIfupdown(
+                interface_name,
+                false,
+                address,
+                prefix,
+                gateway,
+                dns_primary,
+                dns_secondary,
+                ifupdown_error
+            )
+        ) {
+            std::cout
+                << "Статический IPv4 применён через ifupdown. Конфигурация сохранена.";
+
+            return 0;
+        }
+
+        if (!ifupdown_error.empty()) {
+            std::cerr
+                << ifupdown_error
+                << "\n";
+
+            return 1;
+        }
     }
 
     const auto ip =
