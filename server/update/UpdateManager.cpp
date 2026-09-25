@@ -1,9 +1,11 @@
 #include "server/update/UpdateManager.h"
 
+#include <algorithm>
 #include <array>
 #include <cerrno>
 #include <cstdlib>
 #include <filesystem>
+#include <regex>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <vector>
@@ -90,6 +92,98 @@ bool isBusyState(
         state == UpdateState::Building
         ||
         state == UpdateState::Testing;
+}
+
+std::pair<std::size_t, std::size_t>
+lastProgressFraction(
+    const std::string& output,
+    const std::regex& pattern
+)
+{
+    std::pair<std::size_t, std::size_t>
+        result{0, 0};
+
+    for (
+        std::sregex_iterator it(
+            output.begin(),
+            output.end(),
+            pattern
+        ),
+        end;
+        it != end;
+        ++it
+    ) {
+        try {
+            const auto current =
+                static_cast<std::size_t>(
+                    std::stoull(
+                        (*it)[1].str()
+                    )
+                );
+
+            const auto total =
+                static_cast<std::size_t>(
+                    std::stoull(
+                        (*it)[2].str()
+                    )
+                );
+
+            if (
+                total > 0
+                &&
+                current <= total
+            ) {
+                result = {
+                    current,
+                    total
+                };
+            }
+        }
+        catch (...) {
+        }
+    }
+
+    return result;
+}
+
+int scaledProgress(
+    int start,
+    int end,
+    std::size_t current,
+    std::size_t total
+)
+{
+    if (total == 0)
+        return start;
+
+    const auto range =
+        std::max(
+            0,
+            end - start
+        );
+
+    const auto value =
+        start
+        +
+        static_cast<int>(
+            (
+                static_cast<double>(
+                    current
+                )
+                /
+                static_cast<double>(
+                    total
+                )
+            )
+            *
+            range
+        );
+
+    return std::clamp(
+        value,
+        start,
+        end
+    );
 }
 
 }
@@ -287,6 +381,21 @@ bool UpdateManager::requestRestart(
     }
 
     restart_requested_ = true;
+
+    status_.progress_stage =
+        "restart";
+
+    status_.progress_percent =
+        100;
+
+    status_.progress_current =
+        1;
+
+    status_.progress_total =
+        1;
+
+    status_.message =
+        "Перезапуск Home AI Core...";
 
     return true;
 }
@@ -816,6 +925,18 @@ void UpdateManager::performUpdate()
         status_.message =
             "Обновление установлено и протестировано. Требуется перезапуск.";
 
+        status_.progress_stage =
+            "activation";
+
+        status_.progress_percent =
+            95;
+
+        status_.progress_current =
+            1;
+
+        status_.progress_total =
+            1;
+
         status_.last_output =
             tests.output;
     }
@@ -824,7 +945,8 @@ void UpdateManager::performUpdate()
 UpdateManager::CommandResult
 UpdateManager::runCommand(
     const std::string& executable,
-    const std::vector<std::string>& arguments
+    const std::vector<std::string>& arguments,
+    const OutputCallback& output_callback
 ) const
 {
     CommandResult result;
@@ -943,6 +1065,12 @@ UpdateManager::runCommand(
                 count
             )
         );
+
+        if (output_callback) {
+            output_callback(
+                output
+            );
+        }
     }
 
     ::close(pipe_fd[0]);
@@ -1088,12 +1216,98 @@ void UpdateManager::setState(
     status_.busy =
         isBusyState(state);
 
+    switch (state) {
+        case UpdateState::Idle:
+            status_.progress_stage = "idle";
+            status_.progress_percent = 0;
+            break;
+
+        case UpdateState::Checking:
+            status_.progress_stage = "check";
+            status_.progress_percent = 5;
+            break;
+
+        case UpdateState::UpToDate:
+            status_.progress_stage = "complete";
+            status_.progress_percent = 100;
+            break;
+
+        case UpdateState::UpdateAvailable:
+            status_.progress_stage = "check";
+            status_.progress_percent = 10;
+            break;
+
+        case UpdateState::Updating:
+            status_.progress_stage = "download";
+            status_.progress_percent = 15;
+            break;
+
+        case UpdateState::Building:
+            status_.progress_stage = "configure";
+            status_.progress_percent = 25;
+            break;
+
+        case UpdateState::Testing:
+            status_.progress_stage = "tests";
+            status_.progress_percent = 70;
+            break;
+
+        case UpdateState::ReadyToRestart:
+            status_.progress_stage = "activation";
+            status_.progress_percent = 95;
+            break;
+
+        case UpdateState::Error:
+            status_.progress_stage = "error";
+            break;
+    }
+
+    status_.progress_current = 0;
+    status_.progress_total = 0;
+
     if (
         state ==
         UpdateState::Error
     ) {
         status_.restart_required =
             false;
+    }
+}
+
+void UpdateManager::setProgress(
+    const std::string& stage,
+    int percent,
+    std::size_t current,
+    std::size_t total,
+    const std::string& output
+)
+{
+    std::lock_guard<std::mutex>
+        lock(mutex_);
+
+    status_.progress_stage =
+        stage;
+
+    status_.progress_percent =
+        std::clamp(
+            percent,
+            0,
+            100
+        );
+
+    status_.progress_current =
+        current;
+
+    status_.progress_total =
+        total;
+
+    if (!output.empty()) {
+        status_.last_output =
+            output.size() > 65536
+            ? output.substr(
+                output.size() - 65536
+            )
+            : output;
     }
 }
 
