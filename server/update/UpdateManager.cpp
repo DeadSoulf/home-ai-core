@@ -1352,7 +1352,7 @@ void UpdateManager::setState(
 
         case UpdateState::Building:
             status_.progress_stage = "configure";
-            status_.progress_percent = 25;
+            status_.progress_percent = 20;
             break;
 
         case UpdateState::Testing:
