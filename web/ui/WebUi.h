@@ -14,6 +14,7 @@ struct WebUiContext {
     std::string web_port;
     std::string storage_video_mounts;
     std::string storage_personal_mounts;
+    std::string files_root;
     std::string username;
     std::string role;
     bool admin{false};
