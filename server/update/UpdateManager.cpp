@@ -486,6 +486,29 @@ void UpdateManager::performCheck()
 
 void UpdateManager::performUpdate()
 {
+    const auto runtime_config =
+        std::filesystem::path(
+            repository_path_
+        )
+        /
+        "runtime/home-ai.conf";
+
+    if (
+        std::filesystem::exists(
+            runtime_config
+        )
+    ) {
+        runCommand(
+            "/usr/bin/git",
+            {
+                "restore",
+                "--worktree",
+                "--",
+                "config/home-ai.conf"
+            }
+        );
+    }
+
     const auto current_branch =
         currentBranch();
 
