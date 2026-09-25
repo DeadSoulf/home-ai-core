@@ -3068,9 +3068,24 @@ function updateDiskMenuState(
         !mounted
     );
 
+    const managedMount =
+        mounted
+        &&
+        (
+            device.mount_point
+                .startsWith(
+                    "/mnt/home-ai/video/"
+                )
+            ||
+            device.mount_point
+                .startsWith(
+                    "/mnt/home-ai/files/"
+                )
+        );
+
     setDisabled(
         "disk-unmount",
-        !mounted ||
+        !managedMount ||
         !canPrivileged
     );
 
@@ -3434,11 +3449,11 @@ function renderStorageCandidate(
     ignore.addEventListener(
         "click",
         function() {
-            proposeStorageAction(
-                device,
-                "ignore",
-                card
+            ignoredStorageDevices.add(
+                device.device
             );
+
+            card.remove();
         }
     );
 
