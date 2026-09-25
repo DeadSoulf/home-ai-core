@@ -5,6 +5,7 @@ build/
 *.so
 
 # Runtime
+runtime/
 *.log
 *.pid
 
