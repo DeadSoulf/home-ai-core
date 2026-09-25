@@ -47,8 +47,17 @@ WantedBy=multi-user.target
 EOF
     install -m 644 "$temp" "$unit"
     systemctl daemon-reload
-    systemctl enable home-ai-core.service
-    echo 'Installed. Start with: sudo bash scripts/home-ai-service.sh start'
+    systemctl enable --now home-ai-core.service
+    systemctl is-enabled --quiet home-ai-core.service || {
+      echo 'Failed to enable Home AI Core autostart.' >&2
+      exit 1
+    }
+    systemctl is-active --quiet home-ai-core.service || {
+      echo 'Home AI Core service did not start.' >&2
+      systemctl status home-ai-core.service --no-pager || true
+      exit 1
+    }
+    echo 'Installed, enabled at boot, and started.'
     ;;
   uninstall)
     [[ $EUID -eq 0 ]] || { echo 'Use sudo for uninstall.' >&2; exit 1; }
@@ -60,10 +69,18 @@ EOF
   start|stop|restart|status)
     systemctl "$action" home-ai-core.service
     ;;
+  autostart)
+    if systemctl is-enabled --quiet home-ai-core.service; then
+      echo 'Autostart: enabled'
+    else
+      echo 'Autostart: disabled'
+      exit 1
+    fi
+    ;;
   *)
     echo 'Usage: sudo bash scripts/home-ai-service.sh install NON_ROOT_USER [/srv/home-ai-core]'
     echo '       sudo bash scripts/home-ai-service.sh {start|stop|restart|uninstall}'
-    echo '       bash scripts/home-ai-service.sh status'
+    echo '       bash scripts/home-ai-service.sh {status|autostart}'
     [[ $action == help ]]
     ;;
 esac
