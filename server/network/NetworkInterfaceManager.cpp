@@ -698,6 +698,60 @@ std::string ifupdownMethod(
     return {};
 }
 
+std::string managedNetworkdMethod(
+    const std::string& interface_name
+)
+{
+    const auto path =
+        std::filesystem::path(
+            "/etc/systemd/network"
+        )
+        /
+        (
+            "00-home-ai-"
+            +
+            interface_name
+            +
+            ".network"
+        );
+
+    std::ifstream file(path);
+
+    if (!file.is_open())
+        return {};
+
+    std::string line;
+
+    while (
+        std::getline(
+            file,
+            line
+        )
+    ) {
+        const auto trimmed =
+            trimCopy(line);
+
+        if (
+            trimmed == "DHCP=ipv4"
+            ||
+            trimmed == "DHCP=yes"
+        ) {
+            return "dhcp";
+        }
+
+        if (
+            trimmed.rfind(
+                "Address=",
+                0
+            ) == 0
+        ) {
+            return "static";
+        }
+    }
+
+    return {};
+}
+
 std::string detectedIpv4Method(
     const std::string& interface_name
 )
@@ -712,6 +766,14 @@ std::string detectedIpv4Method(
 
     method =
         ifupdownMethod(
+            interface_name
+        );
+
+    if (!method.empty())
+        return method;
+
+    method =
+        managedNetworkdMethod(
             interface_name
         );
 
