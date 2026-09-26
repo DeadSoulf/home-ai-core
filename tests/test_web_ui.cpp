@@ -232,7 +232,7 @@ int main()
         ) == std::string::npos
         ||
         home.find(
-            "Home AI Cloud dashboard redesign 0.0.24"
+            "Home AI Cloud dashboard redesign 0.0.25"
         ) == std::string::npos
     ) {
         std::cerr
@@ -501,7 +501,7 @@ int main()
         ) != std::string::npos
         ||
         cameras.find(
-            "Camera Core 0.0.24"
+            "Camera Core 0.0.25"
         ) == std::string::npos
         ||
         cameras.find(
@@ -624,6 +624,18 @@ int main()
         ) == std::string::npos
         ||
         system.find(
+            "data-stat-usage=\"cpu\""
+        ) == std::string::npos
+        ||
+        system.find(
+            "cpu-meter-fill"
+        ) == std::string::npos
+        ||
+        system.find(
+            "initializeStatCards"
+        ) == std::string::npos
+        ||
+        system.find(
             "update-version-flow"
         ) == std::string::npos
         ||
@@ -638,6 +650,14 @@ int main()
         system.find(
             "data-update-stage=\"build\""
         ) == std::string::npos
+        ||
+        system.find(
+            "<span>70%</span>"
+        ) != std::string::npos
+        ||
+        system.find(
+            "<span>100%</span>"
+        ) != std::string::npos
     ) {
         std::cerr
             << "Update controls are missing from System page\n";

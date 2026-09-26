@@ -188,53 +188,91 @@ void renderSystemStats(
 <span class="section-hint">Обновление каждые 2 секунды</span>
 </div>
 
-<div class="stats-grid">
+<div class="stats-grid stats-grid-live">
 )HTML";
 
     if (include_core_cards) {
         page << R"HTML(
-<div class="stat-card">
+<div class="stat-card stat-card-core">
+<div class="stat-card-top">
 <span class="stat-label">Ядро</span>
+<span class="stat-core-dot" aria-hidden="true"></span>
+</div>
 <strong class="status-ok">RUNNING</strong>
 </div>
 
-<div class="stat-card">
+<div class="stat-card stat-card-core">
+<div class="stat-card-top">
 <span class="stat-label">Web Core</span>
+<span class="stat-core-dot" aria-hidden="true"></span>
+</div>
 <strong class="status-ok">RUNNING</strong>
 </div>
 
-<div class="stat-card">
+<div class="stat-card stat-card-core">
+<div class="stat-card-top">
 <span class="stat-label">Security Core</span>
+<span class="stat-core-dot" aria-hidden="true"></span>
+</div>
 <strong class="status-ok">RUNNING</strong>
 </div>
 )HTML";
     }
 
     page << R"HTML(
-<div class="stat-card">
+<article class="stat-card stat-card-interactive" data-stat-card data-stat-usage="cpu" tabindex="0" role="button" aria-expanded="false">
+<div class="stat-card-top">
 <span class="stat-label">CPU</span>
+<span id="cpu-state" class="stat-state">...</span>
+</div>
 <strong id="cpu-value">...</strong>
+<div class="stat-meter" aria-hidden="true">
+<span id="cpu-meter-fill" class="stat-meter-fill"></span>
 </div>
+<div class="stat-detail">Текущая загрузка процессора</div>
+</article>
 
-<div class="stat-card">
+<article class="stat-card stat-card-interactive" data-stat-card data-stat-usage="ram" tabindex="0" role="button" aria-expanded="false">
+<div class="stat-card-top">
 <span class="stat-label">RAM</span>
+<span id="ram-state" class="stat-state">...</span>
+</div>
 <strong id="ram-value">...</strong>
+<div class="stat-meter" aria-hidden="true">
+<span id="ram-meter-fill" class="stat-meter-fill"></span>
 </div>
+<div class="stat-detail">Использование оперативной памяти</div>
+</article>
 
-<div class="stat-card">
+<article class="stat-card stat-card-interactive" data-stat-card data-stat-usage="disk" tabindex="0" role="button" aria-expanded="false">
+<div class="stat-card-top">
 <span class="stat-label">Системный диск</span>
+<span id="disk-state" class="stat-state">...</span>
+</div>
 <strong id="disk-value">...</strong>
+<div class="stat-meter" aria-hidden="true">
+<span id="disk-meter-fill" class="stat-meter-fill"></span>
 </div>
+<div class="stat-detail">Заполнение системного диска</div>
+</article>
 
-<div class="stat-card">
+<article class="stat-card stat-card-interactive stat-card-info" data-stat-card tabindex="0" role="button" aria-expanded="false">
+<div class="stat-card-top">
 <span class="stat-label">Uptime</span>
+<span class="stat-state stat-state-neutral">↗</span>
+</div>
 <strong id="uptime-value">...</strong>
-</div>
+<div class="stat-detail">Время непрерывной работы</div>
+</article>
 
-<div class="stat-card">
+<article class="stat-card stat-card-interactive stat-card-info" data-stat-card tabindex="0" role="button" aria-expanded="false">
+<div class="stat-card-top">
 <span class="stat-label">Load Average</span>
-<strong id="load-value">...</strong>
+<span class="stat-state stat-state-neutral">1 / 5 / 15</span>
 </div>
+<strong id="load-value">...</strong>
+<div class="stat-detail">Средняя нагрузка за 1 / 5 / 15 минут</div>
+</article>
 </div>
 </div>
 )HTML";
@@ -1048,7 +1086,7 @@ button:disabled {
 
 .update-stage-row {
     display: grid;
-    grid-template-columns: 24px minmax(0, 1fr) 48px;
+    grid-template-columns: 24px minmax(0, 1fr);
     align-items: center;
     gap: 8px;
     padding: 8px 10px;
@@ -1420,8 +1458,7 @@ button:disabled {
     .update-stage-row {
         grid-template-columns:
             22px
-            minmax(0, 1fr)
-            44px;
+            minmax(0, 1fr);
         padding: 8px;
     }
 
@@ -1477,7 +1514,7 @@ button:disabled {
     }
 }
 
-/* Home AI Cloud dashboard redesign 0.0.24 */
+/* Home AI Cloud dashboard redesign 0.0.25 */
 :root {
     --bg: #0B1220;
     --sidebar: rgba(8, 14, 25, 0.94);
@@ -1757,6 +1794,136 @@ body {
 .stat-card strong {
     font-size: 1.45rem;
     letter-spacing: -0.035em;
+}
+
+.stats-grid-live {
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.stat-card {
+    transition:
+        transform 0.18s ease,
+        border-color 0.18s ease,
+        background 0.18s ease;
+}
+
+.stat-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.stat-core-dot {
+    width: 9px;
+    height: 9px;
+    flex: 0 0 9px;
+    border-radius: 50%;
+    background: var(--ok);
+    box-shadow: 0 0 0 5px rgba(34,197,94,0.10);
+}
+
+.stat-card-interactive {
+    cursor: pointer;
+    user-select: none;
+}
+
+.stat-card-interactive:hover,
+.stat-card-interactive:focus-visible,
+.stat-card-interactive.expanded {
+    transform: translateY(-2px);
+    border-color: #355780;
+    background: #101D30;
+}
+
+.stat-state {
+    flex: 0 0 auto;
+    padding: 4px 7px;
+    border: 1px solid #2B4162;
+    border-radius: 999px;
+    background: #111D30;
+    color: #AFC4DC;
+    font-size: 0.68rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.stat-state-neutral {
+    color: #8DBBFF;
+}
+
+.stat-meter {
+    height: 7px;
+    margin-top: 12px;
+    overflow: hidden;
+    border: 1px solid #243852;
+    border-radius: 999px;
+    background: #0A1320;
+}
+
+.stat-meter-fill {
+    display: block;
+    width: 0%;
+    height: 100%;
+    border-radius: inherit;
+    background: #4E8BE8;
+    transition:
+        width 0.35s ease,
+        background 0.2s ease;
+}
+
+.stat-card.stat-normal .stat-state {
+    border-color: #285A3A;
+    background: #10271B;
+    color: #7EE29E;
+}
+
+.stat-card.stat-normal .stat-meter-fill {
+    background: #22C55E;
+}
+
+.stat-card.stat-warning .stat-state {
+    border-color: #66501E;
+    background: #2B220F;
+    color: #F6C763;
+}
+
+.stat-card.stat-warning .stat-meter-fill {
+    background: #F59E0B;
+}
+
+.stat-card.stat-high .stat-state {
+    border-color: #75323A;
+    background: #31161B;
+    color: #FF919A;
+}
+
+.stat-card.stat-high .stat-meter-fill {
+    background: #EF4444;
+}
+
+.stat-detail {
+    max-height: 0;
+    margin-top: 0;
+    overflow: hidden;
+    opacity: 0;
+    color: var(--muted);
+    font-size: 0.78rem;
+    line-height: 1.4;
+    transition:
+        max-height 0.2s ease,
+        margin-top 0.2s ease,
+        opacity 0.2s ease;
+}
+
+.stat-card-interactive.expanded .stat-detail {
+    max-height: 54px;
+    margin-top: 10px;
+    opacity: 1;
+}
+
+.stat-card-info strong {
+    overflow-wrap: anywhere;
 }
 
 input,
@@ -2793,25 +2960,25 @@ button:not(.secondary):not(.danger):not(.sidebar-collapse-button) {
 
 <div id="update-stage-list" class="update-stage-list">
 <div class="update-stage-row pending" data-update-stage="check" data-threshold="5">
-<span class="update-stage-icon">○</span><span>Проверка GitHub</span><span>5%</span>
+<span class="update-stage-icon">○</span><span>Проверка GitHub</span>
 </div>
 <div class="update-stage-row pending" data-update-stage="download" data-threshold="15">
-<span class="update-stage-icon">○</span><span>Получение изменений</span><span>15%</span>
+<span class="update-stage-icon">○</span><span>Получение изменений</span>
 </div>
 <div class="update-stage-row pending" data-update-stage="configure" data-threshold="25">
-<span class="update-stage-icon">○</span><span>Подготовка CMake</span><span>25%</span>
+<span class="update-stage-icon">○</span><span>Подготовка CMake</span>
 </div>
 <div class="update-stage-row pending" data-update-stage="build" data-threshold="70">
-<span class="update-stage-icon">○</span><span>Сборка</span><span>70%</span>
+<span class="update-stage-icon">○</span><span>Сборка</span>
 </div>
 <div class="update-stage-row pending" data-update-stage="tests" data-threshold="90">
-<span class="update-stage-icon">○</span><span>Тестирование</span><span>90%</span>
+<span class="update-stage-icon">○</span><span>Тестирование</span>
 </div>
 <div class="update-stage-row pending" data-update-stage="activation" data-threshold="95">
-<span class="update-stage-icon">○</span><span>Активация новой версии</span><span>95%</span>
+<span class="update-stage-icon">○</span><span>Активация новой версии</span>
 </div>
 <div class="update-stage-row pending" data-update-stage="restart" data-threshold="100">
-<span class="update-stage-icon">○</span><span>Перезапуск</span><span>100%</span>
+<span class="update-stage-icon">○</span><span>Перезапуск</span>
 </div>
 </div>
 </div>
@@ -3487,7 +3654,7 @@ PrivateKey отображается в редакторе и сохраняет�
 <div class="section-card">
 <div class="section-title">
 <h2>Камеры</h2>
-<span class="section-hint">Camera Core 0.0.24</span>
+<span class="section-hint">Camera Core 0.0.25</span>
 </div>
 
 <div class="stats-grid">
@@ -11417,6 +11584,143 @@ function formatBytes(value) {
     );
 }
 
+function setStatUsage(metric, rawValue) {
+    const value =
+        Math.max(
+            0,
+            Math.min(
+                100,
+                Number(rawValue) || 0
+            )
+        );
+
+    const card =
+        document.querySelector(
+            '[data-stat-usage="' +
+            metric +
+            '"]'
+        );
+
+    const fill =
+        document.getElementById(
+            metric +
+            "-meter-fill"
+        );
+
+    const state =
+        document.getElementById(
+            metric +
+            "-state"
+        );
+
+    if (fill)
+        fill.style.width =
+            value + "%";
+
+    if (!card)
+        return;
+
+    card.classList.remove(
+        "stat-normal",
+        "stat-warning",
+        "stat-high"
+    );
+
+    let className =
+        "stat-normal";
+
+    let label =
+        tr("Норма");
+
+    if (value >= 90) {
+        className =
+            "stat-high";
+
+        label =
+            tr("Высокая");
+    }
+    else if (value >= 70) {
+        className =
+            "stat-warning";
+
+        label =
+            tr("Внимание");
+    }
+
+    card.classList.add(
+        className
+    );
+
+    if (state)
+        state.textContent =
+            label;
+}
+
+function toggleStatCard(card) {
+    const expanded =
+        !card.classList.contains(
+            "expanded"
+        );
+
+    card.classList.toggle(
+        "expanded",
+        expanded
+    );
+
+    card.setAttribute(
+        "aria-expanded",
+        expanded
+            ? "true"
+            : "false"
+    );
+}
+
+function initializeStatCards() {
+    document.querySelectorAll(
+        "[data-stat-card]"
+    ).forEach(
+        function(card) {
+            if (
+                card.dataset.statReady ===
+                "1"
+            ) {
+                return;
+            }
+
+            card.dataset.statReady =
+                "1";
+
+            card.addEventListener(
+                "click",
+                function() {
+                    toggleStatCard(
+                        card
+                    );
+                }
+            );
+
+            card.addEventListener(
+                "keydown",
+                function(event) {
+                    if (
+                        event.key !== "Enter"
+                        &&
+                        event.key !== " "
+                    ) {
+                        return;
+                    }
+
+                    event.preventDefault();
+
+                    toggleStatCard(
+                        card
+                    );
+                }
+            );
+        }
+    );
+}
+
 async function updateSystemStats() {
     const cpu =
         document.getElementById(
@@ -11474,6 +11778,21 @@ async function updateSystemStats() {
                 data.disk_percent
             ).toFixed(1)
             + "%";
+
+        setStatUsage(
+            "cpu",
+            data.cpu_percent
+        );
+
+        setStatUsage(
+            "ram",
+            data.memory_percent
+        );
+
+        setStatUsage(
+            "disk",
+            data.disk_percent
+        );
 
         document.getElementById(
             "uptime-value"
@@ -13349,6 +13668,7 @@ async function updateStorageStats() {
 document.addEventListener(
     "DOMContentLoaded",
     function() {
+        initializeStatCards();
         updateSystemStats();
         updateHomeErrors();
         updateModuleStatus();

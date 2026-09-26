@@ -709,3 +709,11 @@ S/N	S/N
 Ошибка обновления	Update error
 Проверка обновлений	Checking for updates
 Обновление выполняется	Update in progress
+Норма	Normal
+Внимание	Attention
+Высокая	High
+Текущая загрузка процессора	Current processor load
+Использование оперативной памяти	Memory usage
+Заполнение системного диска	System disk usage
+Время непрерывной работы	Continuous uptime
+Средняя нагрузка за 1 / 5 / 15 минут	Average load over 1 / 5 / 15 minutes
