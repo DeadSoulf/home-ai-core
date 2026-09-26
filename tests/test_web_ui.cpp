@@ -477,7 +477,7 @@ int main()
         ) != std::string::npos
         ||
         cameras.find(
-            "Camera Core 0.0.21"
+            "Camera Core 0.0.22"
         ) == std::string::npos
         ||
         cameras.find(
