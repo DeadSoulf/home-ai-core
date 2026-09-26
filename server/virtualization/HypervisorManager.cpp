@@ -7,11 +7,13 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <memory>
 #include <sstream>
+#include <string_view>
 #include <utility>
 #include <chrono>
 #include <map>
@@ -232,6 +234,54 @@ bool cpuVirtualizationAvailable()
     }
 
     return false;
+}
+
+bool parseUnsignedRange(std::string_view text, unsigned long long minimum,
+    unsigned long long maximum, unsigned long long& value)
+{
+    if (text.empty()) return false;
+    unsigned long long parsed = 0;
+    const auto* begin = text.data();
+    const auto* end = begin + text.size();
+    const auto result = std::from_chars(begin, end, parsed);
+    if (result.ec != std::errc{} || result.ptr != end ||
+        parsed < minimum || parsed > maximum)
+        return false;
+    value = parsed;
+    return true;
+}
+
+bool validVmName(std::string_view name)
+{
+    if (name.empty() || name.size() > 63) return false;
+    const auto alnum = [](char value) {
+        return (value >= 'a' && value <= 'z') ||
+            (value >= 'A' && value <= 'Z') ||
+            (value >= '0' && value <= '9');
+    };
+    if (!alnum(name.front())) return false;
+    for (const char value : name) {
+        if (!alnum(value) && value != '-' && value != '_' && value != '.')
+            return false;
+    }
+    return true;
+}
+
+std::string xmlEscape(std::string_view value)
+{
+    std::string output;
+    output.reserve(value.size() + 16);
+    for (const char character : value) {
+        switch (character) {
+        case '&': output += "&amp;"; break;
+        case '<': output += "&lt;"; break;
+        case '>': output += "&gt;"; break;
+        case '\'': output += "&apos;"; break;
+        case '"': output += "&quot;"; break;
+        default: output += character; break;
+        }
+    }
+    return output;
 }
 
 }
@@ -1054,12 +1104,78 @@ std::vector<std::string> HypervisorManager::allowedActions(const std::string& st
     return {};
 }
 
+VmCreatePreviewResult HypervisorManager::previewCreate(const VmCreateDraft& draft)
+{
+    VmCreatePreviewResult result;
+    if (!validVmName(draft.name)) {
+        result.code = "invalid_name";
+        result.message = "VM name must be 1-63 ASCII characters, start with a letter or digit, and contain only letters, digits, '.', '_' or '-'.";
+        return result;
+    }
+    unsigned long long vcpus = 0;
+    if (!parseUnsignedRange(draft.vcpus, 1, 256, vcpus)) {
+        result.code = "invalid_vcpus";
+        result.message = "vCPU count must be an integer from 1 to 256.";
+        return result;
+    }
+    unsigned long long memory_mib = 0;
+    if (!parseUnsignedRange(draft.memory_mib, 256, 1048576, memory_mib)) {
+        result.code = "invalid_memory";
+        result.message = "Memory must be an integer from 256 to 1048576 MiB.";
+        return result;
+    }
+    const std::string architecture = draft.architecture.empty() ? "x86_64" : draft.architecture;
+    if (architecture != "x86_64" && architecture != "aarch64") {
+        result.code = "invalid_architecture";
+        result.message = "Architecture must be x86_64 or aarch64.";
+        return result;
+    }
+    const std::string machine = draft.machine_type.empty() ? "auto" : draft.machine_type;
+    const bool machine_valid = machine == "auto" ||
+        (architecture == "x86_64" && (machine == "q35" || machine == "pc")) ||
+        (architecture == "aarch64" && machine == "virt");
+    if (!machine_valid) {
+        result.code = "invalid_machine_type";
+        result.message = "Machine type is incompatible with the selected architecture.";
+        return result;
+    }
+
+    std::ostringstream xml;
+    xml << "<domain type='kvm'>\n"
+        << "  <name>" << xmlEscape(draft.name) << "</name>\n"
+        << "  <memory unit='MiB'>" << memory_mib << "</memory>\n"
+        << "  <currentMemory unit='MiB'>" << memory_mib << "</currentMemory>\n"
+        << "  <vcpu placement='static'>" << vcpus << "</vcpu>\n"
+        << "  <os>\n"
+        << "    <type arch='" << architecture << "'";
+    if (machine != "auto") xml << " machine='" << machine << "'";
+    xml << ">hvm</type>\n"
+        << "    <boot dev='hd'/>\n"
+        << "  </os>\n"
+        << "  <clock offset='utc'/>\n"
+        << "  <on_poweroff>destroy</on_poweroff>\n"
+        << "  <on_reboot>restart</on_reboot>\n"
+        << "  <on_crash>destroy</on_crash>\n"
+        << "</domain>\n";
+
+    result.success = true;
+    result.code = "preview_ready";
+    result.message = "Validated VM definition preview. No VM, disk or network was created.";
+    result.name = draft.name;
+    result.architecture = architecture;
+    result.machine_type = machine;
+    result.vcpus = static_cast<unsigned int>(vcpus);
+    result.memory_bytes = static_cast<std::uint64_t>(memory_mib) * 1024ULL * 1024ULL;
+    result.xml = xml.str();
+    return result;
+}
+
 std::vector<HypervisorCapability> HypervisorManager::capabilities()
 {
     return {{"lifecycle", true}, {"pause_resume", true}, {"autostart", true},
-        {"create", false}, {"edit", false}, {"delete", false},
-        {"snapshots", false}, {"disks", false}, {"networks", false},
-        {"console", false}};
+        {"create_preview", true}, {"create", false}, {"edit", false},
+        {"delete", false}, {"snapshots", false}, {"disks", false},
+        {"networks", false}, {"console", false}};
 }
 
 VmActionResult HypervisorManager::performAction(const std::string& uuid,

@@ -18,7 +18,7 @@ Home AI Core is a local-first autonomous server platform designed for:
 
 ## Current development version
 
-0.0.37 — Hypervisor Core: pause/resume and autostart management
+0.0.38 — Hypervisor Core: safe VM definition preview and validation
 
 The repository root `VERSION` file is the single source of the compiled Core version.
 

@@ -67,6 +67,20 @@ int main() {
         auto form = [&](std::string action, std::string state) {
             return "uuid=" + uuid + "&confirmation=" + uuid + "&action=" + action + "&expected_state=" + state;
         };
+        const std::string preview_path = "/api/hypervisor/create/preview";
+        const std::string preview_form = "name=preview-vm&vcpus=2&memory_mib=4096&architecture=x86_64&machine_type=q35";
+        check(request("POST", preview_path, "", preview_form).find("401 Unauthorized") != std::string::npos, "anonymous create preview");
+        check(request("POST", preview_path, *viewer, preview_form).find("403 Forbidden") != std::string::npos, "viewer create preview");
+        check(request("POST", preview_path, *admin, preview_form, false).find("403 Forbidden") != std::string::npos, "preview request header");
+        const auto preview_response = request("POST", preview_path, *admin, preview_form);
+        check(preview_response.find("200 OK") != std::string::npos &&
+            preview_response.find("preview_ready") != std::string::npos &&
+            preview_response.find("preview-vm") != std::string::npos &&
+            preview_response.find("<domain type='kvm'>") != std::string::npos, "valid create preview");
+        check(request("POST", preview_path, *admin,
+            "name=%3Cbad%3E&vcpus=2&memory_mib=4096&architecture=x86_64&machine_type=q35")
+            .find("invalid_name") != std::string::npos, "preview rejects unsafe name");
+
         check(request("GET", "/api/hypervisor").find("401 Unauthorized") != std::string::npos, "anonymous inventory");
         check(request("POST", action_path, "", form("start", "shutoff")).find("401 Unauthorized") != std::string::npos, "anonymous mutation");
         check(request("POST", action_path, *viewer, form("start", "shutoff")).find("403 Forbidden") != std::string::npos, "viewer mutation");

@@ -4000,6 +4000,46 @@ void WebServer::handleClient(
         return;
     }
 
+    if (method == "POST" && path == "/api/hypervisor/create/preview") {
+        if (!security_.hasPermission(*session, "hypervisor.manage")) {
+            sendResponse(client_fd, "403 Forbidden", "application/json; charset=utf-8",
+                "{\"success\":false,\"code\":\"permission_denied\",\"message\":\"VM management permission is required.\"}");
+            return;
+        }
+        if (headerValue(headers, "X-HomeAI-Request") != "1") {
+            sendResponse(client_fd, "403 Forbidden", "application/json; charset=utf-8",
+                "{\"success\":false,\"code\":\"request_header_required\",\"message\":\"Home AI request header is required.\"}");
+            return;
+        }
+        const auto form = parseForm(body);
+        auto field = [&](const char* name) {
+            const auto it = form.find(name);
+            return it == form.end() ? std::string{} : it->second;
+        };
+        VmCreateDraft draft;
+        draft.name = field("name");
+        draft.vcpus = field("vcpus");
+        draft.memory_mib = field("memory_mib");
+        draft.architecture = field("architecture");
+        draft.machine_type = field("machine_type");
+        const auto result = HypervisorManager::previewCreate(draft);
+        security_.audit("hypervisor.create_preview", session->username, "result=" + result.code);
+
+        std::ostringstream json;
+        json << "{\"success\":" << (result.success ? "true" : "false")
+            << ",\"code\":\"" << jsonEscape(result.code)
+            << "\",\"message\":\"" << jsonEscape(result.message)
+            << "\",\"definition\":{\"name\":\"" << jsonEscape(result.name)
+            << "\",\"architecture\":\"" << jsonEscape(result.architecture)
+            << "\",\"machine_type\":\"" << jsonEscape(result.machine_type)
+            << "\",\"vcpus\":" << result.vcpus
+            << ",\"memory_bytes\":" << result.memory_bytes
+            << "},\"xml\":\"" << jsonEscape(result.xml) << "\"}";
+        sendResponse(client_fd, result.success ? "200 OK" : "400 Bad Request",
+            "application/json; charset=utf-8", json.str());
+        return;
+    }
+
     if (method == "POST" && path == "/api/hypervisor/action") {
         auto respond = [&](const std::string& status, const VmActionResult& result) {
             sendResponse(client_fd, status, "application/json; charset=utf-8",

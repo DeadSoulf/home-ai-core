@@ -778,6 +778,14 @@ Snapshots / backup — NEXT	Snapshots / backup — NEXT
 Создание, изменение и удаление VM — NEXT	Create, edit and delete VMs — NEXT
 Консоль VM — NEXT	VM console — NEXT
 Ожидание команды VM:	Pending VM request:
+Новая VM	New VM
+Предварительная конфигурация проверяет параметры и генерирует безопасный libvirt XML. VM, диски и сети пока не создаются.	The preview validates parameters and generates safe libvirt XML. No VM, disks, or networks are created yet.
+Имя VM	VM name
+Архитектура	Architecture
+Тип машины	Machine type
+Проверить конфигурацию	Validate configuration
+Проверка конфигурации VM…	Validating VM configuration…
+Конфигурация VM валидна. Никакие ресурсы не были созданы.	VM configuration is valid. No resources were created.
 Для найденных камер Home AI Core пытается определить RTSP автоматически. ONVIF используется, если он включён; Hikvision и совместимые камеры могут обнаруживаться и при выключенном ONVIF.	Home AI Core attempts to detect RTSP automatically for discovered cameras. ONVIF is used when enabled; Hikvision and compatible cameras may also be discovered with ONVIF disabled.
 «Проверить» — быстрая проверка RTSP-порта. «Поток» запускает ffprobe и показывает реальный видеокодек, разрешение и FPS. Snapshot создаётся через ffmpeg.	“Check” quickly checks the RTSP port. “Stream” runs ffprobe to show the actual video codec, resolution and FPS. Snapshot uses ffmpeg.
 Запись видео — NEXT	Video recording — NEXT

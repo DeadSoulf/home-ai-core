@@ -30,7 +30,8 @@
 | 0.0.34 | Hypervisor lifecycle: start/shutdown/reboot/force-off | DEVELOPMENT SNAPSHOT |
 | 0.0.35 | Hypervisor Debian setup/readiness guidance | DEVELOPMENT SNAPSHOT |
 | 0.0.36 | Cluster Core foundation: Controller/Worker heartbeat and scheduling | DEVELOPMENT SNAPSHOT |
-| 0.0.37 | Hypervisor pause/resume + autostart controls | IN DEVELOPMENT |
+| 0.0.37 | Hypervisor pause/resume + autostart controls | DEVELOPMENT SNAPSHOT |
+| 0.0.38 | Hypervisor safe VM definition preview and validation | IN DEVELOPMENT |
 | next 0.0.x | Recorder + continuous video transport + archive/event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |

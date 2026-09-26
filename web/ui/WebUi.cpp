@@ -4889,7 +4889,33 @@ ONVIF используется, если он включён; Hikvision и со�
 <div class="placeholder-card">Загрузка виртуальных машин...</div>
 </div>
 </div>
+)HTML";
 
+        if (uiHasPermission(context, "hypervisor.manage")) {
+            page << R"HTML(
+<div id="hypervisor-create-preview" class="section-card">
+<div class="section-title">
+<h2>Новая VM</h2>
+<span class="section-hint">0.0.38 PREVIEW</span>
+</div>
+<p class="muted">Предварительная конфигурация проверяет параметры и генерирует безопасный libvirt XML. VM, диски и сети пока не создаются.</p>
+<form id="hypervisor-create-preview-form">
+<div class="form-grid">
+<div><label>Имя VM</label><input name="name" required maxlength="63" pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,62}" placeholder="home-ai-vm"></div>
+<div><label>vCPU</label><input type="number" name="vcpus" min="1" max="256" value="2" required></div>
+<div><label>RAM, MiB</label><input type="number" name="memory_mib" min="256" max="1048576" value="4096" required></div>
+<div><label>Архитектура</label><select name="architecture"><option value="x86_64">x86_64</option><option value="aarch64">aarch64</option></select></div>
+<div><label>Тип машины</label><select name="machine_type"><option value="auto">Auto</option><option value="q35">q35</option><option value="pc">pc</option><option value="virt">virt</option></select></div>
+</div>
+<div class="button-row"><button type="submit">Проверить конфигурацию</button></div>
+</form>
+<p id="hypervisor-create-preview-message" class="muted" role="status" aria-live="polite"></p>
+<pre id="hypervisor-create-preview-xml" class="log-panel" style="display:none;white-space:pre-wrap"></pre>
+</div>
+)HTML";
+        }
+
+        page << R"HTML(
 <div class="section-card">
 <div class="section-title">
 <h2>Следующие этапы</h2>
@@ -10153,6 +10179,42 @@ function renderHypervisorSetup(host) {
     panel.appendChild(note);
 }
 
+async function previewHypervisorCreate(event) {
+    event.preventDefault();
+    const form = document.getElementById("hypervisor-create-preview-form");
+    const message = document.getElementById("hypervisor-create-preview-message");
+    const xml = document.getElementById("hypervisor-create-preview-xml");
+    if (!form || !message || !xml) return;
+
+    const body = new URLSearchParams();
+    for (const [key, value] of new FormData(form).entries())
+        body.append(key, String(value));
+
+    message.textContent = tr("Проверка конфигурации VM…");
+    message.className = "muted";
+    xml.style.display = "none";
+    xml.textContent = "";
+
+    try {
+        const response = await fetch("/api/hypervisor/create/preview", {
+            method: "POST",
+            headers: {"Content-Type": "application/x-www-form-urlencoded", "X-HomeAI-Request": "1"},
+            body
+        });
+        if (response.status === 401) { window.location = "/login"; return; }
+        const data = await response.json();
+        if (!response.ok || !data.success)
+            throw new Error(data.message || data.code || String(response.status));
+        message.textContent = tr("Конфигурация VM валидна. Никакие ресурсы не были созданы.");
+        message.className = "status-ok";
+        xml.textContent = data.xml || "";
+        xml.style.display = data.xml ? "block" : "none";
+    } catch (error) {
+        message.textContent = error.message;
+        message.className = "status-error";
+    }
+}
+
 const hypervisorActionLabels = {
     "start": "Запустить VM",
     "shutdown": "Завершить работу VM",
@@ -10612,6 +10674,10 @@ document.addEventListener(
                 updateHypervisor
             );
         }
+
+        const createPreview = document.getElementById("hypervisor-create-preview-form");
+        if (createPreview)
+            createPreview.addEventListener("submit", previewHypervisorCreate);
 
         updateHypervisor();
 

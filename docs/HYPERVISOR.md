@@ -121,6 +121,19 @@ Missing lifecycle symbols leave read-only inventory functional.
 
 See [extension contracts](HYPERVISOR_EXTENSIONS.md) for the next module boundaries.
 
+## 0.0.38 VM definition preview
+
+The next creation layer starts as a non-mutating preview instead of accepting arbitrary
+libvirt XML. Administrators can submit a typed draft to `POST /api/hypervisor/create/preview`.
+The manager validates a conservative VM-name grammar, vCPU/memory ranges and
+architecture/machine compatibility, then generates XML server-side. The browser never
+supplies raw XML. The preview does not open a writable libvirt connection and does not
+create a domain, disk, NIC, UUID, NVRAM file or other host resource.
+
+`GET /api/hypervisor` exposes `create_preview: true` while `create`, `edit` and
+`delete` remain false. Actual domain definition will be enabled only together with
+host capability checks, read-back verification and storage/network ownership rules.
+
 ## Validation
 
 Build and run `ctest --test-dir build --output-on-failure` on Linux. Lifecycle and

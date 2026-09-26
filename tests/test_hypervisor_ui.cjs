@@ -20,6 +20,7 @@ const {chromium} = require(process.argv[2] || 'playwright');
     let host = {libvirt_available: true, libvirt_connected: true, kvm_accessible: true, qemu_available: true};
     let statusMessage = '';
     let releaseAction;
+    const createPreviews = [];
 
     const refreshAllowed = () => {
         const auto = autostart ? 'autostart-off' : 'autostart-on';
@@ -38,6 +39,17 @@ const {chromium} = require(process.argv[2] || 'playwright');
                 JSON.stringify(fs.readFileSync('web/ui/translations.tsv', 'utf8')) + ';\n' +
                 fs.readFileSync('web/ui/localization.js', 'utf8') + '\n})();';
             return route.fulfill({contentType: 'application/javascript', body: script});
+        }
+
+        if (url.pathname === '/api/hypervisor/create/preview') {
+            const form = new URLSearchParams(route.request().postData());
+            createPreviews.push(form);
+            assert.equal(route.request().headers()['x-homeai-request'], '1');
+            return route.fulfill({status: 200, json: {
+                success: true, code: 'preview_ready',
+                message: 'Validated VM definition preview.',
+                xml: "<domain type='kvm'>\n  <name>" + form.get('name') + "</name>\n</domain>\n"
+            }});
         }
 
         if (url.pathname === '/api/hypervisor/action') {
@@ -104,6 +116,12 @@ const {chromium} = require(process.argv[2] || 'playwright');
         assert.equal(await page.getByRole('button', {name: 'Запустить VM'}).isEnabled(), true);
         assert.equal(await page.getByRole('button', {name: 'Включить автозапуск VM'}).isEnabled(), true);
         assert.equal(await page.locator('#hypervisor-vm-list strong').innerText(), '<VM & test>');
+        await page.fill('#hypervisor-create-preview-form input[name="name"]', 'preview-vm');
+        await page.getByRole('button', {name: 'Проверить конфигурацию'}).click();
+        await page.waitForFunction(() => document.querySelector('#hypervisor-create-preview-message').textContent.includes('Конфигурация VM валидна'));
+        assert.equal(createPreviews.length, 1);
+        assert.equal(createPreviews[0].get('name'), 'preview-vm');
+        assert((await page.locator('#hypervisor-create-preview-xml').innerText()).includes('<name>preview-vm</name>'));
 
         page.once('dialog', dialog => dialog.dismiss());
         await page.getByRole('button', {name: 'Запустить VM'}).click();

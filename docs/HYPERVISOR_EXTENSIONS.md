@@ -1,8 +1,9 @@
 # Hypervisor extension contracts
 
-Version 0.0.34 implements lifecycle only. `HypervisorManager::capabilities()` is the
-central registry exposed by GET inventory. `create`, `edit`, `delete`, `snapshots`,
-`disks`, `networks` and `console` are false. Unknown lifecycle action names fail
+Version 0.0.34 introduced lifecycle and 0.0.38 adds a non-mutating
+`create_preview` contract. `HypervisorManager::capabilities()` is the central
+registry exposed by GET inventory. `create_preview` is true, while `create`,
+`edit`, `delete`, `snapshots`, `disks`, `networks` and `console` remain false. Unknown lifecycle action names fail
 closed. Clients must treat absent capability names as false for compatibility.
 Do not flip a flag until its backend, authorization, validation and integration
 tests ship together. Existing inventory field names and the Web UI route stay stable.
@@ -26,7 +27,7 @@ tests ship together. Existing inventory field names and the Web UI route stay st
 
 | Module | Input and validation boundary | Backend and completion contract |
 | --- | --- | --- |
-| Create / Edit | Typed VM definition: name, UUID, architecture, machine type, vCPU count, memory bytes, boot, disk IDs, NIC IDs. Validate host limits and references; generate escaped XML, never accept arbitrary XML from the UI. Edit preview includes configuration revision and live-vs-next-boot scope. | Define with libvirt; read the definition back before reporting success. Keep storage creation rollback explicit. Start remains a separate confirmed action. |
+| Create / Edit | Typed VM definition: name, UUID, architecture, machine type, vCPU count, memory bytes, boot, disk IDs, NIC IDs. 0.0.38 implements the first server-generated XML preview for name/vCPU/memory/architecture/machine type only; it performs no host mutation. Validate host limits and references before enabling actual creation; never accept arbitrary XML from the UI. Edit preview includes configuration revision and live-vs-next-boot scope. | Define with libvirt only in a later capability; read the definition back before reporting success. Keep storage creation rollback explicit. Start remains a separate confirmed action. |
 | Delete | UUID, revision, inactive state, explicit confirmation. Preserve disks by default; deleting volumes requires a separate ownership/reference check and confirmation. | Undefine domain configuration only. Handle managed saves, snapshots and NVRAM deliberately; never reuse Force Off as Delete. |
 | Disks / ISO | Storage Pool volume ID, format (qcow2/raw), size and attachment target. Validate quotas, free space, ownership, references and ISO read-only status. Do not accept arbitrary host paths. | Volume operations plus libvirt attachment APIs; report live and persistent configuration independently. Never remove shared volumes. |
 | Networks | Network UUID, NAT/isolated/bridge mode, subnet, DHCP range and bridge ID. Validate conflicts and bridge membership. | libvirt network definitions; coordinate host bridge changes with the existing Network module and its rollback policy. |

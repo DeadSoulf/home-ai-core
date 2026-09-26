@@ -59,6 +59,26 @@ struct VmActionResult {
     std::string state{"unknown"};
 };
 
+struct VmCreateDraft {
+    std::string name;
+    std::string vcpus;
+    std::string memory_mib;
+    std::string architecture{"x86_64"};
+    std::string machine_type{"auto"};
+};
+
+struct VmCreatePreviewResult {
+    bool success{false};
+    std::string code;
+    std::string message;
+    std::string name;
+    std::string architecture;
+    std::string machine_type;
+    unsigned int vcpus{0};
+    std::uint64_t memory_bytes{0};
+    std::string xml;
+};
+
 // Stable capability names for future resource modules. Unsupported operations
 // must remain disabled until their validation, permissions and backend exist.
 struct HypervisorCapability {
@@ -94,6 +114,7 @@ public:
     VmActionResult performAction(const std::string& uuid,
         const std::string& action, const std::string& expected_state,
         const std::string& confirmation);
+    static VmCreatePreviewResult previewCreate(const VmCreateDraft& draft);
     static bool validUuid(const std::string& uuid);
     static std::vector<std::string> allowedActions(const std::string& state);
     static std::vector<HypervisorCapability> capabilities();

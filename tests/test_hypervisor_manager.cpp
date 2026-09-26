@@ -12,8 +12,30 @@ int main()
         HypervisorManager::validUuid(uuid + "0") ||
         HypervisorManager::allowedActions("unknown").size() != 0 ||
         HypervisorManager::allowedActions("shutoff") != std::vector<std::string>{"start"} ||
-        HypervisorManager::allowedActions("paused") != std::vector<std::string>{"force-off"})
+        HypervisorManager::allowedActions("paused") != std::vector<std::string>{"resume", "force-off"})
         return 1;
+    homeai::VmCreateDraft draft;
+    draft.name = "home-ai-test";
+    draft.vcpus = "2";
+    draft.memory_mib = "4096";
+    draft.architecture = "x86_64";
+    draft.machine_type = "q35";
+    const auto preview = HypervisorManager::previewCreate(draft);
+    if (!preview.success || preview.code != "preview_ready" || preview.vcpus != 2 ||
+        preview.memory_bytes != 4096ULL * 1024ULL * 1024ULL ||
+        preview.xml.find("<domain type='kvm'>") == std::string::npos ||
+        preview.xml.find("<name>home-ai-test</name>") == std::string::npos ||
+        preview.xml.find("machine='q35'") == std::string::npos)
+        return 1;
+    draft.name = "<bad>";
+    if (HypervisorManager::previewCreate(draft).code != "invalid_name") return 1;
+    draft.name = "valid"; draft.vcpus = "0";
+    if (HypervisorManager::previewCreate(draft).code != "invalid_vcpus") return 1;
+    draft.vcpus = "2"; draft.memory_mib = "255";
+    if (HypervisorManager::previewCreate(draft).code != "invalid_memory") return 1;
+    draft.memory_mib = "4096"; draft.architecture = "aarch64"; draft.machine_type = "q35";
+    if (HypervisorManager::previewCreate(draft).code != "invalid_machine_type") return 1;
+
     HypervisorManager unavailable;
     if (unavailable.performAction(uuid, "start", "shutoff", "").code != "confirmation_required" ||
         unavailable.performAction(uuid, "delete", "shutoff", uuid).code != "unsupported_action" ||
