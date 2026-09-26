@@ -23,7 +23,8 @@
 | 0.0.17 | Simplified ONVIF discovery list and hidden technical endpoints | DEVELOPMENT SNAPSHOT |
 | 0.0.18 | LAN camera discovery without requiring ONVIF | DEVELOPMENT SNAPSHOT |
 | 0.0.19 | Native Hikvision SADP discovery | DEVELOPMENT SNAPSHOT |
-| 0.0.20 | Camera metadata in discovery results | IN DEVELOPMENT |
+| 0.0.20 | Camera metadata in discovery results | DEVELOPMENT SNAPSHOT |
+| 0.0.21 | Manufacturer identity no longer guessed from ports/SADP | IN DEVELOPMENT |
 | next 0.0.x | Recorder + continuous video transport + archive/event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
@@ -277,21 +278,32 @@ Implemented in the 0.0.19 snapshot:
 - Hikvision model, firmware and serial metadata from SADP
 - discovery independent of ONVIF and RTSP availability
 
-## Current focus: 0.0.20
+## Development snapshot: 0.0.20
+
+Implemented in the 0.0.20 snapshot:
+
+- useful camera metadata displayed directly in discovery rows
+- SADP model, firmware and serial metadata displayed when available
+- ONVIF hardware scope decoded into a human-readable model
+- technical XAddr/scopes remain hidden
+- compact desktop/mobile discovery layout preserved
+
+## Current focus: 0.0.21
 
 Current Camera Core/Web UI work:
 
-- useful camera metadata displayed directly in discovery rows
-- Hikvision manufacturer/source, model, firmware and serial from SADP
-- ONVIF hardware scope decoded into a human-readable model when available
-- percent-encoded scope values decoded before display
-- technical XAddr/scopes remain hidden
-- absent metadata is not guessed
-- compact desktop/mobile discovery layout preserved
-- parser and Web UI tests cover discovery metadata presentation
+- service ports no longer determine manufacturer identity
+- TCP 8000 does not automatically mean Hikvision
+- TCP 37777 does not automatically mean Dahua
+- TCP 34567 does not automatically mean NetSurveillance
+- SADP is treated as a discovery protocol, not proof of retail manufacturer
+- SADP model/firmware/serial data remains available
+- vendor-specific RTSP hints can still be tried internally
+- confirmed manufacturer comes from authenticated camera metadata
+- tests prevent port-based vendor regression
 
-0.0.20 restores useful camera identity information without bringing back the technical ONVIF
-URLs that were intentionally removed from the user-facing list.
+0.0.21 separates protocol/service detection from manufacturer identity so OEM and compatible
+cameras are not mislabeled.
 
 ## Later major capabilities
 

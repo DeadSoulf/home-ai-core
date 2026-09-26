@@ -144,9 +144,9 @@ int main()
             hikvisionPorts
         )
         ||
-        LanCameraDiscovery::vendorHint(
+        !LanCameraDiscovery::vendorHint(
             hikvisionPorts
-        ) != "Hikvision"
+        ).empty()
         ||
         LanCameraDiscovery::
             suggestedRtspUrl(
@@ -157,7 +157,36 @@ int main()
             "rtsp://192.0.2.30:554/Streaming/Channels/101"
     ) {
         std::cerr
-            << "Hikvision LAN discovery heuristics failed\n";
+            << "LAN discovery vendor isolation failed\n";
+
+        return 1;
+    }
+
+    const std::vector<int>
+        dahuaLikePorts{
+            80,
+            554,
+            37777
+        };
+
+    const std::vector<int>
+        netsurveillanceLikePorts{
+            80,
+            554,
+            34567
+        };
+
+    if (
+        !LanCameraDiscovery::vendorHint(
+            dahuaLikePorts
+        ).empty()
+        ||
+        !LanCameraDiscovery::vendorHint(
+            netsurveillanceLikePorts
+        ).empty()
+    ) {
+        std::cerr
+            << "Service ports were incorrectly treated as vendor identity\n";
 
         return 1;
     }

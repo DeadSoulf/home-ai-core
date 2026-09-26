@@ -3141,8 +3141,12 @@ CameraManager::discoverCameras(
 
         item.address =
             device.address;
-        item.vendor_hint =
-            "Hikvision";
+
+        // SADP confirms a Hikvision-compatible discovery
+        // protocol, not necessarily the retail manufacturer.
+        // OEM devices can also answer SADP, so manufacturer
+        // stays unknown until authenticated device metadata
+        // confirms it.
         item.model_hint =
             device.model;
         item.firmware_hint =
@@ -3209,11 +3213,13 @@ CameraManager::discoverCameras(
         if (
             item.suggested_rtsp_url.empty()
             &&
-            item.vendor_hint ==
-                "Hikvision"
+            item.sadp
             &&
             item.rtsp_port > 0
         ) {
+            // SADP is sufficient to try the common
+            // Hikvision-compatible RTSP path internally,
+            // but it is not exposed as a manufacturer claim.
             item.suggested_rtsp_url =
                 LanCameraDiscovery::
                     suggestedRtspUrl(

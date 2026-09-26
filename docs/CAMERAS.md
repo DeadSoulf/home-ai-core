@@ -404,3 +404,19 @@ requiring ONVIF. ONVIF-only devices may additionally expose a model through the 
 If a field is not supplied by the discovery protocol, Home AI Core leaves it absent rather
 than guessing a manufacturer, model or firmware version. Technical XAddr and scope URLs remain
 hidden from the normal UI.
+
+
+## Manufacturer identification rules
+
+Starting with 0.0.21, Home AI Core does not infer a camera manufacturer from TCP service
+ports. Ports such as 8000, 37777 and 34567 are shared by multiple vendors and OEM firmwares.
+
+SADP is also treated as a discovery protocol rather than proof of the retail manufacturer.
+A SADP reply can identify the device model, firmware and serial number, but the Web UI does
+not label the camera as Hikvision solely because it answered SADP.
+
+A manufacturer is considered confirmed only when the camera itself reports it through an
+authenticated metadata mechanism such as ONVIF GetDeviceInformation.
+
+Vendor-specific RTSP path hints may still be tried internally when a compatible discovery
+protocol strongly suggests them, but those hints are not shown as manufacturer identity.

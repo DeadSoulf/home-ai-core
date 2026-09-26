@@ -165,7 +165,7 @@ Current content:
 - combined camera discovery: Hikvision SADP + ONVIF WS-Discovery + local IPv4 camera-port scan
 - native Hikvision SADP discovery over UDP 37020 even when ONVIF/RTSP services are disabled
 - discovery rows show useful camera metadata instead of technical URLs
-- manufacturer/source, model, firmware and serial number are shown when available
+- confirmed manufacturer, plus model, firmware and serial number, are shown when available
 - SADP device model, firmware and serial metadata reused by the camera form
 - compact discovery list remains IP/address only
 - automatic ONVIF Media Profile retrieval when ONVIF is available
@@ -257,3 +257,11 @@ Subsystem-specific settings should live inside their own sections rather than ac
 The System page shows server update state as a live percentage progress view with explicit
 GitHub, CMake, build, test, activation and restart stages. Ninja and CTest counters are shown
 when available, and the detailed command log can be expanded on demand.
+
+
+### Camera manufacturer identity
+
+Discovery protocols and service ports are not treated as manufacturer proof. In particular,
+SADP compatibility does not automatically label a camera as Hikvision, and ports 8000/37777/
+34567 are not used as vendor identity. The UI shows a manufacturer only after the camera
+reports it through authenticated device metadata.

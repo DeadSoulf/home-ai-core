@@ -376,33 +376,11 @@ LanCameraDiscovery::vendorHint(
     const std::vector<int>& open_ports
 )
 {
-    if (
-        hasPort(
-            open_ports,
-            8000
-        )
-    ) {
-        return "Hikvision";
-    }
+    (void)open_ports;
 
-    if (
-        hasPort(
-            open_ports,
-            37777
-        )
-    ) {
-        return "Dahua";
-    }
-
-    if (
-        hasPort(
-            open_ports,
-            34567
-        )
-    ) {
-        return "NetSurveillance";
-    }
-
+    // Open TCP ports are only service hints. They are not
+    // reliable manufacturer identifiers because many camera
+    // vendors and OEM firmwares reuse the same ports.
     return {};
 }
 

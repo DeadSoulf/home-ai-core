@@ -2618,7 +2618,7 @@ PrivateKey отображается в редакторе и сохраняет�
 <div class="section-card">
 <div class="section-title">
 <h2>Камеры</h2>
-<span class="section-hint">Camera Core 0.0.20</span>
+<span class="section-hint">Camera Core 0.0.21</span>
 </div>
 
 <div class="stats-grid">
