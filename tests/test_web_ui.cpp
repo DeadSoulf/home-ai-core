@@ -60,6 +60,8 @@ int main()
         "storage.manage",
         "network.view",
         "network.manage",
+        "cluster.view",
+        "cluster.manage",
         "hypervisor.view",
         "hypervisor.manage",
         "automation.view",
@@ -525,6 +527,7 @@ int main()
         "/ai",
         "/users",
         "/hypervisor",
+        "/cluster",
         "/settings"
         ,"/files", "/admin"
     };
@@ -626,6 +629,40 @@ int main()
         std::cerr
             << "Hypervisor page structure is invalid\n";
 
+        return 1;
+    }
+
+    context.page =
+        "/cluster";
+
+    const auto cluster =
+        homeai::renderWebUi(
+            context
+        );
+
+    if (
+        cluster.find(
+            "id=\"cluster-root\""
+        ) == std::string::npos
+        ||
+        cluster.find(
+            "id=\"cluster-node-list\""
+        ) == std::string::npos
+        ||
+        cluster.find(
+            "/api/cluster"
+        ) == std::string::npos
+        ||
+        cluster.find(
+            "cluster.shared_token"
+        ) == std::string::npos
+        ||
+        cluster.find(
+            "cluster-placement-btn"
+        ) == std::string::npos
+    ) {
+        std::cerr
+            << "Cluster page structure is invalid\n";
         return 1;
     }
 

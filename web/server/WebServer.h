@@ -17,6 +17,7 @@ class UpdateManager;
 class ModuleManager;
 class CameraManager;
 class HypervisorManager;
+class ClusterManager;
 
 class WebServer {
 public:
@@ -27,7 +28,8 @@ public:
         ModuleManager& modules,
         GpuMonitor gpu_monitor = GpuMonitor(),
         CameraManager* cameras = nullptr,
-        HypervisorManager* hypervisor = nullptr
+        HypervisorManager* hypervisor = nullptr,
+        ClusterManager* cluster = nullptr
     );
 
     ~WebServer();
@@ -53,6 +55,7 @@ private:
     GpuMonitor gpu_monitor_;
     CameraManager* cameras_{nullptr};
     HypervisorManager* hypervisor_{nullptr};
+    ClusterManager* cluster_{nullptr};
 
     std::atomic<bool> running_{false};
 

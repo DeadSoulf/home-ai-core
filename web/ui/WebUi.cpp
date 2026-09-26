@@ -164,6 +164,9 @@ std::string pageTitle(
     if (page == "/hypervisor")
         return "Виртуализация";
 
+    if (page == "/cluster")
+        return "Кластер";
+
     if (page == "/system")
         return "Система";
 
@@ -375,6 +378,8 @@ bool isWebUiPath(
         path == "/users"
         ||
         path == "/hypervisor"
+        ||
+        path == "/cluster"
         ||
         path == "/settings" || path == "/admin";
 }
@@ -2896,6 +2901,11 @@ button,
         uiHasPermission(
             context,
             "hypervisor.view"
+        )
+        ||
+        uiHasPermission(
+            context,
+            "cluster.view"
         );
 
     const bool show_services =
@@ -3017,6 +3027,21 @@ button,
                 "/hypervisor",
                 "Виртуализация",
                 "▤"
+            );
+        }
+
+        if (
+            uiHasPermission(
+                context,
+                "cluster.view"
+            )
+        ) {
+            navLink(
+                page,
+                context,
+                "/cluster",
+                "Кластер",
+                "⌘"
             );
         }
 
@@ -4530,6 +4555,249 @@ ONVIF используется, если он включён; Hikvision и со�
             "<div class=\"placeholder-card\">Сценарии — PLANNED</div>"
             "<div class=\"placeholder-card\">История выполнения — PLANNED</div>"
         );
+    }
+    else if (
+        context.page == "/cluster"
+    ) {
+        page << R"HTML(
+<div id="cluster-root" class="section-card">
+<div class="section-title">
+<div>
+<h2>Cluster Core</h2>
+<span class="section-hint">Несколько серверов как единая система</span>
+</div>
+<button id="cluster-refresh-btn" type="button" class="secondary">Обновить</button>
+</div>
+
+<div class="stats-grid">
+<div class="stat-card">
+<span class="stat-label">Режим</span>
+<strong id="cluster-enabled">...</strong>
+</div>
+<div class="stat-card">
+<span class="stat-label">Роль узла</span>
+<strong id="cluster-role">...</strong>
+</div>
+<div class="stat-card">
+<span class="stat-label">Локальный узел</span>
+<strong id="cluster-local-node">...</strong>
+</div>
+<div class="stat-card">
+<span class="stat-label">Узлов online</span>
+<strong id="cluster-online-count">...</strong>
+</div>
+</div>
+
+<p id="cluster-message" class="muted">Загрузка состояния кластера...</p>
+</div>
+
+<div class="section-card">
+<div class="section-title">
+<h2>Узлы кластера</h2>
+<span class="section-hint">Heartbeat, CPU, RAM и системный диск</span>
+</div>
+<div id="cluster-node-list" class="placeholder-grid">
+<div class="placeholder-card">Загрузка узлов...</div>
+</div>
+</div>
+
+<div class="section-card">
+<div class="section-title">
+<h2>Балансировка нагрузки</h2>
+<span class="section-hint">Least weighted load scheduler</span>
+</div>
+
+<div class="form-grid">
+<div>
+<label for="cluster-workload">Тип нагрузки</label>
+<select id="cluster-workload">
+<option value="generic">Общая</option>
+<option value="ai">AI</option>
+<option value="cameras">Камеры</option>
+<option value="vm">Виртуальные машины</option>
+</select>
+</div>
+</div>
+
+<div class="button-row">
+<button id="cluster-placement-btn" type="button">Выбрать узел</button>
+</div>
+
+<div id="cluster-placement-result" class="placeholder-card" style="margin-top:12px">
+Планировщик ещё не запускался.
+</div>
+</div>
+)HTML";
+
+        if (
+            uiHasPermission(
+                context,
+                "cluster.manage"
+            )
+        ) {
+            page << R"HTML(
+<div class="section-card">
+<div class="section-title">
+<h2>Настройка кластера</h2>
+<span class="section-hint">Изменения применяются после перезапуска сервера</span>
+</div>
+
+<form method="POST" action="/api/config">
+<input type="hidden" name="return_to" value="/cluster">
+<input type="hidden" name="cluster.enabled" value="false">
+
+<div class="form-grid">
+<div>
+<label>Режим кластера</label>
+<label style="display:flex;gap:8px;align-items:center">
+<input type="checkbox" name="cluster.enabled" value="true")HTML";
+
+            if (
+                context.cluster_enabled ==
+                    "true"
+                ||
+                context.cluster_enabled ==
+                    "1"
+            ) {
+                page << " checked";
+            }
+
+            page << R"HTML(>
+Включить Cluster Core
+</label>
+</div>
+
+<div>
+<label>Роль</label>
+<select name="cluster.role">
+<option value="controller")HTML";
+
+            if (
+                context.cluster_role ==
+                "controller"
+            ) {
+                page << " selected";
+            }
+
+            page << R"HTML(>Controller</option>
+<option value="worker")HTML";
+
+            if (
+                context.cluster_role ==
+                "worker"
+            ) {
+                page << " selected";
+            }
+
+            page << R"HTML(>Worker</option>
+</select>
+</div>
+
+<div>
+<label>ID узла</label>
+<input name="cluster.node_id" maxlength="64" pattern="[A-Za-z0-9._-]+" value=")HTML";
+
+            page
+                << htmlEscape(
+                    context.cluster_node_id
+                )
+                << R"HTML(" placeholder="server-01">
+</div>
+
+<div>
+<label>Название узла</label>
+<input name="cluster.node_name" maxlength="128" value=")HTML";
+
+            page
+                << htmlEscape(
+                    context.cluster_node_name
+                )
+                << R"HTML(" placeholder="Основной сервер">
+</div>
+
+<div>
+<label>Адрес узла в кластере</label>
+<input name="cluster.advertise_address" value=")HTML";
+
+            page
+                << htmlEscape(
+                    context.cluster_advertise_address
+                )
+                << R"HTML(" placeholder="10.10.0.11">
+</div>
+
+<div>
+<label>Controller host</label>
+<input name="cluster.controller_host" value=")HTML";
+
+            page
+                << htmlEscape(
+                    context.cluster_controller_host
+                )
+                << R"HTML(" placeholder="10.10.0.10">
+<small>Нужно только для Worker.</small>
+</div>
+
+<div>
+<label>Controller port</label>
+<input type="number" min="1" max="65535" name="cluster.controller_port" value=")HTML";
+
+            page
+                << htmlEscape(
+                    context.cluster_controller_port
+                )
+                << R"HTML(">
+</div>
+
+<div>
+<label>Shared token</label>
+<input type="password" minlength="16" name="cluster.shared_token" value="" autocomplete="new-password" placeholder="Оставьте пустым, чтобы не менять">
+<small>)HTML";
+
+            page
+                << (
+                    context.cluster_token_configured ==
+                        "true"
+                    ? "Токен настроен. "
+                    : "Токен пока не настроен. "
+                )
+                << R"HTML(На всех узлах должен быть один и тот же токен.</small>
+</div>
+
+<div>
+<label>Heartbeat, секунд</label>
+<input type="number" min="2" max="60" name="cluster.heartbeat_interval_seconds" value=")HTML";
+
+            page
+                << htmlEscape(
+                    context.cluster_heartbeat_interval
+                )
+                << R"HTML(">
+</div>
+
+<div>
+<label>Timeout узла, секунд</label>
+<input type="number" min="4" max="300" name="cluster.timeout_seconds" value=")HTML";
+
+            page
+                << htmlEscape(
+                    context.cluster_timeout
+                )
+                << R"HTML(">
+</div>
+</div>
+
+<p class="muted">
+Для соединения серверов используйте приватную LAN или WireGuard. Shared token не заменяет шифрование транспорта.
+</p>
+
+<div class="button-row">
+<button type="submit">Сохранить настройки кластера</button>
+</div>
+</form>
+</div>
+)HTML";
+        }
     }
     else if (
         context.page == "/hypervisor"
@@ -10340,6 +10608,319 @@ document.addEventListener(
     }
 );
 
+function clusterPercent(value) {
+    const number = Number(value);
+
+    if (!Number.isFinite(number))
+        return "0.0%";
+
+    return Math.max(
+        0,
+        Math.min(100, number)
+    ).toFixed(1) + "%";
+}
+
+function renderClusterNode(node) {
+    const card =
+        document.createElement("div");
+    card.className =
+        "placeholder-card";
+
+    const title =
+        document.createElement("div");
+    title.style.display = "flex";
+    title.style.alignItems = "center";
+    title.style.justifyContent = "space-between";
+    title.style.gap = "10px";
+
+    const name =
+        document.createElement("strong");
+    name.textContent =
+        node.name
+        || node.id
+        || tr("Узел");
+    name.dataset.i18nSkip = "";
+    title.appendChild(name);
+
+    const state =
+        document.createElement("span");
+    state.className =
+        node.online
+        ? "status-ok"
+        : "status-error";
+    state.textContent =
+        node.online
+        ? tr("ONLINE")
+        : tr("OFFLINE");
+    title.appendChild(state);
+    card.appendChild(title);
+
+    const meta =
+        document.createElement("div");
+    meta.className = "muted";
+    meta.style.marginTop = "8px";
+    meta.textContent =
+        (node.local
+            ? tr("Локальный")
+            : tr("Удалённый"))
+        + " · "
+        + String(node.role || "-")
+        + (
+            node.address
+            ? " · " + node.address
+            : ""
+        );
+    card.appendChild(meta);
+
+    const metrics =
+        document.createElement("div");
+    metrics.style.marginTop = "10px";
+    metrics.textContent =
+        "CPU "
+        + clusterPercent(node.cpu_percent)
+        + " · RAM "
+        + clusterPercent(node.memory_percent)
+        + " · Disk "
+        + clusterPercent(node.disk_percent);
+    card.appendChild(metrics);
+
+    const score =
+        document.createElement("div");
+    score.className = "muted";
+    score.style.marginTop = "6px";
+    score.textContent =
+        tr("Индекс нагрузки")
+        + ": "
+        + Number(
+            node.score || 0
+        ).toFixed(1);
+    card.appendChild(score);
+
+    return card;
+}
+
+async function updateCluster() {
+    const root =
+        document.getElementById(
+            "cluster-root"
+        );
+
+    if (!root)
+        return;
+
+    const list =
+        document.getElementById(
+            "cluster-node-list"
+        );
+
+    const message =
+        document.getElementById(
+            "cluster-message"
+        );
+
+    try {
+        const response =
+            await fetch(
+                "/api/cluster",
+                {cache: "no-store"}
+            );
+
+        if (response.status === 401) {
+            window.location = "/login";
+            return;
+        }
+
+        const data =
+            await response.json();
+
+        if (
+            !response.ok
+            ||
+            !data.success
+        ) {
+            throw new Error(
+                data.message
+                || data.error
+                || tr(
+                    "Cluster Core недоступен."
+                )
+            );
+        }
+
+        document.getElementById(
+            "cluster-enabled"
+        ).textContent =
+            data.enabled
+            ? tr("Включён")
+            : tr("Выключен");
+
+        document.getElementById(
+            "cluster-role"
+        ).textContent =
+            data.role || "-";
+
+        const local =
+            document.getElementById(
+                "cluster-local-node"
+            );
+
+        local.textContent =
+            data.local_node_name
+            || data.local_node_id
+            || "-";
+        local.dataset.i18nSkip = "";
+
+        document.getElementById(
+            "cluster-online-count"
+        ).textContent =
+            String(
+                data.online_nodes || 0
+            );
+
+        message.textContent =
+            data.message || "";
+        message.className = "muted";
+
+        list.replaceChildren();
+
+        const nodes =
+            Array.isArray(data.nodes)
+            ? data.nodes
+            : [];
+
+        if (nodes.length === 0) {
+            const empty =
+                document.createElement("div");
+            empty.className =
+                "placeholder-card";
+            empty.textContent =
+                tr("Узлы пока не обнаружены.");
+            list.appendChild(empty);
+        }
+        else {
+            for (const node of nodes) {
+                list.appendChild(
+                    renderClusterNode(node)
+                );
+            }
+        }
+
+        const placement =
+            data.placement || {};
+
+        if (placement.available) {
+            const result =
+                document.getElementById(
+                    "cluster-placement-result"
+                );
+
+            result.textContent =
+                tr("Рекомендуемый узел")
+                + ": "
+                + (
+                    placement.node_name
+                    || placement.node_id
+                )
+                + " · "
+                + tr("индекс")
+                + " "
+                + Number(
+                    placement.score || 0
+                ).toFixed(1);
+            result.dataset.i18nSkip = "";
+        }
+    }
+    catch (error) {
+        message.textContent =
+            error.message;
+        message.className =
+            "status-error";
+    }
+}
+
+async function updateClusterPlacement() {
+    const select =
+        document.getElementById(
+            "cluster-workload"
+        );
+
+    const result =
+        document.getElementById(
+            "cluster-placement-result"
+        );
+
+    if (!select || !result)
+        return;
+
+    result.textContent =
+        tr("Расчёт размещения...");
+
+    try {
+        const response =
+            await fetch(
+                "/api/cluster/placement?workload="
+                + encodeURIComponent(
+                    select.value
+                ),
+                {cache: "no-store"}
+            );
+
+        if (response.status === 401) {
+            window.location = "/login";
+            return;
+        }
+
+        const data =
+            await response.json();
+
+        if (
+            !response.ok
+            ||
+            !data.success
+        ) {
+            throw new Error(
+                data.error
+                || String(response.status)
+            );
+        }
+
+        if (!data.available) {
+            result.textContent =
+                data.reason
+                || tr(
+                    "Нет доступного узла."
+                );
+            return;
+        }
+
+        result.textContent =
+            tr("Рекомендуемый узел")
+            + ": "
+            + (
+                data.node_name
+                || data.node_id
+            )
+            + " · "
+            + tr("индекс")
+            + " "
+            + Number(
+                data.score || 0
+            ).toFixed(1)
+            + " · "
+            + (
+                data.reason
+                || ""
+            );
+        result.dataset.i18nSkip = "";
+    }
+    catch (error) {
+        result.textContent =
+            error.message;
+        result.className =
+            "status-error";
+    }
+}
+
 function formatUptime(seconds) {
     seconds = Number(seconds);
 
@@ -15417,9 +15998,34 @@ document.addEventListener(
         updateModuleStatus();
         updateStorageStats();
         updateStorageCandidates();
+        updateCluster();
         updateServerUpdateStatus();
         updateNetworkInterfaces();
         updateVpnProfiles();
+
+        const clusterRefreshButton =
+            document.getElementById(
+                "cluster-refresh-btn"
+            );
+
+        if (clusterRefreshButton) {
+            clusterRefreshButton.addEventListener(
+                "click",
+                updateCluster
+            );
+        }
+
+        const clusterPlacementButton =
+            document.getElementById(
+                "cluster-placement-btn"
+            );
+
+        if (clusterPlacementButton) {
+            clusterPlacementButton.addEventListener(
+                "click",
+                updateClusterPlacement
+            );
+        }
 
         const updateCheckButton =
             document.getElementById(
@@ -15710,6 +16316,11 @@ document.addEventListener(
 
         setInterval(
             updateModuleStatus,
+            5000
+        );
+
+        setInterval(
+            updateCluster,
             5000
         );
 

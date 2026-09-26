@@ -24,6 +24,16 @@ struct WebUiContext {
     std::string storage_video_pinned_mount;
     std::string storage_files_pinned_mount;
     std::string files_root;
+    std::string cluster_enabled;
+    std::string cluster_role;
+    std::string cluster_node_id;
+    std::string cluster_node_name;
+    std::string cluster_advertise_address;
+    std::string cluster_controller_host;
+    std::string cluster_controller_port;
+    std::string cluster_token_configured;
+    std::string cluster_heartbeat_interval;
+    std::string cluster_timeout;
     std::string username;
     std::string role;
     std::vector<std::string> permissions;

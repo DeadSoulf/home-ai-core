@@ -800,3 +800,24 @@ libvirt установлен, но подключение недоступно. 
 KVM недоступен. Проверьте виртуализацию в BIOS/UEFI, вложенную виртуализацию и доступ к /dev/kvm.	KVM is unavailable. Check BIOS/UEFI virtualization, nested virtualization and access to /dev/kvm.
 QEMU не найден. Установите зависимости виртуализации на сервере.	QEMU was not found. Install the virtualization dependencies on the server.
 Выполните команду из каталога проекта на Debian-сервере. Установка добавит пакеты, выдаст учётной записи службы доступ к libvirt/KVM и перезапустит Home AI Core.	Run the command from the project directory on the Debian server. Installation adds packages, grants the service account access to libvirt/KVM and restarts Home AI Core.
+Кластер	Cluster
+Несколько серверов как единая система	Multiple servers as one system
+Узлы кластера	Cluster nodes
+Балансировка нагрузки	Load balancing
+Тип нагрузки	Workload type
+Общая	General
+Выбрать узел	Choose node
+Рекомендуемый узел	Recommended node
+Индекс нагрузки	Load index
+индекс	score
+Локальный	Local
+Удалённый	Remote
+Включён	Enabled
+Выключен	Disabled
+Настройка кластера	Cluster settings
+Изменения применяются после перезапуска сервера	Changes apply after server restart
+Сохранить настройки кластера	Save cluster settings
+Cluster Core недоступен.	Cluster Core is unavailable.
+Узлы пока не обнаружены.	No nodes discovered yet.
+Расчёт размещения...	Calculating placement...
+Нет доступного узла.	No node is available.

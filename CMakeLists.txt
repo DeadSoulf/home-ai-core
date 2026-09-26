@@ -75,6 +75,11 @@ file(
     "${CMAKE_CURRENT_SOURCE_DIR}/server/virtualization/*.cpp"
 )
 
+file(
+    GLOB HOMEAI_CLUSTER_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/server/cluster/*.cpp"
+)
+
 add_library(
     homeai-core-lib
 
@@ -90,6 +95,7 @@ add_library(
     ${HOMEAI_NETWORK_SOURCES}
     ${HOMEAI_CAMERA_SOURCES}
     ${HOMEAI_VIRTUALIZATION_SOURCES}
+    ${HOMEAI_CLUSTER_SOURCES}
     server/storage/StorageMonitor.cpp
     server/storage/StoragePool.cpp
     server/storage/DiskOperations.cpp
@@ -461,3 +467,19 @@ set_tests_properties(hypervisor_api PROPERTIES
     ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}/fake-libvirt" TIMEOUT 30)
 add_test(NAME hypervisor_setup COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_hypervisor_setup.sh")
 set_tests_properties(hypervisor_setup PROPERTIES TIMEOUT 15)
+
+
+add_executable(
+    test-cluster-manager
+    tests/test_cluster_manager.cpp
+)
+target_link_libraries(test-cluster-manager PRIVATE homeai-core-lib)
+add_test(NAME cluster_manager COMMAND test-cluster-manager)
+
+add_executable(
+    test-cluster-api
+    tests/test_cluster_api.cpp
+)
+target_link_libraries(test-cluster-api PRIVATE homeai-core-lib)
+add_test(NAME cluster_api COMMAND test-cluster-api)
+set_tests_properties(cluster_api PROPERTIES TIMEOUT 30)

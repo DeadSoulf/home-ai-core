@@ -13,6 +13,7 @@
 #include "server/network/VpnService.h"
 #include "server/cameras/CameraManager.h"
 #include "server/virtualization/HypervisorManager.h"
+#include "server/cluster/ClusterManager.h"
 #include "server/storage/StorageMonitor.h"
 #include "server/storage/StoragePool.h"
 #include "server/storage/DiskOperations.h"
@@ -147,6 +148,9 @@ std::string requiredPermissionForPage(
 
     if (path == "/hypervisor")
         return "hypervisor.view";
+
+    if (path == "/cluster")
+        return "cluster.view";
 
     if (path == "/settings")
         return "system.manage";
@@ -808,7 +812,8 @@ WebServer::WebServer(
     ModuleManager& modules,
     GpuMonitor gpu_monitor,
     CameraManager* cameras,
-    HypervisorManager* hypervisor
+    HypervisorManager* hypervisor,
+    ClusterManager* cluster
 )
     : runtime_(runtime),
       security_(security),
@@ -816,7 +821,8 @@ WebServer::WebServer(
       modules_(modules),
       gpu_monitor_(std::move(gpu_monitor)),
       cameras_(cameras),
-      hypervisor_(hypervisor)
+      hypervisor_(hypervisor),
+      cluster_(cluster)
 {
 }
 
@@ -1235,6 +1241,125 @@ void WebServer::handleClient(
 
     if (method == "GET" && path == "/assets/i18n.js") {
         sendResponse(client_fd, "200 OK", "application/javascript; charset=utf-8", localizationScript());
+        return;
+    }
+
+    if (
+        method == "POST"
+        &&
+        path == "/api/cluster/heartbeat"
+    ) {
+        if (!cluster_) {
+            sendResponse(
+                client_fd,
+                "503 Service Unavailable",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"error\":\"cluster_unavailable\"}"
+            );
+            return;
+        }
+
+        const auto form =
+            parseForm(body);
+
+        const char* required[] = {
+            "node_id",
+            "node_role",
+            "cpu_percent",
+            "memory_percent",
+            "disk_percent"
+        };
+
+        for (const auto* key : required) {
+            if (!form.contains(key)) {
+                sendResponse(
+                    client_fd,
+                    "400 Bad Request",
+                    "application/json; charset=utf-8",
+                    "{\"success\":false,\"error\":\"invalid_heartbeat\"}"
+                );
+                return;
+            }
+        }
+
+        double cpu_percent = 0.0;
+        double memory_percent = 0.0;
+        double disk_percent = 0.0;
+
+        try {
+            cpu_percent =
+                std::stod(
+                    form.at("cpu_percent")
+                );
+            memory_percent =
+                std::stod(
+                    form.at("memory_percent")
+                );
+            disk_percent =
+                std::stod(
+                    form.at("disk_percent")
+                );
+        }
+        catch (...) {
+            sendResponse(
+                client_fd,
+                "400 Bad Request",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"error\":\"invalid_heartbeat\"}"
+            );
+            return;
+        }
+
+        std::string cluster_error;
+
+        const bool accepted =
+            cluster_->acceptHeartbeat(
+                headerValue(
+                    headers,
+                    "X-HomeAI-Cluster-Token"
+                ),
+                form.at("node_id"),
+                form.contains("node_name")
+                    ? form.at("node_name")
+                    : "",
+                form.at("node_role"),
+                form.contains("address")
+                    ? form.at("address")
+                    : "",
+                cpu_percent,
+                memory_percent,
+                disk_percent,
+                cluster_error
+            );
+
+        if (!accepted) {
+            const std::string status =
+                cluster_error == "unauthorized"
+                ? "403 Forbidden"
+                : (
+                    cluster_error ==
+                        "cluster_not_controller"
+                    ? "409 Conflict"
+                    : "400 Bad Request"
+                );
+
+            sendResponse(
+                client_fd,
+                status,
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"error\":\""
+                + jsonEscape(cluster_error)
+                + "\"}"
+            );
+            return;
+        }
+
+        sendResponse(
+            client_fd,
+            "200 OK",
+            "application/json; charset=utf-8",
+            "{\"success\":true}"
+        );
         return;
     }
 
@@ -2630,6 +2755,196 @@ void WebServer::handleClient(
             "unsupported_action"
         );
 
+        return;
+    }
+
+    if (
+        method == "GET"
+        &&
+        (
+            path == "/api/cluster"
+            ||
+            path == "/api/cluster/placement"
+        )
+    ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "cluster.view"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"error\":\"permission_denied\"}"
+            );
+            return;
+        }
+
+        if (!cluster_) {
+            sendResponse(
+                client_fd,
+                "503 Service Unavailable",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"error\":\"cluster_unavailable\"}"
+            );
+            return;
+        }
+
+        const auto query_values =
+            parseForm(query_string);
+
+        const std::string workload =
+            query_values.contains("workload")
+            ? query_values.at("workload")
+            : "generic";
+
+        const auto placement =
+            cluster_->selectNode(workload);
+
+        if (
+            path ==
+            "/api/cluster/placement"
+        ) {
+            std::ostringstream json;
+
+            json
+                << "{\"success\":true"
+                << ",\"available\":"
+                << (
+                    placement.available
+                    ? "true"
+                    : "false"
+                )
+                << ",\"workload\":\""
+                << jsonEscape(placement.workload)
+                << "\",\"node_id\":\""
+                << jsonEscape(placement.node_id)
+                << "\",\"node_name\":\""
+                << jsonEscape(placement.node_name)
+                << "\",\"score\":"
+                << placement.score
+                << ",\"reason\":\""
+                << jsonEscape(placement.reason)
+                << "\"}";
+
+            sendResponse(
+                client_fd,
+                "200 OK",
+                "application/json; charset=utf-8",
+                json.str()
+            );
+            return;
+        }
+
+        const auto snapshot =
+            cluster_->snapshot();
+
+        std::ostringstream json;
+
+        json
+            << "{\"success\":true"
+            << ",\"enabled\":"
+            << (
+                snapshot.enabled
+                ? "true"
+                : "false"
+            )
+            << ",\"configured\":"
+            << (
+                snapshot.configured
+                ? "true"
+                : "false"
+            )
+            << ",\"role\":\""
+            << jsonEscape(snapshot.role)
+            << "\",\"local_node_id\":\""
+            << jsonEscape(snapshot.local_node_id)
+            << "\",\"local_node_name\":\""
+            << jsonEscape(snapshot.local_node_name)
+            << "\",\"controller_host\":\""
+            << jsonEscape(snapshot.controller_host)
+            << "\",\"controller_port\":"
+            << snapshot.controller_port
+            << ",\"heartbeat_interval_seconds\":"
+            << snapshot.heartbeat_interval_seconds
+            << ",\"timeout_seconds\":"
+            << snapshot.timeout_seconds
+            << ",\"online_nodes\":"
+            << snapshot.online_nodes
+            << ",\"message\":\""
+            << jsonEscape(snapshot.message)
+            << "\",\"nodes\":[";
+
+        bool first_cluster_node = true;
+
+        for (const auto& node : snapshot.nodes) {
+            if (!first_cluster_node)
+                json << ",";
+
+            first_cluster_node = false;
+
+            json
+                << "{\"id\":\""
+                << jsonEscape(node.id)
+                << "\",\"name\":\""
+                << jsonEscape(node.name)
+                << "\",\"role\":\""
+                << jsonEscape(node.role)
+                << "\",\"address\":\""
+                << jsonEscape(node.address)
+                << "\",\"cpu_percent\":"
+                << node.cpu_percent
+                << ",\"memory_percent\":"
+                << node.memory_percent
+                << ",\"disk_percent\":"
+                << node.disk_percent
+                << ",\"score\":"
+                << node.score
+                << ",\"last_seen_unix\":"
+                << node.last_seen_unix
+                << ",\"online\":"
+                << (
+                    node.online
+                    ? "true"
+                    : "false"
+                )
+                << ",\"local\":"
+                << (
+                    node.local
+                    ? "true"
+                    : "false"
+                )
+                << "}";
+        }
+
+        json
+            << "],\"placement\":{"
+            << "\"available\":"
+            << (
+                placement.available
+                ? "true"
+                : "false"
+            )
+            << ",\"workload\":\""
+            << jsonEscape(placement.workload)
+            << "\",\"node_id\":\""
+            << jsonEscape(placement.node_id)
+            << "\",\"node_name\":\""
+            << jsonEscape(placement.node_name)
+            << "\",\"score\":"
+            << placement.score
+            << ",\"reason\":\""
+            << jsonEscape(placement.reason)
+            << "\"}}";
+
+        sendResponse(
+            client_fd,
+            "200 OK",
+            "application/json; charset=utf-8",
+            json.str()
+        );
         return;
     }
 
@@ -6273,6 +6588,90 @@ void WebServer::handleClient(
                 )
             ) +
             "\","
+            "\"cluster.enabled\":\"" +
+            jsonEscape(
+                config.get(
+                    "cluster.enabled",
+                    "false"
+                )
+            ) +
+            "\","
+            "\"cluster.role\":\"" +
+            jsonEscape(
+                config.get(
+                    "cluster.role",
+                    "controller"
+                )
+            ) +
+            "\","
+            "\"cluster.node_id\":\"" +
+            jsonEscape(
+                config.get(
+                    "cluster.node_id",
+                    ""
+                )
+            ) +
+            "\","
+            "\"cluster.node_name\":\"" +
+            jsonEscape(
+                config.get(
+                    "cluster.node_name",
+                    ""
+                )
+            ) +
+            "\","
+            "\"cluster.advertise_address\":\"" +
+            jsonEscape(
+                config.get(
+                    "cluster.advertise_address",
+                    ""
+                )
+            ) +
+            "\","
+            "\"cluster.controller_host\":\"" +
+            jsonEscape(
+                config.get(
+                    "cluster.controller_host",
+                    ""
+                )
+            ) +
+            "\","
+            "\"cluster.controller_port\":\"" +
+            jsonEscape(
+                config.get(
+                    "cluster.controller_port",
+                    "8080"
+                )
+            ) +
+            "\","
+            "\"cluster.token_configured\":"
+            +
+            (
+                config.get(
+                    "cluster.shared_token",
+                    ""
+                ).empty()
+                ? "false"
+                : "true"
+            )
+            +
+            ","
+            "\"cluster.heartbeat_interval_seconds\":\"" +
+            jsonEscape(
+                config.get(
+                    "cluster.heartbeat_interval_seconds",
+                    "5"
+                )
+            ) +
+            "\","
+            "\"cluster.timeout_seconds\":\"" +
+            jsonEscape(
+                config.get(
+                    "cluster.timeout_seconds",
+                    "20"
+                )
+            ) +
+            "\","
             "\"files.root\":\"" +
             jsonEscape(
                 config.get(
@@ -6356,6 +6755,34 @@ void WebServer::handleClient(
                         );
                 }
 
+                if (
+                    key == "cluster.enabled"
+                    ||
+                    key == "cluster.role"
+                    ||
+                    key == "cluster.node_id"
+                    ||
+                    key == "cluster.node_name"
+                    ||
+                    key == "cluster.advertise_address"
+                    ||
+                    key == "cluster.controller_host"
+                    ||
+                    key == "cluster.controller_port"
+                    ||
+                    key == "cluster.shared_token"
+                    ||
+                    key == "cluster.heartbeat_interval_seconds"
+                    ||
+                    key == "cluster.timeout_seconds"
+                ) {
+                    return
+                        security_.hasPermission(
+                            *session,
+                            "cluster.manage"
+                        );
+                }
+
                 if (key == "files.root") {
                     return
                         security_.hasPermission(
@@ -6383,6 +6810,16 @@ void WebServer::handleClient(
             "storage.files_reserve_gb",
             "storage.video_pinned_mount",
             "storage.files_pinned_mount",
+            "cluster.enabled",
+            "cluster.role",
+            "cluster.node_id",
+            "cluster.node_name",
+            "cluster.advertise_address",
+            "cluster.controller_host",
+            "cluster.controller_port",
+            "cluster.shared_token",
+            "cluster.heartbeat_interval_seconds",
+            "cluster.timeout_seconds",
             "files.root"
         };
 
@@ -6410,7 +6847,16 @@ void WebServer::handleClient(
             const auto it =
                 form.find(key);
 
-            if (it != form.end()) {
+            if (
+                it != form.end()
+                &&
+                !(
+                    std::string(key) ==
+                        "cluster.shared_token"
+                    &&
+                    it->second.empty()
+                )
+            ) {
                 config.set(
                     key,
                     it->second
@@ -6575,6 +7021,68 @@ void WebServer::handleClient(
             config.get(
                 "files.root",
                 "/mnt/home-ai/files"
+            );
+
+        context.cluster_enabled =
+            config.get(
+                "cluster.enabled",
+                "false"
+            );
+
+        context.cluster_role =
+            config.get(
+                "cluster.role",
+                "controller"
+            );
+
+        context.cluster_node_id =
+            config.get(
+                "cluster.node_id",
+                ""
+            );
+
+        context.cluster_node_name =
+            config.get(
+                "cluster.node_name",
+                ""
+            );
+
+        context.cluster_advertise_address =
+            config.get(
+                "cluster.advertise_address",
+                ""
+            );
+
+        context.cluster_controller_host =
+            config.get(
+                "cluster.controller_host",
+                ""
+            );
+
+        context.cluster_controller_port =
+            config.get(
+                "cluster.controller_port",
+                "8080"
+            );
+
+        context.cluster_token_configured =
+            config.get(
+                "cluster.shared_token",
+                ""
+            ).empty()
+            ? "false"
+            : "true";
+
+        context.cluster_heartbeat_interval =
+            config.get(
+                "cluster.heartbeat_interval_seconds",
+                "5"
+            );
+
+        context.cluster_timeout =
+            config.get(
+                "cluster.timeout_seconds",
+                "20"
             );
 
         context.username =

@@ -4,6 +4,7 @@
 #include "core/runtime/CoreRuntime.h"
 #include "security/auth/SecurityManager.h"
 #include "server/cameras/CameraManager.h"
+#include "server/cluster/ClusterManager.h"
 #include "server/storage/DiskOperations.h"
 #include "server/virtualization/HypervisorManager.h"
 #include "server/storage/StorageMonitor.h"
@@ -171,6 +172,7 @@ int main()
     homeai::StorageMonitor storage_monitor;
     homeai::CameraManager camera_manager;
     homeai::HypervisorManager hypervisor_manager;
+    homeai::ClusterManager cluster_manager;
     homeai::ModuleManager modules;
 
     homeai::WebServer web(
@@ -180,7 +182,8 @@ int main()
         modules,
         homeai::GpuMonitor(),
         &camera_manager,
-        &hypervisor_manager
+        &hypervisor_manager,
+        &cluster_manager
     );
 
     std::string module_error;
@@ -699,6 +702,106 @@ int main()
             std::make_unique<
                 homeai::CallbackModule
             >(
+                "cluster",
+                std::vector<std::string>{
+                    "system-monitor"
+                },
+                [&](std::string& error) {
+                    int controller_port =
+                        runtime.config().getInt(
+                            "cluster.controller_port",
+                            8080
+                        );
+
+                    if (
+                        controller_port < 1
+                        ||
+                        controller_port > 65535
+                    ) {
+                        controller_port = 8080;
+                    }
+
+                    return
+                        cluster_manager.initialize(
+                            runtime.config().getBool(
+                                "cluster.enabled",
+                                false
+                            ),
+                            runtime.config().get(
+                                "cluster.node_id",
+                                ""
+                            ),
+                            runtime.config().get(
+                                "cluster.node_name",
+                                ""
+                            ),
+                            runtime.config().get(
+                                "cluster.role",
+                                "controller"
+                            ),
+                            runtime.config().get(
+                                "cluster.advertise_address",
+                                ""
+                            ),
+                            runtime.config().get(
+                                "cluster.controller_host",
+                                ""
+                            ),
+                            static_cast<std::uint16_t>(
+                                controller_port
+                            ),
+                            runtime.config().get(
+                                "cluster.shared_token",
+                                ""
+                            ),
+                            runtime.config().getInt(
+                                "cluster.heartbeat_interval_seconds",
+                                5
+                            ),
+                            runtime.config().getInt(
+                                "cluster.timeout_seconds",
+                                20
+                            ),
+                            error
+                        );
+                },
+                [&](std::string& error) {
+                    return
+                        cluster_manager.start(
+                            error
+                        );
+                },
+                [&]() {
+                    cluster_manager.stop();
+                },
+                [&]() {
+                    return
+                        cluster_manager.healthy()
+                        ? homeai::ModuleHealth::
+                            Healthy
+                        : homeai::ModuleHealth::
+                            Degraded;
+                },
+                [&]() {
+                    return
+                        cluster_manager.
+                            healthMessage();
+                }
+            ),
+            module_error
+        )
+    ) {
+        homeai::Logger::instance().error(
+            module_error
+        );
+        return 1;
+    }
+
+    if (
+        !modules.registerModule(
+            std::make_unique<
+                homeai::CallbackModule
+            >(
                 "web",
                 std::vector<std::string>{
                     "security",
@@ -706,7 +809,8 @@ int main()
                     "system-monitor",
                     "storage-monitor",
                     "cameras",
-                    "hypervisor"
+                    "hypervisor",
+                    "cluster"
                 },
                 [](std::string&) {
                     return true;

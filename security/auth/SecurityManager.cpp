@@ -86,6 +86,7 @@ defaultsForRole(
             "system.view",
             "storage.view",
             "network.view",
+            "cluster.view",
             "automation.view"
         };
 
@@ -1253,6 +1254,8 @@ SecurityManager::permissionCatalog()
             "storage.manage",
             "network.view",
             "network.manage",
+            "cluster.view",
+            "cluster.manage",
             "hypervisor.view",
             "hypervisor.manage",
             "automation.view",
