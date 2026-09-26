@@ -4300,15 +4300,111 @@ ONVIF используется, если он включён; Hikvision и со�
     else if (
         context.page == "/hypervisor"
     ) {
-        renderPlaceholder(
-            page,
-            "Виртуализация",
-            "Управление KVM, виртуальными машинами, сетями и снапшотами.",
-            "<div class=\"placeholder-card\">Виртуальные машины — PLANNED</div>"
-            "<div class=\"placeholder-card\">Диски VM — PLANNED</div>"
-            "<div class=\"placeholder-card\">Сети VM — PLANNED</div>"
-            "<div class=\"placeholder-card\">Snapshots — PLANNED</div>"
-        );
+        page << R"HTML(
+<div id="hypervisor-root">
+
+<div class="section-card">
+<div class="section-title">
+<h2>Виртуализация</h2>
+<span class="section-hint">Hypervisor Core 0.0.30</span>
+</div>
+
+<p class="muted">
+Первый этап Hypervisor Core работает в режиме только чтения:
+проверяет KVM/QEMU/libvirt и показывает существующие виртуальные машины.
+</p>
+
+<div class="stats-grid">
+<div class="stat-card">
+<span class="stat-label">KVM</span>
+<strong id="hypervisor-kvm">—</strong>
+</div>
+<div class="stat-card">
+<span class="stat-label">libvirt</span>
+<strong id="hypervisor-libvirt">—</strong>
+</div>
+<div class="stat-card">
+<span class="stat-label">VM всего</span>
+<strong id="hypervisor-vm-total">0</strong>
+</div>
+<div class="stat-card">
+<span class="stat-label">VM запущено</span>
+<strong id="hypervisor-vm-running" class="status-ok">0</strong>
+</div>
+</div>
+
+<div class="button-row">
+<button id="hypervisor-refresh-btn" type="button" class="secondary">
+Обновить
+</button>
+</div>
+
+<div
+    id="hypervisor-message"
+    class="muted"
+    role="status"
+    style="margin-top:12px"></div>
+</div>
+
+<div class="section-card">
+<div class="section-title">
+<h2>Хост виртуализации</h2>
+<span class="section-hint">qemu:///system</span>
+</div>
+
+<div class="kv">
+<div>Аппаратная виртуализация</div>
+<div id="hypervisor-hw-virt">—</div>
+<div>/dev/kvm</div>
+<div id="hypervisor-kvm-device">—</div>
+<div>QEMU</div>
+<div id="hypervisor-qemu">—</div>
+<div>CPU</div>
+<div id="hypervisor-cpu-model">—</div>
+<div>Логические CPU</div>
+<div id="hypervisor-cpus">—</div>
+<div>Частота</div>
+<div id="hypervisor-mhz">—</div>
+<div>RAM хоста</div>
+<div id="hypervisor-memory">—</div>
+<div>Топология</div>
+<div id="hypervisor-topology">—</div>
+<div>URI</div>
+<div id="hypervisor-uri">—</div>
+<div>libvirt</div>
+<div id="hypervisor-libvirt-version">—</div>
+<div>QEMU / Hypervisor</div>
+<div id="hypervisor-qemu-version">—</div>
+</div>
+</div>
+
+<div class="section-card">
+<div class="section-title">
+<h2>Виртуальные машины</h2>
+<span class="section-hint">libvirt inventory</span>
+</div>
+
+<div id="hypervisor-vm-list" class="placeholder-grid">
+<div class="placeholder-card">Загрузка виртуальных машин...</div>
+</div>
+</div>
+
+<div class="section-card">
+<div class="section-title">
+<h2>Следующие этапы</h2>
+<span class="section-hint">Virtualization roadmap</span>
+</div>
+
+<div class="placeholder-grid">
+<div class="placeholder-card">Создание и lifecycle VM — NEXT</div>
+<div class="placeholder-card">Диски и ISO — NEXT</div>
+<div class="placeholder-card">Виртуальные сети — NEXT</div>
+<div class="placeholder-card">Snapshots / backup — NEXT</div>
+</div>
+</div>
+
+</div>
+)HTML";
     }
     else if (
         context.page == "/settings"
@@ -9469,6 +9565,427 @@ document.addEventListener(
 
         setInterval(
             updateCameras,
+            10000
+        );
+    }
+);
+
+function hypervisorStateText(state) {
+    const labels = {
+        "running": "Запущена",
+        "blocked": "Заблокирована",
+        "paused": "Приостановлена",
+        "shutdown": "Завершается",
+        "shutoff": "Выключена",
+        "crashed": "Аварийно остановлена",
+        "suspended": "Заморожена",
+        "no-state": "Нет состояния",
+        "unknown": "Неизвестно"
+    };
+
+    return tr(
+        labels[state]
+        || state
+        || "Неизвестно"
+    );
+}
+
+function setHypervisorBoolean(
+    id,
+    value,
+    okText = "Доступно",
+    badText = "Недоступно"
+) {
+    const element =
+        document.getElementById(id);
+
+    if (!element)
+        return;
+
+    element.textContent =
+        value
+        ? tr(okText)
+        : tr(badText);
+
+    element.className =
+        value
+        ? "status-ok"
+        : "status-error";
+}
+
+function renderHypervisorMachine(machine) {
+    const card =
+        document.createElement("div");
+
+    card.className =
+        "placeholder-card";
+
+    const title =
+        document.createElement("strong");
+
+    title.textContent =
+        machine.name
+        || machine.uuid
+        || tr("Виртуальная машина");
+
+    title.dataset.i18nSkip = "";
+    card.appendChild(title);
+
+    const state =
+        document.createElement("div");
+
+    state.className =
+        machine.active
+        ? "status-ok"
+        : "muted";
+
+    state.style.marginTop =
+        "8px";
+
+    state.textContent =
+        hypervisorStateText(
+            machine.state
+        );
+
+    card.appendChild(state);
+
+    const details =
+        document.createElement("div");
+
+    details.className =
+        "muted";
+    details.style.marginTop =
+        "8px";
+
+    details.textContent =
+        tr("CPU")
+        + ": "
+        + Number(machine.vcpus || 0)
+        + " · "
+        + tr("RAM")
+        + ": "
+        + formatBytes(
+            machine.max_memory_bytes
+            || machine.memory_bytes
+            || 0
+        )
+        + " · "
+        + tr("Автозапуск")
+        + ": "
+        + (
+            machine.autostart
+            ? tr("Да")
+            : tr("Нет")
+        );
+
+    card.appendChild(details);
+
+    if (machine.uuid) {
+        const uuid =
+            document.createElement("div");
+
+        uuid.className =
+            "muted";
+        uuid.style.marginTop =
+            "6px";
+        uuid.textContent =
+            "UUID: "
+            + machine.uuid;
+        uuid.dataset.i18nSkip = "";
+
+        card.appendChild(uuid);
+    }
+
+    return card;
+}
+
+async function updateHypervisor() {
+    const root =
+        document.getElementById(
+            "hypervisor-root"
+        );
+
+    if (!root)
+        return;
+
+    const list =
+        document.getElementById(
+            "hypervisor-vm-list"
+        );
+
+    const message =
+        document.getElementById(
+            "hypervisor-message"
+        );
+
+    try {
+        const response =
+            await fetch(
+                "/api/hypervisor",
+                {
+                    cache: "no-store"
+                }
+            );
+
+        if (response.status === 401) {
+            window.location = "/login";
+            return;
+        }
+
+        if (response.status === 403) {
+            throw new Error(
+                tr("Нет права просмотра виртуализации.")
+            );
+        }
+
+        const data =
+            await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.message
+                || data.error
+                || tr("Hypervisor Core недоступен.")
+            );
+        }
+
+        const host =
+            data.host || {};
+
+        const machines =
+            Array.isArray(data.machines)
+            ? data.machines
+            : [];
+
+        const running =
+            machines.filter(
+                function(machine) {
+                    return !!machine.active;
+                }
+            ).length;
+
+        setHypervisorBoolean(
+            "hypervisor-kvm",
+            !!host.kvm_accessible,
+            "READY",
+            "NOT READY"
+        );
+
+        setHypervisorBoolean(
+            "hypervisor-libvirt",
+            !!host.libvirt_connected,
+            "CONNECTED",
+            "OFFLINE"
+        );
+
+        const total =
+            document.getElementById(
+                "hypervisor-vm-total"
+            );
+
+        if (total)
+            total.textContent =
+                String(machines.length);
+
+        const runningElement =
+            document.getElementById(
+                "hypervisor-vm-running"
+            );
+
+        if (runningElement)
+            runningElement.textContent =
+                String(running);
+
+        setHypervisorBoolean(
+            "hypervisor-hw-virt",
+            !!host.hardware_virtualization,
+            "Поддерживается",
+            "Не обнаружена"
+        );
+
+        const kvmDevice =
+            document.getElementById(
+                "hypervisor-kvm-device"
+            );
+
+        if (kvmDevice) {
+            if (!host.kvm_present) {
+                kvmDevice.textContent =
+                    tr("Отсутствует");
+                kvmDevice.className =
+                    "status-error";
+            }
+            else if (
+                !host.kvm_accessible
+            ) {
+                kvmDevice.textContent =
+                    tr("Нет доступа");
+                kvmDevice.className =
+                    "status-warn";
+            }
+            else {
+                kvmDevice.textContent =
+                    tr("Доступен");
+                kvmDevice.className =
+                    "status-ok";
+            }
+        }
+
+        setHypervisorBoolean(
+            "hypervisor-qemu",
+            !!host.qemu_available,
+            "Установлен",
+            "Не найден"
+        );
+
+        const values = {
+            "hypervisor-cpu-model":
+                host.cpu_model || "—",
+            "hypervisor-cpus":
+                String(host.cpus || 0),
+            "hypervisor-mhz":
+                host.mhz
+                ? (
+                    String(host.mhz)
+                    + " MHz"
+                )
+                : "—",
+            "hypervisor-memory":
+                formatBytes(
+                    host.memory_bytes
+                    || 0
+                ),
+            "hypervisor-topology":
+                (
+                    String(host.nodes || 0)
+                    + " NUMA · "
+                    + String(host.sockets || 0)
+                    + " sockets · "
+                    + String(host.cores || 0)
+                    + " cores · "
+                    + String(host.threads || 0)
+                    + " threads"
+                ),
+            "hypervisor-uri":
+                host.connection_uri || "—",
+            "hypervisor-libvirt-version":
+                host.libvirt_version || "—",
+            "hypervisor-qemu-version":
+                host.hypervisor_version || "—"
+        };
+
+        for (
+            const [id, value] of
+            Object.entries(values)
+        ) {
+            const element =
+                document.getElementById(id);
+
+            if (element) {
+                element.textContent =
+                    value;
+                element.dataset.i18nSkip =
+                    "";
+            }
+        }
+
+        if (message) {
+            message.textContent =
+                data.message || "";
+
+            message.className =
+                data.success
+                ? "muted"
+                : "status-warn";
+        }
+
+        if (list) {
+            list.replaceChildren();
+
+            if (!machines.length) {
+                const empty =
+                    document.createElement(
+                        "div"
+                    );
+
+                empty.className =
+                    "placeholder-card";
+
+                empty.textContent =
+                    host.libvirt_connected
+                    ? tr("Виртуальные машины не найдены.")
+                    : tr("Подключение libvirt недоступно.");
+
+                list.appendChild(empty);
+            }
+            else {
+                for (
+                    const machine of
+                    machines
+                ) {
+                    list.appendChild(
+                        renderHypervisorMachine(
+                            machine
+                        )
+                    );
+                }
+            }
+        }
+    }
+    catch (error) {
+        if (message) {
+            message.className =
+                "status-error";
+            message.textContent =
+                tr("Ошибка Hypervisor Core: ")
+                + error.message;
+        }
+
+        if (list) {
+            list.replaceChildren();
+
+            const card =
+                document.createElement(
+                    "div"
+                );
+
+            card.className =
+                "placeholder-card status-error";
+            card.textContent =
+                tr("Не удалось загрузить виртуальные машины.");
+
+            list.appendChild(card);
+        }
+    }
+}
+
+document.addEventListener(
+    "DOMContentLoaded",
+    function() {
+        const root =
+            document.getElementById(
+                "hypervisor-root"
+            );
+
+        if (!root)
+            return;
+
+        const refresh =
+            document.getElementById(
+                "hypervisor-refresh-btn"
+            );
+
+        if (refresh) {
+            refresh.addEventListener(
+                "click",
+                updateHypervisor
+            );
+        }
+
+        updateHypervisor();
+
+        window.setInterval(
+            updateHypervisor,
             10000
         );
     }

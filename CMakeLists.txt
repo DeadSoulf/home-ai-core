@@ -70,6 +70,11 @@ file(
     "${CMAKE_CURRENT_SOURCE_DIR}/server/cameras/*.cpp"
 )
 
+file(
+    GLOB HOMEAI_VIRTUALIZATION_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/server/virtualization/*.cpp"
+)
+
 add_library(
     homeai-core-lib
 
@@ -84,6 +89,7 @@ add_library(
     server/hardware/GpuMonitor.cpp
     ${HOMEAI_NETWORK_SOURCES}
     ${HOMEAI_CAMERA_SOURCES}
+    ${HOMEAI_VIRTUALIZATION_SOURCES}
     server/storage/StorageMonitor.cpp
     server/storage/StoragePool.cpp
     server/storage/DiskOperations.cpp
@@ -124,6 +130,7 @@ target_link_libraries(
     Threads::Threads
     OpenSSL::Crypto
     SQLite::SQLite3
+    ${CMAKE_DL_LIBS}
 )
 
 add_executable(
@@ -418,4 +425,21 @@ target_link_libraries(
 add_test(
     NAME camera_support
     COMMAND test-camera-support
+)
+
+
+add_executable(
+    test-hypervisor-manager
+    tests/test_hypervisor_manager.cpp
+)
+
+target_link_libraries(
+    test-hypervisor-manager
+    PRIVATE
+    homeai-core-lib
+)
+
+add_test(
+    NAME hypervisor_manager
+    COMMAND test-hypervisor-manager
 )

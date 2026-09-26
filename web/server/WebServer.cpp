@@ -12,6 +12,7 @@
 #include "server/network/NetworkInterfaceManager.h"
 #include "server/network/VpnService.h"
 #include "server/cameras/CameraManager.h"
+#include "server/virtualization/HypervisorManager.h"
 #include "server/storage/StorageMonitor.h"
 #include "server/storage/StoragePool.h"
 #include "server/storage/DiskOperations.h"
@@ -806,14 +807,16 @@ WebServer::WebServer(
     UpdateManager& updates,
     ModuleManager& modules,
     GpuMonitor gpu_monitor,
-    CameraManager* cameras
+    CameraManager* cameras,
+    HypervisorManager* hypervisor
 )
     : runtime_(runtime),
       security_(security),
       updates_(updates),
       modules_(modules),
       gpu_monitor_(std::move(gpu_monitor)),
-      cameras_(cameras)
+      cameras_(cameras),
+      hypervisor_(hypervisor)
 {
 }
 
@@ -3677,6 +3680,188 @@ void WebServer::handleClient(
             )
             +
             "}"
+        );
+
+        return;
+    }
+
+    if (
+        method == "GET"
+        &&
+        path == "/api/hypervisor"
+    ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "hypervisor.view"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"error\":\"permission_denied\"}"
+            );
+
+            return;
+        }
+
+        if (!hypervisor_) {
+            sendResponse(
+                client_fd,
+                "503 Service Unavailable",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"Hypervisor Core is unavailable.\"}"
+            );
+
+            return;
+        }
+
+        std::string error;
+        const auto snapshot =
+            hypervisor_->snapshot(
+                error
+            );
+
+        std::ostringstream json;
+
+        json
+            << "{\"success\":"
+            << (
+                error.empty()
+                ? "true"
+                : "false"
+            )
+            << ",\"message\":\""
+            << jsonEscape(
+                !error.empty()
+                ? error
+                : snapshot.host.message
+            )
+            << "\",\"host\":{"
+            << "\"kvm_present\":"
+            << (
+                snapshot.host.kvm_present
+                ? "true"
+                : "false"
+            )
+            << ",\"kvm_accessible\":"
+            << (
+                snapshot.host.kvm_accessible
+                ? "true"
+                : "false"
+            )
+            << ",\"hardware_virtualization\":"
+            << (
+                snapshot.host.hardware_virtualization
+                ? "true"
+                : "false"
+            )
+            << ",\"qemu_available\":"
+            << (
+                snapshot.host.qemu_available
+                ? "true"
+                : "false"
+            )
+            << ",\"libvirt_available\":"
+            << (
+                snapshot.host.libvirt_available
+                ? "true"
+                : "false"
+            )
+            << ",\"libvirt_connected\":"
+            << (
+                snapshot.host.libvirt_connected
+                ? "true"
+                : "false"
+            )
+            << ",\"connection_uri\":\""
+            << jsonEscape(
+                snapshot.host.connection_uri
+            )
+            << "\",\"libvirt_version\":\""
+            << jsonEscape(
+                snapshot.host.libvirt_version
+            )
+            << "\",\"hypervisor_version\":\""
+            << jsonEscape(
+                snapshot.host.hypervisor_version
+            )
+            << "\",\"cpu_model\":\""
+            << jsonEscape(
+                snapshot.host.cpu_model
+            )
+            << "\",\"memory_bytes\":"
+            << snapshot.host.memory_bytes
+            << ",\"cpus\":"
+            << snapshot.host.cpus
+            << ",\"mhz\":"
+            << snapshot.host.mhz
+            << ",\"nodes\":"
+            << snapshot.host.nodes
+            << ",\"sockets\":"
+            << snapshot.host.sockets
+            << ",\"cores\":"
+            << snapshot.host.cores
+            << ",\"threads\":"
+            << snapshot.host.threads
+            << "},\"machines\":[";
+
+        bool first = true;
+
+        for (
+            const auto& machine :
+            snapshot.machines
+        ) {
+            if (!first)
+                json << ",";
+
+            first = false;
+
+            json
+                << "{"
+                << "\"name\":\""
+                << jsonEscape(
+                    machine.name
+                )
+                << "\",\"uuid\":\""
+                << jsonEscape(
+                    machine.uuid
+                )
+                << "\",\"state\":\""
+                << jsonEscape(
+                    machine.state
+                )
+                << "\",\"active\":"
+                << (
+                    machine.active
+                    ? "true"
+                    : "false"
+                )
+                << ",\"autostart\":"
+                << (
+                    machine.autostart
+                    ? "true"
+                    : "false"
+                )
+                << ",\"vcpus\":"
+                << machine.vcpus
+                << ",\"memory_bytes\":"
+                << machine.memory_bytes
+                << ",\"max_memory_bytes\":"
+                << machine.max_memory_bytes
+                << ",\"cpu_time_ns\":"
+                << machine.cpu_time_ns
+                << "}";
+        }
+
+        json << "]}";
+
+        sendResponse(
+            client_fd,
+            "200 OK",
+            "application/json; charset=utf-8",
+            json.str()
         );
 
         return;

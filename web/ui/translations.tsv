@@ -720,3 +720,42 @@ S/N	S/N
 Перетащить плитку	Drag tile
 Свернуть плитку	Minimize tile
 Развернуть плитку	Expand tile
+Первый этап Hypervisor Core работает в режиме только чтения:	The first Hypervisor Core stage is read-only:
+Хост виртуализации	Virtualization host
+Аппаратная виртуализация	Hardware virtualization
+Логические CPU	Logical CPUs
+Частота	Frequency
+RAM хоста	Host RAM
+Топология	Topology
+Виртуальная машина	Virtual machine
+VM всего	Total VMs
+VM запущено	Running VMs
+Автозапуск	Autostart
+Да	Yes
+Нет	No
+Поддерживается	Supported
+Не обнаружена	Not detected
+Отсутствует	Missing
+Нет доступа	No access
+Доступен	Accessible
+Установлен	Installed
+Не найден	Not found
+Запущена	Running
+Заблокирована	Blocked
+Приостановлена	Paused
+Завершается	Shutting down
+Выключена	Powered off
+Аварийно остановлена	Crashed
+Заморожена	Suspended
+Нет состояния	No state
+Недоступно	Unavailable
+Виртуальные машины не найдены.	No virtual machines found.
+Подключение libvirt недоступно.	libvirt connection is unavailable.
+Нет права просмотра виртуализации.	Virtualization view permission is required.
+Hypervisor Core недоступен.	Hypervisor Core is unavailable.
+Ошибка Hypervisor Core: 	Hypervisor Core error: 
+Не удалось загрузить виртуальные машины.	Unable to load virtual machines.
+Создание и lifecycle VM — NEXT	VM creation and lifecycle — NEXT
+Диски и ISO — NEXT	VM disks and ISO — NEXT
+Виртуальные сети — NEXT	Virtual networks — NEXT
+Snapshots / backup — NEXT	Snapshots / backup — NEXT

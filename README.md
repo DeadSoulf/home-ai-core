@@ -18,7 +18,7 @@ Home AI Core is a local-first autonomous server platform designed for:
 
 ## Current development version
 
-0.0.22 — redesigned responsive Home AI Cloud dashboard and navigation
+0.0.30 — Hypervisor Core foundation: KVM/QEMU/libvirt host and VM inventory
 
 The repository root `VERSION` file is the single source of the compiled Core version.
 
@@ -51,6 +51,7 @@ The repository root `VERSION` file is the single source of the compiled Core ver
 - [Storage Monitoring](docs/STORAGE.md)
 - [Web UI](docs/WEB_UI.md)
 - [Cameras](docs/CAMERAS.md)
+- [Hypervisor](docs/HYPERVISOR.md)
 - [Server Updates](docs/UPDATES.md)
 - [Module Manager](docs/MODULES.md)
 

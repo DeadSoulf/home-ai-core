@@ -587,6 +587,49 @@ int main()
     }
 
     context.page =
+        "/hypervisor";
+
+    const auto hypervisor =
+        homeai::renderWebUi(
+            context
+        );
+
+    if (
+        hypervisor.find(
+            "id=\"hypervisor-root\""
+        ) == std::string::npos
+        ||
+        hypervisor.find(
+            "Hypervisor Core 0.0.30"
+        ) == std::string::npos
+        ||
+        hypervisor.find(
+            "/api/hypervisor"
+        ) == std::string::npos
+        ||
+        hypervisor.find(
+            "id=\"hypervisor-vm-list\""
+        ) == std::string::npos
+        ||
+        hypervisor.find(
+            "id=\"hypervisor-kvm-device\""
+        ) == std::string::npos
+        ||
+        hypervisor.find(
+            "updateHypervisor"
+        ) == std::string::npos
+        ||
+        hypervisor.find(
+            "Виртуальные машины — PLANNED"
+        ) != std::string::npos
+    ) {
+        std::cerr
+            << "Hypervisor page structure is invalid\n";
+
+        return 1;
+    }
+
+    context.page =
         "/system";
 
     const auto system =

@@ -238,12 +238,20 @@ Planned:
 
 ## Virtualization
 
-Reserved for KVM:
+The `/hypervisor` page now contains the first read-only Hypervisor Core dashboard:
 
-- virtual machines
-- VM disks
-- VM networks
-- snapshots
+- KVM device presence and access
+- CPU hardware-virtualization capability
+- QEMU availability
+- libvirt runtime availability
+- `qemu:///system` connection status
+- host CPU, RAM and topology
+- libvirt/QEMU versions
+- existing VM inventory
+- VM state, vCPU, memory and autostart
+
+VM creation, lifecycle actions, storage, networks and snapshots remain disabled until the
+foundation is validated on the development server.
 
 ## Settings
 

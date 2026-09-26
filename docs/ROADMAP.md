@@ -25,7 +25,8 @@
 | 0.0.19 | Native Hikvision SADP discovery | DEVELOPMENT SNAPSHOT |
 | 0.0.20 | Camera metadata in discovery results | DEVELOPMENT SNAPSHOT |
 | 0.0.21 | Manufacturer identity no longer guessed from ports/SADP | DEVELOPMENT SNAPSHOT |
-| 0.0.22 | Redesigned responsive Home AI Cloud dashboard and navigation | IN DEVELOPMENT |
+| 0.0.22 | Redesigned responsive Home AI Cloud dashboard and navigation | DEVELOPMENT SNAPSHOT |
+| 0.0.30 | Hypervisor Core foundation: KVM/QEMU/libvirt inventory | IN DEVELOPMENT |
 | next 0.0.x | Recorder + continuous video transport + archive/event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
@@ -306,7 +307,7 @@ Implemented in the 0.0.21 snapshot:
 0.0.21 separates protocol/service detection from manufacturer identity so OEM and compatible
 cameras are not mislabeled.
 
-## Current focus: 0.0.22
+## Development snapshot: 0.0.22
 
 Current Web UI work:
 
@@ -319,6 +320,28 @@ Current Web UI work:
 - keep the server update path in the Web UI
 
 0.0.22 is a presentation and navigation redesign; existing Web/API functionality remains in place.
+
+## Current focus: 0.0.30
+
+Current Hypervisor Core work:
+
+- KVM device presence and access detection
+- Intel VMX / AMD SVM capability detection
+- QEMU executable discovery
+- optional runtime loading of libvirt without a build-time libvirt dependency
+- read-only `qemu:///system` connection
+- host CPU, RAM and topology inventory
+- libvirt and hypervisor version reporting
+- existing VM/domain inventory
+- VM state, vCPU, memory and autostart reporting
+- dedicated `hypervisor` Module Manager module
+- permission-protected `GET /api/hypervisor`
+- real responsive `/hypervisor` Web dashboard
+- graceful degradation when KVM/QEMU/libvirt are unavailable
+- foundation unit tests without requiring KVM/libvirt in the test environment
+
+0.0.30 is intentionally read-only. VM lifecycle and destructive actions remain disabled until
+the host foundation is validated on the development server.
 
 ## Later major capabilities
 
@@ -346,9 +369,17 @@ Current Web UI work:
 
 ### Hypervisor
 
-- KVM-based VM management
-- disks and virtual networks
-- snapshots and backups
+Foundation started in 0.0.30.
+
+Next capabilities:
+
+- VM lifecycle and creation
+- disks, ISO images and Storage Pool integration
+- virtual networks
+- browser console
+- snapshots and rollback
+- backups and restore
+- hardware passthrough
 - sandbox VMs for testing generated code
 
 ### AI
