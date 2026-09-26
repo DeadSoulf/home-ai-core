@@ -232,7 +232,7 @@ int main()
         ) == std::string::npos
         ||
         home.find(
-            "Home AI Cloud dashboard redesign 0.0.28"
+            "Home AI Cloud dashboard redesign 0.0.29"
         ) == std::string::npos
     ) {
         std::cerr
@@ -501,7 +501,7 @@ int main()
         ) != std::string::npos
         ||
         cameras.find(
-            "Camera Core 0.0.28"
+            "Camera Core 0.0.29"
         ) == std::string::npos
         ||
         cameras.find(
@@ -672,7 +672,15 @@ int main()
         ) == std::string::npos
         ||
         system.find(
-            "align-items: flex-start;"
+            "height: 156px;"
+        ) == std::string::npos
+        ||
+        system.find(
+            "height: 66px;"
+        ) == std::string::npos
+        ||
+        system.find(
+            "grid-template-columns:"
         ) == std::string::npos
         ||
         system.find(

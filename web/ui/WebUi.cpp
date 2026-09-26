@@ -1562,7 +1562,7 @@ button:disabled {
     }
 }
 
-/* Home AI Cloud dashboard redesign 0.0.28 */
+/* Home AI Cloud dashboard redesign 0.0.29 */
 :root {
     --bg: #0B1220;
     --sidebar: rgba(8, 14, 25, 0.94);
@@ -1845,22 +1845,25 @@ body {
 }
 
 .stats-grid-live {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns:
+        repeat(auto-fit, minmax(210px, 1fr));
+    align-items: start;
     gap: 12px;
 }
 
 .stats-grid-live > .stat-card {
-    flex: 1 1 190px;
-    min-width: min(190px, 100%);
-    min-height: 0;
-    height: auto;
-    align-self: flex-start;
+    width: 100%;
+    min-width: 0;
+    height: 156px;
+    min-height: 156px;
+    align-self: start;
 }
 
 .stats-grid-live > .stat-card.stat-compact {
-    flex-basis: 160px;
+    height: 66px;
+    min-height: 66px;
+    align-self: start;
 }
 
 .stat-card {
@@ -2134,7 +2137,18 @@ body {
         right: 9px;
     }
 
+    .stats-grid-live {
+        grid-template-columns:
+            repeat(auto-fit, minmax(170px, 1fr));
+    }
+
+    .stats-grid-live > .stat-card {
+        height: 150px;
+        min-height: 150px;
+    }
+
     .stat-card.stat-compact {
+        height: 70px;
         min-height: 70px;
         padding-right: 86px;
     }
@@ -3876,7 +3890,7 @@ PrivateKey отображается в редакторе и сохраняет�
 <div class="section-card">
 <div class="section-title">
 <h2>Камеры</h2>
-<span class="section-hint">Camera Core 0.0.28</span>
+<span class="section-hint">Camera Core 0.0.29</span>
 </div>
 
 <div class="stats-grid">
