@@ -3115,6 +3115,16 @@ CameraManager::discoverCameras(
         item.onvif_xaddr =
             device.xaddr;
         item.onvif = true;
+
+        if (
+            item.model_hint.empty()
+        ) {
+            item.model_hint =
+                OnvifDiscovery::scopeValue(
+                    device.scopes,
+                    "hardware"
+                );
+        }
     }
 
     for (

@@ -164,6 +164,8 @@ Current content:
 - lightweight RTSP endpoint checks
 - combined camera discovery: Hikvision SADP + ONVIF WS-Discovery + local IPv4 camera-port scan
 - native Hikvision SADP discovery over UDP 37020 even when ONVIF/RTSP services are disabled
+- discovery rows show useful camera metadata instead of technical URLs
+- manufacturer/source, model, firmware and serial number are shown when available
 - SADP device model, firmware and serial metadata reused by the camera form
 - compact discovery list remains IP/address only
 - automatic ONVIF Media Profile retrieval when ONVIF is available

@@ -22,7 +22,8 @@
 | 0.0.16 | ONVIF PTZ controls + browser Live View preview | DEVELOPMENT SNAPSHOT |
 | 0.0.17 | Simplified ONVIF discovery list and hidden technical endpoints | DEVELOPMENT SNAPSHOT |
 | 0.0.18 | LAN camera discovery without requiring ONVIF | DEVELOPMENT SNAPSHOT |
-| 0.0.19 | Native Hikvision SADP discovery | IN DEVELOPMENT |
+| 0.0.19 | Native Hikvision SADP discovery | DEVELOPMENT SNAPSHOT |
+| 0.0.20 | Camera metadata in discovery results | IN DEVELOPMENT |
 | next 0.0.x | Recorder + continuous video transport + archive/event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
@@ -265,22 +266,32 @@ Implemented in the 0.0.18 snapshot:
 - Hikvision-compatible RTSP path suggestion
 - ONVIF and LAN results merged by IP
 
-## Current focus: 0.0.19
+## Development snapshot: 0.0.19
 
-Current Camera Core work:
+Implemented in the 0.0.19 snapshot:
 
 - native Hikvision SADP discovery on UDP 37020
-- SADP inquiry and inquiry_v32 probes
-- multicast, global broadcast and subnet-broadcast probes
-- discovery from every active non-loopback IPv4 interface
+- inquiry and inquiry_v32 probes
+- multicast / broadcast / subnet-broadcast discovery
 - SADP / ONVIF / LAN results merged by IP
 - Hikvision model, firmware and serial metadata from SADP
-- SADP discovery does not require ONVIF or an open RTSP port
-- standard Hikvision RTSP path remains a fallback after discovery
-- parser tests cover real ProbeMatch fields
-- compact IP-only Web UI remains unchanged
+- discovery independent of ONVIF and RTSP availability
 
-0.0.19 makes Hikvision device discovery independent of ONVIF and RTSP service availability.
+## Current focus: 0.0.20
+
+Current Camera Core/Web UI work:
+
+- useful camera metadata displayed directly in discovery rows
+- Hikvision manufacturer/source, model, firmware and serial from SADP
+- ONVIF hardware scope decoded into a human-readable model when available
+- percent-encoded scope values decoded before display
+- technical XAddr/scopes remain hidden
+- absent metadata is not guessed
+- compact desktop/mobile discovery layout preserved
+- parser and Web UI tests cover discovery metadata presentation
+
+0.0.20 restores useful camera identity information without bringing back the technical ONVIF
+URLs that were intentionally removed from the user-facing list.
 
 ## Later major capabilities
 

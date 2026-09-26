@@ -636,8 +636,20 @@ small {
     border-radius: 8px;
 }
 
+.camera-discovery-main {
+    min-width: 0;
+}
+
 .camera-discovery-row strong {
     min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.camera-discovery-meta {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.4;
     overflow-wrap: anywhere;
 }
 
@@ -2606,7 +2618,7 @@ PrivateKey отображается в редакторе и сохраняет�
 <div class="section-card">
 <div class="section-title">
 <h2>Камеры</h2>
-<span class="section-hint">Camera Core 0.0.19</span>
+<span class="section-hint">Camera Core 0.0.20</span>
 </div>
 
 <div class="stats-grid">
@@ -6384,6 +6396,14 @@ async function discoverOnvifCameras() {
             row.className =
                 "camera-discovery-row";
 
+            const main =
+                document.createElement(
+                    "div"
+                );
+
+            main.className =
+                "camera-discovery-main";
+
             const title =
                 document.createElement(
                     "strong"
@@ -6395,7 +6415,95 @@ async function discoverOnvifCameras() {
 
             title.dataset.i18nSkip = "";
 
-            row.appendChild(title);
+            main.appendChild(title);
+
+            const identityParts = [];
+
+            if (device.vendor_hint) {
+                identityParts.push(
+                    device.vendor_hint
+                );
+            }
+            else if (device.onvif) {
+                identityParts.push(
+                    "ONVIF"
+                );
+            }
+            else if (device.sadp) {
+                identityParts.push(
+                    "SADP"
+                );
+            }
+
+            if (device.model_hint) {
+                identityParts.push(
+                    device.model_hint
+                );
+            }
+
+            if (identityParts.length) {
+                const identity =
+                    document.createElement(
+                        "div"
+                    );
+
+                identity.className =
+                    "camera-discovery-meta";
+
+                identity.textContent =
+                    identityParts.join(
+                        " · "
+                    );
+
+                identity.dataset.i18nSkip =
+                    "";
+
+                main.appendChild(
+                    identity
+                );
+            }
+
+            const detailParts = [];
+
+            if (device.firmware_hint) {
+                detailParts.push(
+                    tr("Прошивка")
+                    + ": "
+                    + device.firmware_hint
+                );
+            }
+
+            if (device.serial_hint) {
+                detailParts.push(
+                    tr("S/N")
+                    + ": "
+                    + device.serial_hint
+                );
+            }
+
+            if (detailParts.length) {
+                const details =
+                    document.createElement(
+                        "div"
+                    );
+
+                details.className =
+                    "camera-discovery-meta";
+
+                details.textContent =
+                    detailParts.join(
+                        " · "
+                    );
+
+                details.dataset.i18nSkip =
+                    "";
+
+                main.appendChild(
+                    details
+                );
+            }
+
+            row.appendChild(main);
 
             const use =
                 document.createElement(

@@ -4,6 +4,7 @@
 #include <array>
 #include <arpa/inet.h>
 #include <chrono>
+#include <cctype>
 #include <cstring>
 #include <netinet/in.h>
 #include <regex>
@@ -98,6 +99,135 @@ std::string makeProbe()
         "</e:Envelope>";
 }
 
+}
+
+std::string
+OnvifDiscovery::scopeValue(
+    const std::string& scopes,
+    const std::string& category
+)
+{
+    const std::string prefix =
+        "onvif://www.onvif.org/"
+        + category
+        + "/";
+
+    std::istringstream stream(
+        scopes
+    );
+
+    std::string scope;
+
+    while (stream >> scope) {
+        if (
+            scope.rfind(
+                prefix,
+                0
+            ) != 0
+        ) {
+            continue;
+        }
+
+        const auto encoded =
+            scope.substr(
+                prefix.size()
+            );
+
+        std::string result;
+        result.reserve(
+            encoded.size()
+        );
+
+        for (
+            std::size_t index = 0;
+            index < encoded.size();
+            ++index
+        ) {
+            if (
+                encoded[index] == '%'
+                &&
+                index + 2 <
+                    encoded.size()
+            ) {
+                auto hex_value =
+                    [](char character) {
+                        if (
+                            character >= '0'
+                            &&
+                            character <= '9'
+                        ) {
+                            return
+                                character - '0';
+                        }
+
+                        character =
+                            static_cast<char>(
+                                std::tolower(
+                                    static_cast<
+                                        unsigned char
+                                    >(character)
+                                )
+                            );
+
+                        if (
+                            character >= 'a'
+                            &&
+                            character <= 'f'
+                        ) {
+                            return
+                                10
+                                +
+                                (
+                                    character - 'a'
+                                );
+                        }
+
+                        return -1;
+                    };
+
+                const int high =
+                    hex_value(
+                        encoded[
+                            index + 1
+                        ]
+                    );
+
+                const int low =
+                    hex_value(
+                        encoded[
+                            index + 2
+                        ]
+                    );
+
+                if (
+                    high >= 0
+                    &&
+                    low >= 0
+                ) {
+                    result.push_back(
+                        static_cast<char>(
+                            (
+                                high << 4
+                            )
+                            |
+                            low
+                        )
+                    );
+
+                    index += 2;
+                    continue;
+                }
+            }
+
+            result.push_back(
+                encoded[index]
+            );
+        }
+
+        return result;
+    }
+
+    return {};
 }
 
 std::vector<OnvifDevice>

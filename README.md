@@ -18,7 +18,7 @@ Home AI Core is a local-first autonomous server platform designed for:
 
 ## Current development version
 
-0.0.19 — native Hikvision SADP discovery
+0.0.20 — camera metadata in discovery results
 
 The repository root `VERSION` file is the single source of the compiled Core version.
 

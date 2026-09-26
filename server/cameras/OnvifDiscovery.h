@@ -26,6 +26,11 @@ public:
         const std::string& xml,
         const std::string& remote_address
     );
+
+    static std::string scopeValue(
+        const std::string& scopes,
+        const std::string& category
+    );
 };
 
 }

@@ -60,6 +60,26 @@ int main()
         return 1;
     }
 
+    const auto hardwareScope =
+        OnvifDiscovery::scopeValue(
+            "onvif://www.onvif.org/name/NVR "
+            "onvif://www.onvif.org/hardware/DS-N332%2F2%28C%29 "
+            "onvif://www.onvif.org/location/country/china",
+            "hardware"
+        );
+
+    if (
+        hardwareScope !=
+        "DS-N332/2(C)"
+    ) {
+        std::cerr
+            << "ONVIF scope metadata parser failed: "
+            << hardwareScope
+            << '\n';
+
+        return 1;
+    }
+
     const std::string sadpXml =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
         "<ProbeMatch>"

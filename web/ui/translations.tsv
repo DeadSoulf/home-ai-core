@@ -704,3 +704,5 @@ ONVIF выключен. RTSP адрес подготовлен автомати�
 RTSP адрес уже определён по сетевому обнаружению.	RTSP address was already determined by network discovery.
 Для этой камеры ONVIF выключен и RTSP адрес не удалось определить автоматически.	ONVIF is disabled for this camera and the RTSP address could not be determined automatically.
 Hikvision найдена через SADP. RTSP адрес подготовлен автоматически. Введите логин/пароль и сохраните камеру.	Hikvision was found via SADP. The RTSP address was prepared automatically. Enter the username/password and save the camera.
+Прошивка	Firmware
+S/N	S/N

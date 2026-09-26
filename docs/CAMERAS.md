@@ -383,3 +383,24 @@ Activated
 For a Hikvision device discovered only through SADP, the camera form can therefore prefill
 manufacturer/model/firmware/serial information before ONVIF is available. The RTSP main-stream
 URL still uses the normal Hikvision path suggestion and is validated later by media probing.
+
+
+## Discovery metadata presentation
+
+Starting with 0.0.20, the compact discovery list keeps technical endpoints hidden but shows
+useful device information when it is actually available:
+
+```text
+10.10.10.10
+Hikvision · DS-2CD...
+Firmware: V5.7.x · S/N: ...
+                         [Use]
+```
+
+Hikvision SADP supplies manufacturer/source, model, firmware and serial information without
+requiring ONVIF. ONVIF-only devices may additionally expose a model through the standard
+`hardware/...` discovery scope; percent-encoded scope values are decoded before display.
+
+If a field is not supplied by the discovery protocol, Home AI Core leaves it absent rather
+than guessing a manufacturer, model or firmware version. Technical XAddr and scope URLs remain
+hidden from the normal UI.

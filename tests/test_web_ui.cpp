@@ -449,6 +449,22 @@ int main()
         ) == std::string::npos
         ||
         cameras.find(
+            "camera-discovery-meta"
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "device.firmware_hint"
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "device.serial_hint"
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "Прошивка"
+        ) == std::string::npos
+        ||
+        cameras.find(
             "Hikvision найдена через SADP"
         ) == std::string::npos
         ||
@@ -461,7 +477,7 @@ int main()
         ) != std::string::npos
         ||
         cameras.find(
-            "Camera Core 0.0.19"
+            "Camera Core 0.0.20"
         ) == std::string::npos
         ||
         cameras.find(
