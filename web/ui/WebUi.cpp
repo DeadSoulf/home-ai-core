@@ -2614,6 +2614,240 @@ button:not(.secondary):not(.danger):not(.sidebar-collapse-button) {
     }
 }
 
+
+/* Home AI Cloud visual polish 0.0.32 */
+:root {
+    --radius-panel: 16px;
+    --radius-card: 12px;
+    --radius-control: 10px;
+    --shadow-panel: 0 8px 26px rgba(0, 0, 0, 0.13);
+}
+
+html,
+body {
+    background:
+        radial-gradient(circle at 100% 0%, rgba(37, 99, 235, 0.08), transparent 30rem),
+        var(--bg);
+}
+
+.topbar {
+    min-height: 72px;
+    padding: 14px 28px;
+    background: rgba(11, 18, 32, 0.88);
+    border-bottom-color: rgba(34, 48, 73, 0.82);
+}
+
+.topbar h1 {
+    font-size: clamp(1.25rem, 1.8vw, 1.65rem);
+}
+
+.page {
+    max-width: 1380px;
+    padding: 22px 26px 44px;
+}
+
+.section-card {
+    padding: 18px;
+    margin-bottom: 14px;
+    border-radius: var(--radius-panel);
+    background: var(--surface);
+    box-shadow: var(--shadow-panel);
+}
+
+.section-title {
+    margin-bottom: 14px;
+}
+
+.section-title h2,
+.section-card > h2 {
+    font-size: 1.08rem;
+    line-height: 1.25;
+}
+
+.section-hint {
+    font-size: 0.78rem;
+}
+
+.stat-card,
+.placeholder-card,
+.storage-card,
+.user-card,
+.audit-entry,
+.dashboard-shortcut,
+.update-version-card {
+    border-radius: var(--radius-card);
+    background: #0F1929;
+}
+
+.stat-card {
+    padding: 14px;
+}
+
+.stat-card strong {
+    font-size: 1.32rem;
+}
+
+.stat-card-control {
+    width: 26px;
+    min-width: 26px;
+    height: 26px;
+    min-height: 26px;
+    border-radius: 7px;
+}
+
+.stat-card-controls {
+    top: 9px;
+    right: 9px;
+}
+
+.stat-card-top {
+    padding-right: 62px;
+}
+
+.stat-state {
+    padding: 3px 7px;
+}
+
+.stat-meter {
+    height: 6px;
+}
+
+.dashboard-shortcut {
+    min-height: 104px;
+    gap: 14px;
+    padding: 14px;
+    border-color: #22344D;
+    background: #101B2D;
+}
+
+.dashboard-shortcut:hover {
+    background: #142137;
+}
+
+.dashboard-shortcut-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+}
+
+.update-status-card {
+    min-height: 88px;
+    padding: 15px 16px;
+    border-radius: var(--radius-card);
+    background: #0F1A2B;
+}
+
+.update-state-orb {
+    width: 46px;
+    height: 46px;
+    flex-basis: 46px;
+    border-radius: 12px;
+}
+
+.update-version-card {
+    padding: 13px 14px;
+}
+
+.update-progress-shell {
+    padding: 12px;
+    border-radius: var(--radius-card);
+    background: #0E192A;
+}
+
+.update-stage-row {
+    padding: 8px 9px;
+    border-radius: 9px;
+    background: #101A2A;
+}
+
+input,
+select,
+textarea {
+    min-height: 42px;
+    padding: 9px 11px;
+    border-radius: var(--radius-control);
+    border-color: #293A55;
+    background: #0C1523;
+}
+
+button,
+.button-row > a {
+    min-height: 40px;
+    padding: 9px 14px;
+    border-radius: var(--radius-control);
+}
+
+.secondary {
+    background: #101A2A;
+}
+
+.sidebar {
+    padding-top: 18px;
+}
+
+.brand {
+    padding-bottom: 16px;
+}
+
+.nav-group {
+    margin-top: 10px;
+}
+
+.nav-caption {
+    padding-top: 7px;
+    padding-bottom: 5px;
+}
+
+.nav-link {
+    min-height: 40px;
+    padding: 9px 11px;
+    border-radius: 10px;
+}
+
+.sidebar-user {
+    border-radius: 12px;
+}
+
+@media (max-width: 860px) {
+    .topbar {
+        min-height: 64px;
+        padding:
+            max(9px, env(safe-area-inset-top))
+            13px
+            9px;
+    }
+
+    .page {
+        padding:
+            14px
+            12px
+            max(98px, calc(env(safe-area-inset-bottom) + 82px));
+    }
+
+    .section-card {
+        padding: 14px;
+        border-radius: 14px;
+    }
+}
+
+@media (max-width: 600px) {
+    .stat-card-control {
+        width: 32px;
+        min-width: 32px;
+        height: 32px;
+        min-height: 32px;
+    }
+
+    .stat-card-top {
+        padding-right: 74px;
+    }
+
+    .dashboard-shortcut {
+        min-height: 92px;
+        padding: 12px;
+    }
+}
+
 </style>
 </head>
 <body>

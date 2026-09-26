@@ -754,6 +754,10 @@ int main()
         ) == std::string::npos
         ||
         system.find(
+            "Home AI Cloud visual polish 0.0.32"
+        ) == std::string::npos
+        ||
+        system.find(
             "update-remote-card"
         ) == std::string::npos
         ||
