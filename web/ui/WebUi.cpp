@@ -1562,7 +1562,7 @@ button:disabled {
     }
 }
 
-/* Home AI Cloud dashboard redesign 0.0.27 */
+/* Home AI Cloud dashboard redesign 0.0.28 */
 :root {
     --bg: #0B1220;
     --sidebar: rgba(8, 14, 25, 0.94);
@@ -1845,7 +1845,22 @@ body {
 }
 
 .stats-grid-live {
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.stats-grid-live > .stat-card {
+    flex: 1 1 190px;
+    min-width: min(190px, 100%);
+    min-height: 0;
+    height: auto;
+    align-self: flex-start;
+}
+
+.stats-grid-live > .stat-card.stat-compact {
+    flex-basis: 160px;
 }
 
 .stat-card {
@@ -2045,10 +2060,15 @@ body {
 
 .stat-card.stat-dragging {
     z-index: 3;
-    opacity: 0.68;
+    opacity: 0.72;
     border-color: #5A82B6;
     transform: scale(0.985);
-    pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+}
+
+.stat-card.stat-drop-target {
+    border-color: #4778B3;
+    background: #12223A;
 }
 
 .stat-card.stat-compact {
@@ -3856,7 +3876,7 @@ PrivateKey отображается в редакторе и сохраняет�
 <div class="section-card">
 <div class="section-title">
 <h2>Камеры</h2>
-<span class="section-hint">Camera Core 0.0.27</span>
+<span class="section-hint">Camera Core 0.0.28</span>
 </div>
 
 <div class="stats-grid">
@@ -12093,6 +12113,58 @@ function toggleStatCompact(card) {
     );
 }
 
+function findStatDropTarget(
+    grid,
+    card,
+    clientX,
+    clientY
+) {
+    const elements =
+        document.elementsFromPoint(
+            clientX,
+            clientY
+        );
+
+    for (
+        const element of
+        elements
+    ) {
+        const candidate =
+            element.closest
+            ? element.closest(
+                "[data-stat-card]"
+            )
+            : null;
+
+        if (
+            candidate
+            &&
+            candidate !== card
+            &&
+            candidate.parentElement === grid
+        ) {
+            return candidate;
+        }
+    }
+
+    return null;
+}
+
+function clearStatDropTargets(grid) {
+    if (!grid)
+        return;
+
+    grid.querySelectorAll(
+        ".stat-drop-target"
+    ).forEach(
+        function(item) {
+            item.classList.remove(
+                "stat-drop-target"
+            );
+        }
+    );
+}
+
 function reorderStatCard(
     grid,
     card,
@@ -12111,44 +12183,64 @@ function reorderStatCard(
         ||
         target.parentElement !== grid
     ) {
-        return;
+        return false;
     }
 
     const rect =
         target.getBoundingClientRect();
 
-    const sameRow =
-        Math.abs(
-            clientY -
-            (
-                rect.top
-                +
-                rect.height / 2
-            )
-        ) <
-        rect.height / 2;
-
     const before =
-        sameRow
-        ? clientX <
-            (
-                rect.left
-                +
-                rect.width / 2
-            )
-        : clientY <
+        clientY <
             (
                 rect.top
                 +
-                rect.height / 2
-            );
+                rect.height * 0.35
+            )
+        ||
+        (
+            clientY <=
+                (
+                    rect.bottom
+                    -
+                    rect.height * 0.35
+                )
+            &&
+            clientX <
+                (
+                    rect.left
+                    +
+                    rect.width / 2
+                )
+        );
+
+    if (before) {
+        if (
+            card.nextElementSibling ===
+            target
+        ) {
+            return false;
+        }
+
+        grid.insertBefore(
+            card,
+            target
+        );
+
+        return true;
+    }
+
+    const after =
+        target.nextElementSibling;
+
+    if (after === card)
+        return false;
 
     grid.insertBefore(
         card,
-        before
-            ? target
-            : target.nextSibling
+        after
     );
+
+    return true;
 }
 
 function toggleStatCard(card) {
@@ -12230,6 +12322,68 @@ function initializeStatCards() {
                         let dragPointerId =
                             null;
 
+                        let dragFrame =
+                            null;
+
+                        let dragPoint =
+                            null;
+
+                        let currentTarget =
+                            null;
+
+                        const processDrag =
+                            function() {
+                                dragFrame =
+                                    null;
+
+                                if (
+                                    dragPointerId === null
+                                    ||
+                                    !dragPoint
+                                ) {
+                                    return;
+                                }
+
+                                const target =
+                                    findStatDropTarget(
+                                        grid,
+                                        card,
+                                        dragPoint.x,
+                                        dragPoint.y
+                                    );
+
+                                if (
+                                    target !==
+                                    currentTarget
+                                ) {
+                                    if (currentTarget) {
+                                        currentTarget.classList.remove(
+                                            "stat-drop-target"
+                                        );
+                                    }
+
+                                    currentTarget =
+                                        target;
+
+                                    if (currentTarget) {
+                                        currentTarget.classList.add(
+                                            "stat-drop-target"
+                                        );
+                                    }
+                                }
+
+                                if (!target)
+                                    return;
+
+                                reorderStatCard(
+                                    grid,
+                                    card,
+                                    target,
+                                    dragPoint.x,
+                                    dragPoint.y
+                                );
+                            };
+
                         handle.addEventListener(
                             "pointerdown",
                             function(event) {
@@ -12245,9 +12399,20 @@ function initializeStatCards() {
                                 dragPointerId =
                                     event.pointerId;
 
-                                handle.setPointerCapture(
-                                    event.pointerId
-                                );
+                                dragPoint = {
+                                    x:
+                                        event.clientX,
+                                    y:
+                                        event.clientY
+                                };
+
+                                try {
+                                    handle.setPointerCapture(
+                                        event.pointerId
+                                    );
+                                }
+                                catch (error) {
+                                }
 
                                 card.classList.add(
                                     "stat-dragging"
@@ -12268,26 +12433,21 @@ function initializeStatCards() {
                                     return;
                                 }
 
-                                const element =
-                                    document.elementFromPoint(
+                                dragPoint = {
+                                    x:
                                         event.clientX,
+                                    y:
                                         event.clientY
-                                    );
+                                };
 
-                                const target =
-                                    element
-                                    ? element.closest(
-                                        "[data-stat-card]"
-                                    )
-                                    : null;
+                                if (dragFrame === null) {
+                                    dragFrame =
+                                        window.requestAnimationFrame(
+                                            processDrag
+                                        );
+                                }
 
-                                reorderStatCard(
-                                    grid,
-                                    card,
-                                    target,
-                                    event.clientX,
-                                    event.clientY
-                                );
+                                event.preventDefault();
                             }
                         );
 
@@ -12303,9 +12463,28 @@ function initializeStatCards() {
                                 dragPointerId =
                                     null;
 
+                                dragPoint =
+                                    null;
+
+                                if (dragFrame !== null) {
+                                    window.cancelAnimationFrame(
+                                        dragFrame
+                                    );
+
+                                    dragFrame =
+                                        null;
+                                }
+
                                 card.classList.remove(
                                     "stat-dragging"
                                 );
+
+                                clearStatDropTargets(
+                                    grid
+                                );
+
+                                currentTarget =
+                                    null;
 
                                 saveStatsLayout(
                                     grid
@@ -12322,6 +12501,20 @@ function initializeStatCards() {
                         handle.addEventListener(
                             "pointercancel",
                             finishDrag
+                        );
+
+                        handle.addEventListener(
+                            "lostpointercapture",
+                            function(event) {
+                                if (
+                                    dragPointerId ===
+                                    event.pointerId
+                                ) {
+                                    finishDrag(
+                                        event
+                                    );
+                                }
+                            }
                         );
                     }
 
