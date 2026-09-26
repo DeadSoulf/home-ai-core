@@ -159,6 +159,24 @@ int main()
             8080
         );
 
+    const bool web_tls_enabled =
+        runtime.config().getBool(
+            "web.tls_enabled",
+            false
+        );
+
+    const auto web_tls_certificate =
+        runtime.config().get(
+            "web.tls_certificate",
+            "runtime/tls/server.crt"
+        );
+
+    const auto web_tls_private_key =
+        runtime.config().get(
+            "web.tls_private_key",
+            "runtime/tls/server.key"
+        );
+
     if (
         web_port < 1 ||
         web_port > 65535
@@ -834,7 +852,10 @@ int main()
                                 std::uint16_t
                             >(
                                 web_port
-                            )
+                            ),
+                            web_tls_enabled,
+                            web_tls_certificate,
+                            web_tls_private_key
                         )
                     ) {
                         return true;
@@ -859,8 +880,16 @@ int main()
                 [&]() {
                     return
                         web.isRunning()
-                        ? "HTTP interface is accepting connections."
-                        : "HTTP interface is stopped.";
+                        ? (
+                            web_tls_enabled
+                            ? "HTTPS interface is accepting connections."
+                            : "HTTP interface is accepting connections."
+                        )
+                        : (
+                            web_tls_enabled
+                            ? "HTTPS interface is stopped."
+                            : "HTTP interface is stopped."
+                        );
                 }
             ),
             module_error

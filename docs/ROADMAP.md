@@ -33,7 +33,8 @@
 | 0.0.37 | Hypervisor pause/resume + autostart controls | DEVELOPMENT SNAPSHOT |
 | 0.0.38 | Hypervisor safe VM definition preview and validation | DEVELOPMENT SNAPSHOT |
 | 0.0.39 | Hypervisor persistent VM definition with libvirt read-back | DEVELOPMENT SNAPSHOT |
-| 0.0.40 | Hypervisor VM Storage Pool + disk placement preview | IN DEVELOPMENT |
+| 0.0.40 | Hypervisor VM Storage Pool + disk placement preview | DEVELOPMENT SNAPSHOT |
+| 0.0.41 | Security foundation: built-in HTTPS/TLS + Debian CI | IN DEVELOPMENT |
 | next 0.0.x | Recorder + continuous video transport + archive/event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
@@ -396,3 +397,18 @@ Next capabilities:
 - planning
 - experience feedback
 - controlled self-development
+
+
+## Development snapshot: 0.0.41
+
+Security/platform hardening in this milestone:
+
+- automatic clean build and CTest workflow on Debian 13 for `develop` and `main`
+- optional built-in HTTPS using OpenSSL
+- TLS 1.2+ minimum protocol
+- certificate/private-key validation before the listener starts
+- HTTPS-only HSTS response header
+- `Secure` session cookies when TLS is enabled
+- local self-signed certificate setup helper
+- TLS integration test performing a real client/server handshake
+- HTTP remains the default until an administrator explicitly enables TLS

@@ -107,3 +107,35 @@ This installs:
 
 The helper is required only for privileged IPv4 changes. Reading interface/IP status does not
 require it. Re-run the installer after updating Home AI Core whenever the helper binary changes.
+
+
+## HTTPS / TLS
+
+Home AI Core can terminate TLS directly and still runs as the normal service account. The
+certificate and private key only need to be readable by that account; no root capability is
+required for the default high Web port.
+
+Generate a local certificate:
+
+```bash
+cd /srv/home-ai-core
+bash scripts/setup-tls.sh home-ai-core.local
+```
+
+Then edit `runtime/home-ai.conf`:
+
+```text
+web.tls_enabled=true
+web.tls_certificate=runtime/tls/server.crt
+web.tls_private_key=runtime/tls/server.key
+```
+
+and restart:
+
+```bash
+sudo systemctl restart home-ai-core
+```
+
+Keep `web.tls_enabled=false` until the certificate is present. With TLS enabled, invalid or
+mismatched certificate/key files prevent the Web module from starting rather than silently
+falling back to plaintext.

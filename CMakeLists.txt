@@ -135,6 +135,7 @@ target_link_libraries(
     PUBLIC
     Threads::Threads
     OpenSSL::Crypto
+    OpenSSL::SSL
     SQLite::SQLite3
     ${CMAKE_DL_LIBS}
 )
@@ -483,3 +484,12 @@ add_executable(
 target_link_libraries(test-cluster-api PRIVATE homeai-core-lib)
 add_test(NAME cluster_api COMMAND test-cluster-api)
 set_tests_properties(cluster_api PROPERTIES TIMEOUT 30)
+
+
+add_executable(
+    test-web-tls
+    tests/test_web_tls.cpp
+)
+target_link_libraries(test-web-tls PRIVATE homeai-core-lib)
+add_test(NAME web_tls COMMAND test-web-tls)
+set_tests_properties(web_tls PROPERTIES TIMEOUT 30)

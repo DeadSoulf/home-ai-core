@@ -250,15 +250,39 @@ sudo apt install libsqlite3-dev
 
 This is a build-time/library dependency, not a separate database service.
 
-## Current network limitation
+## HTTPS/TLS
 
-The development Web Core still uses plain HTTP.
+The Web Core can serve HTTPS directly with OpenSSL. TLS is deliberately disabled by default so
+an update cannot lock an existing installation out before a certificate is prepared.
 
-Do not expose the management port directly to the public Internet. TLS/HTTPS remains required before remote administrative access is production-ready.
+Configuration:
+
+```text
+web.tls_enabled=false
+web.tls_certificate=runtime/tls/server.crt
+web.tls_private_key=runtime/tls/server.key
+```
+
+When enabled, startup fails closed if the certificate is missing, the private key is invalid,
+or the key does not match the certificate. TLS 1.2 or newer is required. HTTPS responses add
+HSTS and authenticated session cookies receive the `Secure` attribute.
+
+A local self-signed certificate can be generated without root access:
+
+```bash
+bash scripts/setup-tls.sh home-ai-core.local
+```
+
+A self-signed certificate must be trusted on client devices to remove browser warnings. For
+remote/production administration, use a certificate issued by a trusted internal or public CA.
+Do not expose an HTTP-only management port directly to the public Internet.
+
+Cluster heartbeat traffic remains a separate concern: keep it on a trusted private network or
+WireGuard as documented by Cluster Core. Enabling Web TLS does not automatically change worker
+heartbeat transport.
 
 ## Planned hardening
 
-- HTTPS/TLS
 - explicit CSRF tokens across all state-changing APIs
 - source/IP-aware login throttling
 - optional MFA

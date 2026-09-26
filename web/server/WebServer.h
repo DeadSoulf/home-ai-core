@@ -36,12 +36,17 @@ public:
 
     bool start(
         const std::string& bind_address,
-        std::uint16_t port
+        std::uint16_t port,
+        bool tls_enabled = false,
+        const std::string& tls_certificate_file = {},
+        const std::string& tls_private_key_file = {}
     );
 
     void stop();
 
     bool isRunning() const;
+    bool tlsEnabled() const;
+    std::uint16_t port() const;
 
 private:
     void run();
@@ -63,6 +68,11 @@ private:
 
     std::string bind_address_;
     std::uint16_t port_{0};
+
+    bool tls_enabled_{false};
+    std::string tls_certificate_file_;
+    std::string tls_private_key_file_;
+    void* tls_context_{nullptr};
 
     std::thread server_thread_;
 

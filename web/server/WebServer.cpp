@@ -25,7 +25,10 @@
 #include <cerrno>
 #include <cstring>
 #include <cstdint>
+#include <limits>
 #include <optional>
+#include <openssl/err.h>
+#include <openssl/ssl.h>
 #include <sstream>
 #include <string>
 #include <sys/socket.h>
@@ -39,6 +42,21 @@ namespace homeai {
 namespace {
 
 using Header = std::pair<std::string, std::string>;
+
+thread_local SSL* current_tls_connection = nullptr;
+thread_local bool current_transport_is_tls = false;
+
+std::string tlsErrorText()
+{
+    const auto code = ERR_get_error();
+
+    if (code == 0)
+        return "unknown TLS error";
+
+    char buffer[256]{};
+    ERR_error_string_n(code, buffer, sizeof(buffer));
+    return buffer;
+}
 
 std::string htmlEscape(const std::string& value)
 {
@@ -511,22 +529,79 @@ void sendAll(
     std::size_t sent = 0;
 
     while (sent < data.size()) {
-        const auto result =
-            ::send(
-                socket_fd,
-                data.data() + sent,
+        const auto remaining =
+            std::min<std::size_t>(
                 data.size() - sent,
-                MSG_NOSIGNAL
+                static_cast<std::size_t>(
+                    std::numeric_limits<int>::max()
+                )
             );
+
+        int result = 0;
+
+        if (current_tls_connection) {
+            result =
+                SSL_write(
+                    current_tls_connection,
+                    data.data() + sent,
+                    static_cast<int>(remaining)
+                );
+        }
+        else {
+            const auto plain_result =
+                ::send(
+                    socket_fd,
+                    data.data() + sent,
+                    remaining,
+                    MSG_NOSIGNAL
+                );
+
+            if (plain_result > 0)
+                result = static_cast<int>(plain_result);
+        }
 
         if (result <= 0)
             return;
 
-        sent +=
+        sent += static_cast<std::size_t>(result);
+    }
+}
+
+int receiveSome(
+    int socket_fd,
+    char* buffer,
+    std::size_t buffer_size
+)
+{
+    const auto size =
+        std::min<std::size_t>(
+            buffer_size,
             static_cast<std::size_t>(
-                result
+                std::numeric_limits<int>::max()
+            )
+        );
+
+    if (current_tls_connection) {
+        return
+            SSL_read(
+                current_tls_connection,
+                buffer,
+                static_cast<int>(size)
             );
     }
+
+    const auto result =
+        ::recv(
+            socket_fd,
+            buffer,
+            size,
+            0
+        );
+
+    if (result <= 0)
+        return static_cast<int>(result);
+
+    return static_cast<int>(result);
 }
 
 void sendResponse(
@@ -553,7 +628,14 @@ void sendResponse(
         << "Cache-Control: no-store\r\n"
         << "X-Content-Type-Options: nosniff\r\n"
         << "X-Frame-Options: DENY\r\n"
-        << "Referrer-Policy: no-referrer\r\n"
+        << "Referrer-Policy: no-referrer\r\n";
+
+    if (current_transport_is_tls) {
+        response
+            << "Strict-Transport-Security: max-age=31536000\r\n";
+    }
+
+    response
         << "Content-Security-Policy: "
            "default-src 'self'; "
            "style-src 'self' 'unsafe-inline'; "
@@ -638,20 +720,27 @@ bool isApiPath(
 }
 
 std::string sessionCookie(
-    const std::string& token
+    const std::string& token,
+    bool secure
 )
 {
     return
         "homeai_session=" +
         token +
-        "; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800";
+        "; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800" +
+        (secure ? "; Secure" : "");
 }
 
-std::string clearSessionCookie()
+std::string clearSessionCookie(
+    bool secure
+)
 {
     return
-        "homeai_session=; "
-        "Path=/; HttpOnly; SameSite=Strict; Max-Age=0";
+        std::string(
+            "homeai_session=; "
+            "Path=/; HttpOnly; SameSite=Strict; Max-Age=0"
+        ) +
+        (secure ? "; Secure" : "");
 }
 
 std::string renderAuthPage(
@@ -833,7 +922,10 @@ WebServer::~WebServer()
 
 bool WebServer::start(
     const std::string& bind_address,
-    std::uint16_t port
+    std::uint16_t port,
+    bool tls_enabled,
+    const std::string& tls_certificate_file,
+    const std::string& tls_private_key_file
 )
 {
     if (running_)
@@ -841,6 +933,93 @@ bool WebServer::start(
 
     bind_address_ = bind_address;
     port_ = port;
+    tls_enabled_ = tls_enabled;
+    tls_certificate_file_ = tls_certificate_file;
+    tls_private_key_file_ = tls_private_key_file;
+
+    if (tls_enabled_) {
+        ERR_clear_error();
+
+        if (
+            tls_certificate_file_.empty()
+            ||
+            tls_private_key_file_.empty()
+        ) {
+            Logger::instance().error(
+                "WebServer: TLS is enabled but certificate/key path is empty"
+            );
+            return false;
+        }
+
+        auto* context = SSL_CTX_new(TLS_server_method());
+
+        if (!context) {
+            Logger::instance().error(
+                "WebServer: unable to create TLS context: " + tlsErrorText()
+            );
+            return false;
+        }
+
+        tls_context_ = context;
+
+        if (
+            SSL_CTX_set_min_proto_version(
+                context,
+                TLS1_2_VERSION
+            ) != 1
+        ) {
+            Logger::instance().error(
+                "WebServer: unable to require TLS 1.2+: " + tlsErrorText()
+            );
+            SSL_CTX_free(context);
+            tls_context_ = nullptr;
+            return false;
+        }
+
+        SSL_CTX_set_options(context, SSL_OP_NO_COMPRESSION);
+
+        if (
+            SSL_CTX_use_certificate_chain_file(
+                context,
+                tls_certificate_file_.c_str()
+            ) != 1
+        ) {
+            Logger::instance().error(
+                "WebServer: unable to load TLS certificate: " + tlsErrorText()
+            );
+            SSL_CTX_free(context);
+            tls_context_ = nullptr;
+            return false;
+        }
+
+        if (
+            SSL_CTX_use_PrivateKey_file(
+                context,
+                tls_private_key_file_.c_str(),
+                SSL_FILETYPE_PEM
+            ) != 1
+            ||
+            SSL_CTX_check_private_key(context) != 1
+        ) {
+            Logger::instance().error(
+                "WebServer: TLS private key is invalid or does not match the certificate: "
+                + tlsErrorText()
+            );
+            SSL_CTX_free(context);
+            tls_context_ = nullptr;
+            return false;
+        }
+    }
+
+    auto release_tls =
+        [this]() {
+            if (tls_context_) {
+                SSL_CTX_free(
+                    static_cast<SSL_CTX*>(tls_context_)
+                );
+                tls_context_ = nullptr;
+            }
+        };
 
     server_fd_ =
         ::socket(
@@ -854,6 +1033,7 @@ bool WebServer::start(
             "WebServer: socket creation failed"
         );
 
+        release_tls();
         return false;
     }
 
@@ -885,6 +1065,7 @@ bool WebServer::start(
 
         ::close(server_fd_);
         server_fd_ = -1;
+        release_tls();
         return false;
     }
 
@@ -906,7 +1087,23 @@ bool WebServer::start(
 
         ::close(server_fd_);
         server_fd_ = -1;
+        release_tls();
         return false;
+    }
+
+    if (port_ == 0) {
+        sockaddr_in bound_address{};
+        socklen_t bound_size = sizeof(bound_address);
+
+        if (
+            ::getsockname(
+                server_fd_,
+                reinterpret_cast<sockaddr*>(&bound_address),
+                &bound_size
+            ) == 0
+        ) {
+            port_ = ntohs(bound_address.sin_port);
+        }
     }
 
     if (
@@ -921,6 +1118,7 @@ bool WebServer::start(
 
         ::close(server_fd_);
         server_fd_ = -1;
+        release_tls();
         return false;
     }
 
@@ -933,10 +1131,11 @@ bool WebServer::start(
         );
 
     Logger::instance().info(
-        "Web interface started on http://" +
-        bind_address_ +
-        ":" +
-        std::to_string(port_)
+        "Web interface started on "
+        + std::string(tls_enabled_ ? "https://" : "http://")
+        + bind_address_
+        + ":"
+        + std::to_string(port_)
     );
 
     return true;
@@ -975,6 +1174,13 @@ void WebServer::stop()
         );
     }
 
+    if (tls_context_) {
+        SSL_CTX_free(
+            static_cast<SSL_CTX*>(tls_context_)
+        );
+        tls_context_ = nullptr;
+    }
+
     Logger::instance().info(
         "Web interface stopped"
     );
@@ -983,6 +1189,16 @@ void WebServer::stop()
 bool WebServer::isRunning() const
 {
     return running_;
+}
+
+bool WebServer::tlsEnabled() const
+{
+    return tls_enabled_;
+}
+
+std::uint16_t WebServer::port() const
+{
+    return port_;
 }
 
 void WebServer::run()
@@ -1046,12 +1262,14 @@ void WebServer::run()
         }
 
         if (!client_slot) {
-            sendResponse(
-                client_fd,
-                "503 Service Unavailable",
-                "text/plain; charset=utf-8",
-                "Server busy"
-            );
+            if (!tls_enabled_) {
+                sendResponse(
+                    client_fd,
+                    "503 Service Unavailable",
+                    "text/plain; charset=utf-8",
+                    "Server busy"
+                );
+            }
 
             ::shutdown(
                 client_fd,
@@ -1098,6 +1316,48 @@ void WebServer::handleClientWorker(
     int client_fd
 )
 {
+    SSL* tls_connection = nullptr;
+
+    if (tls_enabled_) {
+        tls_connection =
+            SSL_new(
+                static_cast<SSL_CTX*>(tls_context_)
+            );
+
+        if (
+            !tls_connection
+            ||
+            SSL_set_fd(
+                tls_connection,
+                client_fd
+            ) != 1
+            ||
+            SSL_accept(tls_connection) != 1
+        ) {
+            Logger::instance().warning(
+                "WebServer: TLS handshake failed"
+            );
+
+            if (tls_connection)
+                SSL_free(tls_connection);
+
+            ::shutdown(client_fd, SHUT_RDWR);
+            ::close(client_fd);
+
+            {
+                std::lock_guard<std::mutex> lock(client_mutex_);
+                if (active_clients_ > 0)
+                    --active_clients_;
+            }
+
+            client_cv_.notify_all();
+            return;
+        }
+
+        current_tls_connection = tls_connection;
+        current_transport_is_tls = true;
+    }
+
     try {
         handleClient(
             client_fd
@@ -1107,6 +1367,14 @@ void WebServer::handleClientWorker(
         Logger::instance().error(
             "WebServer: client worker failed"
         );
+    }
+
+    current_tls_connection = nullptr;
+    current_transport_is_tls = false;
+
+    if (tls_connection) {
+        SSL_shutdown(tls_connection);
+        SSL_free(tls_connection);
     }
 
     ::shutdown(
@@ -1136,11 +1404,10 @@ void WebServer::handleClient(
 
     while (request.size() < 65536) {
         const auto received =
-            ::recv(
+            receiveSome(
                 client_fd,
                 buffer,
-                sizeof(buffer),
-                0
+                sizeof(buffer)
             );
 
         if (received <= 0)
@@ -1494,7 +1761,10 @@ void WebServer::handleClient(
                 {
                     {
                         "Set-Cookie",
-                        sessionCookie(*token)
+                        sessionCookie(
+                            *token,
+                            tls_enabled_
+                        )
                     }
                 }
             );
@@ -1614,7 +1884,10 @@ void WebServer::handleClient(
             {
                 {
                     "Set-Cookie",
-                    sessionCookie(*token)
+                    sessionCookie(
+                            *token,
+                            tls_enabled_
+                        )
                 }
             }
         );
@@ -1636,7 +1909,9 @@ void WebServer::handleClient(
             {
                 {
                     "Set-Cookie",
-                    clearSessionCookie()
+                    clearSessionCookie(
+                        tls_enabled_
+                    )
                 }
             }
         );
