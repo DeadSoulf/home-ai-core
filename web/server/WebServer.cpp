@@ -4028,7 +4028,9 @@ void WebServer::handleClient(
         // Log bounded identifiers and machine-readable outcome; never raw form data.
         security_.audit("hypervisor.action", session->username,
             "uuid=" + (HypervisorManager::validUuid(uuid) ? uuid : "invalid") +
-            " action=" + ((action == "start" || action == "shutdown" || action == "reboot" || action == "force-off") ? action : "invalid") +
+            " action=" + ((action == "start" || action == "shutdown" || action == "reboot" ||
+                action == "pause" || action == "resume" || action == "autostart-on" ||
+                action == "autostart-off" || action == "force-off") ? action : "invalid") +
             " result=" + result.code);
         const auto status = result.success ? "202 Accepted" :
             result.code == "permission_denied" ? "403 Forbidden" :

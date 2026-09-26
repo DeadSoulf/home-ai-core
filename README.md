@@ -18,7 +18,7 @@ Home AI Core is a local-first autonomous server platform designed for:
 
 ## Current development version
 
-0.0.35 — Hypervisor Core: Debian setup guidance, readiness checks and status translations
+0.0.37 — Hypervisor Core: pause/resume and autostart management
 
 The repository root `VERSION` file is the single source of the compiled Core version.
 

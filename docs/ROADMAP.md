@@ -26,7 +26,11 @@
 | 0.0.20 | Camera metadata in discovery results | DEVELOPMENT SNAPSHOT |
 | 0.0.21 | Manufacturer identity no longer guessed from ports/SADP | DEVELOPMENT SNAPSHOT |
 | 0.0.22 | Redesigned responsive Home AI Cloud dashboard and navigation | DEVELOPMENT SNAPSHOT |
-| 0.0.30 | Hypervisor Core foundation: KVM/QEMU/libvirt inventory | IN DEVELOPMENT |
+| 0.0.30 | Hypervisor Core foundation: KVM/QEMU/libvirt inventory | DEVELOPMENT SNAPSHOT |
+| 0.0.34 | Hypervisor lifecycle: start/shutdown/reboot/force-off | DEVELOPMENT SNAPSHOT |
+| 0.0.35 | Hypervisor Debian setup/readiness guidance | DEVELOPMENT SNAPSHOT |
+| 0.0.36 | Cluster Core foundation: Controller/Worker heartbeat and scheduling | DEVELOPMENT SNAPSHOT |
+| 0.0.37 | Hypervisor pause/resume + autostart controls | IN DEVELOPMENT |
 | next 0.0.x | Recorder + continuous video transport + archive/event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |

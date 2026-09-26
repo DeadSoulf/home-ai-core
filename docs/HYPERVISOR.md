@@ -54,7 +54,7 @@ Core adds the Web UI, permissions, audit, automation, storage policies and futur
 The Core does not manage VM inventory by parsing `virsh` output and does not construct QEMU
 command lines directly.
 
-## 0.0.34 lifecycle
+## 0.0.34–0.0.37 lifecycle
 
 The existing inventory remains read-only. Lifecycle requests open a separate writable
 `qemu:///system` connection only after Web/API authorization and explicit confirmation.
@@ -65,7 +65,7 @@ inventory read does not imply that writes are permitted. Do not run the whole Co
 
 ```text
 uuid=<canonical lowercase UUID>
-action=start|shutdown|reboot|force-off
+action=start|shutdown|reboot|pause|resume|autostart-on|autostart-off|force-off
 expected_state=<state shown when confirming>
 confirmation=<same UUID>
 ```
@@ -78,13 +78,17 @@ are display-only and never become executable commands or identifiers for mutatio
 
 | Observed state | Actions |
 | --- | --- |
-| shutoff | Start |
-| running, blocked | Shutdown, Reboot, Force Off |
-| paused, shutdown, crashed, suspended | Force Off |
-| unknown, no-state, unreadable | None |
+| shutoff | Start, Autostart on/off |
+| running, blocked | Shutdown, Reboot, Pause, Force Off, Autostart on/off |
+| paused | Resume, Force Off, Autostart on/off |
+| shutdown, crashed, suspended | Force Off, Autostart on/off |
+| unknown, no-state, unreadable | Autostart on/off only when the domain state is readable |
 
-Commands use `virDomainCreate`, `virDomainShutdown`, `virDomainReboot` and
-`virDomainDestroy`. Force Off does not undefine a persistent VM or delete its disks.
+Commands use `virDomainCreate`, `virDomainShutdown`, `virDomainReboot`,
+`virDomainSuspend`, `virDomainResume`, `virDomainSetAutostart` and
+`virDomainDestroy`. Pause/resume and autostart are loaded as optional lifecycle
+extensions so an older libvirt runtime can still keep the original lifecycle controls.
+Force Off does not undefine a persistent VM or delete its disks.
 Transient libvirt domains can disappear when stopped, as defined by libvirt.
 
 Success returns HTTP 202 with `{success, code: "accepted", message, state}`.
@@ -215,7 +219,7 @@ request header and audit entries.
 ## Planned sequence
 
 1. Validate host capability and VM inventory.
-2. VM lifecycle: start, graceful shutdown, reboot, force-off and autostart.
+2. VM lifecycle: start, graceful shutdown, reboot, pause/resume, force-off and autostart. (Implemented through 0.0.37)
 3. VM creation/editing with safe libvirt XML generation.
 4. qcow2/raw disks, ISO attachment and Storage Pool integration.
 5. NAT, bridge and isolated virtual networks.

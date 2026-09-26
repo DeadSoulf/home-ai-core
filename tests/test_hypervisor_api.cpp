@@ -80,6 +80,11 @@ int main() {
         check(inventory.find("allowed_actions") != std::string::npos && inventory.find("capabilities") != std::string::npos, "inventory contract");
         check(request("POST", action_path, *admin, form("start", "running")).find("409 Conflict") != std::string::npos, "stale state");
         check(request("POST", action_path, *admin, form("start", "shutoff")).find("202 Accepted") != std::string::npos, "start");
+        check(request("POST", action_path, *admin, form("pause", "running")).find("202 Accepted") != std::string::npos, "pause");
+        check(request("POST", action_path, *admin, form("resume", "paused")).find("202 Accepted") != std::string::npos, "resume");
+        check(request("POST", action_path, *admin, form("autostart-on", "running")).find("202 Accepted") != std::string::npos, "autostart on");
+        check(request("GET", "/api/hypervisor", *admin).find("\"autostart\":true") != std::string::npos, "autostart inventory on");
+        check(request("POST", action_path, *admin, form("autostart-off", "running")).find("202 Accepted") != std::string::npos, "autostart off");
         check(request("POST", action_path, *admin, form("shutdown", "running")).find("202 Accepted") != std::string::npos, "shutdown accepted");
         check(request("POST", action_path, *admin, form("reboot", "running")).find("operation_pending") != std::string::npos, "duplicate request");
         check(request("POST", action_path, *admin, form("force-off", "running")).find("202 Accepted") != std::string::npos, "force off");

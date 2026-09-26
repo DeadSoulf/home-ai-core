@@ -10157,6 +10157,10 @@ const hypervisorActionLabels = {
     "start": "Запустить VM",
     "shutdown": "Завершить работу VM",
     "reboot": "Перезагрузить VM",
+    "pause": "Приостановить VM",
+    "resume": "Продолжить VM",
+    "autostart-on": "Включить автозапуск VM",
+    "autostart-off": "Отключить автозапуск VM",
     "force-off": "Принудительно выключить VM"
 };
 let hypervisorActionBusy = false;
@@ -10188,8 +10192,16 @@ async function performHypervisorAction(machine, action) {
         if (response.status === 401) { window.location = "/login"; return; }
         const data = await response.json();
         if (!response.ok || !data.success) throw new Error(data.message || data.code || String(response.status));
-        message.textContent = machine.name + ": " + tr("Команда принята. Состояние обновляется; гостевая ОС может проигнорировать выключение или перезагрузку.");
-        message.className = "status-warn";
+        if (action === "autostart-on" || action === "autostart-off") {
+            message.textContent = machine.name + ": " + tr("Настройка автозапуска VM обновлена.");
+            message.className = "status-ok";
+        } else if (action === "pause" || action === "resume") {
+            message.textContent = machine.name + ": " + tr("Состояние VM обновлено.");
+            message.className = "status-ok";
+        } else {
+            message.textContent = machine.name + ": " + tr("Команда принята. Состояние обновляется; гостевая ОС может проигнорировать выключение или перезагрузку.");
+            message.className = "status-warn";
+        }
     } catch (error) {
         message.textContent = machine.name + ": " + error.message;
         message.className = "status-error";
@@ -10285,12 +10297,14 @@ function renderHypervisorMachine(machine) {
     const actions = document.createElement("div");
     actions.className = "actions";
     const allowed = Array.isArray(machine.allowed_actions) ? machine.allowed_actions : [];
-    for (const [action, label] of Object.entries(hypervisorActionLabels)) {
+    for (const action of allowed) {
+        const label = hypervisorActionLabels[action];
+        if (!label) continue;
         const button = document.createElement("button");
         button.type = "button";
         button.className = action === "force-off" ? "danger" : "secondary";
         button.textContent = tr(label);
-        button.disabled = !allowed.includes(action) || hypervisorActionBusy;
+        button.disabled = hypervisorActionBusy;
         button.addEventListener("click", () => performHypervisorAction(machine, action));
         actions.appendChild(button);
     }

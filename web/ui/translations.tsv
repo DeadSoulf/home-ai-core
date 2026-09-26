@@ -764,11 +764,17 @@ Snapshots / backup — NEXT	Snapshots / backup — NEXT
 Запустить VM	Start VM
 Завершить работу VM	Shut down VM
 Перезагрузить VM	Reboot VM
+Приостановить VM	Pause VM
+Продолжить VM	Resume VM
+Включить автозапуск VM	Enable VM autostart
+Отключить автозапуск VM	Disable VM autostart
 Принудительно выключить VM	Force off VM
 Несохранённые данные будут потеряны. Для подтверждения введите UUID:	Unsaved data will be lost. Enter the UUID to confirm:
 Подтвердить операцию?	Confirm this operation?
 Отправка команды VM…	Sending VM command…
 Команда принята. Состояние обновляется; гостевая ОС может проигнорировать выключение или перезагрузку.	Request accepted. State is being refreshed; the guest may ignore shutdown or reboot.
+Состояние VM обновлено.	VM state updated.
+Настройка автозапуска VM обновлена.	VM autostart setting updated.
 Создание, изменение и удаление VM — NEXT	Create, edit and delete VMs — NEXT
 Консоль VM — NEXT	VM console — NEXT
 Ожидание команды VM:	Pending VM request:
