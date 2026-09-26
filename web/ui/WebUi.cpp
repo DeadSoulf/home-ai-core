@@ -1562,7 +1562,7 @@ button:disabled {
     }
 }
 
-/* Home AI Cloud dashboard redesign 0.0.26 */
+/* Home AI Cloud dashboard redesign 0.0.27 */
 :root {
     --bg: #0B1220;
     --sidebar: rgba(8, 14, 25, 0.94);
@@ -1849,6 +1849,8 @@ body {
 }
 
 .stat-card {
+    position: relative;
+    overflow: hidden;
     transition:
         transform 0.18s ease,
         border-color 0.18s ease,
@@ -1859,7 +1861,16 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: 8px;
+    min-width: 0;
+    padding-right: 66px;
+}
+
+.stat-card-top > .stat-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .stat-card-head-actions {
@@ -1867,13 +1878,18 @@ body {
     align-items: center;
     gap: 6px;
     min-width: 0;
+    flex: 0 1 auto;
 }
 
 .stat-card-controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 2;
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    opacity: 0.72;
+    opacity: 0.84;
     transition: opacity 0.16s ease;
 }
 
@@ -2036,25 +2052,27 @@ body {
 }
 
 .stat-card.stat-compact {
-    min-height: 62px;
-    padding: 10px 12px;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-        "header value";
-    align-items: center;
-    gap: 10px;
+    min-height: 66px;
+    padding: 9px 76px 9px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 2px;
 }
 
 .stat-card.stat-compact .stat-card-top {
-    grid-area: header;
+    width: 100%;
+    padding-right: 0;
     min-width: 0;
 }
 
 .stat-card.stat-compact > strong {
-    grid-area: value;
     margin: 0;
-    font-size: 1rem;
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 0.96rem;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
@@ -2066,16 +2084,24 @@ body {
 }
 
 .stat-card.stat-compact .stat-card-controls {
-    margin-left: 4px;
+    top: 50%;
+    right: 10px;
+    margin: 0;
+    transform: translateY(-50%);
 }
 
 .stat-card.stat-compact .stat-label {
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 @media (max-width: 600px) {
+    .stat-card-top {
+        padding-right: 78px;
+    }
+
     .stat-card-control {
         width: 34px;
         min-width: 34px;
@@ -2083,8 +2109,22 @@ body {
         min-height: 34px;
     }
 
+    .stat-card-controls {
+        top: 9px;
+        right: 9px;
+    }
+
     .stat-card.stat-compact {
-        min-height: 58px;
+        min-height: 70px;
+        padding-right: 86px;
+    }
+
+    .stat-card.stat-compact .stat-card-top {
+        padding-right: 0;
+    }
+
+    .stat-card.stat-compact .stat-card-controls {
+        right: 9px;
     }
 }
 
@@ -3816,7 +3856,7 @@ PrivateKey отображается в редакторе и сохраняет�
 <div class="section-card">
 <div class="section-title">
 <h2>Камеры</h2>
-<span class="section-hint">Camera Core 0.0.26</span>
+<span class="section-hint">Camera Core 0.0.27</span>
 </div>
 
 <div class="stats-grid">

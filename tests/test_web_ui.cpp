@@ -232,7 +232,7 @@ int main()
         ) == std::string::npos
         ||
         home.find(
-            "Home AI Cloud dashboard redesign 0.0.26"
+            "Home AI Cloud dashboard redesign 0.0.27"
         ) == std::string::npos
     ) {
         std::cerr
@@ -501,7 +501,7 @@ int main()
         ) != std::string::npos
         ||
         cameras.find(
-            "Camera Core 0.0.26"
+            "Camera Core 0.0.27"
         ) == std::string::npos
         ||
         cameras.find(
@@ -653,6 +653,14 @@ int main()
         ||
         system.find(
             "stat-compact"
+        ) == std::string::npos
+        ||
+        system.find(
+            "position: absolute;"
+        ) == std::string::npos
+        ||
+        system.find(
+            "padding-right: 66px;"
         ) == std::string::npos
         ||
         system.find(
