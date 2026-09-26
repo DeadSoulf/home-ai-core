@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "server/cameras/CameraMediaTools.h"
+#include "server/cameras/HikvisionSadpDiscovery.h"
 #include "server/cameras/LanCameraDiscovery.h"
 #include "server/cameras/OnvifDiscovery.h"
 #include "server/cameras/OnvifMediaClient.h"
@@ -64,9 +65,13 @@ struct CameraDiscoveryDevice {
     std::string address;
     std::string onvif_xaddr;
     std::string vendor_hint;
+    std::string model_hint;
+    std::string firmware_hint;
+    std::string serial_hint;
     std::string suggested_rtsp_url;
     int rtsp_port{0};
     bool onvif{false};
+    bool sadp{false};
 };
 
 class CameraManager {

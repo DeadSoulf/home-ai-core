@@ -3065,15 +3065,23 @@ CameraManager::discoverCameras(
     error.clear();
 
     OnvifDiscovery onvif_discovery;
+    HikvisionSadpDiscovery sadp_discovery;
     LanCameraDiscovery lan_discovery;
 
     std::string onvif_error;
+    std::string sadp_error;
     std::string lan_error;
 
     const auto onvif_devices =
         onvif_discovery.discover(
             timeout_ms,
             onvif_error
+        );
+
+    const auto sadp_devices =
+        sadp_discovery.discover(
+            timeout_ms,
+            sadp_error
         );
 
     const auto lan_devices =
@@ -3107,6 +3115,31 @@ CameraManager::discoverCameras(
         item.onvif_xaddr =
             device.xaddr;
         item.onvif = true;
+    }
+
+    for (
+        const auto& device :
+        sadp_devices
+    ) {
+        if (device.address.empty())
+            continue;
+
+        auto& item =
+            merged[
+                device.address
+            ];
+
+        item.address =
+            device.address;
+        item.vendor_hint =
+            "Hikvision";
+        item.model_hint =
+            device.model;
+        item.firmware_hint =
+            device.software_version;
+        item.serial_hint =
+            device.serial_number;
+        item.sadp = true;
     }
 
     for (
@@ -3147,6 +3180,36 @@ CameraManager::discoverCameras(
                         device.address,
                         device.vendor_hint,
                         device.rtsp_port
+                    );
+        }
+    }
+
+    for (
+        auto& [address, item] :
+        merged
+    ) {
+        if (
+            item.sadp
+            &&
+            item.rtsp_port == 0
+        ) {
+            item.rtsp_port = 554;
+        }
+
+        if (
+            item.suggested_rtsp_url.empty()
+            &&
+            item.vendor_hint ==
+                "Hikvision"
+            &&
+            item.rtsp_port > 0
+        ) {
+            item.suggested_rtsp_url =
+                LanCameraDiscovery::
+                    suggestedRtspUrl(
+                        address,
+                        "Hikvision",
+                        item.rtsp_port
                     );
         }
     }
@@ -3214,10 +3277,16 @@ CameraManager::discoverCameras(
         &&
         !onvif_error.empty()
         &&
+        !sadp_error.empty()
+        &&
         !lan_error.empty()
     ) {
         error =
             onvif_error
+            +
+            " "
+            +
+            sadp_error
             +
             " "
             +

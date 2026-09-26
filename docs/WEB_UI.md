@@ -162,8 +162,9 @@ Current content:
 - local encrypted password storage
 - ONLINE/OFFLINE/disabled network state
 - lightweight RTSP endpoint checks
-- combined camera discovery: ONVIF WS-Discovery plus local IPv4 camera-port scan
-- discovery of Hikvision-compatible cameras even when ONVIF is disabled
+- combined camera discovery: Hikvision SADP + ONVIF WS-Discovery + local IPv4 camera-port scan
+- native Hikvision SADP discovery over UDP 37020 even when ONVIF/RTSP services are disabled
+- SADP device model, firmware and serial metadata reused by the camera form
 - compact discovery list remains IP/address only
 - automatic ONVIF Media Profile retrieval when ONVIF is available
 - ONVIF device information: manufacturer, model, firmware version and serial number

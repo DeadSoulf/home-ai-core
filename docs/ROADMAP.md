@@ -21,7 +21,8 @@
 | 0.0.15 | ONVIF manufacturer/model/firmware/serial metadata | DEVELOPMENT SNAPSHOT |
 | 0.0.16 | ONVIF PTZ controls + browser Live View preview | DEVELOPMENT SNAPSHOT |
 | 0.0.17 | Simplified ONVIF discovery list and hidden technical endpoints | DEVELOPMENT SNAPSHOT |
-| 0.0.18 | LAN camera discovery without requiring ONVIF | IN DEVELOPMENT |
+| 0.0.18 | LAN camera discovery without requiring ONVIF | DEVELOPMENT SNAPSHOT |
+| 0.0.19 | Native Hikvision SADP discovery | IN DEVELOPMENT |
 | next 0.0.x | Recorder + continuous video transport + archive/event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
@@ -254,25 +255,32 @@ Implemented in the 0.0.17 snapshot:
 - ONVIF XAddr retained internally
 - scopes, hardware URLs and profile URLs hidden from the normal UI
 
-## Current focus: 0.0.18
+## Development snapshot: 0.0.18
+
+Implemented in the 0.0.18 snapshot:
+
+- discovery no longer requires ONVIF
+- bounded local IPv4 scan
+- common camera service-port probing
+- Hikvision-compatible RTSP path suggestion
+- ONVIF and LAN results merged by IP
+
+## Current focus: 0.0.19
 
 Current Camera Core work:
 
-- discovery no longer requires ONVIF
-- bounded local IPv4 scan of up to 254 addresses
-- common camera port probing with short non-blocking connect timeouts
-- Hikvision-compatible detection through service port 8000
-- Dahua-compatible detection through service port 37777
-- NetSurveillance-compatible detection through service port 34567
-- RTSP port detection on 554 / 8554
-- ONVIF and LAN results merged by IP to avoid duplicates
-- common Hikvision main-stream RTSP path suggested automatically
-- normal 80/443-only Web hosts are excluded
-- Web UI keeps the same compact IP-only presentation
-- parser/heuristic tests cover Hikvision discovery behavior
+- native Hikvision SADP discovery on UDP 37020
+- SADP inquiry and inquiry_v32 probes
+- multicast, global broadcast and subnet-broadcast probes
+- discovery from every active non-loopback IPv4 interface
+- SADP / ONVIF / LAN results merged by IP
+- Hikvision model, firmware and serial metadata from SADP
+- SADP discovery does not require ONVIF or an open RTSP port
+- standard Hikvision RTSP path remains a fallback after discovery
+- parser tests cover real ProbeMatch fields
+- compact IP-only Web UI remains unchanged
 
-ONVIF remains preferred when available because it supplies authoritative Media Profiles,
-device information and PTZ capabilities. It is no longer an entry requirement for discovery.
+0.0.19 makes Hikvision device discovery independent of ONVIF and RTSP service availability.
 
 ## Later major capabilities
 

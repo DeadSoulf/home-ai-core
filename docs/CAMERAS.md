@@ -2,7 +2,7 @@
 
 ## Scope
 
-Camera Core 0.0.18 introduces the persistent camera inventory and health layer used by the
+Camera Core 0.0.19 introduces the persistent camera inventory and health layer used by the
 future NVR stack.
 
 0.0.16 adds ONVIF PTZ controls and the first browser Live View implementation on top of the
@@ -338,3 +338,48 @@ rtsp://CAMERA_IP:554/Streaming/Channels/101
 This does not require ONVIF. Username and password remain separate and are still protected by
 Camera Core. If ONVIF is available, ONVIF Media Profiles remain preferred because they provide
 authoritative stream, PTZ and device metadata.
+
+
+## Native Hikvision SADP discovery
+
+0.0.19 adds the Hikvision Search Active Devices Protocol as a first-class discovery source.
+
+Camera discovery now combines:
+
+```text
+Hikvision SADP
+      +
+ONVIF WS-Discovery
+      +
+bounded IPv4 camera-port scan
+```
+
+SADP sends both `inquiry` and `inquiry_v32` XML probes over UDP port 37020 to:
+
+```text
+239.255.255.250
+255.255.255.255
+the active interface subnet broadcast address
+```
+
+The probe is sent from every active non-loopback IPv4 interface. Replies are merged with the
+existing discovery results by IP address, so a Hikvision device does not appear twice when
+both SADP and ONVIF are enabled.
+
+SADP does not require the camera's ONVIF service or RTSP service to be enabled. When returned
+by the device, Camera Core reuses the SADP fields:
+
+```text
+IPv4Address
+DeviceDescription
+DeviceSN
+SoftwareVersion
+MAC
+CommandPort
+HttpPort
+Activated
+```
+
+For a Hikvision device discovered only through SADP, the camera form can therefore prefill
+manufacturer/model/firmware/serial information before ONVIF is available. The RTSP main-stream
+URL still uses the normal Hikvision path suggestion and is validated later by media probing.

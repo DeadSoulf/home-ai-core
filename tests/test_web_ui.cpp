@@ -441,6 +441,18 @@ int main()
         ) == std::string::npos
         ||
         cameras.find(
+            "current.sadp"
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "current.model_hint"
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "Hikvision найдена через SADP"
+        ) == std::string::npos
+        ||
+        cameras.find(
             "device.scopes"
         ) != std::string::npos
         ||
@@ -449,7 +461,7 @@ int main()
         ) != std::string::npos
         ||
         cameras.find(
-            "Camera Core 0.0.18"
+            "Camera Core 0.0.19"
         ) == std::string::npos
         ||
         cameras.find(

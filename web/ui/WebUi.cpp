@@ -2606,7 +2606,7 @@ PrivateKey отображается в редакторе и сохраняет�
 <div class="section-card">
 <div class="section-title">
 <h2>Камеры</h2>
-<span class="section-hint">Camera Core 0.0.18</span>
+<span class="section-hint">Camera Core 0.0.19</span>
 </div>
 
 <div class="stats-grid">
@@ -6445,7 +6445,25 @@ async function discoverOnvifCameras() {
                     }
 
                     onvifProfileCache = [];
-                    setCameraDeviceInfo({});
+
+                    setCameraDeviceInfo(
+                        {
+                            manufacturer:
+                                current.vendor_hint
+                                || "",
+                            model:
+                                current.model_hint
+                                || "",
+                            firmware_version:
+                                current.firmware_hint
+                                || "",
+                            serial_number:
+                                current.serial_hint
+                                || "",
+                            hardware_id:
+                                ""
+                        }
+                    );
 
                     const profileList =
                         document.getElementById(
@@ -6473,7 +6491,9 @@ async function discoverOnvifCameras() {
                             current.suggested_rtsp_url
                         ) {
                             profileMessage.textContent =
-                                tr("ONVIF выключен. RTSP адрес подготовлен автоматически. Введите логин/пароль и сохраните камеру.");
+                                current.sadp
+                                ? tr("Hikvision найдена через SADP. RTSP адрес подготовлен автоматически. Введите логин/пароль и сохраните камеру.")
+                                : tr("ONVIF выключен. RTSP адрес подготовлен автоматически. Введите логин/пароль и сохраните камеру.");
                         }
                         else {
                             profileMessage.textContent =
@@ -6486,8 +6506,17 @@ async function discoverOnvifCameras() {
                         &&
                         !name.value.trim()
                     ) {
+                        const detectedName =
+                            [
+                                current.vendor_hint,
+                                current.model_hint
+                            ]
+                            .filter(Boolean)
+                            .join(" ")
+                            .trim();
+
                         const prefix =
-                            current.vendor_hint
+                            detectedName
                             || tr("Камера");
 
                         name.value =

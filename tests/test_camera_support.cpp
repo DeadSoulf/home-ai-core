@@ -1,4 +1,5 @@
 #include "server/cameras/CameraMediaTools.h"
+#include "server/cameras/HikvisionSadpDiscovery.h"
 #include "server/cameras/LanCameraDiscovery.h"
 #include "server/cameras/OnvifDiscovery.h"
 #include "server/cameras/OnvifMediaClient.h"
@@ -55,6 +56,58 @@ int main()
     ) {
         std::cerr
             << "ONVIF discovery parser failed\n";
+
+        return 1;
+    }
+
+    const std::string sadpXml =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+        "<ProbeMatch>"
+        "<Uuid>FC25924E-AFE2-49E6-ACC9-F84A6859054D</Uuid>"
+        "<Types>inquiry</Types>"
+        "<DeviceType>38930</DeviceType>"
+        "<DeviceDescription>DS-2CD2432F-IW</DeviceDescription>"
+        "<DeviceSN>DS-2CD2432F-IW20150126CCCH502126167</DeviceSN>"
+        "<CommandPort>8000</CommandPort>"
+        "<HttpPort>80</HttpPort>"
+        "<MAC>c0-56-e3-fe-42-92</MAC>"
+        "<IPv4Address>10.10.10.77</IPv4Address>"
+        "<SoftwareVersion>V5.7.15 build 240101</SoftwareVersion>"
+        "<Activated>true</Activated>"
+        "</ProbeMatch>";
+
+    const auto sadpDevice =
+        HikvisionSadpDiscovery::
+            parseResponse(
+                sadpXml
+            );
+
+    if (
+        sadpDevice.address !=
+            "10.10.10.77"
+        ||
+        sadpDevice.model !=
+            "DS-2CD2432F-IW"
+        ||
+        sadpDevice.serial_number !=
+            "DS-2CD2432F-IW20150126CCCH502126167"
+        ||
+        sadpDevice.software_version !=
+            "V5.7.15 build 240101"
+        ||
+        sadpDevice.command_port !=
+            8000
+        ||
+        sadpDevice.http_port !=
+            80
+        ||
+        sadpDevice.mac !=
+            "C0:56:E3:FE:42:92"
+        ||
+        !sadpDevice.activated
+    ) {
+        std::cerr
+            << "Hikvision SADP parser failed\n";
 
         return 1;
     }

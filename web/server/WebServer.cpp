@@ -3060,6 +3060,18 @@ void WebServer::handleClient(
                     << jsonEscape(
                         device.vendor_hint
                     )
+                    << "\",\"model_hint\":\""
+                    << jsonEscape(
+                        device.model_hint
+                    )
+                    << "\",\"firmware_hint\":\""
+                    << jsonEscape(
+                        device.firmware_hint
+                    )
+                    << "\",\"serial_hint\":\""
+                    << jsonEscape(
+                        device.serial_hint
+                    )
                     << "\",\"suggested_rtsp_url\":\""
                     << jsonEscape(
                         device.suggested_rtsp_url
@@ -3069,6 +3081,12 @@ void WebServer::handleClient(
                     << ",\"onvif\":"
                     << (
                         device.onvif
+                        ? "true"
+                        : "false"
+                    )
+                    << ",\"sadp\":"
+                    << (
+                        device.sadp
                         ? "true"
                         : "false"
                     )
