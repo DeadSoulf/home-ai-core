@@ -24,7 +24,8 @@
 | 0.0.18 | LAN camera discovery without requiring ONVIF | DEVELOPMENT SNAPSHOT |
 | 0.0.19 | Native Hikvision SADP discovery | DEVELOPMENT SNAPSHOT |
 | 0.0.20 | Camera metadata in discovery results | DEVELOPMENT SNAPSHOT |
-| 0.0.21 | Manufacturer identity no longer guessed from ports/SADP | IN DEVELOPMENT |
+| 0.0.21 | Manufacturer identity no longer guessed from ports/SADP | DEVELOPMENT SNAPSHOT |
+| 0.0.22 | Redesigned responsive Home AI Cloud dashboard and navigation | IN DEVELOPMENT |
 | next 0.0.x | Recorder + continuous video transport + archive/event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
@@ -288,9 +289,9 @@ Implemented in the 0.0.20 snapshot:
 - technical XAddr/scopes remain hidden
 - compact desktop/mobile discovery layout preserved
 
-## Current focus: 0.0.21
+## Development snapshot: 0.0.21
 
-Current Camera Core/Web UI work:
+Implemented in the 0.0.21 snapshot:
 
 - service ports no longer determine manufacturer identity
 - TCP 8000 does not automatically mean Hikvision
@@ -304,6 +305,20 @@ Current Camera Core/Web UI work:
 
 0.0.21 separates protocol/service detection from manufacturer identity so OEM and compatible
 cameras are not mislabeled.
+
+## Current focus: 0.0.22
+
+Current Web UI work:
+
+- apply the approved Home AI Cloud dark dashboard design without replacing backend behavior
+- clearer blue/graphite visual hierarchy for system cards, navigation and controls
+- responsive dashboard shortcuts for cameras, network/WireGuard, system and storage
+- persistent phone bottom navigation for the most-used sections
+- retain the permission-aware sidebar and existing mobile drawer for the complete menu
+- preserve camera discovery, WireGuard, system update, storage and user-management workflows
+- keep the server update path in the Web UI
+
+0.0.22 is a presentation and navigation redesign; existing Web/API functionality remains in place.
 
 ## Later major capabilities
 
