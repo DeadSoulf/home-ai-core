@@ -791,3 +791,12 @@ Snapshots / backup — NEXT	Snapshots / backup — NEXT
 Конфигурация WireGuard	WireGuard configuration
 Новый профиль	New profile
 Выберите «Редактировать» у существующего профиля или создайте новый.	Select “Edit” for an existing profile or create a new one.
+libvirt не установлен. Ядро виртуализации работает в режиме обнаружения оборудования.	libvirt is not installed. Hypervisor Core is running in detection-only mode.
+Не удалось подключиться к qemu:///system. Проверьте службу libvirt и права доступа к сокету.	Unable to connect to qemu:///system. Check libvirt daemon/socket permissions.
+Сведения о KVM/QEMU/libvirt и виртуальных машинах доступны.	KVM/QEMU/libvirt inventory is available.
+Настройка виртуализации	Virtualization setup
+libvirt не установлен. Установите зависимости на Debian-сервере с Home AI Core.	libvirt is not installed. Install the dependencies on the Debian server running Home AI Core.
+libvirt установлен, но подключение недоступно. Проверьте службу libvirt и права учётной записи Home AI Core.	libvirt is installed but the connection is unavailable. Check the libvirt service and Home AI Core account permissions.
+KVM недоступен. Проверьте виртуализацию в BIOS/UEFI, вложенную виртуализацию и доступ к /dev/kvm.	KVM is unavailable. Check BIOS/UEFI virtualization, nested virtualization and access to /dev/kvm.
+QEMU не найден. Установите зависимости виртуализации на сервере.	QEMU was not found. Install the virtualization dependencies on the server.
+Выполните команду из каталога проекта на Debian-сервере. Установка добавит пакеты, выдаст учётной записи службы доступ к libvirt/KVM и перезапустит Home AI Core.	Run the command from the project directory on the Debian server. Installation adds packages, grants the service account access to libvirt/KVM and restarts Home AI Core.

@@ -1,5 +1,35 @@
 # Hypervisor Core
 
+## Debian setup (0.0.35)
+
+From the updated repository on the Debian server, run:
+
+```bash
+sudo bash scripts/setup-hypervisor.sh check
+sudo bash scripts/setup-hypervisor.sh install
+```
+
+`check` only inspects KVM, QEMU and a libvirt connection. When run with sudo, it
+tests access as the configured non-root `home-ai-core.service` user; without sudo,
+it tests the current account. A connection check does not prove permission for
+every domain operation. The script does not create, start or stop VMs directly.
+
+`install` requires Debian and an existing non-root Core service account. It installs
+QEMU/libvirt packages, adds that account to `libvirt` and `kvm`, enables local libvirt
+daemons while preserving an existing modular setup, and restarts Home AI Core to load
+the library and new group membership. These groups grant powerful host virtualization
+access. Existing libvirt domain autostart policies apply when daemons start.
+No network listener or passwordless sudo rule is added. Errors stop installation;
+package and group changes already completed are retained, so inspect the output before
+retrying. No automatic rollback or daemon architecture migration is attempted.
+
+If Debian itself runs inside Proxmox, `/dev/kvm` may require nested virtualization
+enabled in the parent host/VM configuration. Installing packages alone cannot enable
+that hardware capability. The Web UI distinguishes missing libvirt, unavailable
+connections and missing KVM/QEMU and provides the appropriate setup/check command.
+
+The daemon selection follows the [libvirt daemon architecture](https://libvirt.org/daemons.html).
+
 ## Architecture
 
 Home AI Core uses the Linux virtualization stack instead of implementing a hypervisor itself:

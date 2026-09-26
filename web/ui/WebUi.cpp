@@ -9849,6 +9849,42 @@ function setHypervisorBoolean(
         : "status-error";
 }
 
+function renderHypervisorSetup(host) {
+    const root = document.getElementById("hypervisor-root");
+    let panel = document.getElementById("hypervisor-setup");
+    if (!panel) {
+        panel = document.createElement("div");
+        panel.id = "hypervisor-setup";
+        panel.className = "section-card";
+        root.prepend(panel);
+    }
+    panel.replaceChildren();
+    panel.hidden = !!(host.libvirt_connected && host.kvm_accessible && host.qemu_available);
+    if (panel.hidden) return;
+    const title = document.createElement("h3");
+    title.textContent = tr("Настройка виртуализации");
+    panel.appendChild(title);
+    const hint = document.createElement("p");
+    hint.textContent = tr(!host.libvirt_available
+        ? "libvirt не установлен. Установите зависимости на Debian-сервере с Home AI Core."
+        : !host.libvirt_connected
+            ? "libvirt установлен, но подключение недоступно. Проверьте службу libvirt и права учётной записи Home AI Core."
+            : !host.kvm_accessible
+                ? "KVM недоступен. Проверьте виртуализацию в BIOS/UEFI, вложенную виртуализацию и доступ к /dev/kvm."
+                : "QEMU не найден. Установите зависимости виртуализации на сервере.");
+    panel.appendChild(hint);
+    const command = document.createElement("code");
+    command.style.overflowWrap = "anywhere";
+    command.textContent = !host.libvirt_available || !host.qemu_available
+        ? "sudo bash scripts/setup-hypervisor.sh install"
+        : "sudo bash scripts/setup-hypervisor.sh check";
+    panel.appendChild(command);
+    const note = document.createElement("p");
+    note.className = "muted";
+    note.textContent = tr("Выполните команду из каталога проекта на Debian-сервере. Установка добавит пакеты, выдаст учётной записи службы доступ к libvirt/KVM и перезапустит Home AI Core.");
+    panel.appendChild(note);
+}
+
 const hypervisorActionLabels = {
     "start": "Запустить VM",
     "shutdown": "Завершить работу VM",
@@ -10045,6 +10081,7 @@ async function updateHypervisor() {
         const data =
             await response.json();
 
+        if (data.host) renderHypervisorSetup(data.host);
         if (!response.ok || !data.success) {
             throw new Error(
                 data.message
@@ -10195,7 +10232,7 @@ async function updateHypervisor() {
 
         if (message) {
             message.textContent =
-                data.message || "";
+                tr(data.message || "");
 
             message.className =
                 data.success

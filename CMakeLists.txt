@@ -459,3 +459,5 @@ add_dependencies(test-hypervisor-api fake-libvirt)
 add_test(NAME hypervisor_api COMMAND test-hypervisor-api)
 set_tests_properties(hypervisor_api PROPERTIES
     ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}/fake-libvirt" TIMEOUT 30)
+add_test(NAME hypervisor_setup COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_hypervisor_setup.sh")
+set_tests_properties(hypervisor_setup PROPERTIES TIMEOUT 15)

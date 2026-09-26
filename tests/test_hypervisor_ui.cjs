@@ -10,6 +10,8 @@ const {chromium} = require(process.argv[2] || 'playwright');
     page.on('pageerror', error => errors.push(error.message));
     const uuid = '11111111-2222-3333-4444-555555555555';
     let state = 'shutoff', allowed = ['start'], posts = [], deny = false, broken = false;
+    let host = {libvirt_available: true, libvirt_connected: true, kvm_accessible: true, qemu_available: true};
+    let statusMessage = '';
     let releaseAction;
     await page.route('http://homeai.test/**', async route => {
         const url = new URL(route.request().url());
@@ -28,7 +30,7 @@ const {chromium} = require(process.argv[2] || 'playwright');
             return route.fulfill({status: 202, json: {success: true, code: 'accepted', state}});
         }
         if (url.pathname === '/api/hypervisor') return route.fulfill({json: {
-            success: !broken, message: broken ? 'Inventory failed' : '', host: {libvirt_connected: true},
+            success: !broken, message: statusMessage || (broken ? 'Inventory failed' : ''), host,
             machines: [{uuid, name: '<VM & test>', state, active: state !== 'shutoff', allowed_actions: allowed}]
         }});
         if (url.pathname.startsWith('/api/')) return route.fulfill({status: 503, json: {success: false}});
@@ -77,6 +79,28 @@ const {chromium} = require(process.argv[2] || 'playwright');
         broken = true;
         await page.evaluate(() => updateHypervisor());
         assert.equal(await page.locator('#hypervisor-vm-list button').count(), 0);
+        broken = false;
+        host = {libvirt_available: false, libvirt_connected: false};
+        statusMessage = 'libvirt is not installed. Hypervisor Core is running in detection-only mode.';
+        await page.evaluate(() => updateHypervisor());
+        assert.equal(await page.locator('#hypervisor-message').innerText(), 'libvirt не установлен. Ядро виртуализации работает в режиме обнаружения оборудования.');
+        assert((await page.locator('#hypervisor-setup code').innerText()).endsWith(' install'));
+        await page.selectOption('#language-selector', 'en');
+        await page.waitForFunction(() => document.documentElement.lang === 'en');
+        await page.waitForFunction(() => document.querySelector('#hypervisor-message')?.textContent.includes('detection-only'));
+        assert.equal(await page.locator('#hypervisor-message').innerText(), statusMessage);
+        host = {libvirt_available: true, libvirt_connected: false, qemu_available: true};
+        broken = true;
+        await page.evaluate(() => updateHypervisor());
+        assert((await page.locator('#hypervisor-setup').innerText()).includes('connection is unavailable'));
+        assert((await page.locator('#hypervisor-setup code').innerText()).endsWith(' check'));
+        broken = false;
+        host.libvirt_connected = true;
+        await page.evaluate(() => updateHypervisor());
+        assert((await page.locator('#hypervisor-setup').innerText()).includes('nested virtualization'));
+        host.kvm_accessible = true;
+        await page.evaluate(() => updateHypervisor());
+        assert(await page.locator('#hypervisor-setup').isHidden());
         assert.deepEqual(errors, []);
         console.log('Hypervisor browser tests passed');
     } finally { await browser.close(); }
