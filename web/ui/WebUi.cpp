@@ -4540,12 +4540,11 @@ ONVIF используется, если он включён; Hikvision и со�
 <div class="section-card">
 <div class="section-title">
 <h2>Виртуализация</h2>
-<span class="section-hint">Hypervisor Core 0.0.30</span>
+<span class="section-hint">Hypervisor Core</span>
 </div>
 
 <p class="muted">
-Первый этап Hypervisor Core работает в режиме только чтения:
-проверяет KVM/QEMU/libvirt и показывает существующие виртуальные машины.
+Управление существующими VM через KVM/QEMU/libvirt. Каждая операция требует подтверждения.
 </p>
 
 <div class="stats-grid">
@@ -4630,10 +4629,11 @@ ONVIF используется, если он включён; Hikvision и со�
 </div>
 
 <div class="placeholder-grid">
-<div class="placeholder-card">Создание и lifecycle VM — NEXT</div>
+<div class="placeholder-card">Создание, изменение и удаление VM — NEXT</div>
 <div class="placeholder-card">Диски и ISO — NEXT</div>
 <div class="placeholder-card">Виртуальные сети — NEXT</div>
 <div class="placeholder-card">Snapshots / backup — NEXT</div>
+<div class="placeholder-card">Консоль VM — NEXT</div>
 </div>
 </div>
 
@@ -9849,6 +9849,52 @@ function setHypervisorBoolean(
         : "status-error";
 }
 
+const hypervisorActionLabels = {
+    "start": "Запустить VM",
+    "shutdown": "Завершить работу VM",
+    "reboot": "Перезагрузить VM",
+    "force-off": "Принудительно выключить VM"
+};
+let hypervisorActionBusy = false;
+let hypervisorRefreshBusy = false;
+
+async function performHypervisorAction(machine, action) {
+    if (hypervisorActionBusy || hypervisorRefreshBusy) return;
+    const label = tr(hypervisorActionLabels[action]);
+    const warning = action === "force-off"
+        ? tr("Несохранённые данные будут потеряны. Для подтверждения введите UUID:")
+        : tr("Подтвердить операцию?");
+    const question = label + "\n" + machine.name + "\n" + machine.uuid + "\n" + warning;
+    if (action === "force-off") {
+        if (window.prompt(question) !== machine.uuid) return;
+    } else if (!window.confirm(question)) return;
+
+    hypervisorActionBusy = true;
+    document.querySelectorAll("#hypervisor-vm-list button").forEach(button => button.disabled = true);
+    const message = document.getElementById("hypervisor-action-message");
+    message.textContent = tr("Отправка команды VM…");
+    message.className = "muted";
+    try {
+        const response = await fetch("/api/hypervisor/action", {
+            method: "POST",
+            headers: {"Content-Type": "application/x-www-form-urlencoded", "X-HomeAI-Request": "1"},
+            body: new URLSearchParams({uuid: machine.uuid, action,
+                expected_state: machine.state, confirmation: machine.uuid})
+        });
+        if (response.status === 401) { window.location = "/login"; return; }
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.message || data.code || String(response.status));
+        message.textContent = machine.name + ": " + tr("Команда принята. Состояние обновляется; гостевая ОС может проигнорировать выключение или перезагрузку.");
+        message.className = "status-warn";
+    } catch (error) {
+        message.textContent = machine.name + ": " + error.message;
+        message.className = "status-error";
+    } finally {
+        hypervisorActionBusy = false;
+        await updateHypervisor();
+    }
+}
+
 function renderHypervisorMachine(machine) {
     const card =
         document.createElement("div");
@@ -9932,6 +9978,25 @@ function renderHypervisorMachine(machine) {
         card.appendChild(uuid);
     }
 
+    const actions = document.createElement("div");
+    actions.className = "actions";
+    const allowed = Array.isArray(machine.allowed_actions) ? machine.allowed_actions : [];
+    for (const [action, label] of Object.entries(hypervisorActionLabels)) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = action === "force-off" ? "danger" : "secondary";
+        button.textContent = tr(label);
+        button.disabled = !allowed.includes(action) || hypervisorActionBusy;
+        button.addEventListener("click", () => performHypervisorAction(machine, action));
+        actions.appendChild(button);
+    }
+    card.appendChild(actions);
+    if (machine.pending_action || machine.error) {
+        const notice = document.createElement("p");
+        notice.className = "status-warn";
+        notice.textContent = machine.error || (tr("Ожидание команды VM:") + " " + tr(hypervisorActionLabels[machine.pending_action] || machine.pending_action));
+        card.appendChild(notice);
+    }
     return card;
 }
 
@@ -9943,6 +10008,9 @@ async function updateHypervisor() {
 
     if (!root)
         return;
+
+    if (hypervisorRefreshBusy || hypervisorActionBusy) return;
+    hypervisorRefreshBusy = true;
 
     const list =
         document.getElementById(
@@ -9977,7 +10045,7 @@ async function updateHypervisor() {
         const data =
             await response.json();
 
-        if (!response.ok) {
+        if (!response.ok || !data.success) {
             throw new Error(
                 data.message
                 || data.error
@@ -10192,6 +10260,8 @@ async function updateHypervisor() {
 
             list.appendChild(card);
         }
+    } finally {
+        hypervisorRefreshBusy = false;
     }
 }
 
@@ -10205,6 +10275,12 @@ document.addEventListener(
 
         if (!root)
             return;
+
+        const actionMessage = document.createElement("p");
+        actionMessage.id = "hypervisor-action-message";
+        actionMessage.setAttribute("role", "status");
+        actionMessage.setAttribute("aria-live", "polite");
+        root.prepend(actionMessage);
 
         const refresh =
             document.getElementById(

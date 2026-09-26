@@ -24,7 +24,89 @@ Core adds the Web UI, permissions, audit, automation, storage policies and futur
 The Core does not manage VM inventory by parsing `virsh` output and does not construct QEMU
 command lines directly.
 
-## 0.0.30 foundation
+## 0.0.34 lifecycle
+
+The existing inventory remains read-only. Lifecycle requests open a separate writable
+`qemu:///system` connection only after Web/API authorization and explicit confirmation.
+The service account needs libvirt write access (socket policy / polkit); a successful
+inventory read does not imply that writes are permitted. Do not run the whole Core as root.
+
+`POST /api/hypervisor/action` accepts URL-encoded fields:
+
+```text
+uuid=<canonical lowercase UUID>
+action=start|shutdown|reboot|force-off
+expected_state=<state shown when confirming>
+confirmation=<same UUID>
+```
+
+Every request requires an authenticated session, `hypervisor.manage` and
+`X-HomeAI-Request: 1`. The UI asks for confirmation for all commands; Force Off also
+requires typing the UUID and warns about data loss. The API independently validates
+the confirmation target and rereads the domain state before dispatch. Domain names
+are display-only and never become executable commands or identifiers for mutation.
+
+| Observed state | Actions |
+| --- | --- |
+| shutoff | Start |
+| running, blocked | Shutdown, Reboot, Force Off |
+| paused, shutdown, crashed, suspended | Force Off |
+| unknown, no-state, unreadable | None |
+
+Commands use `virDomainCreate`, `virDomainShutdown`, `virDomainReboot` and
+`virDomainDestroy`. Force Off does not undefine a persistent VM or delete its disks.
+Transient libvirt domains can disappear when stopped, as defined by libvirt.
+
+Success returns HTTP 202 with `{success, code: "accepted", message, state}`.
+`state` is an immediate observation, not proof of completion. In particular, guests
+may ignore Shutdown/Reboot; the UI polls every 10 seconds and keeps the command
+result separate from inventory status. No automatic escalation to Force Off occurs.
+Graceful requests suppress duplicate non-force operations for 30 seconds per UUID,
+or until a powered-off state is observed. `pending_action` exposes this guard in the
+inventory; an unreadable VM reports `error` and has no enabled actions.
+This guard is process-local, not a durable job queue; restarting Core clears it.
+
+Errors return `success: false`, `code`, `message`, `state`:
+
+- 400: invalid UUID/action, missing confirmation or expected state.
+- 403: insufficient Core or libvirt permissions, missing request header.
+- 404: domain disappeared.
+- 409: stale/disallowed state or recent pending operation.
+- 502: libvirt operation/read failure.
+- 503: module, lifecycle symbols or writable connection unavailable.
+
+Authorized action attempts are audited with actor, UUID, action and result code.
+No shell commands, credentials or raw form bodies enter the audit record.
+External administrators can still change state between read and dispatch; libvirt
+remains authoritative and resulting errors are returned, never retried automatically.
+
+`GET /api/hypervisor` retains its existing fields and adds `allowed_actions` per VM
+(empty for view-only users) and `capabilities`. Capability flags describe implemented
+features, not host authorization; `allowed_actions` is advisory and POST revalidates.
+Missing lifecycle symbols leave read-only inventory functional.
+
+See [extension contracts](HYPERVISOR_EXTENSIONS.md) for the next module boundaries.
+
+## Validation
+
+Build and run `ctest --test-dir build --output-on-failure` on Linux. Lifecycle and
+HTTP integration tests use a dedicated fake `libvirt.so.0` selected only for those
+tests, covering denied writes, missing domains, rejected operations, ignored guest
+shutdown, state conflicts, duplicate suppression and resource cleanup. These tests
+never operate on host VMs. The ordinary manager test covers optional/missing libvirt.
+
+After CTest generates UI fixtures, run:
+
+```text
+node tests/test_hypervisor_ui.cjs [path-to-playwright] [browser-channel]
+node tests/test_localization.cjs [path-to-playwright]
+```
+
+Real KVM/guest-agent and Debian service-policy verification remains a deployment
+check: use a disposable VM, verify each command and denied permissions, confirm
+the audit trail, and verify other pages before restarting the normal service.
+
+## 0.0.30 foundation (historical)
 
 The first implementation is intentionally read-only.
 
@@ -83,7 +165,7 @@ The Web dashboard reports what is actually missing before VM management is enabl
 
 ## Security
 
-The current API is read-only:
+The original inventory API is read-only:
 
 ```text
 GET /api/hypervisor
@@ -97,8 +179,8 @@ hypervisor.view
 
 No VM lifecycle or destructive operation is available in 0.0.30.
 
-Future mutation endpoints will require `hypervisor.manage`, the standard Home AI request
-header and audit entries.
+The 0.0.34 lifecycle endpoint above adds `hypervisor.manage`, the standard Home AI
+request header and audit entries.
 
 ## Planned sequence
 

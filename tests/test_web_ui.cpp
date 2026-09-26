@@ -600,7 +600,7 @@ int main()
         ) == std::string::npos
         ||
         hypervisor.find(
-            "Hypervisor Core 0.0.30"
+            "performHypervisorAction"
         ) == std::string::npos
         ||
         hypervisor.find(

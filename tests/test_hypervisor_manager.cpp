@@ -7,6 +7,20 @@ int main()
 {
     using homeai::HypervisorManager;
 
+    const std::string uuid = "11111111-2222-3333-4444-555555555555";
+    if (!HypervisorManager::validUuid(uuid) || HypervisorManager::validUuid("../vm") ||
+        HypervisorManager::validUuid(uuid + "0") ||
+        HypervisorManager::allowedActions("unknown").size() != 0 ||
+        HypervisorManager::allowedActions("shutoff") != std::vector<std::string>{"start"} ||
+        HypervisorManager::allowedActions("paused") != std::vector<std::string>{"force-off"})
+        return 1;
+    HypervisorManager unavailable;
+    if (unavailable.performAction(uuid, "start", "shutoff", "").code != "confirmation_required" ||
+        unavailable.performAction(uuid, "delete", "shutoff", uuid).code != "unsupported_action" ||
+        unavailable.performAction(uuid, "start", "", uuid).code != "expected_state_required" ||
+        unavailable.performAction(uuid, "start", "shutoff", uuid).code != "unavailable")
+        return 1;
+
     if (
         HypervisorManager::versionToString(
             1002003UL

@@ -34,7 +34,10 @@ struct HypervisorHostInfo {
 struct VirtualMachineInfo {
     std::string name;
     std::string uuid;
-    std::string state;
+    std::string state{"unknown"};
+    std::vector<std::string> allowed_actions;
+    std::string pending_action;
+    std::string error;
     bool active{false};
     bool autostart{false};
 
@@ -47,6 +50,20 @@ struct VirtualMachineInfo {
 struct HypervisorSnapshot {
     HypervisorHostInfo host;
     std::vector<VirtualMachineInfo> machines;
+};
+
+struct VmActionResult {
+    bool success{false};
+    std::string code;
+    std::string message;
+    std::string state{"unknown"};
+};
+
+// Stable capability names for future resource modules. Unsupported operations
+// must remain disabled until their validation, permissions and backend exist.
+struct HypervisorCapability {
+    std::string name;
+    bool implemented;
 };
 
 class HypervisorManager {
@@ -73,6 +90,13 @@ public:
     );
 
     bool healthy() const;
+
+    VmActionResult performAction(const std::string& uuid,
+        const std::string& action, const std::string& expected_state,
+        const std::string& confirmation);
+    static bool validUuid(const std::string& uuid);
+    static std::vector<std::string> allowedActions(const std::string& state);
+    static std::vector<HypervisorCapability> capabilities();
 
     std::string healthMessage() const;
 

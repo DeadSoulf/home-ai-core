@@ -3685,6 +3685,47 @@ void WebServer::handleClient(
         return;
     }
 
+    if (method == "POST" && path == "/api/hypervisor/action") {
+        auto respond = [&](const std::string& status, const VmActionResult& result) {
+            sendResponse(client_fd, status, "application/json; charset=utf-8",
+                "{\"success\":" + std::string(result.success ? "true" : "false") +
+                ",\"code\":\"" + jsonEscape(result.code) + "\",\"message\":\"" +
+                jsonEscape(result.message) + "\",\"state\":\"" + jsonEscape(result.state) + "\"}");
+        };
+        if (!security_.hasPermission(*session, "hypervisor.manage")) {
+            respond("403 Forbidden", {false, "permission_denied", "VM management permission is required."});
+            return;
+        }
+        if (headerValue(headers, "X-HomeAI-Request") != "1") {
+            respond("403 Forbidden", {false, "request_header_required", "Home AI request header is required."});
+            return;
+        }
+        const auto form = parseForm(body);
+        auto field = [&](const char* name) {
+            const auto it = form.find(name);
+            return it == form.end() ? std::string{} : it->second;
+        };
+        const auto uuid = field("uuid");
+        const auto action = field("action");
+        const auto result = hypervisor_
+            ? hypervisor_->performAction(uuid, action, field("expected_state"), field("confirmation"))
+            : VmActionResult{false, "unavailable", "Hypervisor Core is unavailable."};
+        // Log bounded identifiers and machine-readable outcome; never raw form data.
+        security_.audit("hypervisor.action", session->username,
+            "uuid=" + (HypervisorManager::validUuid(uuid) ? uuid : "invalid") +
+            " action=" + ((action == "start" || action == "shutdown" || action == "reboot" || action == "force-off") ? action : "invalid") +
+            " result=" + result.code);
+        const auto status = result.success ? "202 Accepted" :
+            result.code == "permission_denied" ? "403 Forbidden" :
+            result.code == "not_found" ? "404 Not Found" :
+            result.code == "unavailable" ? "503 Service Unavailable" :
+            result.code == "backend_error" ? "502 Bad Gateway" :
+            (result.code == "state_changed" || result.code == "invalid_state" || result.code == "operation_pending")
+                ? "409 Conflict" : "400 Bad Request";
+        respond(status, result);
+        return;
+    }
+
     if (
         method == "GET"
         &&
@@ -3852,10 +3893,28 @@ void WebServer::handleClient(
                 << machine.max_memory_bytes
                 << ",\"cpu_time_ns\":"
                 << machine.cpu_time_ns
-                << "}";
+                << ",\"pending_action\":\"" << jsonEscape(machine.pending_action)
+                << "\",\"error\":\"" << jsonEscape(machine.error)
+                << "\",\"allowed_actions\":[";
+            bool first_action = true;
+            if (security_.hasPermission(*session, "hypervisor.manage")) {
+                for (const auto& action : machine.allowed_actions) {
+                    if (!first_action) json << ',';
+                    first_action = false;
+                    json << '\"' << jsonEscape(action) << '\"';
+                }
+            }
+            json << "]}";
         }
 
-        json << "]}";
+        json << "],\"capabilities\":{";
+        bool first_capability = true;
+        for (const auto& capability : HypervisorManager::capabilities()) {
+            if (!first_capability) json << ',';
+            first_capability = false;
+            json << '\"' << capability.name << "\":" << (capability.implemented ? "true" : "false");
+        }
+        json << "}}";
 
         sendResponse(
             client_fd,

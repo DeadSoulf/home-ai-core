@@ -13,6 +13,8 @@
 #include <memory>
 #include <sstream>
 #include <utility>
+#include <chrono>
+#include <map>
 
 namespace homeai {
 
@@ -268,6 +270,30 @@ struct HypervisorManager::Impl {
         virDomainFree{nullptr};
 
     bool initialized{false};
+    VirConnectOpenReadOnly virConnectOpen{nullptr};
+    virDomainPtr (*virDomainLookupByUUIDString)(virConnectPtr, const char*){nullptr};
+    int (*virDomainCreate)(virDomainPtr){nullptr};
+    int (*virDomainShutdown)(virDomainPtr){nullptr};
+    int (*virDomainReboot)(virDomainPtr, unsigned int){nullptr};
+    int (*virDomainDestroy)(virDomainPtr){nullptr};
+    int (*virGetLastErrorCode)(){nullptr};
+    const char* (*virGetLastErrorMessage)(){nullptr};
+    bool lifecycle_loaded{false};
+    struct PendingAction {
+        std::string action;
+        std::chrono::steady_clock::time_point deadline;
+    };
+    std::map<std::string, PendingAction> pending;
+
+    VmActionResult failure(const std::string& fallback) const
+    {
+        const int code = virGetLastErrorCode ? virGetLastErrorCode() : 0;
+        const char* detail = virGetLastErrorMessage ? virGetLastErrorMessage() : nullptr;
+        return {false, code == 42 ? "not_found" :
+            (code == 29 || code == 45 || code == 79 || code == 88 || code == 94) ? "permission_denied" :
+            code == 55 ? "invalid_state" : "backend_error",
+            detail ? std::string(detail) : fallback, "unknown"};
+    }
     bool libvirt_loaded{false};
     bool last_connected{false};
     std::string last_message;
@@ -426,12 +452,24 @@ struct HypervisorManager::Impl {
         }
 
         libvirt_loaded = true;
+        // Optional mutation symbols must never break read-only inventory.
+        lifecycle_loaded =
+            symbol("virConnectOpen", virConnectOpen) &&
+            symbol("virDomainLookupByUUIDString", virDomainLookupByUUIDString) &&
+            symbol("virDomainCreate", virDomainCreate) &&
+            symbol("virDomainShutdown", virDomainShutdown) &&
+            symbol("virDomainReboot", virDomainReboot) &&
+            symbol("virDomainDestroy", virDomainDestroy) &&
+            symbol("virGetLastErrorCode", virGetLastErrorCode) &&
+            symbol("virGetLastErrorMessage", virGetLastErrorMessage);
         return true;
     }
 
     void unload()
     {
         libvirt_loaded = false;
+        lifecycle_loaded = false;
+        pending.clear();
         last_connected = false;
 
         if (library) {
@@ -449,6 +487,7 @@ struct HypervisorManager::Impl {
     )
     {
         HypervisorSnapshot result;
+        error.clear();
 
         last_connected = false;
 
@@ -590,6 +629,7 @@ struct HypervisorManager::Impl {
             );
 
         if (count < 0) {
+            last_connected = false;
             error =
                 "Unable to list libvirt virtual machines.";
 
@@ -692,6 +732,17 @@ struct HypervisorManager::Impl {
 
                 machine.cpu_time_ns =
                     info.cpuTime;
+                if (active >= 0 && lifecycle_loaded && HypervisorManager::validUuid(machine.uuid))
+                    machine.allowed_actions = HypervisorManager::allowedActions(machine.state);
+                if (active < 0) machine.error = "Unable to read VM activity.";
+                if (machine.state == "shutoff") pending.erase(machine.uuid);
+                const auto request = pending.find(machine.uuid);
+                if (request != pending.end() && request->second.deadline > std::chrono::steady_clock::now()) {
+                    machine.pending_action = request->second.action;
+                    std::erase_if(machine.allowed_actions, [](const auto& action) { return action != "force-off"; });
+                }
+            } else {
+                machine.error = "Unable to read VM state.";
             }
 
             int autostart = 0;
@@ -945,6 +996,94 @@ HypervisorManager::domainStateLabel(
     default:
         return "unknown";
     }
+}
+
+bool HypervisorManager::validUuid(const std::string& uuid)
+{
+    if (uuid.size() != 36) return false;
+    for (std::size_t i = 0; i < uuid.size(); ++i) {
+        const char c = uuid[i];
+        if (i == 8 || i == 13 || i == 18 || i == 23) {
+            if (c != '-') return false;
+        } else if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+std::vector<std::string> HypervisorManager::allowedActions(const std::string& state)
+{
+    if (state == "shutoff") return {"start"};
+    if (state == "running" || state == "blocked") return {"shutdown", "reboot", "force-off"};
+    if (state == "paused" || state == "shutdown" || state == "crashed" || state == "suspended")
+        return {"force-off"};
+    return {};
+}
+
+std::vector<HypervisorCapability> HypervisorManager::capabilities()
+{
+    return {{"lifecycle", true}, {"create", false}, {"edit", false},
+        {"delete", false}, {"snapshots", false}, {"disks", false},
+        {"networks", false}, {"console", false}};
+}
+
+VmActionResult HypervisorManager::performAction(const std::string& uuid,
+    const std::string& action, const std::string& expected_state,
+    const std::string& confirmation)
+{
+    if (!validUuid(uuid)) return {false, "invalid_uuid", "A canonical VM UUID is required."};
+    if (action != "start" && action != "shutdown" && action != "reboot" && action != "force-off")
+        return {false, "unsupported_action", "This VM operation is not implemented."};
+    if (confirmation != uuid) return {false, "confirmation_required", "Confirm the target VM UUID."};
+    if (expected_state.empty()) return {false, "expected_state_required", "Refresh the VM state before confirming."};
+
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    if (!impl_->initialized || !impl_->lifecycle_loaded)
+        return {false, "unavailable", "VM lifecycle support is unavailable."};
+    auto* connection = impl_->virConnectOpen("qemu:///system");
+    if (!connection) {
+        auto result = impl_->failure("Unable to open a writable libvirt connection.");
+        if (result.code == "backend_error") result.code = "unavailable";
+        return result;
+    }
+    auto close = [this](auto* value) { impl_->virConnectClose(value); };
+    std::unique_ptr<_virConnect, decltype(close)> connection_guard(connection, close);
+    auto* domain = impl_->virDomainLookupByUUIDString(connection, uuid.c_str());
+    if (!domain) return impl_->failure("Unable to find VM.");
+    auto release = [this](auto* value) { impl_->virDomainFree(value); };
+    std::unique_ptr<_virDomain, decltype(release)> domain_guard(domain, release);
+    VirDomainInfo info{};
+    if (impl_->virDomainGetInfo(domain, &info) < 0) return impl_->failure("Unable to read VM state.");
+    const auto state = domainStateLabel(info.state);
+    if (state != expected_state) return {false, "state_changed", "VM state changed; refresh and confirm again.", state};
+    const auto actions = allowedActions(state);
+    if (std::find(actions.begin(), actions.end(), action) == actions.end())
+        return {false, "invalid_state", "Operation is not allowed in the current VM state.", state};
+    const auto now = std::chrono::steady_clock::now();
+    for (auto it = impl_->pending.begin(); it != impl_->pending.end();) {
+        if (it->second.deadline <= now) it = impl_->pending.erase(it);
+        else ++it;
+    }
+    // A guest can ignore graceful requests. Suppress duplicate submissions for
+    // 30 seconds, but permit an explicitly confirmed force-off immediately.
+    if (state == "shutoff") impl_->pending.erase(uuid);
+    if (action != "force-off" && impl_->pending.contains(uuid))
+        return {false, "operation_pending", "A recent request is still pending. Refresh and wait before retrying.", state};
+    int rc = -1;
+    if (action == "start") rc = impl_->virDomainCreate(domain);
+    else if (action == "shutdown") rc = impl_->virDomainShutdown(domain);
+    else if (action == "reboot") rc = impl_->virDomainReboot(domain, 0);
+    else rc = impl_->virDomainDestroy(domain);
+    if (rc < 0) return impl_->failure("libvirt rejected the VM operation.");
+    if (action == "shutdown" || action == "reboot")
+        impl_->pending[uuid] = {action, now + std::chrono::seconds(30)};
+    else impl_->pending.erase(uuid);
+    // Never claim that a guest has shut down or rebooted just because it
+    // accepted the request. This is only an immediate observed state.
+    const auto observed = impl_->virDomainGetInfo(domain, &info) == 0
+        ? domainStateLabel(info.state) : "unknown";
+    return {true, "accepted", "VM request accepted. Refresh to observe the current state.", observed};
 }
 
 }

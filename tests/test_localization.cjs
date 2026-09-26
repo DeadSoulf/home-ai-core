@@ -59,6 +59,8 @@ const script = '(() => { const catalog = ' + JSON.stringify(fs.readFileSync(path
         assert.equal(await page.evaluate(()=>tr('/mnt/user-files')), '/mnt/user-files');
         assert.equal(await page.evaluate(()=>tr('Устройство: /mnt/admin/Сеть')), 'Устройство: /mnt/admin/Сеть');
         assert((await page.locator('#module-list').innerText()).includes('Аутентификация и сессии готовы.'));
+        await page.locator('#update-log-details summary').click();
+        await page.waitForFunction(()=>document.querySelector('#update-output').textContent.includes('Original compiler output'));
         assert((await page.locator('#update-output').innerText()).includes('Original compiler output'));
         assert.deepEqual(errors,[]);
         console.log('Browser tests passed: all pages, persistence, dynamic messages, GPU selection/removal/clear.');

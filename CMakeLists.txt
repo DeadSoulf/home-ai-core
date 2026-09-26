@@ -443,3 +443,19 @@ add_test(
     NAME hypervisor_manager
     COMMAND test-hypervisor-manager
 )
+
+add_library(fake-libvirt SHARED tests/fake_libvirt.cpp)
+set_target_properties(fake-libvirt PROPERTIES OUTPUT_NAME virt SOVERSION 0
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/fake-libvirt")
+add_executable(test-hypervisor-lifecycle tests/test_hypervisor_lifecycle.cpp)
+target_link_libraries(test-hypervisor-lifecycle PRIVATE homeai-core-lib)
+add_dependencies(test-hypervisor-lifecycle fake-libvirt)
+add_test(NAME hypervisor_lifecycle COMMAND test-hypervisor-lifecycle)
+set_tests_properties(hypervisor_lifecycle PROPERTIES
+    ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}/fake-libvirt" TIMEOUT 30)
+add_executable(test-hypervisor-api tests/test_hypervisor_api.cpp)
+target_link_libraries(test-hypervisor-api PRIVATE homeai-core-lib)
+add_dependencies(test-hypervisor-api fake-libvirt)
+add_test(NAME hypervisor_api COMMAND test-hypervisor-api)
+set_tests_properties(hypervisor_api PROPERTIES
+    ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}/fake-libvirt" TIMEOUT 30)

@@ -759,3 +759,35 @@ Hypervisor Core недоступен.	Hypervisor Core is unavailable.
 Диски и ISO — NEXT	VM disks and ISO — NEXT
 Виртуальные сети — NEXT	Virtual networks — NEXT
 Snapshots / backup — NEXT	Snapshots / backup — NEXT
+
+Управление существующими VM через KVM/QEMU/libvirt. Каждая операция требует подтверждения.	Manage existing VMs through KVM/QEMU/libvirt. Every operation requires confirmation.
+Запустить VM	Start VM
+Завершить работу VM	Shut down VM
+Перезагрузить VM	Reboot VM
+Принудительно выключить VM	Force off VM
+Несохранённые данные будут потеряны. Для подтверждения введите UUID:	Unsaved data will be lost. Enter the UUID to confirm:
+Подтвердить операцию?	Confirm this operation?
+Отправка команды VM…	Sending VM command…
+Команда принята. Состояние обновляется; гостевая ОС может проигнорировать выключение или перезагрузку.	Request accepted. State is being refreshed; the guest may ignore shutdown or reboot.
+Создание, изменение и удаление VM — NEXT	Create, edit and delete VMs — NEXT
+Консоль VM — NEXT	VM console — NEXT
+Ожидание команды VM:	Pending VM request:
+Для найденных камер Home AI Core пытается определить RTSP автоматически. ONVIF используется, если он включён; Hikvision и совместимые камеры могут обнаруживаться и при выключенном ONVIF.	Home AI Core attempts to detect RTSP automatically for discovered cameras. ONVIF is used when enabled; Hikvision and compatible cameras may also be discovered with ONVIF disabled.
+«Проверить» — быстрая проверка RTSP-порта. «Поток» запускает ffprobe и показывает реальный видеокодек, разрешение и FPS. Snapshot создаётся через ffmpeg.	“Check” quickly checks the RTSP port. “Stream” runs ffprobe to show the actual video codec, resolution and FPS. Snapshot uses ffmpeg.
+Запись видео — NEXT	Video recording — NEXT
+Архив / таймлайн — NEXT	Archive / timeline — NEXT
+Непрерывный видеопоток — NEXT	Continuous video streaming — NEXT
+Быстрый доступ	Quick access
+Основные функции Home AI Cloud	Home AI Cloud essentials
+Поиск, просмотр и управление камерами	Discover, view and manage cameras
+Сеть и WireGuard	Network and WireGuard
+Интерфейсы, VPN и удалённый доступ	Interfaces, VPN and remote access
+Состояние ядра и обновление сервера	Core status and server updates
+Диски, пулы и состояние накопителей	Disks, pools and storage health
+Редактор WireGuard	WireGuard editor
+Создание и изменение *.conf	Create and edit *.conf
+Конфигурация загружается только при нажатии «Редактировать». PrivateKey отображается в редакторе и сохраняется в runtime/wireguard с правами 0600. Для активного туннеля сохранённые изменения вступят в силу после переподключения профиля.	Configuration is loaded only when you click “Edit”. PrivateKey is shown in the editor and saved in runtime/wireguard with permissions 0600. For an active tunnel, saved changes take effect after reconnecting the profile.
+Имя профиля	Profile name
+Конфигурация WireGuard	WireGuard configuration
+Новый профиль	New profile
+Выберите «Редактировать» у существующего профиля или создайте новый.	Select “Edit” for an existing profile or create a new one.
