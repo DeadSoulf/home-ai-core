@@ -140,11 +140,11 @@ int main()
         )
         ||
         home.find(
-            "<span>Хранилище</span>"
+            "<span class=\"nav-label\">Хранилище</span>"
         ) == std::string::npos
         ||
         home.find(
-            "<span>AI / GPU</span>"
+            "<span class=\"nav-label\">AI / GPU</span>"
         ) == std::string::npos
         ||
         home.find(
