@@ -70,7 +70,8 @@ int main() {
             const bool expected =
                 capability.name == "lifecycle"
                 || capability.name == "pause_resume"
-                || capability.name == "autostart";
+                || capability.name == "autostart"
+                || capability.name == "create_preview";
             check(capability.implemented == expected, "future features disabled");
         }
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
