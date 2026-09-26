@@ -1477,7 +1477,7 @@ button:disabled {
     }
 }
 
-/* Home AI Cloud dashboard redesign 0.0.23 */
+/* Home AI Cloud dashboard redesign 0.0.24 */
 :root {
     --bg: #0B1220;
     --sidebar: rgba(8, 14, 25, 0.94);
@@ -1792,10 +1792,260 @@ button:not(.secondary):not(.danger):not(.sidebar-collapse-button) {
     background: #0E1828;
 }
 
+.update-console {
+    overflow: hidden;
+}
+
+.update-console .section-title {
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.update-branch-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border: 1px solid #2B4162;
+    border-radius: 999px;
+    background: #111D30;
+    color: var(--muted);
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+
+.update-branch-chip strong {
+    color: var(--text);
+    font-size: 0.78rem;
+}
+
+.update-status-card {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    min-height: 96px;
+    padding: 17px 18px;
+    border: 1px solid #28466D;
+    border-radius: 16px;
+    background:
+        radial-gradient(circle at 0% 50%, rgba(37,99,235,0.18), transparent 26rem),
+        #0D1829;
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease;
+}
+
+.update-state-orb {
+    flex: 0 0 50px;
+    width: 50px;
+    height: 50px;
+    display: grid;
+    place-items: center;
+    border-radius: 15px;
+    border: 1px solid #355984;
+    background: #142642;
+    color: #8DBBFF;
+    font-size: 1.45rem;
+    font-weight: 800;
+}
+
+.update-status-copy {
+    min-width: 0;
+}
+
+.update-status-caption,
+.update-version-label {
+    display: block;
+    color: var(--muted);
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.update-status-copy > strong {
+    display: block;
+    margin: 3px 0 4px;
+    font-size: 1.18rem;
+    letter-spacing: -0.02em;
+}
+
+.update-status-copy .muted {
+    margin: 0;
+}
+
+.update-status-card.is-busy .update-state-orb {
+    animation: update-spin 1.2s linear infinite;
+}
+
+.update-status-card.is-available {
+    border-color: #3E63A0;
+}
+
+.update-status-card.is-ready {
+    border-color: #287A4A;
+    background:
+        radial-gradient(circle at 0% 50%, rgba(34,197,94,0.16), transparent 26rem),
+        #0D1B24;
+}
+
+.update-status-card.is-ready .update-state-orb {
+    border-color: #2E7047;
+    background: #102B1E;
+    color: #77E49B;
+}
+
+.update-status-card.is-error {
+    border-color: #7A343C;
+    background:
+        radial-gradient(circle at 0% 50%, rgba(239,68,68,0.13), transparent 26rem),
+        #211217;
+}
+
+.update-status-card.is-error .update-state-orb {
+    border-color: #7A343C;
+    background: #32171D;
+    color: #FF929B;
+}
+
+@keyframes update-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.update-version-flow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 42px minmax(0, 1fr);
+    align-items: stretch;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.update-version-card {
+    min-width: 0;
+    padding: 15px 16px;
+    border: 1px solid #22344E;
+    border-radius: 14px;
+    background: #0E1828;
+    transition:
+        border-color 0.2s ease,
+        transform 0.2s ease,
+        background 0.2s ease;
+}
+
+.update-version-card > strong {
+    display: block;
+    margin: 5px 0 2px;
+    overflow: hidden;
+    color: var(--text);
+    font-size: 1.18rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.update-version-card small {
+    color: var(--muted);
+}
+
+.update-version-card.is-new {
+    border-color: #3769AF;
+    background: linear-gradient(145deg, rgba(37,99,235,0.14), #0E1828);
+    transform: translateY(-1px);
+}
+
+.update-version-card.is-synced {
+    border-color: #28563A;
+}
+
+.update-flow-arrow {
+    display: grid;
+    place-items: center;
+    color: #6E91C4;
+    font-size: 1.4rem;
+}
+
 .update-progress-shell {
     border-radius: 14px;
     border-color: #28466D;
     background: linear-gradient(145deg, rgba(37,99,235,0.12), rgba(37,99,235,0.03));
+}
+
+.update-progress-bar {
+    background: linear-gradient(90deg, #2563EB, #60A5FA);
+}
+
+.update-stage-row {
+    position: relative;
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease,
+        transform 0.2s ease,
+        opacity 0.2s ease;
+}
+
+.update-stage-row.current {
+    border-color: #416EA8;
+    background: #142640;
+    transform: translateX(3px);
+}
+
+.update-stage-row.done {
+    border-color: #234835;
+    background: #0F211A;
+}
+
+.update-actions {
+    margin-top: 14px;
+}
+
+.update-actions button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 168px;
+}
+
+.update-actions button:disabled {
+    opacity: 0.48;
+    cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+    .update-console .section-title {
+        align-items: stretch;
+    }
+
+    .update-branch-chip {
+        align-self: flex-start;
+    }
+
+    .update-status-card {
+        align-items: flex-start;
+        padding: 15px;
+    }
+
+    .update-state-orb {
+        flex-basis: 44px;
+        width: 44px;
+        height: 44px;
+        border-radius: 13px;
+    }
+
+    .update-version-flow {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .update-flow-arrow {
+        height: 20px;
+        transform: rotate(90deg);
+    }
+
+    .update-actions button {
+        width: 100%;
+        min-width: 0;
+    }
 }
 
 .dashboard-shortcuts {
@@ -2488,21 +2738,45 @@ button:not(.secondary):not(.danger):not(.sidebar-collapse-button) {
 </div>
 </div>
 
-<div class="section-card">
+<div class="section-card update-console">
 <div class="section-title">
+<div>
 <h2>Обновление сервера</h2>
 <span class="section-hint">GitHub → build → tests → restart</span>
 </div>
-
-<div class="kv">
-<div>Ветка</div><div id="update-branch">...</div>
-<div>Локальная версия</div><div id="update-local">...</div>
-<div>GitHub версия</div><div id="update-remote">...</div>
-<div>Состояние</div><div id="update-state">...</div>
+<div class="update-branch-chip">
+<span>Ветка</span>
+<strong id="update-branch" data-i18n-skip>...</strong>
+</div>
 </div>
 
-<div id="update-message" class="muted" style="margin-top:14px">
-Проверка состояния обновлений...
+<div id="update-status-card" class="update-status-card is-checking" aria-live="polite">
+<div id="update-state-orb" class="update-state-orb" aria-hidden="true">↻</div>
+<div class="update-status-copy">
+<span class="update-status-caption">Состояние</span>
+<strong id="update-state">Проверка обновлений</strong>
+<div id="update-message" class="muted">Проверка состояния обновлений...</div>
+</div>
+</div>
+
+<div class="update-version-flow">
+<article id="update-local-card" class="update-version-card is-current">
+<span class="update-version-label">Локальная версия</span>
+<strong id="update-local" data-i18n-skip>...</strong>
+<small><span>Версия</span> <span data-i18n-skip>)HTML"
+            << htmlEscape(
+                context.version
+            )
+            << R"HTML(</span></small>
+</article>
+
+<div class="update-flow-arrow" aria-hidden="true">→</div>
+
+<article id="update-remote-card" class="update-version-card">
+<span class="update-version-label">GitHub версия</span>
+<strong id="update-remote" data-i18n-skip>...</strong>
+<small id="update-remote-note">Проверка обновлений</small>
+</article>
 </div>
 
 <div class="update-progress-shell">
@@ -2542,9 +2816,10 @@ button:not(.secondary):not(.danger):not(.sidebar-collapse-button) {
 </div>
 </div>
 
-<div class="button-row">
+<div class="button-row update-actions">
 <button id="update-check-btn" type="button" class="secondary">
-Проверить обновления
+<span aria-hidden="true">↻</span>
+<span>Проверить обновления</span>
 </button>
 )HTML";
 
@@ -2556,10 +2831,12 @@ button:not(.secondary):not(.danger):not(.sidebar-collapse-button) {
         ) {
             page << R"HTML(
 <button id="update-apply-btn" type="button" disabled>
-Обновить сервер
+<span aria-hidden="true">↓</span>
+<span>Обновить сервер</span>
 </button>
 <button id="update-restart-btn" type="button" class="secondary" disabled>
-Перезапустить сервер
+<span aria-hidden="true">⏻</span>
+<span>Перезапустить сервер</span>
 </button>
 )HTML";
         }
@@ -3210,7 +3487,7 @@ PrivateKey отображается в редакторе и сохраняет�
 <div class="section-card">
 <div class="section-title">
 <h2>Камеры</h2>
-<span class="section-hint">Camera Core 0.0.23</span>
+<span class="section-hint">Camera Core 0.0.24</span>
 </div>
 
 <div class="stats-grid">
@@ -9055,6 +9332,129 @@ function renderUpdateProgress(data) {
     );
 }
 
+function renderUpdateState(data) {
+    const card =
+        document.getElementById(
+            "update-status-card"
+        );
+
+    const state =
+        document.getElementById(
+            "update-state"
+        );
+
+    const orb =
+        document.getElementById(
+            "update-state-orb"
+        );
+
+    const remoteCard =
+        document.getElementById(
+            "update-remote-card"
+        );
+
+    const remoteNote =
+        document.getElementById(
+            "update-remote-note"
+        );
+
+    let label =
+        tr("Проверка обновлений");
+
+    let icon = "↻";
+    let mode = "is-checking";
+
+    if (
+        data.state === "error"
+    ) {
+        label =
+            tr("Ошибка обновления");
+        icon = "!";
+        mode = "is-error";
+    }
+    else if (
+        data.restart_required
+        ||
+        data.state ===
+            "ready_to_restart"
+    ) {
+        label =
+            tr("Требуется перезапуск");
+        icon = "✓";
+        mode = "is-ready";
+    }
+    else if (data.busy) {
+        label =
+            tr("Обновление выполняется");
+        icon = "↻";
+        mode = "is-busy";
+    }
+    else if (
+        data.update_available
+        ||
+        data.state ===
+            "update_available"
+    ) {
+        label =
+            tr("Доступно обновление");
+        icon = "↓";
+        mode = "is-available";
+    }
+    else if (
+        data.state === "up_to_date"
+    ) {
+        label =
+            tr("Обновлений нет");
+        icon = "✓";
+        mode = "is-ready";
+    }
+
+    if (state)
+        state.textContent =
+            label;
+
+    if (orb)
+        orb.textContent =
+            icon;
+
+    if (card) {
+        card.classList.remove(
+            "is-checking",
+            "is-busy",
+            "is-available",
+            "is-ready",
+            "is-error"
+        );
+
+        card.classList.add(
+            mode
+        );
+    }
+
+    if (remoteCard) {
+        remoteCard.classList.toggle(
+            "is-new",
+            Boolean(
+                data.update_available
+            )
+        );
+
+        remoteCard.classList.toggle(
+            "is-synced",
+            (
+                !data.update_available
+                &&
+                data.state ===
+                    "up_to_date"
+            )
+        );
+    }
+
+    if (remoteNote)
+        remoteNote.textContent =
+            label;
+}
+
 async function updateServerUpdateStatus() {
     try {
         const response =
@@ -9136,14 +9536,13 @@ async function updateServerUpdateStatus() {
             );
 
         document.getElementById(
-            "update-state"
-        ).textContent =
-            data.state || "-";
-
-        document.getElementById(
             "update-message"
         ).textContent =
             data.message || "";
+
+        renderUpdateState(
+            data
+        );
 
         renderUpdateProgress(
             data

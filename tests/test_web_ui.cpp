@@ -232,7 +232,7 @@ int main()
         ) == std::string::npos
         ||
         home.find(
-            "Home AI Cloud dashboard redesign 0.0.23"
+            "Home AI Cloud dashboard redesign 0.0.24"
         ) == std::string::npos
     ) {
         std::cerr
@@ -501,7 +501,7 @@ int main()
         ) != std::string::npos
         ||
         cameras.find(
-            "Camera Core 0.0.23"
+            "Camera Core 0.0.24"
         ) == std::string::npos
         ||
         cameras.find(
@@ -617,6 +617,22 @@ int main()
         ||
         system.find(
             "update-progress-bar"
+        ) == std::string::npos
+        ||
+        system.find(
+            "update-status-card"
+        ) == std::string::npos
+        ||
+        system.find(
+            "update-version-flow"
+        ) == std::string::npos
+        ||
+        system.find(
+            "update-remote-card"
+        ) == std::string::npos
+        ||
+        system.find(
+            "renderUpdateState"
         ) == std::string::npos
         ||
         system.find(

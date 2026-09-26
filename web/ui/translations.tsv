@@ -706,3 +706,6 @@ RTSP адрес уже определён по сетевому обнаруже
 Hikvision найдена через SADP. RTSP адрес подготовлен автоматически. Введите логин/пароль и сохраните камеру.	Hikvision was found via SADP. The RTSP address was prepared automatically. Enter the username/password and save the camera.
 Прошивка	Firmware
 S/N	S/N
+Ошибка обновления	Update error
+Проверка обновлений	Checking for updates
+Обновление выполняется	Update in progress
