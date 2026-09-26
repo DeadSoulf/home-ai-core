@@ -41,6 +41,40 @@ int main() {
         check(manager.snapshot(error).machines[0].autostart, "autostart inventory on");
         check(act("autostart-off", "running").success, "disable autostart");
         check(!manager.snapshot(error).machines[0].autostart, "autostart inventory off");
+
+        homeai::VmCreateDraft create_draft;
+        create_draft.name = "too-large";
+        create_draft.vcpus = "9";
+        create_draft.memory_mib = "4096";
+        create_draft.architecture = "x86_64";
+        create_draft.machine_type = "q35";
+        check(manager.createVm(create_draft, "too-large").code == "host_limit_exceeded",
+            "create host limit");
+        check(resources() == 0, "host limit handles leaked");
+
+        create_draft.name = "created-vm";
+        create_draft.vcpus = "2";
+        create_draft.memory_mib = "4096";
+        create_draft.architecture = "x86_64";
+        create_draft.machine_type = "q35";
+        const auto created = manager.createVm(create_draft, "created-vm");
+        check(created.success && created.code == "created" &&
+            created.uuid == "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" &&
+            created.state == "shutoff", "persistent create read-back");
+        const auto created_inventory = manager.snapshot(error);
+        check(std::any_of(created_inventory.machines.begin(), created_inventory.machines.end(),
+            [](const auto& vm) { return vm.name == "created-vm"; }), "created VM inventory");
+        check(manager.createVm(create_draft, "wrong").code == "confirmation_required",
+            "create confirmation");
+        check(manager.createVm(create_draft, "created-vm").code == "duplicate_name",
+            "duplicate VM name");
+        create_draft.name = "failed-vm";
+        failure(5);
+        check(manager.createVm(create_draft, "failed-vm").code == "backend_error",
+            "create backend failure");
+        failure(0);
+        check(resources() == 0, "create handles leaked");
+
         check(act("reboot", "running").success, "reboot");
         check(act("force-off", "running").success, "stop");
         check(act("start", "shutoff").success, "start for graceful completion");
@@ -55,7 +89,7 @@ int main() {
         state(5);
         failure(1);
         check(act("start", "shutoff").code == "permission_denied", "write permission failure");
-        check(manager.snapshot(error).machines.size() == 1, "read-only survives write failure");
+        check(manager.snapshot(error).machines.size() == 2, "read-only survives write failure");
         failure(2);
         check(act("start", "shutoff").code == "backend_error", "backend failure");
         failure(3);
@@ -64,9 +98,15 @@ int main() {
         failure(4);
         check(act("start", "shutoff").code == "not_found", "deleted domain");
         check(resources() == 0, "connection/domain handles leaked");
+        const auto live_capabilities = manager.runtimeCapabilities();
+        check(std::any_of(live_capabilities.begin(), live_capabilities.end(),
+            [](const auto& capability) {
+                return capability.name == "create" && capability.implemented;
+            }), "create capability available");
+
         manager.shutdown();
         check(act("start", "shutoff").code == "unavailable", "stopped module");
-        for (const auto& capability : manager.capabilities()) {
+        for (const auto& capability : manager.runtimeCapabilities()) {
             const bool expected =
                 capability.name == "lifecycle"
                 || capability.name == "pause_resume"

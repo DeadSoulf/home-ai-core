@@ -134,6 +134,28 @@ create a domain, disk, NIC, UUID, NVRAM file or other host resource.
 `delete` remain false. Actual domain definition will be enabled only together with
 host capability checks, read-back verification and storage/network ownership rules.
 
+## 0.0.39 persistent VM creation
+
+Administrators can now submit the same typed definition to
+`POST /api/hypervisor/create` after preview. The server revalidates every field,
+requires `hypervisor.manage`, `X-HomeAI-Request: 1`, and an exact VM-name
+confirmation. The browser never posts libvirt XML.
+
+Creation uses a short-lived writable `qemu:///system` connection and
+`virDomainDefineXML`. Before defining the domain, Home AI Core checks the detected
+host CPU/RAM capacity and rejects duplicate libvirt names. After libvirt accepts the
+definition, the manager reads name, UUID and state back through libvirt before
+reporting success. The new domain is persistent but remains powered off.
+
+This milestone intentionally creates no disks, storage volumes, NICs, networks,
+NVRAM or other host resources, and it does not expose undefine/delete. Starting the
+new VM remains a separate confirmed lifecycle action. Creation symbols are loaded as
+an independent optional backend group so older or restricted libvirt runtimes keep
+inventory and lifecycle support even when `create` is unavailable.
+
+`GET /api/hypervisor` keeps `create_preview: true` and exposes `create: true`
+only when the running libvirt backend provides the required safe-definition symbols.
+
 ## Validation
 
 Build and run `ctest --test-dir build --output-on-failure` on Linux. Lifecycle and
@@ -233,7 +255,7 @@ request header and audit entries.
 
 1. Validate host capability and VM inventory.
 2. VM lifecycle: start, graceful shutdown, reboot, pause/resume, force-off and autostart. (Implemented through 0.0.37)
-3. VM creation/editing with safe libvirt XML generation.
+3. VM creation with safe libvirt XML generation. (Persistent definition implemented in 0.0.39; edit remains planned)
 4. qcow2/raw disks, ISO attachment and Storage Pool integration.
 5. NAT, bridge and isolated virtual networks.
 6. browser console.

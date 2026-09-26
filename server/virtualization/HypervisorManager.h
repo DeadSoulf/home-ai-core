@@ -79,6 +79,15 @@ struct VmCreatePreviewResult {
     std::string xml;
 };
 
+struct VmCreateResult {
+    bool success{false};
+    std::string code;
+    std::string message;
+    std::string name;
+    std::string uuid;
+    std::string state{"unknown"};
+};
+
 // Stable capability names for future resource modules. Unsupported operations
 // must remain disabled until their validation, permissions and backend exist.
 struct HypervisorCapability {
@@ -114,10 +123,13 @@ public:
     VmActionResult performAction(const std::string& uuid,
         const std::string& action, const std::string& expected_state,
         const std::string& confirmation);
+    VmCreateResult createVm(const VmCreateDraft& draft,
+        const std::string& confirmation);
     static VmCreatePreviewResult previewCreate(const VmCreateDraft& draft);
     static bool validUuid(const std::string& uuid);
     static std::vector<std::string> allowedActions(const std::string& state);
     static std::vector<HypervisorCapability> capabilities();
+    std::vector<HypervisorCapability> runtimeCapabilities() const;
 
     std::string healthMessage() const;
 

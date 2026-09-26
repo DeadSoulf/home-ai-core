@@ -1,9 +1,12 @@
 # Hypervisor extension contracts
 
-Version 0.0.34 introduced lifecycle and 0.0.38 adds a non-mutating
-`create_preview` contract. `HypervisorManager::capabilities()` is the central
-registry exposed by GET inventory. `create_preview` is true, while `create`,
-`edit`, `delete`, `snapshots`, `disks`, `networks` and `console` remain false. Unknown lifecycle action names fail
+Version 0.0.34 introduced lifecycle, 0.0.38 added a non-mutating
+`create_preview` contract, and 0.0.39 adds persistent domain definition.
+`HypervisorManager::capabilities()` is the implementation registry while
+`runtimeCapabilities()` masks backend-dependent features for GET inventory.
+`create_preview` is always true; `create` is exposed only when its libvirt
+symbol group is available. `edit`, `delete`, `snapshots`, `disks`,
+`networks` and `console` remain false. Unknown lifecycle action names fail
 closed. Clients must treat absent capability names as false for compatibility.
 Do not flip a flag until its backend, authorization, validation and integration
 tests ship together. Existing inventory field names and the Web UI route stay stable.
@@ -27,7 +30,7 @@ tests ship together. Existing inventory field names and the Web UI route stay st
 
 | Module | Input and validation boundary | Backend and completion contract |
 | --- | --- | --- |
-| Create / Edit | Typed VM definition: name, UUID, architecture, machine type, vCPU count, memory bytes, boot, disk IDs, NIC IDs. 0.0.38 implements the first server-generated XML preview for name/vCPU/memory/architecture/machine type only; it performs no host mutation. Validate host limits and references before enabling actual creation; never accept arbitrary XML from the UI. Edit preview includes configuration revision and live-vs-next-boot scope. | Define with libvirt only in a later capability; read the definition back before reporting success. Keep storage creation rollback explicit. Start remains a separate confirmed action. |
+| Create / Edit | Typed VM definition: name, UUID, architecture, machine type, vCPU count, memory bytes, boot, disk IDs, NIC IDs. 0.0.38 implements server-generated preview; 0.0.39 enables persistent creation for name/vCPU/memory/architecture/machine type only. Raw XML from the UI remains forbidden. Edit preview still requires configuration revision and live-vs-next-boot scope. | 0.0.39 validates host CPU/RAM and duplicate names, defines with `virDomainDefineXML`, then reads name/UUID/state back before success. It creates no storage/network resources and never starts the VM automatically. Storage creation/rollback and edit remain future work. |
 | Delete | UUID, revision, inactive state, explicit confirmation. Preserve disks by default; deleting volumes requires a separate ownership/reference check and confirmation. | Undefine domain configuration only. Handle managed saves, snapshots and NVRAM deliberately; never reuse Force Off as Delete. |
 | Disks / ISO | Storage Pool volume ID, format (qcow2/raw), size and attachment target. Validate quotas, free space, ownership, references and ISO read-only status. Do not accept arbitrary host paths. | Volume operations plus libvirt attachment APIs; report live and persistent configuration independently. Never remove shared volumes. |
 | Networks | Network UUID, NAT/isolated/bridge mode, subnet, DHCP range and bridge ID. Validate conflicts and bridge membership. | libvirt network definitions; coordinate host bridge changes with the existing Network module and its rollback policy. |

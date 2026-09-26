@@ -21,6 +21,7 @@ const {chromium} = require(process.argv[2] || 'playwright');
     let statusMessage = '';
     let releaseAction;
     const createPreviews = [];
+    const creates = [];
 
     const refreshAllowed = () => {
         const auto = autostart ? 'autostart-off' : 'autostart-on';
@@ -49,6 +50,19 @@ const {chromium} = require(process.argv[2] || 'playwright');
                 success: true, code: 'preview_ready',
                 message: 'Validated VM definition preview.',
                 xml: "<domain type='kvm'>\n  <name>" + form.get('name') + "</name>\n</domain>\n"
+            }});
+        }
+
+        if (url.pathname === '/api/hypervisor/create') {
+            const form = new URLSearchParams(route.request().postData());
+            creates.push(form);
+            assert.equal(route.request().headers()['x-homeai-request'], '1');
+            return route.fulfill({status: 201, json: {
+                success: true, code: 'created',
+                message: 'Persistent VM definition created.',
+                name: form.get('name'),
+                uuid: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+                state: 'shutoff'
             }});
         }
 
@@ -89,6 +103,7 @@ const {chromium} = require(process.argv[2] || 'playwright');
                 success: !broken,
                 message: statusMessage || (broken ? 'Inventory failed' : ''),
                 host,
+                capabilities: {create_preview: true, create: true},
                 machines: [{
                     uuid,
                     name: '<VM & test>',
@@ -122,6 +137,19 @@ const {chromium} = require(process.argv[2] || 'playwright');
         assert.equal(createPreviews.length, 1);
         assert.equal(createPreviews[0].get('name'), 'preview-vm');
         assert((await page.locator('#hypervisor-create-preview-xml').innerText()).includes('<name>preview-vm</name>'));
+        assert.equal(await page.getByRole('button', {name: 'Создать VM'}).isVisible(), true);
+
+        page.once('dialog', dialog => dialog.dismiss());
+        await page.getByRole('button', {name: 'Создать VM'}).click();
+        assert.equal(creates.length, 0);
+
+        page.once('dialog', dialog => dialog.accept('preview-vm'));
+        await page.getByRole('button', {name: 'Создать VM'}).click();
+        await page.waitForFunction(() =>
+            document.querySelector('#hypervisor-create-preview-message').textContent.includes('VM создана как постоянная конфигурация'));
+        assert.equal(creates.length, 1);
+        assert.equal(creates[0].get('confirmation'), 'preview-vm');
+        assert.equal(creates[0].get('name'), 'preview-vm');
 
         page.once('dialog', dialog => dialog.dismiss());
         await page.getByRole('button', {name: 'Запустить VM'}).click();

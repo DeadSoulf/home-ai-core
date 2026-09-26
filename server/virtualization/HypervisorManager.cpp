@@ -322,6 +322,8 @@ struct HypervisorManager::Impl {
     bool initialized{false};
     VirConnectOpenReadOnly virConnectOpen{nullptr};
     virDomainPtr (*virDomainLookupByUUIDString)(virConnectPtr, const char*){nullptr};
+    virDomainPtr (*virDomainLookupByName)(virConnectPtr, const char*){nullptr};
+    virDomainPtr (*virDomainDefineXML)(virConnectPtr, const char*){nullptr};
     int (*virDomainCreate)(virDomainPtr){nullptr};
     int (*virDomainShutdown)(virDomainPtr){nullptr};
     int (*virDomainReboot)(virDomainPtr, unsigned int){nullptr};
@@ -333,6 +335,7 @@ struct HypervisorManager::Impl {
     const char* (*virGetLastErrorMessage)(){nullptr};
     bool lifecycle_loaded{false};
     bool extended_lifecycle_loaded{false};
+    bool create_loaded{false};
     struct PendingAction {
         std::string action;
         std::chrono::steady_clock::time_point deadline;
@@ -506,23 +509,33 @@ struct HypervisorManager::Impl {
         }
 
         libvirt_loaded = true;
-        // Optional mutation symbols must never break read-only inventory.
-        lifecycle_loaded =
+        // Mutation feature groups are optional and independent. Missing creation
+        // symbols must not disable inventory or lifecycle, and vice versa.
+        const bool mutation_common =
             symbol("virConnectOpen", virConnectOpen) &&
+            symbol("virGetLastErrorCode", virGetLastErrorCode) &&
+            symbol("virGetLastErrorMessage", virGetLastErrorMessage);
+
+        lifecycle_loaded =
+            mutation_common &&
             symbol("virDomainLookupByUUIDString", virDomainLookupByUUIDString) &&
             symbol("virDomainCreate", virDomainCreate) &&
             symbol("virDomainShutdown", virDomainShutdown) &&
             symbol("virDomainReboot", virDomainReboot) &&
-            symbol("virDomainDestroy", virDomainDestroy) &&
-            symbol("virGetLastErrorCode", virGetLastErrorCode) &&
-            symbol("virGetLastErrorMessage", virGetLastErrorMessage);
+            symbol("virDomainDestroy", virDomainDestroy);
 
-        // Optional lifecycle extensions should not disable the already-supported
-        // start/shutdown/reboot/force-off controls on older libvirt runtimes.
         extended_lifecycle_loaded =
+            lifecycle_loaded &&
             symbol("virDomainSuspend", virDomainSuspend) &&
             symbol("virDomainResume", virDomainResume) &&
             symbol("virDomainSetAutostart", virDomainSetAutostart);
+
+        // 0.0.39 creates only a persistent domain definition. It deliberately
+        // does not load undefine/storage/network APIs.
+        create_loaded =
+            mutation_common &&
+            symbol("virDomainLookupByName", virDomainLookupByName) &&
+            symbol("virDomainDefineXML", virDomainDefineXML);
         return true;
     }
 
@@ -531,6 +544,7 @@ struct HypervisorManager::Impl {
         libvirt_loaded = false;
         lifecycle_loaded = false;
         extended_lifecycle_loaded = false;
+        create_loaded = false;
         pending.clear();
         last_connected = false;
 
@@ -1173,9 +1187,96 @@ VmCreatePreviewResult HypervisorManager::previewCreate(const VmCreateDraft& draf
 std::vector<HypervisorCapability> HypervisorManager::capabilities()
 {
     return {{"lifecycle", true}, {"pause_resume", true}, {"autostart", true},
-        {"create_preview", true}, {"create", false}, {"edit", false},
+        {"create_preview", true}, {"create", true}, {"edit", false},
         {"delete", false}, {"snapshots", false}, {"disks", false},
         {"networks", false}, {"console", false}};
+}
+
+std::vector<HypervisorCapability> HypervisorManager::runtimeCapabilities() const
+{
+    auto result = capabilities();
+    bool create_available = false;
+    if (impl_) {
+        std::lock_guard<std::mutex> lock(impl_->mutex);
+        create_available = impl_->initialized && impl_->create_loaded;
+    }
+    for (auto& capability : result) {
+        if (capability.name == "create")
+            capability.implemented = create_available;
+    }
+    return result;
+}
+
+VmCreateResult HypervisorManager::createVm(const VmCreateDraft& draft,
+    const std::string& confirmation)
+{
+    const auto preview = previewCreate(draft);
+    if (!preview.success)
+        return {false, preview.code, preview.message};
+
+    if (confirmation != preview.name)
+        return {false, "confirmation_required",
+            "Confirm creation by entering the exact VM name.", preview.name};
+
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    if (!impl_->initialized || !impl_->create_loaded)
+        return {false, "unavailable",
+            "Persistent VM creation is unavailable in this libvirt runtime.",
+            preview.name};
+
+    auto* connection = impl_->virConnectOpen("qemu:///system");
+    if (!connection) {
+        auto result = impl_->failure("Unable to open a writable libvirt connection.");
+        if (result.code == "backend_error") result.code = "unavailable";
+        return {false, result.code, result.message, preview.name};
+    }
+    auto close = [this](auto* value) { impl_->virConnectClose(value); };
+    std::unique_ptr<_virConnect, decltype(close)> connection_guard(connection, close);
+
+    VirNodeInfo host{};
+    if (impl_->virNodeGetInfo(connection, &host) < 0) {
+        const auto result = impl_->failure("Unable to read host limits before VM creation.");
+        return {false, result.code, result.message, preview.name};
+    }
+    const std::uint64_t host_memory_bytes =
+        static_cast<std::uint64_t>(host.memory) * 1024ULL;
+    if ((host.cpus && preview.vcpus > host.cpus) ||
+        (host_memory_bytes && preview.memory_bytes > host_memory_bytes)) {
+        return {false, "host_limit_exceeded",
+            "Requested CPU or memory exceeds the detected host capacity.",
+            preview.name};
+    }
+
+    if (auto* existing = impl_->virDomainLookupByName(connection, preview.name.c_str())) {
+        auto release = [this](auto* value) { impl_->virDomainFree(value); };
+        std::unique_ptr<_virDomain, decltype(release)> existing_guard(existing, release);
+        return {false, "duplicate_name",
+            "A libvirt domain with this name already exists.", preview.name};
+    }
+
+    auto* domain = impl_->virDomainDefineXML(connection, preview.xml.c_str());
+    if (!domain) {
+        const auto result = impl_->failure("libvirt rejected the persistent VM definition.");
+        return {false, result.code, result.message, preview.name};
+    }
+    auto release = [this](auto* value) { impl_->virDomainFree(value); };
+    std::unique_ptr<_virDomain, decltype(release)> domain_guard(domain, release);
+
+    const char* observed_name = impl_->virDomainGetName(domain);
+    std::array<char, vir_uuid_string_buflen> uuid{};
+    VirDomainInfo info{};
+    if (!observed_name || preview.name != observed_name ||
+        impl_->virDomainGetUUIDString(domain, uuid.data()) < 0 ||
+        !validUuid(uuid.data()) ||
+        impl_->virDomainGetInfo(domain, &info) < 0) {
+        return {false, "created_unverified",
+            "libvirt defined the VM, but read-back verification failed. Refresh inventory before retrying.",
+            preview.name};
+    }
+
+    return {true, "created",
+        "Persistent VM definition created. The VM was not started and no disk or network was created.",
+        observed_name, uuid.data(), domainStateLabel(info.state)};
 }
 
 VmActionResult HypervisorManager::performAction(const std::string& uuid,

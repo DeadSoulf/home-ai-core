@@ -4896,9 +4896,9 @@ ONVIF используется, если он включён; Hikvision и со�
 <div id="hypervisor-create-preview" class="section-card">
 <div class="section-title">
 <h2>Новая VM</h2>
-<span class="section-hint">0.0.38 PREVIEW</span>
+<span class="section-hint">0.0.39 CREATE</span>
 </div>
-<p class="muted">Предварительная конфигурация проверяет параметры и генерирует безопасный libvirt XML. VM, диски и сети пока не создаются.</p>
+<p class="muted">Сначала проверьте конфигурацию. После успешной проверки можно создать постоянную VM в libvirt. VM не запускается автоматически; диски и сети не создаются.</p>
 <form id="hypervisor-create-preview-form">
 <div class="form-grid">
 <div><label>Имя VM</label><input name="name" required maxlength="63" pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,62}" placeholder="home-ai-vm"></div>
@@ -4907,7 +4907,10 @@ ONVIF используется, если он включён; Hikvision и со�
 <div><label>Архитектура</label><select name="architecture"><option value="x86_64">x86_64</option><option value="aarch64">aarch64</option></select></div>
 <div><label>Тип машины</label><select name="machine_type"><option value="auto">Auto</option><option value="q35">q35</option><option value="pc">pc</option><option value="virt">virt</option></select></div>
 </div>
-<div class="button-row"><button type="submit">Проверить конфигурацию</button></div>
+<div class="button-row">
+<button type="submit">Проверить конфигурацию</button>
+<button id="hypervisor-create-btn" type="button" class="secondary" hidden disabled>Создать VM</button>
+</div>
 </form>
 <p id="hypervisor-create-preview-message" class="muted" role="status" aria-live="polite"></p>
 <pre id="hypervisor-create-preview-xml" class="log-panel" style="display:none;white-space:pre-wrap"></pre>
@@ -4923,7 +4926,7 @@ ONVIF используется, если он включён; Hikvision и со�
 </div>
 
 <div class="placeholder-grid">
-<div class="placeholder-card">Создание, изменение и удаление VM — NEXT</div>
+<div class="placeholder-card">Изменение и удаление VM — NEXT</div>
 <div class="placeholder-card">Диски и ISO — NEXT</div>
 <div class="placeholder-card">Виртуальные сети — NEXT</div>
 <div class="placeholder-card">Snapshots / backup — NEXT</div>
@@ -10179,6 +10182,20 @@ function renderHypervisorSetup(host) {
     panel.appendChild(note);
 }
 
+let hypervisorCreateSupported = false;
+let hypervisorCreatePreviewReady = false;
+let hypervisorCreatePreviewFingerprint = "";
+
+function resetHypervisorCreatePreview() {
+    hypervisorCreatePreviewReady = false;
+    hypervisorCreatePreviewFingerprint = "";
+    const button = document.getElementById("hypervisor-create-btn");
+    if (button) {
+        button.hidden = true;
+        button.disabled = true;
+    }
+}
+
 async function previewHypervisorCreate(event) {
     event.preventDefault();
     const form = document.getElementById("hypervisor-create-preview-form");
@@ -10190,6 +10207,7 @@ async function previewHypervisorCreate(event) {
     for (const [key, value] of new FormData(form).entries())
         body.append(key, String(value));
 
+    resetHypervisorCreatePreview();
     message.textContent = tr("Проверка конфигурации VM…");
     message.className = "muted";
     xml.style.display = "none";
@@ -10209,9 +10227,68 @@ async function previewHypervisorCreate(event) {
         message.className = "status-ok";
         xml.textContent = data.xml || "";
         xml.style.display = data.xml ? "block" : "none";
+        hypervisorCreatePreviewReady = true;
+        hypervisorCreatePreviewFingerprint = body.toString();
+        const createButton = document.getElementById("hypervisor-create-btn");
+        if (createButton && hypervisorCreateSupported) {
+            createButton.hidden = false;
+            createButton.disabled = false;
+        }
     } catch (error) {
         message.textContent = error.message;
         message.className = "status-error";
+    }
+}
+
+async function createHypervisorVm() {
+    const form = document.getElementById("hypervisor-create-preview-form");
+    const message = document.getElementById("hypervisor-create-preview-message");
+    const button = document.getElementById("hypervisor-create-btn");
+    if (!form || !message || !button || !hypervisorCreateSupported ||
+        !hypervisorCreatePreviewReady) return;
+
+    const body = new URLSearchParams();
+    for (const [key, value] of new FormData(form).entries())
+        body.append(key, String(value));
+
+    if (body.toString() !== hypervisorCreatePreviewFingerprint) {
+        resetHypervisorCreatePreview();
+        message.textContent = tr("Конфигурация изменена. Выполните проверку ещё раз.");
+        message.className = "status-warn";
+        return;
+    }
+
+    const name = body.get("name") || "";
+    const answer = window.prompt(
+        tr("Для создания VM введите её имя:") + "\n" + name
+    );
+    if (answer !== name) return;
+
+    body.append("confirmation", name);
+    button.disabled = true;
+    message.textContent = tr("Создание VM…");
+    message.className = "muted";
+
+    try {
+        const response = await fetch("/api/hypervisor/create", {
+            method: "POST",
+            headers: {"Content-Type": "application/x-www-form-urlencoded", "X-HomeAI-Request": "1"},
+            body
+        });
+        if (response.status === 401) { window.location = "/login"; return; }
+        const data = await response.json();
+        if (!response.ok || !data.success)
+            throw new Error(data.message || data.code || String(response.status));
+
+        message.textContent = (data.name || name) + ": " +
+            tr("VM создана как постоянная конфигурация. Она не запущена; диски и сети не создавались.");
+        message.className = "status-ok";
+        resetHypervisorCreatePreview();
+        await updateHypervisor();
+    } catch (error) {
+        message.textContent = error.message;
+        message.className = "status-error";
+        button.disabled = !hypervisorCreatePreviewReady;
     }
 }
 
@@ -10432,6 +10509,15 @@ async function updateHypervisor() {
                 || data.error
                 || tr("Hypervisor Core недоступен.")
             );
+        }
+
+        hypervisorCreateSupported =
+            !!(data.capabilities && data.capabilities.create);
+        const createButton = document.getElementById("hypervisor-create-btn");
+        if (createButton) {
+            const ready = hypervisorCreateSupported && hypervisorCreatePreviewReady;
+            createButton.hidden = !ready;
+            createButton.disabled = !ready;
         }
 
         const host =
@@ -10676,8 +10762,15 @@ document.addEventListener(
         }
 
         const createPreview = document.getElementById("hypervisor-create-preview-form");
-        if (createPreview)
+        if (createPreview) {
             createPreview.addEventListener("submit", previewHypervisorCreate);
+            createPreview.addEventListener("input", resetHypervisorCreatePreview);
+            createPreview.addEventListener("change", resetHypervisorCreatePreview);
+        }
+
+        const createButton = document.getElementById("hypervisor-create-btn");
+        if (createButton)
+            createButton.addEventListener("click", createHypervisorVm);
 
         updateHypervisor();
 

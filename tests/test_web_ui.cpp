@@ -635,6 +635,18 @@ int main()
         ) == std::string::npos
         ||
         hypervisor.find(
+            "id=\"hypervisor-create-btn\""
+        ) == std::string::npos
+        ||
+        hypervisor.find(
+            "/api/hypervisor/create"
+        ) == std::string::npos
+        ||
+        hypervisor.find(
+            "createHypervisorVm"
+        ) == std::string::npos
+        ||
+        hypervisor.find(
             "Виртуальные машины — PLANNED"
         ) != std::string::npos
     ) {

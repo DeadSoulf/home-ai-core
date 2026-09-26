@@ -4040,6 +4040,52 @@ void WebServer::handleClient(
         return;
     }
 
+    if (method == "POST" && path == "/api/hypervisor/create") {
+        auto respond = [&](const std::string& status, const VmCreateResult& result) {
+            sendResponse(client_fd, status, "application/json; charset=utf-8",
+                "{\"success\":" + std::string(result.success ? "true" : "false") +
+                ",\"code\":\"" + jsonEscape(result.code) + "\",\"message\":\"" +
+                jsonEscape(result.message) + "\",\"name\":\"" + jsonEscape(result.name) +
+                "\",\"uuid\":\"" + jsonEscape(result.uuid) + "\",\"state\":\"" +
+                jsonEscape(result.state) + "\"}");
+        };
+        if (!security_.hasPermission(*session, "hypervisor.manage")) {
+            respond("403 Forbidden", {false, "permission_denied",
+                "VM management permission is required."});
+            return;
+        }
+        if (headerValue(headers, "X-HomeAI-Request") != "1") {
+            respond("403 Forbidden", {false, "request_header_required",
+                "Home AI request header is required."});
+            return;
+        }
+        const auto form = parseForm(body);
+        auto field = [&](const char* name) {
+            const auto it = form.find(name);
+            return it == form.end() ? std::string{} : it->second;
+        };
+        VmCreateDraft draft;
+        draft.name = field("name");
+        draft.vcpus = field("vcpus");
+        draft.memory_mib = field("memory_mib");
+        draft.architecture = field("architecture");
+        draft.machine_type = field("machine_type");
+        const auto result = hypervisor_
+            ? hypervisor_->createVm(draft, field("confirmation"))
+            : VmCreateResult{false, "unavailable", "Hypervisor Core is unavailable."};
+        security_.audit("hypervisor.create", session->username,
+            "result=" + result.code);
+        const auto status = result.success ? "201 Created" :
+            result.code == "permission_denied" ? "403 Forbidden" :
+            (result.code == "duplicate_name" || result.code == "host_limit_exceeded")
+                ? "409 Conflict" :
+            result.code == "unavailable" ? "503 Service Unavailable" :
+            (result.code == "backend_error" || result.code == "created_unverified")
+                ? "502 Bad Gateway" : "400 Bad Request";
+        respond(status, result);
+        return;
+    }
+
     if (method == "POST" && path == "/api/hypervisor/action") {
         auto respond = [&](const std::string& status, const VmActionResult& result) {
             sendResponse(client_fd, status, "application/json; charset=utf-8",
@@ -4266,7 +4312,7 @@ void WebServer::handleClient(
 
         json << "],\"capabilities\":{";
         bool first_capability = true;
-        for (const auto& capability : HypervisorManager::capabilities()) {
+        for (const auto& capability : hypervisor_->runtimeCapabilities()) {
             if (!first_capability) json << ',';
             first_capability = false;
             json << '\"' << capability.name << "\":" << (capability.implemented ? "true" : "false");

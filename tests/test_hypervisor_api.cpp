@@ -81,6 +81,26 @@ int main() {
             "name=%3Cbad%3E&vcpus=2&memory_mib=4096&architecture=x86_64&machine_type=q35")
             .find("invalid_name") != std::string::npos, "preview rejects unsafe name");
 
+        const std::string create_path = "/api/hypervisor/create";
+        const std::string create_form = preview_form + "&confirmation=preview-vm";
+        check(request("POST", create_path, "", create_form).find("401 Unauthorized") != std::string::npos, "anonymous create");
+        check(request("POST", create_path, *viewer, create_form).find("403 Forbidden") != std::string::npos, "viewer create");
+        check(request("POST", create_path, *admin, create_form, false).find("403 Forbidden") != std::string::npos, "create request header");
+        check(request("POST", create_path, *admin, preview_form + "&confirmation=wrong")
+            .find("confirmation_required") != std::string::npos, "create confirmation");
+        check(request("POST", create_path, *admin,
+            "name=too-large&vcpus=9&memory_mib=4096&architecture=x86_64&machine_type=q35&confirmation=too-large")
+            .find("409 Conflict") != std::string::npos, "create host limit");
+        const auto create_response = request("POST", create_path, *admin, create_form);
+        check(create_response.find("201 Created") != std::string::npos &&
+            create_response.find("\"code\":\"created\"") != std::string::npos &&
+            create_response.find("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee") != std::string::npos,
+            "persistent create");
+        const auto duplicate_response = request("POST", create_path, *admin, create_form);
+        check(duplicate_response.find("409 Conflict") != std::string::npos &&
+            duplicate_response.find("duplicate_name") != std::string::npos,
+            "duplicate create");
+
         check(request("GET", "/api/hypervisor").find("401 Unauthorized") != std::string::npos, "anonymous inventory");
         check(request("POST", action_path, "", form("start", "shutoff")).find("401 Unauthorized") != std::string::npos, "anonymous mutation");
         check(request("POST", action_path, *viewer, form("start", "shutoff")).find("403 Forbidden") != std::string::npos, "viewer mutation");
@@ -91,7 +111,10 @@ int main() {
         const auto view_only = request("GET", "/api/hypervisor", *viewer);
         check(view_only.find("200 OK") != std::string::npos &&
             view_only.find("\"allowed_actions\":[]") != std::string::npos, "view-only inventory disables actions");
-        check(inventory.find("allowed_actions") != std::string::npos && inventory.find("capabilities") != std::string::npos, "inventory contract");
+        check(inventory.find("allowed_actions") != std::string::npos &&
+            inventory.find("capabilities") != std::string::npos &&
+            inventory.find("\"create\":true") != std::string::npos &&
+            inventory.find("preview-vm") != std::string::npos, "inventory contract");
         check(request("POST", action_path, *admin, form("start", "running")).find("409 Conflict") != std::string::npos, "stale state");
         check(request("POST", action_path, *admin, form("start", "shutoff")).find("202 Accepted") != std::string::npos, "start");
         check(request("POST", action_path, *admin, form("pause", "running")).find("202 Accepted") != std::string::npos, "pause");
@@ -106,6 +129,10 @@ int main() {
         void* fake = dlopen("libvirt.so.0", RTLD_NOW);
         auto failure = reinterpret_cast<void(*)(int)>(dlsym(fake, "fakeFailure"));
         check(failure != nullptr, "isolated fake library");
+        failure(5);
+        check(request("POST", create_path, *admin,
+            "name=backend-fail&vcpus=2&memory_mib=4096&architecture=x86_64&machine_type=q35&confirmation=backend-fail")
+            .find("502 Bad Gateway") != std::string::npos, "create backend failure");
         failure(1);
         check(request("POST", action_path, *admin, form("start", "shutoff")).find("403 Forbidden") != std::string::npos, "libvirt denied");
         failure(2);
@@ -114,7 +141,9 @@ int main() {
         check(request("POST", action_path, *admin, form("start", "shutoff")).find("404 Not Found") != std::string::npos, "missing domain");
         failure(0);
         dlclose(fake);
-        check(request("GET", "/api/users/audit", *admin).find("hypervisor.action") != std::string::npos, "audit trail");
+        const auto audit = request("GET", "/api/users/audit", *admin);
+        check(audit.find("hypervisor.action") != std::string::npos &&
+            audit.find("hypervisor.create") != std::string::npos, "audit trail");
         hypervisor.shutdown();
         check(request("POST", action_path, *admin, form("start", "shutoff")).find("503 Service Unavailable") != std::string::npos, "stopped module");
         server.stop();
