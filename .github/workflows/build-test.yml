@@ -1,0 +1,56 @@
+name: Build and test
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  pull_request:
+    branches:
+      - develop
+      - main
+  workflow_dispatch:
+
+jobs:
+  debian-13:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:trixie-slim
+
+    steps:
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates \
+            git \
+            cmake \
+            ninja-build \
+            g++ \
+            pkg-config \
+            libssl-dev \
+            libsqlite3-dev
+          rm -rf /var/lib/apt/lists/*
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+
+      - name: Build
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --build build
+
+      - name: Test
+        shell: bash
+        run: |
+          set -euo pipefail
+          ctest --test-dir build --output-on-failure
