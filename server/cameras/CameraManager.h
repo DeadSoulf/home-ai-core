@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "server/cameras/CameraMediaTools.h"
+#include "server/cameras/LanCameraDiscovery.h"
 #include "server/cameras/OnvifDiscovery.h"
 #include "server/cameras/OnvifMediaClient.h"
 
@@ -57,6 +58,15 @@ struct CameraResult {
     std::string code;
     std::string message;
     std::int64_t id{0};
+};
+
+struct CameraDiscoveryDevice {
+    std::string address;
+    std::string onvif_xaddr;
+    std::string vendor_hint;
+    std::string suggested_rtsp_url;
+    int rtsp_port{0};
+    bool onvif{false};
 };
 
 class CameraManager {
@@ -118,8 +128,8 @@ public:
         std::int64_t id
     );
 
-    std::vector<OnvifDevice>
-    discoverOnvif(
+    std::vector<CameraDiscoveryDevice>
+    discoverCameras(
         int timeout_ms,
         std::string& error
     ) const;

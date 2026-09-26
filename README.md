@@ -18,7 +18,7 @@ Home AI Core is a local-first autonomous server platform designed for:
 
 ## Current development version
 
-0.0.17 — simplified ONVIF camera discovery list and hidden technical endpoints
+0.0.18 — LAN camera discovery without requiring ONVIF
 
 The repository root `VERSION` file is the single source of the compiled Core version.
 

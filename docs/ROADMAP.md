@@ -20,7 +20,8 @@
 | 0.0.14 | Automatic RTSP discovery from ONVIF Media Profiles | DEVELOPMENT SNAPSHOT |
 | 0.0.15 | ONVIF manufacturer/model/firmware/serial metadata | DEVELOPMENT SNAPSHOT |
 | 0.0.16 | ONVIF PTZ controls + browser Live View preview | DEVELOPMENT SNAPSHOT |
-| 0.0.17 | Simplified ONVIF discovery list and hidden technical endpoints | IN DEVELOPMENT |
+| 0.0.17 | Simplified ONVIF discovery list and hidden technical endpoints | DEVELOPMENT SNAPSHOT |
+| 0.0.18 | LAN camera discovery without requiring ONVIF | IN DEVELOPMENT |
 | next 0.0.x | Recorder + continuous video transport + archive/event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
@@ -244,20 +245,34 @@ Implemented in the 0.0.16 snapshot:
 - on-demand browser Live View preview
 - parallel Web client workers for camera operations
 
-## Current focus: 0.0.17
+## Development snapshot: 0.0.17
 
-Current Camera Core/Web UI work:
+Implemented in the 0.0.17 snapshot:
 
 - compact WS-Discovery camera list
-- only the discovered camera IP/address is shown to the user
-- ONVIF XAddr is retained internally and no longer displayed in the normal camera form
-- discovery scopes, hardware URLs and profile URLs are hidden from the user-facing list
-- existing automatic ONVIF selection and stream detection behavior is preserved
-- camera discovery layout remains responsive on desktop and mobile
-- Web UI tests enforce the simplified discovery presentation
+- only the discovered camera IP/address shown to the user
+- ONVIF XAddr retained internally
+- scopes, hardware URLs and profile URLs hidden from the normal UI
 
-0.0.17 is a presentation cleanup only; Camera Core continues to use the full ONVIF discovery
-metadata internally.
+## Current focus: 0.0.18
+
+Current Camera Core work:
+
+- discovery no longer requires ONVIF
+- bounded local IPv4 scan of up to 254 addresses
+- common camera port probing with short non-blocking connect timeouts
+- Hikvision-compatible detection through service port 8000
+- Dahua-compatible detection through service port 37777
+- NetSurveillance-compatible detection through service port 34567
+- RTSP port detection on 554 / 8554
+- ONVIF and LAN results merged by IP to avoid duplicates
+- common Hikvision main-stream RTSP path suggested automatically
+- normal 80/443-only Web hosts are excluded
+- Web UI keeps the same compact IP-only presentation
+- parser/heuristic tests cover Hikvision discovery behavior
+
+ONVIF remains preferred when available because it supplies authoritative Media Profiles,
+device information and PTZ capabilities. It is no longer an entry requirement for discovery.
 
 ## Later major capabilities
 

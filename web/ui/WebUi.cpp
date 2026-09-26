@@ -2606,7 +2606,7 @@ PrivateKey отображается в редакторе и сохраняет�
 <div class="section-card">
 <div class="section-title">
 <h2>Камеры</h2>
-<span class="section-hint">Camera Core 0.0.17</span>
+<span class="section-hint">Camera Core 0.0.18</span>
 </div>
 
 <div class="stats-grid">
@@ -2634,18 +2634,18 @@ PrivateKey отображается в редакторе и сохраняет�
             page << R"HTML(
 <div class="section-card">
 <div class="section-title">
-<h2>Поиск ONVIF</h2>
+<h2>Поиск камер</h2>
 <button
     id="camera-discover-btn"
     type="button"
     class="secondary">
-Найти ONVIF камеры
+Найти камеры
 </button>
 </div>
 
 <p class="muted">
-Поиск выполняется в локальной сети через WS-Discovery.
-Выберите нужную камеру из списка.
+Поиск выполняется по локальной сети.
+Камеры находятся даже с выключенным ONVIF.
 </p>
 
 <div
@@ -2736,9 +2736,9 @@ PrivateKey отображается в редакторе и сохраняет�
 </label>
 
 <p class="muted">
-Для ONVIF-камер RTSP URL вручную вводить не нужно:
-выберите найденную камеру, укажите логин/пароль и запустите автоопределение.
-Ручной RTSP URL остаётся только как резервный вариант.
+Для найденных камер Home AI Core пытается определить RTSP автоматически.
+ONVIF используется, если он включён; Hikvision и совместимые камеры могут
+обнаруживаться и при выключенном ONVIF.
 </p>
 
 <div class="button-row">
@@ -5586,11 +5586,27 @@ async function autoDetectCameraStream() {
         );
 
     if (!xaddr) {
+        const rtsp =
+            document.getElementById(
+                "camera-rtsp-url"
+            ).value.trim();
+
+        if (rtsp) {
+            if (message) {
+                message.className =
+                    "status-ok";
+                message.textContent =
+                    tr("RTSP адрес уже определён по сетевому обнаружению.");
+            }
+
+            return;
+        }
+
         if (message) {
             message.className =
                 "status-error";
             message.textContent =
-                tr("Сначала найдите и выберите ONVIF камеру.");
+                tr("Для этой камеры ONVIF выключен и RTSP адрес не удалось определить автоматически.");
         }
 
         return;
@@ -6312,7 +6328,7 @@ async function discoverOnvifCameras() {
         button.disabled = true;
 
     message.textContent =
-        tr("Поиск ONVIF камер...");
+        tr("Поиск камер в локальной сети...");
 
     list.replaceChildren();
 
@@ -6344,10 +6360,10 @@ async function discoverOnvifCameras() {
         message.textContent =
             onvifDiscoveryCache.length
             ? (
-                tr("Найдено ONVIF устройств: ")
+                tr("Найдено камер: ")
                 + onvifDiscoveryCache.length
             )
-            : tr("ONVIF устройства не найдены.");
+            : tr("Камеры не найдены.");
 
         for (
             let index = 0;
@@ -6375,7 +6391,7 @@ async function discoverOnvifCameras() {
 
             title.textContent =
                 device.remote_address
-                || tr("ONVIF устройство");
+                || tr("Камера");
 
             title.dataset.i18nSkip = "";
 
@@ -6423,7 +6439,9 @@ async function discoverOnvifCameras() {
                         );
 
                     if (rtsp) {
-                        rtsp.value = "";
+                        rtsp.value =
+                            current.suggested_rtsp_url
+                            || "";
                     }
 
                     onvifProfileCache = [];
@@ -6446,8 +6464,21 @@ async function discoverOnvifCameras() {
                     if (profileMessage) {
                         profileMessage.className =
                             "muted";
-                        profileMessage.textContent =
-                            tr("Введите логин/пароль камеры и нажмите «Определить поток автоматически».");
+
+                        if (current.xaddr) {
+                            profileMessage.textContent =
+                                tr("Введите логин/пароль камеры и нажмите «Определить поток автоматически».");
+                        }
+                        else if (
+                            current.suggested_rtsp_url
+                        ) {
+                            profileMessage.textContent =
+                                tr("ONVIF выключен. RTSP адрес подготовлен автоматически. Введите логин/пароль и сохраните камеру.");
+                        }
+                        else {
+                            profileMessage.textContent =
+                                tr("Камера найдена без ONVIF. Укажите RTSP адрес вручную.");
+                        }
                     }
 
                     if (
@@ -6455,13 +6486,18 @@ async function discoverOnvifCameras() {
                         &&
                         !name.value.trim()
                     ) {
+                        const prefix =
+                            current.vendor_hint
+                            || tr("Камера");
+
                         name.value =
                             current.remote_address
                             ? (
-                                "ONVIF "
+                                prefix
+                                + " "
                                 + current.remote_address
                             )
-                            : tr("ONVIF камера");
+                            : prefix;
                     }
 
                     const form =

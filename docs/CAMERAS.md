@@ -2,7 +2,7 @@
 
 ## Scope
 
-Camera Core 0.0.16 introduces the persistent camera inventory and health layer used by the
+Camera Core 0.0.18 introduces the persistent camera inventory and health layer used by the
 future NVR stack.
 
 0.0.16 adds ONVIF PTZ controls and the first browser Live View implementation on top of the
@@ -175,8 +175,10 @@ The Cameras page provides:
 - add/edit form with automatic ONVIF state kept internally
 - edit without exposing the stored password
 - enable/disable control
-- compact ONVIF WS-Discovery list showing only the camera IP/address
-- technical XAddr and discovery scopes are not shown in the normal Web UI
+- compact camera discovery list showing only the camera IP/address
+- ONVIF WS-Discovery plus a bounded local IPv4 camera-port scan
+- Hikvision-compatible discovery through the normal camera service ports even when ONVIF is disabled
+- technical XAddr, scopes and scanned ports are not shown in the normal Web UI
 - manufacturer, model, firmware version and serial number
 - persistent device metadata on camera cards
 - ONVIF PTZ capability detection from PTZ service + Media Profile
@@ -297,3 +299,42 @@ Starting with 0.0.17, WS-Discovery results are presented as a compact user-facin
 The ONVIF XAddr, scopes and profile URLs remain available internally to Camera Core but are
 not rendered in the discovery list. The XAddr form field is also hidden from the normal camera
 form; selecting a camera stores it automatically.
+
+
+## Discovery without ONVIF
+
+Starting with 0.0.18, ONVIF is no longer required for a camera to appear in discovery.
+
+Camera Core combines:
+
+```text
+ONVIF WS-Discovery
+        +
+local IPv4 camera-port scan
+```
+
+The LAN scanner is bounded to at most 254 addresses around the server's active local IPv4
+network and probes only common camera/service ports:
+
+```text
+554   RTSP
+8554  alternate RTSP
+8000  Hikvision-compatible service
+8899  common alternate ONVIF service
+37777 Dahua-compatible service
+34567 NetSurveillance-compatible service
+80/443 Web service hints
+```
+
+A normal Web server exposing only 80/443 is not classified as a camera.
+
+For a Hikvision-compatible device with RTSP on port 554, Camera Core prepares the common main
+stream path automatically:
+
+```text
+rtsp://CAMERA_IP:554/Streaming/Channels/101
+```
+
+This does not require ONVIF. Username and password remain separate and are still protected by
+Camera Core. If ONVIF is available, ONVIF Media Profiles remain preferred because they provide
+authoritative stream, PTZ and device metadata.

@@ -429,6 +429,18 @@ int main()
         ) == std::string::npos
         ||
         cameras.find(
+            "Найти камеры"
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "выключенным ONVIF"
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "current.suggested_rtsp_url"
+        ) == std::string::npos
+        ||
+        cameras.find(
             "device.scopes"
         ) != std::string::npos
         ||
@@ -437,7 +449,7 @@ int main()
         ) != std::string::npos
         ||
         cameras.find(
-            "Camera Core 0.0.17"
+            "Camera Core 0.0.18"
         ) == std::string::npos
         ||
         cameras.find(

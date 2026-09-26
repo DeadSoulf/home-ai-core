@@ -162,8 +162,10 @@ Current content:
 - local encrypted password storage
 - ONLINE/OFFLINE/disabled network state
 - lightweight RTSP endpoint checks
-- ONVIF WS-Discovery
-- automatic ONVIF Media Profile retrieval
+- combined camera discovery: ONVIF WS-Discovery plus local IPv4 camera-port scan
+- discovery of Hikvision-compatible cameras even when ONVIF is disabled
+- compact discovery list remains IP/address only
+- automatic ONVIF Media Profile retrieval when ONVIF is available
 - ONVIF device information: manufacturer, model, firmware version and serial number
 - persistent camera device metadata shown on camera cards
 - ONVIF PTZ controls for cameras exposing a PTZ profile

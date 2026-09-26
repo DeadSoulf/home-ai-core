@@ -691,3 +691,15 @@ PTZ для этой камеры не настроен.	PTZ is not configured fo
 PTZ не поддерживается или ещё не обнаружен через ONVIF.	PTZ is not supported or has not yet been detected via ONVIF.
 Неизвестная PTZ команда.	Unknown PTZ command.
 Выберите нужную камеру из списка.	Select the camera you want from the list.
+Поиск камер	Camera discovery
+Найти камеры	Find cameras
+Поиск выполняется по локальной сети.	Search runs on the local network.
+Камеры находятся даже с выключенным ONVIF.	Cameras can be found even when ONVIF is disabled.
+Поиск камер в локальной сети...	Searching for cameras on the local network...
+Найдено камер: 	Cameras found: 
+Камеры не найдены.	No cameras found.
+Камера	Camera
+ONVIF выключен. RTSP адрес подготовлен автоматически. Введите логин/пароль и сохраните камеру.	ONVIF is disabled. The RTSP address was prepared automatically. Enter the username/password and save the camera.
+Камера найдена без ONVIF. Укажите RTSP адрес вручную.	Camera found without ONVIF. Enter the RTSP address manually.
+RTSP адрес уже определён по сетевому обнаружению.	RTSP address was already determined by network discovery.
+Для этой камеры ONVIF выключен и RTSP адрес не удалось определить автоматически.	ONVIF is disabled for this camera and the RTSP address could not be determined automatically.

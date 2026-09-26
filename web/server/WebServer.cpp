@@ -3003,7 +3003,7 @@ void WebServer::handleClient(
             std::string error;
 
             const auto devices =
-                cameras_->discoverOnvif(
+                cameras_->discoverCameras(
                     timeout_ms,
                     error
                 );
@@ -3023,7 +3023,7 @@ void WebServer::handleClient(
             }
 
             security_.audit(
-                "camera.onvif.discover",
+                "camera.discover",
                 session->username,
                 "devices=" +
                 std::to_string(
@@ -3048,27 +3048,31 @@ void WebServer::handleClient(
 
                 json
                     << "{"
-                    << "\"endpoint_reference\":\""
+                    << "\"remote_address\":\""
                     << jsonEscape(
-                        device.endpoint_reference
+                        device.address
                     )
                     << "\",\"xaddr\":\""
                     << jsonEscape(
-                        device.xaddr
+                        device.onvif_xaddr
                     )
-                    << "\",\"types\":\""
+                    << "\",\"vendor_hint\":\""
                     << jsonEscape(
-                        device.types
+                        device.vendor_hint
                     )
-                    << "\",\"scopes\":\""
+                    << "\",\"suggested_rtsp_url\":\""
                     << jsonEscape(
-                        device.scopes
+                        device.suggested_rtsp_url
                     )
-                    << "\",\"remote_address\":\""
-                    << jsonEscape(
-                        device.remote_address
+                    << "\",\"rtsp_port\":"
+                    << device.rtsp_port
+                    << ",\"onvif\":"
+                    << (
+                        device.onvif
+                        ? "true"
+                        : "false"
                     )
-                    << "\"}";
+                    << "}";
             }
 
             json << "]}";

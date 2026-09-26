@@ -1,10 +1,12 @@
 #include "server/cameras/CameraMediaTools.h"
+#include "server/cameras/LanCameraDiscovery.h"
 #include "server/cameras/OnvifDiscovery.h"
 #include "server/cameras/OnvifMediaClient.h"
 
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <vector>
 
 int main()
 {
@@ -53,6 +55,53 @@ int main()
     ) {
         std::cerr
             << "ONVIF discovery parser failed\n";
+
+        return 1;
+    }
+
+    const std::vector<int>
+        hikvisionPorts{
+            80,
+            554,
+            8000
+        };
+
+    if (
+        !LanCameraDiscovery::likelyCamera(
+            hikvisionPorts
+        )
+        ||
+        LanCameraDiscovery::vendorHint(
+            hikvisionPorts
+        ) != "Hikvision"
+        ||
+        LanCameraDiscovery::
+            suggestedRtspUrl(
+                "192.0.2.30",
+                "Hikvision",
+                554
+            ) !=
+            "rtsp://192.0.2.30:554/Streaming/Channels/101"
+    ) {
+        std::cerr
+            << "Hikvision LAN discovery heuristics failed\n";
+
+        return 1;
+    }
+
+    const std::vector<int>
+        webOnlyPorts{
+            80,
+            443
+        };
+
+    if (
+        LanCameraDiscovery::likelyCamera(
+            webOnlyPorts
+        )
+    ) {
+        std::cerr
+            << "Generic Web host was misclassified as a camera\n";
 
         return 1;
     }

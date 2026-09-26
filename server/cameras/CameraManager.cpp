@@ -7,13 +7,16 @@
 
 #include <algorithm>
 #include <array>
+#include <arpa/inet.h>
 #include <cctype>
+#include <cstdint>
 #include <cerrno>
 #include <chrono>
 #include <cstring>
 #include <filesystem>
 #include <fcntl.h>
 #include <fstream>
+#include <map>
 #include <mutex>
 #include <netdb.h>
 #include <optional>
@@ -3053,19 +3056,175 @@ CameraManager::snapshot(
     return result;
 }
 
-std::vector<OnvifDevice>
-CameraManager::discoverOnvif(
+std::vector<CameraDiscoveryDevice>
+CameraManager::discoverCameras(
     int timeout_ms,
     std::string& error
 ) const
 {
-    OnvifDiscovery discovery;
+    error.clear();
 
-    return
-        discovery.discover(
+    OnvifDiscovery onvif_discovery;
+    LanCameraDiscovery lan_discovery;
+
+    std::string onvif_error;
+    std::string lan_error;
+
+    const auto onvif_devices =
+        onvif_discovery.discover(
             timeout_ms,
-            error
+            onvif_error
         );
+
+    const auto lan_devices =
+        lan_discovery.discover(
+            90,
+            lan_error
+        );
+
+    std::map<
+        std::string,
+        CameraDiscoveryDevice
+    > merged;
+
+    for (
+        const auto& device :
+        onvif_devices
+    ) {
+        if (
+            device.remote_address.empty()
+        ) {
+            continue;
+        }
+
+        auto& item =
+            merged[
+                device.remote_address
+            ];
+
+        item.address =
+            device.remote_address;
+        item.onvif_xaddr =
+            device.xaddr;
+        item.onvif = true;
+    }
+
+    for (
+        const auto& device :
+        lan_devices
+    ) {
+        if (device.address.empty())
+            continue;
+
+        auto& item =
+            merged[
+                device.address
+            ];
+
+        item.address =
+            device.address;
+
+        if (
+            item.vendor_hint.empty()
+        ) {
+            item.vendor_hint =
+                device.vendor_hint;
+        }
+
+        if (
+            item.rtsp_port == 0
+        ) {
+            item.rtsp_port =
+                device.rtsp_port;
+        }
+
+        if (
+            item.suggested_rtsp_url.empty()
+        ) {
+            item.suggested_rtsp_url =
+                LanCameraDiscovery::
+                    suggestedRtspUrl(
+                        device.address,
+                        device.vendor_hint,
+                        device.rtsp_port
+                    );
+        }
+    }
+
+    std::vector<CameraDiscoveryDevice>
+        result;
+
+    result.reserve(
+        merged.size()
+    );
+
+    for (
+        auto& [address, device] :
+        merged
+    ) {
+        (void)address;
+
+        result.push_back(
+            std::move(device)
+        );
+    }
+
+    auto ipv4_number =
+        [](
+            const std::string& address
+        ) -> std::uint32_t {
+            in_addr value{};
+
+            if (
+                ::inet_pton(
+                    AF_INET,
+                    address.c_str(),
+                    &value
+                ) != 1
+            ) {
+                return 0;
+            }
+
+            return
+                ntohl(
+                    value.s_addr
+                );
+        };
+
+    std::sort(
+        result.begin(),
+        result.end(),
+        [&](
+            const CameraDiscoveryDevice& left,
+            const CameraDiscoveryDevice& right
+        ) {
+            return
+                ipv4_number(
+                    left.address
+                )
+                <
+                ipv4_number(
+                    right.address
+                );
+        }
+    );
+
+    if (
+        result.empty()
+        &&
+        !onvif_error.empty()
+        &&
+        !lan_error.empty()
+    ) {
+        error =
+            onvif_error
+            +
+            " "
+            +
+            lan_error;
+    }
+
+    return result;
 }
 
 OnvifMediaResult
