@@ -70,11 +70,15 @@ void navLink(
         )
         << "\" href=\""
         << target
+        << "\" aria-label=\""
+        << htmlEscape(label)
+        << "\" title=\""
+        << htmlEscape(label)
         << "\">"
         << "<span class=\"nav-icon\">"
         << icon
         << "</span>"
-        << "<span>"
+        << "<span class=\"nav-label\">"
         << htmlEscape(label)
         << "</span>"
         << "</a>";
@@ -1473,7 +1477,7 @@ button:disabled {
     }
 }
 
-/* Home AI Cloud dashboard redesign 0.0.22 */
+/* Home AI Cloud dashboard redesign 0.0.23 */
 :root {
     --bg: #0B1220;
     --sidebar: rgba(8, 14, 25, 0.94);
@@ -1487,6 +1491,8 @@ button:disabled {
     --ok: #22C55E;
     --warn: #F59E0B;
     --danger: #EF4444;
+    --sidebar-width: 264px;
+    --sidebar-collapsed-width: 92px;
 }
 
 html,
@@ -1498,11 +1504,14 @@ body {
 }
 
 .sidebar {
-    width: 264px;
+    width: var(--sidebar-width);
     padding: 22px 16px;
     background: var(--sidebar);
     border-right: 1px solid var(--border);
     backdrop-filter: blur(16px);
+    transition:
+        width 0.2s ease,
+        padding 0.2s ease;
 }
 
 .brand {
@@ -1529,6 +1538,28 @@ body {
 
 .brand-text small {
     font-size: 0.74rem;
+}
+
+.sidebar-collapse-button {
+    flex: 0 0 30px;
+    width: 30px;
+    height: 30px;
+    margin-left: auto;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border: 1px solid #2A3B56;
+    border-radius: 10px;
+    background: #111D30;
+    color: #AFC4DC;
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.sidebar-collapse-button:hover {
+    background: #16243A;
+    color: white;
 }
 
 .nav-group {
@@ -1578,8 +1609,87 @@ body {
     background: rgba(255,255,255,0.025);
 }
 
+.sidebar-user-icon {
+    display: none;
+}
+
 .content {
-    margin-left: 264px;
+    margin-left: var(--sidebar-width);
+    transition: margin-left 0.2s ease;
+}
+
+@media (min-width: 861px) {
+    body.sidebar-collapsed .sidebar {
+        width: var(--sidebar-collapsed-width);
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    body.sidebar-collapsed .content {
+        margin-left: var(--sidebar-collapsed-width);
+    }
+
+    body.sidebar-collapsed .brand {
+        justify-content: center;
+        gap: 6px;
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    body.sidebar-collapsed .brand-text,
+    body.sidebar-collapsed .nav-label,
+    body.sidebar-collapsed .sidebar-user-info,
+    body.sidebar-collapsed .sidebar-user-label {
+        display: none;
+    }
+
+    body.sidebar-collapsed .sidebar-collapse-button {
+        margin-left: 0;
+    }
+
+    body.sidebar-collapsed .nav-group {
+        margin-top: 8px;
+    }
+
+    body.sidebar-collapsed .nav-caption {
+        height: 1px;
+        margin: 12px 8px;
+        padding: 0;
+        overflow: hidden;
+        background: var(--border);
+        color: transparent;
+        font-size: 0;
+    }
+
+    body.sidebar-collapsed .nav-link {
+        justify-content: center;
+        gap: 0;
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    body.sidebar-collapsed .nav-icon {
+        width: 22px;
+        font-size: 1.08rem;
+    }
+
+    body.sidebar-collapsed .sidebar-user {
+        padding: 8px;
+    }
+
+    body.sidebar-collapsed .sidebar-user form {
+        margin: 0;
+    }
+
+    body.sidebar-collapsed .sidebar-user button {
+        min-height: 40px;
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    body.sidebar-collapsed .sidebar-user-icon {
+        display: inline;
+    }
 }
 
 .topbar {
@@ -1662,7 +1772,7 @@ button,
     border-radius: 12px;
 }
 
-button:not(.secondary):not(.danger) {
+button:not(.secondary):not(.danger):not(.sidebar-collapse-button) {
     background: #2563EB;
     color: white;
 }
@@ -1746,6 +1856,10 @@ button:not(.secondary):not(.danger) {
 }
 
 @media (max-width: 860px) {
+    .sidebar-collapse-button {
+        display: none;
+    }
+
     .sidebar {
         width: min(86vw, 320px);
         padding:
@@ -1864,7 +1978,9 @@ button:not(.secondary):not(.danger) {
         << htmlEscape(
             context.version
         )
-        << "</small></div></div>";
+        << "</small></div>"
+        << "<button id=\"sidebar-collapse-button\" class=\"sidebar-collapse-button\" type=\"button\" aria-controls=\"sidebar-navigation\" aria-expanded=\"true\" aria-label=\"Свернуть меню\" title=\"Свернуть меню\">‹</button>"
+        << "</div>";
 
     page << "<nav>";
 
@@ -2165,7 +2281,7 @@ button:not(.secondary):not(.danger) {
 
     page
         << "<div class=\"sidebar-user\">"
-        << "<div><strong>"
+        << "<div class=\"sidebar-user-info\"><strong>"
         << "<span data-i18n-skip>" << htmlEscape(context.username) << "</span>"
         << "</strong><small>"
         << htmlEscape(
@@ -2175,7 +2291,7 @@ button:not(.secondary):not(.danger) {
         )
         << "</small></div>"
         << "<form method=\"POST\" action=\"/logout\">"
-        << "<button type=\"submit\" class=\"secondary\">Выйти</button>"
+        << "<button type=\"submit\" class=\"secondary\" aria-label=\"Выйти\" title=\"Выйти\"><span class=\"sidebar-user-icon\" aria-hidden=\"true\">⇥</span><span class=\"sidebar-user-label\">Выйти</span></button>"
         << "</form></div>";
 
     page << R"HTML(
@@ -3094,7 +3210,7 @@ PrivateKey отображается в редакторе и сохраняет�
 <div class="section-card">
 <div class="section-title">
 <h2>Камеры</h2>
-<span class="section-hint">Camera Core 0.0.22</span>
+<span class="section-hint">Camera Core 0.0.23</span>
 </div>
 
 <div class="stats-grid">
@@ -3707,6 +3823,101 @@ ONVIF используется, если он включён; Hikvision и со�
 
 <script>
 
+const sidebarPreferenceKey =
+    "home-ai.sidebar-collapsed";
+
+function readSidebarCollapsedPreference() {
+    try {
+        return (
+            window.localStorage.getItem(
+                sidebarPreferenceKey
+            ) === "1"
+        );
+    }
+    catch (error) {
+        return false;
+    }
+}
+
+function setDesktopSidebarCollapsed(
+    collapsed,
+    persist
+) {
+    const desktop =
+        window.matchMedia(
+            "(min-width: 861px)"
+        ).matches;
+
+    const effective =
+        desktop
+        &&
+        collapsed;
+
+    document.body.classList.toggle(
+        "sidebar-collapsed",
+        effective
+    );
+
+    const button =
+        document.getElementById(
+            "sidebar-collapse-button"
+        );
+
+    if (button) {
+        const english =
+            document.documentElement.lang ===
+            "en";
+
+        const label =
+            effective
+            ? (
+                english
+                ? "Expand menu"
+                : "Развернуть меню"
+            )
+            : (
+                english
+                ? "Collapse menu"
+                : "Свернуть меню"
+            );
+
+        button.setAttribute(
+            "aria-expanded",
+            effective
+                ? "false"
+                : "true"
+        );
+
+        button.setAttribute(
+            "aria-label",
+            label
+        );
+
+        button.setAttribute(
+            "title",
+            label
+        );
+
+        button.textContent =
+            effective
+                ? "›"
+                : "‹";
+    }
+
+    if (persist) {
+        try {
+            window.localStorage.setItem(
+                sidebarPreferenceKey,
+                collapsed
+                    ? "1"
+                    : "0"
+            );
+        }
+        catch (error) {
+        }
+    }
+}
+
 function setMobileMenuOpen(open) {
     const button =
         document.getElementById(
@@ -3821,7 +4032,17 @@ document.addEventListener(
                 "sidebar-navigation"
             );
 
+        const collapseButton =
+            document.getElementById(
+                "sidebar-collapse-button"
+            );
+
         setMobileMenuOpen(
+            false
+        );
+
+        setDesktopSidebarCollapsed(
+            readSidebarCollapsedPreference(),
             false
         );
 
@@ -3833,6 +4054,20 @@ document.addEventListener(
                         !document.body.classList.contains(
                             "mobile-menu-open"
                         )
+                    );
+                }
+            );
+        }
+
+        if (collapseButton) {
+            collapseButton.addEventListener(
+                "click",
+                function() {
+                    setDesktopSidebarCollapsed(
+                        !document.body.classList.contains(
+                            "sidebar-collapsed"
+                        ),
+                        true
                     );
                 }
             );
@@ -3893,24 +4128,29 @@ document.addEventListener(
                 "(min-width: 861px)"
             );
 
-        const closeOnDesktop =
+        const syncSidebarLayout =
             function(event) {
-                if (event.matches) {
-                    setMobileMenuOpen(
-                        false
-                    );
-                }
+                setMobileMenuOpen(
+                    false
+                );
+
+                setDesktopSidebarCollapsed(
+                    event.matches
+                        ? readSidebarCollapsedPreference()
+                        : false,
+                    false
+                );
             };
 
         if (media.addEventListener) {
             media.addEventListener(
                 "change",
-                closeOnDesktop
+                syncSidebarLayout
             );
         }
         else if (media.addListener) {
             media.addListener(
-                closeOnDesktop
+                syncSidebarLayout
             );
         }
     }
