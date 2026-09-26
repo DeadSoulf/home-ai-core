@@ -67,6 +67,18 @@ int main() {
         auto form = [&](std::string action, std::string state) {
             return "uuid=" + uuid + "&confirmation=" + uuid + "&action=" + action + "&expected_state=" + state;
         };
+        const std::string storage_preview_path = "/api/hypervisor/storage/preview";
+        check(request("POST", storage_preview_path, "", "size_gib=32").find("401 Unauthorized") != std::string::npos,
+            "anonymous disk placement preview");
+        check(request("POST", storage_preview_path, *viewer, "size_gib=32").find("403 Forbidden") != std::string::npos,
+            "viewer disk placement preview");
+        check(request("POST", storage_preview_path, *admin, "size_gib=32", false).find("403 Forbidden") != std::string::npos,
+            "disk placement request header");
+        check(request("POST", storage_preview_path, *admin, "size_gib=0").find("invalid_size") != std::string::npos,
+            "disk placement size validation");
+        check(request("POST", storage_preview_path, *admin, "size_gib=32").find("no_vm_storage") != std::string::npos,
+            "disk placement requires VM pool");
+
         const std::string preview_path = "/api/hypervisor/create/preview";
         const std::string preview_form = "name=preview-vm&vcpus=2&memory_mib=4096&architecture=x86_64&machine_type=q35";
         check(request("POST", preview_path, "", preview_form).find("401 Unauthorized") != std::string::npos, "anonymous create preview");

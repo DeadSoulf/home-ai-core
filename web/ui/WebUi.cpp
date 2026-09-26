@@ -3967,6 +3967,129 @@ PrivateKey отображается в редакторе и сохраняет�
 )HTML";
         }
 
+        if (
+            uiHasPermission(
+                context,
+                "storage.manage"
+            )
+        ) {
+            page << R"HTML(
+<div class="section-card">
+<div class="section-title">
+<h2>VM Storage Pool</h2>
+<span class="section-hint">0.0.40</span>
+</div>
+<form method="POST" action="/api/config">
+<input type="hidden" name="return_to" value="/storage">
+
+<div class="form-grid">
+<div>
+<label>Стратегия VM</label>
+<select name="storage.vm_policy">
+<option value="most_free")HTML";
+
+            page
+                << (
+                    context.storage_vm_policy ==
+                        "most_free"
+                    ? " selected"
+                    : ""
+                )
+                << R"HTML(>Больше всего свободного места</option>
+<option value="sequential")HTML";
+
+            page
+                << (
+                    context.storage_vm_policy ==
+                        "sequential"
+                    ? " selected"
+                    : ""
+                )
+                << R"HTML(>Заполнять диски по очереди</option>
+<option value="balanced")HTML";
+
+            page
+                << (
+                    context.storage_vm_policy ==
+                        "balanced"
+                    ? " selected"
+                    : ""
+                )
+                << R"HTML(>Равномерная загрузка</option>
+<option value="pinned")HTML";
+
+            page
+                << (
+                    context.storage_vm_policy ==
+                        "pinned"
+                    ? " selected"
+                    : ""
+                )
+                << R"HTML(>Закрепление за диском</option>
+</select>
+</div>
+
+<div>
+<label>Резерв VM, %</label>
+<input
+    type="number"
+    min="0"
+    max="95"
+    name="storage.vm_reserve_percent"
+    value=")HTML";
+
+            page
+                << htmlEscape(
+                    context.storage_vm_reserve_percent
+                )
+                << R"HTML(">
+</div>
+
+<div>
+<label>Резерв VM, GB</label>
+<input
+    type="number"
+    min="0"
+    name="storage.vm_reserve_gb"
+    value=")HTML";
+
+            page
+                << htmlEscape(
+                    context.storage_vm_reserve_gb
+                )
+                << R"HTML(">
+</div>
+
+<div>
+<label>Закреплённый диск для VM</label>
+<select
+    id="storage-vm-pinned"
+    name="storage.vm_pinned_mount"
+    data-selected=")HTML";
+
+            page
+                << htmlEscape(
+                    context.storage_vm_pinned_mount
+                )
+                << R"HTML(">
+<option value="">Автоматически</option>
+</select>
+</div>
+</div>
+
+<p class="muted">
+VM-пул использует только диски, которым назначена роль VM. Резерв
+не расходуется при выборе места для будущих виртуальных дисков.
+</p>
+
+<div class="button-row">
+<button type="submit">Сохранить настройки VM-пула</button>
+</div>
+</form>
+</div>
+)HTML";
+        }
+
         page << R"HTML(
 <div id="disk-menu-overlay" class="disk-menu-overlay">
 <div class="disk-menu-panel">
@@ -3994,6 +4117,10 @@ PrivateKey отображается в редакторе и сохраняет�
 <label>
 <input id="disk-role-personal" type="checkbox" style="width:auto;margin-right:8px">
 Использовать для домашних файлов
+</label>
+<label>
+<input id="disk-role-vm" type="checkbox" style="width:auto;margin-right:8px">
+Использовать для виртуальных машин
 </label>
 </div>
 
@@ -4914,6 +5041,34 @@ ONVIF используется, если он включён; Hikvision и со�
 </form>
 <p id="hypervisor-create-preview-message" class="muted" role="status" aria-live="polite"></p>
 <pre id="hypervisor-create-preview-xml" class="log-panel" style="display:none;white-space:pre-wrap"></pre>
+</div>
+)HTML";
+        }
+
+        if (uiHasPermission(context, "hypervisor.manage")) {
+            page << R"HTML(
+<div id="hypervisor-storage-preview" class="section-card">
+<div class="section-title">
+<h2>Хранилище VM</h2>
+<span class="section-hint">0.0.40 PREVIEW</span>
+</div>
+<p class="muted">
+Выберите размер будущего диска. Home AI Core проверит VM Storage Pool,
+резерв свободного места и выберет том по стабильному UUID. Файл диска
+на этом этапе не создаётся.
+</p>
+<form id="hypervisor-storage-preview-form">
+<div class="form-grid">
+<div>
+<label>Размер диска, GiB</label>
+<input type="number" name="size_gib" min="1" max="65536" value="32" required>
+</div>
+</div>
+<div class="button-row">
+<button type="submit">Проверить размещение</button>
+</div>
+</form>
+<p id="hypervisor-storage-preview-message" class="muted" role="status" aria-live="polite"></p>
 </div>
 )HTML";
         }
@@ -10182,6 +10337,108 @@ function renderHypervisorSetup(host) {
     panel.appendChild(note);
 }
 
+async function previewHypervisorDiskPlacement(event) {
+    event.preventDefault();
+
+    const form =
+        document.getElementById(
+            "hypervisor-storage-preview-form"
+        );
+
+    const message =
+        document.getElementById(
+            "hypervisor-storage-preview-message"
+        );
+
+    if (!form || !message)
+        return;
+
+    const body =
+        new URLSearchParams();
+
+    for (
+        const [key, value]
+        of new FormData(form).entries()
+    ) {
+        body.append(
+            key,
+            String(value)
+        );
+    }
+
+    message.textContent =
+        tr("Проверка размещения диска…");
+    message.className =
+        "muted";
+    delete message.dataset.i18nSkip;
+
+    try {
+        const response =
+            await fetch(
+                "/api/hypervisor/storage/preview",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type":
+                            "application/x-www-form-urlencoded",
+                        "X-HomeAI-Request":
+                            "1"
+                    },
+                    body
+                }
+            );
+
+        if (response.status === 401) {
+            window.location =
+                "/login";
+            return;
+        }
+
+        const data =
+            await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(
+                data.message
+                || data.code
+                || String(response.status)
+            );
+        }
+
+        message.textContent =
+            tr("Размещение доступно")
+            + ": "
+            + tr("том")
+            + " "
+            + data.volume_id
+            + ", "
+            + tr("запрошено")
+            + " "
+            + formatBytes(
+                data.requested_bytes
+            )
+            + ", "
+            + tr("свободно")
+            + " "
+            + formatBytes(
+                data.free_bytes
+            )
+            + ". "
+            + tr("Файл диска не создан.");
+
+        message.className =
+            "status-ok";
+        message.dataset.i18nSkip =
+            "";
+    }
+    catch (error) {
+        message.textContent =
+            error.message;
+        message.className =
+            "status-error";
+    }
+}
+
 let hypervisorCreateSupported = false;
 let hypervisorCreatePreviewReady = false;
 let hypervisorCreatePreviewFingerprint = "";
@@ -10771,6 +11028,18 @@ document.addEventListener(
         const createButton = document.getElementById("hypervisor-create-btn");
         if (createButton)
             createButton.addEventListener("click", createHypervisorVm);
+
+        const storagePreview =
+            document.getElementById(
+                "hypervisor-storage-preview-form"
+            );
+
+        if (storagePreview) {
+            storagePreview.addEventListener(
+                "submit",
+                previewHypervisorDiskPlacement
+            );
+        }
 
         updateHypervisor();
 
@@ -14556,24 +14825,39 @@ async function updateHomeErrors() {
     }
 }
 
+function storageVolumeHasRole(
+    volume,
+    role
+) {
+    return String(
+        volume && volume.role
+        ? volume.role
+        : ""
+    ).split("+").includes(role);
+}
+
 function storageRoleLabel(role) {
-    if (role === "video")
-        return "Видео";
-
-    if (role === "personal")
-        return "Личные файлы";
-
-    if (
-        role ===
-        "video+personal"
-    ) {
-        return "Видео + личные файлы";
-    }
-
     if (role === "system")
-        return "Системный";
+        return tr("Системный");
 
-    return "Не назначен";
+    if (role === "unassigned" || !role)
+        return tr("Не назначен");
+
+    const labels = {
+        video: "Видео",
+        personal: "Личные файлы",
+        vm: "VM"
+    };
+
+    return String(role)
+        .split("+")
+        .map(function(item) {
+            return tr(
+                labels[item]
+                || item
+            );
+        })
+        .join(" + ");
 }
 
 const ignoredStorageDevices =
@@ -14772,18 +15056,16 @@ function updateDiskMenuState(device) {
             "disk-role-personal"
         );
 
+    const vmRole =
+        document.getElementById(
+            "disk-role-vm"
+        );
+
     if (videoRole) {
         videoRole.checked =
-            Boolean(
-                assignedVolume
-                &&
-                (
-                    assignedVolume.role ===
-                        "video"
-                    ||
-                    assignedVolume.role ===
-                        "video+personal"
-                )
+            storageVolumeHasRole(
+                assignedVolume,
+                "video"
             );
 
         videoRole.disabled =
@@ -14798,19 +15080,29 @@ function updateDiskMenuState(device) {
 
     if (personalRole) {
         personalRole.checked =
-            Boolean(
-                assignedVolume
-                &&
-                (
-                    assignedVolume.role ===
-                        "personal"
-                    ||
-                    assignedVolume.role ===
-                        "video+personal"
-                )
+            storageVolumeHasRole(
+                assignedVolume,
+                "personal"
             );
 
         personalRole.disabled =
+            !mounted
+            &&
+            (
+                !candidate
+                ||
+                !canPrivileged
+            );
+    }
+
+    if (vmRole) {
+        vmRole.checked =
+            storageVolumeHasRole(
+                assignedVolume,
+                "vm"
+            );
+
+        vmRole.disabled =
             !mounted
             &&
             (
@@ -14848,6 +15140,11 @@ function updateDiskMenuState(device) {
             device.mount_point
                 .startsWith(
                     "/mnt/home-ai/files/"
+                )
+            ||
+            device.mount_point
+                .startsWith(
+                    "/mnt/home-ai/vm/"
                 )
             ||
             device.mount_point
@@ -15005,6 +15302,11 @@ async function runDiskAction(action) {
                 "disk-role-personal"
             );
 
+        const vmRole =
+            document.getElementById(
+                "disk-role-vm"
+            );
+
         parameters.set(
             "video",
             videoRole &&
@@ -15017,6 +15319,14 @@ async function runDiskAction(action) {
             "personal",
             personalRole &&
             personalRole.checked
+            ? "1"
+            : "0"
+        );
+
+        parameters.set(
+            "vm",
+            vmRole &&
+            vmRole.checked
             ? "1"
             : "0"
         );
@@ -15514,10 +15824,10 @@ function populatePinnedStorageSelects(volumes) {
 
             for (const volume of volumes) {
                 const matches =
-                    volume.role === role
-                    ||
-                    volume.role ===
-                        "video+personal";
+                    storageVolumeHasRole(
+                        volume,
+                        role
+                    );
 
                 if (
                     !matches
@@ -15601,6 +15911,11 @@ function populatePinnedStorageSelects(volumes) {
         "storage-files-pinned",
         "personal"
     );
+
+    populate(
+        "storage-vm-pinned",
+        "vm"
+    );
 }
 
 function renderStoragePools(data) {
@@ -15634,11 +15949,9 @@ function renderStoragePools(data) {
             const matching =
                 volumes.filter(
                     function(volume) {
-                        return (
-                            volume.role === role
-                            ||
-                            volume.role ===
-                                "video+personal"
+                        return storageVolumeHasRole(
+                            volume,
+                            role
                         );
                     }
                 );
@@ -15858,6 +16171,13 @@ function renderStoragePools(data) {
             data.files_policy,
             data.files_target,
             data.files_summary
+        ),
+        renderPool(
+            tr("VM-пул"),
+            "vm",
+            data.vm_policy,
+            data.vm_target,
+            data.vm_summary
         )
     );
 }

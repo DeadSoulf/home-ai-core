@@ -43,6 +43,23 @@ int main()
         unavailable.performAction(uuid, "start", "shutoff", uuid).code != "unavailable")
         return 1;
 
+    const auto capabilities =
+        HypervisorManager::capabilities();
+
+    bool disk_preview = false;
+    bool disks = false;
+
+    for (const auto& capability : capabilities) {
+        if (capability.name == "disk_preview")
+            disk_preview = capability.implemented;
+
+        if (capability.name == "disks")
+            disks = capability.implemented;
+    }
+
+    if (!disk_preview || disks)
+        return 1;
+
     if (
         HypervisorManager::versionToString(
             1002003UL

@@ -9,11 +9,13 @@ int main()
     const auto volumes =
         monitor.snapshot(
             "/mnt/home-ai-video-test",
-            "/mnt/home-ai-files-test"
+            "/mnt/home-ai-files-test",
+            "/mnt/home-ai-vm-test"
         );
 
     bool video_offline = false;
     bool files_offline = false;
+    bool vm_offline = false;
 
     for (const auto& volume : volumes) {
         if (
@@ -37,12 +39,25 @@ int main()
         ) {
             files_offline = true;
         }
+
+        if (
+            volume.mount_point ==
+                "/mnt/home-ai-vm-test"
+            &&
+            volume.role == "vm"
+            &&
+            volume.status == "offline"
+        ) {
+            vm_offline = true;
+        }
     }
 
     if (
         !video_offline
         ||
         !files_offline
+        ||
+        !vm_offline
     ) {
         std::cerr
             << "Configured offline storage was not reported\n";

@@ -49,7 +49,8 @@ class StorageMonitor {
 public:
     std::vector<StorageVolume> snapshot(
         const std::string& video_mounts,
-        const std::string& personal_mounts
+        const std::string& personal_mounts,
+        const std::string& vm_mounts = ""
     ) const;
 
     std::vector<BlockDeviceInfo>
@@ -72,7 +73,8 @@ private:
     static std::string classifyRole(
         const std::string& mount_point,
         const std::vector<std::string>& video_mounts,
-        const std::vector<std::string>& personal_mounts
+        const std::vector<std::string>& personal_mounts,
+        const std::vector<std::string>& vm_mounts
     );
 };
 

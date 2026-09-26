@@ -13,18 +13,34 @@ bool hasRole(
     const std::string& role
 )
 {
-    if (role == "video") {
-        return
-            volume.role == "video"
-            ||
-            volume.role == "video+personal";
-    }
+    if (role.empty())
+        return false;
 
-    if (role == "personal") {
-        return
-            volume.role == "personal"
-            ||
-            volume.role == "video+personal";
+    std::size_t start = 0;
+
+    while (start <= volume.role.size()) {
+        auto end =
+            volume.role.find(
+                '+',
+                start
+            );
+
+        if (end == std::string::npos)
+            end = volume.role.size();
+
+        if (
+            volume.role.substr(
+                start,
+                end - start
+            ) == role
+        ) {
+            return true;
+        }
+
+        if (end == volume.role.size())
+            break;
+
+        start = end + 1;
     }
 
     return false;
@@ -66,7 +82,8 @@ std::uint64_t reserveFor(
 bool eligible(
     const StorageVolume& volume,
     const std::string& role,
-    const StoragePoolOptions& options
+    const StoragePoolOptions& options,
+    std::uint64_t required_bytes
 )
 {
     if (
@@ -84,12 +101,20 @@ bool eligible(
         return false;
     }
 
-    return
-        volume.free_bytes >
+    const auto reserve =
         reserveFor(
             volume,
             options
         );
+
+    if (volume.free_bytes <= reserve)
+        return false;
+
+    return
+        required_bytes == 0
+        ||
+        volume.free_bytes - reserve >=
+            required_bytes;
 }
 
 std::uint64_t usableFree(
@@ -199,7 +224,8 @@ std::optional<StorageVolume>
 StoragePoolSelector::select(
     const std::vector<StorageVolume>& volumes,
     const std::string& role,
-    const StoragePoolOptions& options
+    const StoragePoolOptions& options,
+    std::uint64_t required_bytes
 )
 {
     std::vector<const StorageVolume*>
@@ -210,7 +236,8 @@ StoragePoolSelector::select(
             eligible(
                 volume,
                 role,
-                options
+                options,
+                required_bytes
             )
         ) {
             candidates.push_back(

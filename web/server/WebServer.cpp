@@ -4000,6 +4000,131 @@ void WebServer::handleClient(
         return;
     }
 
+    if (method == "POST" && path == "/api/hypervisor/storage/preview") {
+        auto respond =
+            [&](const std::string& status,
+                bool success,
+                const std::string& code,
+                const std::string& message,
+                const StorageVolume* volume,
+                std::uint64_t requested_bytes,
+                const std::string& policy) {
+                std::ostringstream json;
+                json
+                    << "{\"success\":" << (success ? "true" : "false")
+                    << ",\"code\":\"" << jsonEscape(code)
+                    << "\",\"message\":\"" << jsonEscape(message) << "\"";
+
+                if (volume != nullptr) {
+                    json
+                        << ",\"volume_id\":\"" << jsonEscape(volume->uuid)
+                        << "\",\"filesystem\":\"" << jsonEscape(volume->filesystem)
+                        << "\",\"requested_bytes\":" << requested_bytes
+                        << ",\"free_bytes\":" << volume->free_bytes
+                        << ",\"policy\":\"" << jsonEscape(policy) << "\"";
+                }
+
+                json << "}";
+                sendResponse(client_fd, status, "application/json; charset=utf-8", json.str());
+            };
+
+        if (!security_.hasPermission(*session, "hypervisor.manage")) {
+            respond("403 Forbidden", false, "permission_denied",
+                "VM management permission is required.", nullptr, 0, "");
+            return;
+        }
+
+        if (headerValue(headers, "X-HomeAI-Request") != "1") {
+            respond("403 Forbidden", false, "request_header_required",
+                "Home AI request header is required.", nullptr, 0, "");
+            return;
+        }
+
+        const auto form = parseForm(body);
+        const auto size_it = form.find("size_gib");
+        const auto size_gib =
+            size_it == form.end()
+            ? std::optional<std::int64_t>{}
+            : parseInt64(size_it->second);
+
+        if (!size_gib || *size_gib < 1 || *size_gib > 65536) {
+            security_.audit("hypervisor.disk_preview", session->username, "result=invalid_size");
+            respond("400 Bad Request", false, "invalid_size",
+                "Disk size must be between 1 and 65536 GiB.", nullptr, 0, "");
+            return;
+        }
+
+        const auto requested_bytes =
+            static_cast<std::uint64_t>(*size_gib) *
+            1024ULL * 1024ULL * 1024ULL;
+
+        auto& config = runtime_.config();
+        StorageMonitor monitor;
+        const auto volumes =
+            monitor.snapshot(
+                config.get("storage.video_mounts", ""),
+                config.get("storage.personal_mounts", ""),
+                config.get("storage.vm_mounts", "")
+            );
+
+        StoragePoolOptions options;
+        options.policy =
+            StoragePoolSelector::policyFromString(
+                config.get("storage.vm_policy", "most_free")
+            );
+        options.reserve_percent =
+            config.getInt("storage.vm_reserve_percent", 10);
+        const auto reserve_gib =
+            std::max(0, config.getInt("storage.vm_reserve_gb", 0));
+        options.reserve_bytes =
+            static_cast<std::uint64_t>(reserve_gib) *
+            1024ULL * 1024ULL * 1024ULL;
+        options.preferred_mount =
+            config.get("storage.vm_pinned_mount", "");
+
+        const auto target =
+            StoragePoolSelector::select(
+                volumes,
+                "vm",
+                options,
+                requested_bytes
+            );
+        const auto policy =
+            StoragePoolSelector::policyToString(options.policy);
+
+        if (!target) {
+            security_.audit("hypervisor.disk_preview", session->username, "result=no_vm_storage");
+            respond("409 Conflict", false, "no_vm_storage",
+                "No VM storage volume has enough usable free space.",
+                nullptr, requested_bytes, policy);
+            return;
+        }
+
+        if (target->uuid.empty()) {
+            security_.audit("hypervisor.disk_preview", session->username, "result=unstable_volume_id");
+            respond("409 Conflict", false, "unstable_volume_id",
+                "The selected VM storage volume has no stable filesystem UUID.",
+                nullptr, requested_bytes, policy);
+            return;
+        }
+
+        security_.audit(
+            "hypervisor.disk_preview",
+            session->username,
+            "result=preview_ready volume=" + target->uuid
+        );
+        respond(
+            "200 OK",
+            true,
+            "preview_ready",
+            "VM disk placement is valid. No file was created.",
+            &*target,
+            requested_bytes,
+            policy
+        );
+        return;
+    }
+
     if (method == "POST" && path == "/api/hypervisor/create/preview") {
         if (!security_.hasPermission(*session, "hypervisor.manage")) {
             sendResponse(client_fd, "403 Forbidden", "application/json; charset=utf-8",
@@ -4426,6 +4551,10 @@ void WebServer::handleClient(
                 storage_config.get(
                     "storage.personal_mounts",
                     ""
+                ),
+                storage_config.get(
+                    "storage.vm_mounts",
+                    ""
                 )
             );
 
@@ -4490,6 +4619,11 @@ void WebServer::handleClient(
                 "storage.files"
             );
 
+        const auto vm_options =
+            makePoolOptions(
+                "storage.vm"
+            );
+
         const auto video_target =
             StoragePoolSelector::select(
                 volumes,
@@ -4504,6 +4638,13 @@ void WebServer::handleClient(
                 files_options
             );
 
+        const auto vm_target =
+            StoragePoolSelector::select(
+                volumes,
+                "vm",
+                vm_options
+            );
+
         const auto video_summary =
             StoragePoolSelector::summarize(
                 volumes,
@@ -4514,6 +4655,12 @@ void WebServer::handleClient(
             StoragePoolSelector::summarize(
                 volumes,
                 "personal"
+            );
+
+        const auto vm_summary =
+            StoragePoolSelector::summarize(
+                volumes,
+                "vm"
             );
 
         std::ostringstream json;
@@ -4536,6 +4683,14 @@ void WebServer::handleClient(
                     )
             )
             << "\","
+            << "\"vm_policy\":\""
+            << jsonEscape(
+                StoragePoolSelector::
+                    policyToString(
+                        vm_options.policy
+                    )
+            )
+            << "\","
             << "\"video_target\":\""
             << jsonEscape(
                 video_target
@@ -4547,6 +4702,13 @@ void WebServer::handleClient(
             << jsonEscape(
                 files_target
                 ? files_target->mount_point
+                : ""
+            )
+            << "\","
+            << "\"vm_target\":\""
+            << jsonEscape(
+                vm_target
+                ? vm_target->mount_point
                 : ""
             )
             << "\","
@@ -4578,6 +4740,22 @@ void WebServer::handleClient(
             << ",\"free_bytes_complete\":"
             << (
                 files_summary.free_bytes_complete
+                ? "true"
+                : "false"
+            )
+            << "},"
+            << "\"vm_summary\":{"
+            << "\"assigned_volumes\":"
+            << vm_summary.assigned_volumes
+            << ",\"online_volumes\":"
+            << vm_summary.online_volumes
+            << ",\"total_bytes\":"
+            << vm_summary.total_bytes
+            << ",\"free_bytes\":"
+            << vm_summary.free_bytes
+            << ",\"free_bytes_complete\":"
+            << (
+                vm_summary.free_bytes_complete
                 ? "true"
                 : "false"
             )
@@ -4824,6 +5002,11 @@ void WebServer::handleClient(
             &&
             form.at("personal") == "1";
 
+        const bool use_vm =
+            form.contains("vm")
+            &&
+            form.at("vm") == "1";
+
         StorageMonitor monitor;
 
         const auto devices =
@@ -4897,6 +5080,8 @@ void WebServer::handleClient(
                     !use_video
                     &&
                     !use_personal
+                    &&
+                    !use_vm
                 ) {
                     sendActionResult(
                         {
@@ -4912,7 +5097,11 @@ void WebServer::handleClient(
                 const std::string mount_role =
                     use_video
                     ? "video"
-                    : "personal";
+                    : (
+                        use_personal
+                        ? "personal"
+                        : "vm"
+                    );
 
                 const auto mount_result =
                     role_operations.mount(
@@ -4941,11 +5130,9 @@ void WebServer::handleClient(
             }
 
             if (mount_point.empty()) {
-                if (mounted_by_request) {
-                    role_operations.unmount(
-                        device
-                    );
-                }
+                if (mounted_by_request)
+                    role_operations.unmount(device);
+
                 sendActionResult(
                     {
                         false,
@@ -4953,82 +5140,49 @@ void WebServer::handleClient(
                         "Не удалось определить точку монтирования диска."
                     }
                 );
-
                 return;
             }
 
             const auto video_key =
                 "storage.video_mounts";
-
             const auto personal_key =
                 "storage.personal_mounts";
+            const auto vm_key =
+                "storage.vm_mounts";
 
             const auto previous_video =
-                config.get(
-                    video_key,
-                    ""
-                );
-
+                config.get(video_key, "");
             const auto previous_personal =
-                config.get(
-                    personal_key,
-                    ""
-                );
+                config.get(personal_key, "");
+            const auto previous_vm =
+                config.get(vm_key, "");
 
             config.set(
                 video_key,
                 use_video
-                ? addCsvValue(
-                    config.get(
-                        video_key,
-                        ""
-                    ),
-                    mount_point
-                )
-                : removeCsvValue(
-                    config.get(
-                        video_key,
-                        ""
-                    ),
-                    mount_point
-                )
+                ? addCsvValue(config.get(video_key, ""), mount_point)
+                : removeCsvValue(config.get(video_key, ""), mount_point)
             );
-
             config.set(
                 personal_key,
                 use_personal
-                ? addCsvValue(
-                    config.get(
-                        personal_key,
-                        ""
-                    ),
-                    mount_point
-                )
-                : removeCsvValue(
-                    config.get(
-                        personal_key,
-                        ""
-                    ),
-                    mount_point
-                )
+                ? addCsvValue(config.get(personal_key, ""), mount_point)
+                : removeCsvValue(config.get(personal_key, ""), mount_point)
+            );
+            config.set(
+                vm_key,
+                use_vm
+                ? addCsvValue(config.get(vm_key, ""), mount_point)
+                : removeCsvValue(config.get(vm_key, ""), mount_point)
             );
 
             if (!config.save()) {
-                config.set(
-                    video_key,
-                    previous_video
-                );
+                config.set(video_key, previous_video);
+                config.set(personal_key, previous_personal);
+                config.set(vm_key, previous_vm);
 
-                config.set(
-                    personal_key,
-                    previous_personal
-                );
-
-                if (mounted_by_request) {
-                    role_operations.unmount(
-                        device
-                    );
-                }
+                if (mounted_by_request)
+                    role_operations.unmount(device);
 
                 sendActionResult(
                     {
@@ -5037,43 +5191,29 @@ void WebServer::handleClient(
                         "Не удалось сохранить назначение диска."
                     }
                 );
-
                 return;
             }
 
             security_.audit(
                 "storage.roles",
                 session->username,
-                "device=" +
-                device +
-                " uuid=" +
-                info->uuid +
-                " mount=" +
-                mount_point +
-                " video=" +
-                (
-                    use_video
-                    ? "1"
-                    : "0"
-                ) +
-                " files=" +
-                (
-                    use_personal
-                    ? "1"
-                    : "0"
-                )
+                "device=" + device +
+                " uuid=" + info->uuid +
+                " mount=" + mount_point +
+                " video=" + (use_video ? "1" : "0") +
+                " files=" + (use_personal ? "1" : "0") +
+                " vm=" + (use_vm ? "1" : "0")
             );
 
             sendActionResult(
                 {
                     true,
                     "ok",
-                    use_video || use_personal
+                    use_video || use_personal || use_vm
                     ? "Назначение диска обновлено."
                     : "Назначение Home AI Core снято."
                 }
             );
-
             return;
         }
 
@@ -6612,6 +6752,14 @@ void WebServer::handleClient(
                 )
             ) +
             "\","
+            "\"storage.vm_mounts\":\"" +
+            jsonEscape(
+                config.get(
+                    "storage.vm_mounts",
+                    ""
+                )
+            ) +
+            "\","
             "\"storage.video_policy\":\"" +
             jsonEscape(
                 config.get(
@@ -6624,6 +6772,14 @@ void WebServer::handleClient(
             jsonEscape(
                 config.get(
                     "storage.files_policy",
+                    "most_free"
+                )
+            ) +
+            "\","
+            "\"storage.vm_policy\":\"" +
+            jsonEscape(
+                config.get(
+                    "storage.vm_policy",
                     "most_free"
                 )
             ) +
@@ -6644,6 +6800,14 @@ void WebServer::handleClient(
                 )
             ) +
             "\","
+            "\"storage.vm_reserve_percent\":\"" +
+            jsonEscape(
+                config.get(
+                    "storage.vm_reserve_percent",
+                    "10"
+                )
+            ) +
+            "\","
             "\"storage.video_reserve_gb\":\"" +
             jsonEscape(
                 config.get(
@@ -6660,6 +6824,14 @@ void WebServer::handleClient(
                 )
             ) +
             "\","
+            "\"storage.vm_reserve_gb\":\"" +
+            jsonEscape(
+                config.get(
+                    "storage.vm_reserve_gb",
+                    "0"
+                )
+            ) +
+            "\","
             "\"storage.video_pinned_mount\":\"" +
             jsonEscape(
                 config.get(
@@ -6672,6 +6844,14 @@ void WebServer::handleClient(
             jsonEscape(
                 config.get(
                     "storage.files_pinned_mount",
+                    ""
+                )
+            ) +
+            "\","
+            "\"storage.vm_pinned_mount\":\"" +
+            jsonEscape(
+                config.get(
+                    "storage.vm_pinned_mount",
                     ""
                 )
             ) +
@@ -6820,21 +7000,31 @@ void WebServer::handleClient(
                     ||
                     key == "storage.personal_mounts"
                     ||
+                    key == "storage.vm_mounts"
+                    ||
                     key == "storage.video_policy"
                     ||
                     key == "storage.files_policy"
+                    ||
+                    key == "storage.vm_policy"
                     ||
                     key == "storage.video_reserve_percent"
                     ||
                     key == "storage.files_reserve_percent"
                     ||
+                    key == "storage.vm_reserve_percent"
+                    ||
                     key == "storage.video_reserve_gb"
                     ||
                     key == "storage.files_reserve_gb"
                     ||
+                    key == "storage.vm_reserve_gb"
+                    ||
                     key == "storage.video_pinned_mount"
                     ||
                     key == "storage.files_pinned_mount"
+                    ||
+                    key == "storage.vm_pinned_mount"
                 ) {
                     return
                         security_.hasPermission(
@@ -6890,14 +7080,19 @@ void WebServer::handleClient(
             "web.port",
             "storage.video_mounts",
             "storage.personal_mounts",
+            "storage.vm_mounts",
             "storage.video_policy",
             "storage.files_policy",
+            "storage.vm_policy",
             "storage.video_reserve_percent",
             "storage.files_reserve_percent",
+            "storage.vm_reserve_percent",
             "storage.video_reserve_gb",
             "storage.files_reserve_gb",
+            "storage.vm_reserve_gb",
             "storage.video_pinned_mount",
             "storage.files_pinned_mount",
+            "storage.vm_pinned_mount",
             "cluster.enabled",
             "cluster.role",
             "cluster.node_id",
@@ -7057,6 +7252,12 @@ void WebServer::handleClient(
                 ""
             );
 
+        context.storage_vm_mounts =
+            config.get(
+                "storage.vm_mounts",
+                ""
+            );
+
         context.storage_video_policy =
             config.get(
                 "storage.video_policy",
@@ -7066,6 +7267,12 @@ void WebServer::handleClient(
         context.storage_files_policy =
             config.get(
                 "storage.files_policy",
+                "most_free"
+            );
+
+        context.storage_vm_policy =
+            config.get(
+                "storage.vm_policy",
                 "most_free"
             );
 
@@ -7081,6 +7288,12 @@ void WebServer::handleClient(
                 "10"
             );
 
+        context.storage_vm_reserve_percent =
+            config.get(
+                "storage.vm_reserve_percent",
+                "10"
+            );
+
         context.storage_video_reserve_gb =
             config.get(
                 "storage.video_reserve_gb",
@@ -7093,6 +7306,12 @@ void WebServer::handleClient(
                 "0"
             );
 
+        context.storage_vm_reserve_gb =
+            config.get(
+                "storage.vm_reserve_gb",
+                "0"
+            );
+
         context.storage_video_pinned_mount =
             config.get(
                 "storage.video_pinned_mount",
@@ -7102,6 +7321,12 @@ void WebServer::handleClient(
         context.storage_files_pinned_mount =
             config.get(
                 "storage.files_pinned_mount",
+                ""
+            );
+
+        context.storage_vm_pinned_mount =
+            config.get(
+                "storage.vm_pinned_mount",
                 ""
             );
 

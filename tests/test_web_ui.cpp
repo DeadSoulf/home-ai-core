@@ -273,6 +273,18 @@ int main()
         ) == std::string::npos
         ||
         storage.find(
+            "Использовать для виртуальных машин"
+        ) == std::string::npos
+        ||
+        storage.find(
+            "storage.vm_policy"
+        ) == std::string::npos
+        ||
+        storage.find(
+            "storage-vm-pinned"
+        ) == std::string::npos
+        ||
+        storage.find(
             "storage-pools"
         ) == std::string::npos
         ||
@@ -644,6 +656,18 @@ int main()
         ||
         hypervisor.find(
             "createHypervisorVm"
+        ) == std::string::npos
+        ||
+        hypervisor.find(
+            "id=\"hypervisor-storage-preview-form\""
+        ) == std::string::npos
+        ||
+        hypervisor.find(
+            "/api/hypervisor/storage/preview"
+        ) == std::string::npos
+        ||
+        hypervisor.find(
+            "previewHypervisorDiskPlacement"
         ) == std::string::npos
         ||
         hypervisor.find(

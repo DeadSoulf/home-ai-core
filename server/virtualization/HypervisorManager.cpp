@@ -1187,8 +1187,8 @@ VmCreatePreviewResult HypervisorManager::previewCreate(const VmCreateDraft& draf
 std::vector<HypervisorCapability> HypervisorManager::capabilities()
 {
     return {{"lifecycle", true}, {"pause_resume", true}, {"autostart", true},
-        {"create_preview", true}, {"create", true}, {"edit", false},
-        {"delete", false}, {"snapshots", false}, {"disks", false},
+        {"create_preview", true}, {"create", true}, {"disk_preview", true},
+        {"edit", false}, {"delete", false}, {"snapshots", false}, {"disks", false},
         {"networks", false}, {"console", false}};
 }
 

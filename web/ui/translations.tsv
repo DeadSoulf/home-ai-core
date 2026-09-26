@@ -842,3 +842,21 @@ Cluster Core недоступен.	Cluster Core is unavailable.
 VM создана как постоянная конфигурация. Она не запущена; диски и сети не создавались.	The VM was created as a persistent definition. It was not started; no disks or networks were created.
 Сначала проверьте конфигурацию. После успешной проверки можно создать постоянную VM в libvirt. VM не запускается автоматически; диски и сети не создаются.	Validate the configuration first. After a successful preview, a persistent libvirt VM can be created. The VM is not started automatically; no disks or networks are created.
 Изменение и удаление VM — NEXT	Edit and delete VM — NEXT
+Использовать для виртуальных машин	Use for virtual machines
+VM Storage Pool	VM Storage Pool
+Стратегия VM	VM strategy
+Резерв VM, %	VM reserve, %
+Резерв VM, GB	VM reserve, GB
+Закреплённый диск для VM	Pinned VM disk
+VM-пул	VM pool
+Хранилище VM	VM storage
+Размер диска, GiB	Disk size, GiB
+Проверить размещение	Check placement
+Выберите размер будущего диска. Home AI Core проверит VM Storage Pool, резерв свободного места и выберет том по стабильному UUID. Файл диска на этом этапе не создаётся.	Choose the future disk size. Home AI Core will check the VM Storage Pool, free-space reserve and select a volume by stable UUID. No disk file is created at this stage.
+Проверка размещения диска…	Checking disk placement…
+Размещение доступно	Placement is available
+том	volume
+запрошено	requested
+Файл диска не создан.	No disk file was created.
+VM-пул использует только диски, которым назначена роль VM. Резерв не расходуется при выборе места для будущих виртуальных дисков.	The VM pool uses only disks assigned the VM role. The reserve is not consumed when selecting space for future virtual disks.
+Сохранить настройки VM-пула	Save VM pool settings

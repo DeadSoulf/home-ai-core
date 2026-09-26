@@ -77,6 +77,9 @@ bool safeMountPoint(
     const std::string files_prefix =
         "/mnt/home-ai/files/";
 
+    const std::string vm_prefix =
+        "/mnt/home-ai/vm/";
+
     const std::string storage_prefix =
         "/mnt/home-ai/storage/";
 
@@ -88,6 +91,11 @@ bool safeMountPoint(
         ||
         path.rfind(
             files_prefix,
+            0
+        ) == 0
+        ||
+        path.rfind(
+            vm_prefix,
             0
         ) == 0
         ||
@@ -288,6 +296,11 @@ bool mountedInsideHomeAI(
             ||
             info.mount_point.rfind(
                 "/mnt/home-ai/files/",
+                0
+            ) == 0
+            ||
+            info.mount_point.rfind(
+                "/mnt/home-ai/vm/",
                 0
             ) == 0
             ||

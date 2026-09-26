@@ -40,3 +40,15 @@ tests ship together. Existing inventory field names and the Web UI route stay st
 Each module should add manager tests against an isolated backend, HTTP tests for
 authorization/confirmation/conflicts, and browser tests for disabled capabilities,
 pending results and errors before becoming available in the existing VM cards.
+
+
+### 0.0.40 storage placement contract
+
+`POST /api/hypervisor/storage/preview` is preview-only. It accepts a disk size in GiB
+and resolves a target through Storage Core. It must not accept a host path, libvirt XML,
+image filename or mount point from the browser. A successful preview returns a stable
+filesystem UUID and capacity metadata only.
+
+The `disk_preview` capability is implemented while `disks` remains false. A later
+disk-creation capability must add controlled filename generation, QEMU/libvirt ownership,
+atomic creation, explicit rollback and read-back before `disks=true`.

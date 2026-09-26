@@ -376,6 +376,10 @@ int main()
                             runtime.config().get(
                                 "storage.personal_mounts",
                                 ""
+                            ),
+                            runtime.config().get(
+                                "storage.vm_mounts",
+                                ""
                             )
                         );
 
@@ -391,6 +395,11 @@ int main()
                             ||
                             volume.mount_point.rfind(
                                 "/mnt/home-ai/files/",
+                                0
+                            ) == 0
+                            ||
+                            volume.mount_point.rfind(
+                                "/mnt/home-ai/vm/",
                                 0
                             ) == 0
                             ||
@@ -495,6 +504,10 @@ int main()
                             runtime.config().get(
                                 "storage.personal_mounts",
                                 ""
+                            ),
+                            runtime.config().get(
+                                "storage.vm_mounts",
+                                ""
                             )
                         );
 
@@ -503,14 +516,11 @@ int main()
                         volumes
                     ) {
                         const bool managed =
-                            volume.role ==
-                                "video"
-                            ||
-                            volume.role ==
-                                "personal"
-                            ||
-                            volume.role ==
-                                "video+personal";
+                            volume.role !=
+                                "system"
+                            &&
+                            volume.role !=
+                                "unassigned";
 
                         if (!managed)
                             continue;
@@ -544,6 +554,10 @@ int main()
                             runtime.config().get(
                                 "storage.personal_mounts",
                                 ""
+                            ),
+                            runtime.config().get(
+                                "storage.vm_mounts",
+                                ""
                             )
                         );
 
@@ -555,14 +569,11 @@ int main()
                         volumes
                     ) {
                         const bool is_managed =
-                            volume.role ==
-                                "video"
-                            ||
-                            volume.role ==
-                                "personal"
-                            ||
-                            volume.role ==
-                                "video+personal";
+                            volume.role !=
+                                "system"
+                            &&
+                            volume.role !=
+                                "unassigned";
 
                         if (!is_managed)
                             continue;

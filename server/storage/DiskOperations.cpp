@@ -143,6 +143,12 @@ std::string DiskOperations::defaultMountPoint(
             stable_name;
     }
 
+    if (role == "vm") {
+        return
+            "/mnt/home-ai/vm/" +
+            stable_name;
+    }
+
     if (role == "storage") {
         return
             "/mnt/home-ai/storage/" +

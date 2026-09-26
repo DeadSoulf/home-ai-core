@@ -485,37 +485,36 @@ bool StorageMonitor::containsMount(
 std::string StorageMonitor::classifyRole(
     const std::string& mount_point,
     const std::vector<std::string>& video_mounts,
-    const std::vector<std::string>& personal_mounts
+    const std::vector<std::string>& personal_mounts,
+    const std::vector<std::string>& vm_mounts
 )
 {
-    const bool video =
-        containsMount(
-            video_mounts,
-            mount_point
-        );
+    std::vector<std::string> roles;
 
-    const bool personal =
-        containsMount(
-            personal_mounts,
-            mount_point
-        );
+    if (containsMount(video_mounts, mount_point))
+        roles.emplace_back("video");
 
-    if (video && personal)
-        return "video+personal";
+    if (containsMount(personal_mounts, mount_point))
+        roles.emplace_back("personal");
 
-    if (video)
-        return "video";
+    if (containsMount(vm_mounts, mount_point))
+        roles.emplace_back("vm");
 
-    if (personal)
-        return "personal";
+    if (!roles.empty()) {
+        std::ostringstream result;
 
-    if (
-        normalizeMount(
-            mount_point
-        ) == "/"
-    ) {
-        return "system";
+        for (std::size_t index = 0; index < roles.size(); ++index) {
+            if (index > 0)
+                result << "+";
+
+            result << roles[index];
+        }
+
+        return result.str();
     }
+
+    if (normalizeMount(mount_point) == "/")
+        return "system";
 
     return "unassigned";
 }
@@ -523,7 +522,8 @@ std::string StorageMonitor::classifyRole(
 std::vector<StorageVolume>
 StorageMonitor::snapshot(
     const std::string& video_mounts_value,
-    const std::string& personal_mounts_value
+    const std::string& personal_mounts_value,
+    const std::string& vm_mounts_value
 ) const
 {
     const auto video_mounts =
@@ -534,6 +534,11 @@ StorageMonitor::snapshot(
     const auto personal_mounts =
         parseMountList(
             personal_mounts_value
+        );
+
+    const auto vm_mounts =
+        parseMountList(
+            vm_mounts_value
         );
 
     const auto uuids =
@@ -623,7 +628,8 @@ StorageMonitor::snapshot(
                 classifyRole(
                     mount_point,
                     video_mounts,
-                    personal_mounts
+                    personal_mounts,
+                    vm_mounts
                 );
 
             volume.status =
@@ -747,25 +753,20 @@ StorageMonitor::snapshot(
             );
         };
 
-    for (const auto& mount : video_mounts) {
-        const bool also_personal =
-            containsMount(
+    std::set<std::string> configured_mounts;
+    configured_mounts.insert(video_mounts.begin(), video_mounts.end());
+    configured_mounts.insert(personal_mounts.begin(), personal_mounts.end());
+    configured_mounts.insert(vm_mounts.begin(), vm_mounts.end());
+
+    for (const auto& mount : configured_mounts) {
+        addOffline(
+            mount,
+            classifyRole(
+                mount,
+                video_mounts,
                 personal_mounts,
-                mount
-            );
-
-        addOffline(
-            mount,
-            also_personal
-                ? "video+personal"
-                : "video"
-        );
-    }
-
-    for (const auto& mount : personal_mounts) {
-        addOffline(
-            mount,
-            "personal"
+                vm_mounts
+            )
         );
     }
 

@@ -263,3 +263,19 @@ request header and audit entries.
 8. backup/restore separate from snapshots.
 9. USB/PCI/VFIO passthrough.
 10. disposable sandbox VMs for generated-code testing.
+
+
+## 0.0.40 VM disk placement preview
+
+Hypervisor Core can validate placement for a future VM disk without creating it.
+
+- selection is restricted to the managed Storage Core `vm` pool
+- the browser supplies only a typed size in GiB
+- policy, pinned target and reserve thresholds are resolved server-side
+- the selected storage volume is identified by filesystem UUID
+- arbitrary host paths are not accepted
+- the requested size must fit after the VM pool reserve
+- no qcow2/raw file, libvirt disk attachment or VM mutation occurs
+
+Actual disk-image creation remains disabled until controlled file ownership, rollback and
+read-back are implemented.

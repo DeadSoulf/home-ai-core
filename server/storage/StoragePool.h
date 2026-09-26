@@ -57,7 +57,8 @@ public:
     select(
         const std::vector<StorageVolume>& volumes,
         const std::string& role,
-        const StoragePoolOptions& options
+        const StoragePoolOptions& options,
+        std::uint64_t required_bytes = 0
     );
 };
 

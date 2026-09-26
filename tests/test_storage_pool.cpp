@@ -27,7 +27,7 @@ int main()
 
     StorageVolume c;
     c.mount_point = "/pool/c";
-    c.role = "personal";
+    c.role = "personal+vm";
     c.status = "online";
     c.capacity_available = true;
     c.total_bytes = 1000;
@@ -247,6 +247,40 @@ int main()
     ) {
         std::cerr
             << "Pinned fallback policy failed\n";
+
+        return 1;
+    }
+
+    const auto vm =
+        StoragePoolSelector::select(
+            volumes,
+            "vm",
+            StoragePoolOptions{},
+            500
+        );
+
+    if (
+        !vm
+        ||
+        vm->mount_point != "/pool/c"
+    ) {
+        std::cerr
+            << "VM pool role/required-bytes selection failed\n";
+
+        return 1;
+    }
+
+    const auto too_large_vm =
+        StoragePoolSelector::select(
+            volumes,
+            "vm",
+            StoragePoolOptions{},
+            801
+        );
+
+    if (too_large_vm) {
+        std::cerr
+            << "VM pool accepted an oversized placement\n";
 
         return 1;
     }

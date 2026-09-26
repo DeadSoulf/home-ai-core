@@ -22,6 +22,7 @@ const {chromium} = require(process.argv[2] || 'playwright');
     let releaseAction;
     const createPreviews = [];
     const creates = [];
+    const diskPreviews = [];
 
     const refreshAllowed = () => {
         const auto = autostart ? 'autostart-off' : 'autostart-on';
@@ -40,6 +41,22 @@ const {chromium} = require(process.argv[2] || 'playwright');
                 JSON.stringify(fs.readFileSync('web/ui/translations.tsv', 'utf8')) + ';\n' +
                 fs.readFileSync('web/ui/localization.js', 'utf8') + '\n})();';
             return route.fulfill({contentType: 'application/javascript', body: script});
+        }
+
+        if (url.pathname === '/api/hypervisor/storage/preview') {
+            const form = new URLSearchParams(route.request().postData());
+            diskPreviews.push(form);
+            assert.equal(route.request().headers()['x-homeai-request'], '1');
+            return route.fulfill({status: 200, json: {
+                success: true,
+                code: 'preview_ready',
+                message: 'VM disk placement is valid. No file was created.',
+                volume_id: '11112222-3333-4444-5555-666677778888',
+                filesystem: 'ext4',
+                requested_bytes: Number(form.get('size_gib')) * 1024 * 1024 * 1024,
+                free_bytes: 200 * 1024 * 1024 * 1024,
+                policy: 'most_free'
+            }});
         }
 
         if (url.pathname === '/api/hypervisor/create/preview') {
@@ -131,6 +148,13 @@ const {chromium} = require(process.argv[2] || 'playwright');
         assert.equal(await page.getByRole('button', {name: 'Запустить VM'}).isEnabled(), true);
         assert.equal(await page.getByRole('button', {name: 'Включить автозапуск VM'}).isEnabled(), true);
         assert.equal(await page.locator('#hypervisor-vm-list strong').innerText(), '<VM & test>');
+        await page.fill('#hypervisor-storage-preview-form input[name="size_gib"]', '40');
+        await page.getByRole('button', {name: 'Проверить размещение'}).click();
+        await page.waitForFunction(() =>
+            document.querySelector('#hypervisor-storage-preview-message').textContent.includes('11112222-3333-4444-5555-666677778888'));
+        assert.equal(diskPreviews.length, 1);
+        assert.equal(diskPreviews[0].get('size_gib'), '40');
+
         await page.fill('#hypervisor-create-preview-form input[name="name"]', 'preview-vm');
         await page.getByRole('button', {name: 'Проверить конфигурацию'}).click();
         await page.waitForFunction(() => document.querySelector('#hypervisor-create-preview-message').textContent.includes('Конфигурация VM валидна'));

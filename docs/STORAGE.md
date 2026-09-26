@@ -57,7 +57,8 @@ A disk can be assigned to:
 
 - video
 - home files
-- both video and home files
+- virtual machines
+- any combination of these roles
 
 For an unused unmounted disk, Home AI Core mounts it once and adds the resulting mount point
 to every selected pool. For an already mounted disk, only the Home AI role assignment changes.
@@ -127,17 +128,19 @@ The installer:
 - installs the helper as root-owned executable
 - creates `/mnt/home-ai/video`
 - creates `/mnt/home-ai/files`
+- creates `/mnt/home-ai/vm`
 - installs a narrowly scoped sudo rule allowing only the Home AI storage helper
 
 The helper itself performs the block-device safety checks again before every privileged action.
 
 ## Storage roles and pools
 
-Two comma-separated configuration keys track all mount points in each pool:
+Three comma-separated configuration keys track all mount points in each pool:
 
 ```text
 storage.video_mounts=
 storage.personal_mounts=
+storage.vm_mounts=
 ```
 
 The same mount point may exist in both keys, so one physical disk can serve both roles.
@@ -167,7 +170,7 @@ Volumes that have reached that reserve are excluded from new-write selection.
 
 ## Offline detection
 
-Configured video/personal mount points remain visible even when not mounted and are shown as:
+Configured video/personal/VM mount points remain visible even when not mounted and are shown as:
 
 ```text
 OFFLINE
@@ -262,6 +265,28 @@ This prevents disk-format results from breaking `response.json()` in the Web UI.
 
 ## Disk role workflow
 
-The Web UI now exposes two role checkboxes and one `Применить назначение` action.
+The Web UI now exposes three role checkboxes and one `Применить назначение` action.
 This removes the ambiguous distinction between "mount" and "assign" buttons while still
 preserving the same safe backend behavior.
+
+
+## VM Storage Pool (0.0.40)
+
+Virtual-machine storage is a third managed pool role alongside video and personal files.
+
+```text
+storage.vm_mounts=
+storage.vm_policy=most_free
+storage.vm_reserve_percent=10
+storage.vm_reserve_gb=0
+storage.vm_pinned_mount=
+```
+
+A filesystem may belong to several Home AI roles at the same time, for example
+`video+personal+vm`. VM placement uses only online, writable, capacity-readable
+volumes assigned to the `vm` role. The pool reserve is applied before checking that
+the requested virtual-disk size fits.
+
+`POST /api/hypervisor/storage/preview` accepts only `size_gib`. It does not accept
+a host path or filename. A successful preview identifies the selected filesystem by
+stable filesystem UUID and does not create a disk image.

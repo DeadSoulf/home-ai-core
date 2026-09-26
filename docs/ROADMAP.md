@@ -32,7 +32,8 @@
 | 0.0.36 | Cluster Core foundation: Controller/Worker heartbeat and scheduling | DEVELOPMENT SNAPSHOT |
 | 0.0.37 | Hypervisor pause/resume + autostart controls | DEVELOPMENT SNAPSHOT |
 | 0.0.38 | Hypervisor safe VM definition preview and validation | DEVELOPMENT SNAPSHOT |
-| 0.0.39 | Hypervisor persistent VM definition with libvirt read-back | IN DEVELOPMENT |
+| 0.0.39 | Hypervisor persistent VM definition with libvirt read-back | DEVELOPMENT SNAPSHOT |
+| 0.0.40 | Hypervisor VM Storage Pool + disk placement preview | IN DEVELOPMENT |
 | next 0.0.x | Recorder + continuous video transport + archive/event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |

@@ -40,6 +40,7 @@ install -o root -g root -m 0755     "$HELPER"     /usr/local/libexec/home-ai-sto
 install -d -m 0750 /mnt/home-ai
 install -d -m 0750 /mnt/home-ai/video
 install -d -m 0750 /mnt/home-ai/files
+install -d -m 0750 /mnt/home-ai/vm
 install -d -m 0750 /mnt/home-ai/storage
 
 SUDOERS="/etc/sudoers.d/home-ai-storage-helper"
