@@ -188,31 +188,49 @@ void renderSystemStats(
 <span class="section-hint">Обновление каждые 2 секунды</span>
 </div>
 
-<div class="stats-grid stats-grid-live">
+<div class="stats-grid stats-grid-live" data-stat-grid>
 )HTML";
 
     if (include_core_cards) {
         page << R"HTML(
-<div class="stat-card stat-card-core">
+<div class="stat-card stat-card-core" data-stat-card data-stat-id="core">
 <div class="stat-card-top">
 <span class="stat-label">Ядро</span>
+<div class="stat-card-head-actions">
 <span class="stat-core-dot" aria-hidden="true"></span>
+<div class="stat-card-controls">
+<button type="button" class="stat-card-control stat-drag-handle" data-stat-drag-handle aria-label="Перетащить плитку" title="Перетащить плитку">⠿</button>
+<button type="button" class="stat-card-control stat-compact-toggle" data-stat-compact-toggle aria-pressed="false" aria-label="Свернуть плитку" title="Свернуть плитку">▭</button>
+</div>
+</div>
 </div>
 <strong class="status-ok">RUNNING</strong>
 </div>
 
-<div class="stat-card stat-card-core">
+<div class="stat-card stat-card-core" data-stat-card data-stat-id="web-core">
 <div class="stat-card-top">
 <span class="stat-label">Web Core</span>
+<div class="stat-card-head-actions">
 <span class="stat-core-dot" aria-hidden="true"></span>
+<div class="stat-card-controls">
+<button type="button" class="stat-card-control stat-drag-handle" data-stat-drag-handle aria-label="Перетащить плитку" title="Перетащить плитку">⠿</button>
+<button type="button" class="stat-card-control stat-compact-toggle" data-stat-compact-toggle aria-pressed="false" aria-label="Свернуть плитку" title="Свернуть плитку">▭</button>
+</div>
+</div>
 </div>
 <strong class="status-ok">RUNNING</strong>
 </div>
 
-<div class="stat-card stat-card-core">
+<div class="stat-card stat-card-core" data-stat-card data-stat-id="security-core">
 <div class="stat-card-top">
 <span class="stat-label">Security Core</span>
+<div class="stat-card-head-actions">
 <span class="stat-core-dot" aria-hidden="true"></span>
+<div class="stat-card-controls">
+<button type="button" class="stat-card-control stat-drag-handle" data-stat-drag-handle aria-label="Перетащить плитку" title="Перетащить плитку">⠿</button>
+<button type="button" class="stat-card-control stat-compact-toggle" data-stat-compact-toggle aria-pressed="false" aria-label="Свернуть плитку" title="Свернуть плитку">▭</button>
+</div>
+</div>
 </div>
 <strong class="status-ok">RUNNING</strong>
 </div>
@@ -220,10 +238,16 @@ void renderSystemStats(
     }
 
     page << R"HTML(
-<article class="stat-card stat-card-interactive" data-stat-card data-stat-usage="cpu" tabindex="0" role="button" aria-expanded="false">
+<article class="stat-card stat-card-interactive" data-stat-card data-stat-id="cpu" data-stat-usage="cpu" tabindex="0" role="button" aria-expanded="false">
 <div class="stat-card-top">
 <span class="stat-label">CPU</span>
+<div class="stat-card-head-actions">
 <span id="cpu-state" class="stat-state">...</span>
+<div class="stat-card-controls">
+<button type="button" class="stat-card-control stat-drag-handle" data-stat-drag-handle aria-label="Перетащить плитку" title="Перетащить плитку">⠿</button>
+<button type="button" class="stat-card-control stat-compact-toggle" data-stat-compact-toggle aria-pressed="false" aria-label="Свернуть плитку" title="Свернуть плитку">▭</button>
+</div>
+</div>
 </div>
 <strong id="cpu-value">...</strong>
 <div class="stat-meter" aria-hidden="true">
@@ -232,10 +256,16 @@ void renderSystemStats(
 <div class="stat-detail">Текущая загрузка процессора</div>
 </article>
 
-<article class="stat-card stat-card-interactive" data-stat-card data-stat-usage="ram" tabindex="0" role="button" aria-expanded="false">
+<article class="stat-card stat-card-interactive" data-stat-card data-stat-id="ram" data-stat-usage="ram" tabindex="0" role="button" aria-expanded="false">
 <div class="stat-card-top">
 <span class="stat-label">RAM</span>
+<div class="stat-card-head-actions">
 <span id="ram-state" class="stat-state">...</span>
+<div class="stat-card-controls">
+<button type="button" class="stat-card-control stat-drag-handle" data-stat-drag-handle aria-label="Перетащить плитку" title="Перетащить плитку">⠿</button>
+<button type="button" class="stat-card-control stat-compact-toggle" data-stat-compact-toggle aria-pressed="false" aria-label="Свернуть плитку" title="Свернуть плитку">▭</button>
+</div>
+</div>
 </div>
 <strong id="ram-value">...</strong>
 <div class="stat-meter" aria-hidden="true">
@@ -244,10 +274,16 @@ void renderSystemStats(
 <div class="stat-detail">Использование оперативной памяти</div>
 </article>
 
-<article class="stat-card stat-card-interactive" data-stat-card data-stat-usage="disk" tabindex="0" role="button" aria-expanded="false">
+<article class="stat-card stat-card-interactive" data-stat-card data-stat-id="disk" data-stat-usage="disk" tabindex="0" role="button" aria-expanded="false">
 <div class="stat-card-top">
 <span class="stat-label">Системный диск</span>
+<div class="stat-card-head-actions">
 <span id="disk-state" class="stat-state">...</span>
+<div class="stat-card-controls">
+<button type="button" class="stat-card-control stat-drag-handle" data-stat-drag-handle aria-label="Перетащить плитку" title="Перетащить плитку">⠿</button>
+<button type="button" class="stat-card-control stat-compact-toggle" data-stat-compact-toggle aria-pressed="false" aria-label="Свернуть плитку" title="Свернуть плитку">▭</button>
+</div>
+</div>
 </div>
 <strong id="disk-value">...</strong>
 <div class="stat-meter" aria-hidden="true">
@@ -256,19 +292,31 @@ void renderSystemStats(
 <div class="stat-detail">Заполнение системного диска</div>
 </article>
 
-<article class="stat-card stat-card-interactive stat-card-info" data-stat-card tabindex="0" role="button" aria-expanded="false">
+<article class="stat-card stat-card-interactive stat-card-info" data-stat-card data-stat-id="uptime" tabindex="0" role="button" aria-expanded="false">
 <div class="stat-card-top">
 <span class="stat-label">Uptime</span>
+<div class="stat-card-head-actions">
 <span class="stat-state stat-state-neutral">↗</span>
+<div class="stat-card-controls">
+<button type="button" class="stat-card-control stat-drag-handle" data-stat-drag-handle aria-label="Перетащить плитку" title="Перетащить плитку">⠿</button>
+<button type="button" class="stat-card-control stat-compact-toggle" data-stat-compact-toggle aria-pressed="false" aria-label="Свернуть плитку" title="Свернуть плитку">▭</button>
+</div>
+</div>
 </div>
 <strong id="uptime-value">...</strong>
 <div class="stat-detail">Время непрерывной работы</div>
 </article>
 
-<article class="stat-card stat-card-interactive stat-card-info" data-stat-card tabindex="0" role="button" aria-expanded="false">
+<article class="stat-card stat-card-interactive stat-card-info" data-stat-card data-stat-id="load" tabindex="0" role="button" aria-expanded="false">
 <div class="stat-card-top">
 <span class="stat-label">Load Average</span>
+<div class="stat-card-head-actions">
 <span class="stat-state stat-state-neutral">1 / 5 / 15</span>
+<div class="stat-card-controls">
+<button type="button" class="stat-card-control stat-drag-handle" data-stat-drag-handle aria-label="Перетащить плитку" title="Перетащить плитку">⠿</button>
+<button type="button" class="stat-card-control stat-compact-toggle" data-stat-compact-toggle aria-pressed="false" aria-label="Свернуть плитку" title="Свернуть плитку">▭</button>
+</div>
+</div>
 </div>
 <strong id="load-value">...</strong>
 <div class="stat-detail">Средняя нагрузка за 1 / 5 / 15 минут</div>
@@ -1514,7 +1562,7 @@ button:disabled {
     }
 }
 
-/* Home AI Cloud dashboard redesign 0.0.25 */
+/* Home AI Cloud dashboard redesign 0.0.26 */
 :root {
     --bg: #0B1220;
     --sidebar: rgba(8, 14, 25, 0.94);
@@ -1814,6 +1862,59 @@ body {
     gap: 10px;
 }
 
+.stat-card-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.stat-card-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0.72;
+    transition: opacity 0.16s ease;
+}
+
+.stat-card:hover .stat-card-controls,
+.stat-card:focus-within .stat-card-controls,
+.stat-card.stat-dragging .stat-card-controls {
+    opacity: 1;
+}
+
+.stat-card-control {
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    min-height: 28px;
+    padding: 0;
+    display: inline-grid;
+    place-items: center;
+    border: 1px solid #29405F;
+    border-radius: 8px;
+    background: #101C2E;
+    color: #93A9C3;
+    font-size: 0.92rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.stat-card-control:hover {
+    border-color: #426A9B;
+    background: #16263D;
+    color: white;
+}
+
+.stat-drag-handle {
+    cursor: grab;
+    touch-action: none;
+}
+
+.stat-drag-handle:active {
+    cursor: grabbing;
+}
+
 .stat-core-dot {
     width: 9px;
     height: 9px;
@@ -1924,6 +2025,67 @@ body {
 
 .stat-card-info strong {
     overflow-wrap: anywhere;
+}
+
+.stat-card.stat-dragging {
+    z-index: 3;
+    opacity: 0.68;
+    border-color: #5A82B6;
+    transform: scale(0.985);
+    pointer-events: none;
+}
+
+.stat-card.stat-compact {
+    min-height: 62px;
+    padding: 10px 12px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "header value";
+    align-items: center;
+    gap: 10px;
+}
+
+.stat-card.stat-compact .stat-card-top {
+    grid-area: header;
+    min-width: 0;
+}
+
+.stat-card.stat-compact > strong {
+    grid-area: value;
+    margin: 0;
+    font-size: 1rem;
+    white-space: nowrap;
+}
+
+.stat-card.stat-compact .stat-meter,
+.stat-card.stat-compact .stat-detail,
+.stat-card.stat-compact .stat-state,
+.stat-card.stat-compact .stat-core-dot {
+    display: none;
+}
+
+.stat-card.stat-compact .stat-card-controls {
+    margin-left: 4px;
+}
+
+.stat-card.stat-compact .stat-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+    .stat-card-control {
+        width: 34px;
+        min-width: 34px;
+        height: 34px;
+        min-height: 34px;
+    }
+
+    .stat-card.stat-compact {
+        min-height: 58px;
+    }
 }
 
 input,
@@ -3654,7 +3816,7 @@ PrivateKey отображается в редакторе и сохраняет�
 <div class="section-card">
 <div class="section-title">
 <h2>Камеры</h2>
-<span class="section-hint">Camera Core 0.0.25</span>
+<span class="section-hint">Camera Core 0.0.26</span>
 </div>
 
 <div class="stats-grid">
@@ -11656,6 +11818,299 @@ function setStatUsage(metric, rawValue) {
             label;
 }
 
+const statsLayoutStorageKey =
+    "home-ai.stats-layout-v1";
+
+function readStatsLayout() {
+    try {
+        const raw =
+            window.localStorage.getItem(
+                statsLayoutStorageKey
+            );
+
+        if (!raw)
+            return {
+                order: [],
+                compact: []
+            };
+
+        const parsed =
+            JSON.parse(raw);
+
+        return {
+            order:
+                Array.isArray(
+                    parsed.order
+                )
+                ? parsed.order
+                : [],
+            compact:
+                Array.isArray(
+                    parsed.compact
+                )
+                ? parsed.compact
+                : []
+        };
+    }
+    catch (error) {
+        return {
+            order: [],
+            compact: []
+        };
+    }
+}
+
+function saveStatsLayout(grid) {
+    if (!grid)
+        return;
+
+    const cards =
+        Array.from(
+            grid.querySelectorAll(
+                ":scope > [data-stat-card]"
+            )
+        );
+
+    const payload = {
+        order:
+            cards.map(
+                function(card) {
+                    return (
+                        card.dataset.statId
+                        || ""
+                    );
+                }
+            ).filter(Boolean),
+        compact:
+            cards.filter(
+                function(card) {
+                    return card.classList.contains(
+                        "stat-compact"
+                    );
+                }
+            ).map(
+                function(card) {
+                    return (
+                        card.dataset.statId
+                        || ""
+                    );
+                }
+            ).filter(Boolean)
+    };
+
+    try {
+        window.localStorage.setItem(
+            statsLayoutStorageKey,
+            JSON.stringify(
+                payload
+            )
+        );
+    }
+    catch (error) {
+    }
+}
+
+function updateStatCompactButton(card) {
+    const button =
+        card.querySelector(
+            "[data-stat-compact-toggle]"
+        );
+
+    if (!button)
+        return;
+
+    const compact =
+        card.classList.contains(
+            "stat-compact"
+        );
+
+    const label =
+        compact
+        ? tr("Развернуть плитку")
+        : tr("Свернуть плитку");
+
+    button.setAttribute(
+        "aria-pressed",
+        compact
+            ? "true"
+            : "false"
+    );
+
+    button.setAttribute(
+        "aria-label",
+        label
+    );
+
+    button.setAttribute(
+        "title",
+        label
+    );
+
+    button.textContent =
+        compact
+        ? "□"
+        : "▭";
+}
+
+function applyStatsLayout(grid) {
+    const layout =
+        readStatsLayout();
+
+    const cards =
+        Array.from(
+            grid.querySelectorAll(
+                ":scope > [data-stat-card]"
+            )
+        );
+
+    const byId =
+        new Map(
+            cards.map(
+                function(card) {
+                    return [
+                        card.dataset.statId,
+                        card
+                    ];
+                }
+            )
+        );
+
+    for (
+        const id of
+        layout.order
+    ) {
+        const card =
+            byId.get(id);
+
+        if (card)
+            grid.appendChild(card);
+    }
+
+    const compact =
+        new Set(
+            layout.compact
+        );
+
+    cards.forEach(
+        function(card) {
+            card.classList.toggle(
+                "stat-compact",
+                compact.has(
+                    card.dataset.statId
+                )
+            );
+
+            if (
+                card.classList.contains(
+                    "stat-compact"
+                )
+            ) {
+                card.classList.remove(
+                    "expanded"
+                );
+
+                card.setAttribute(
+                    "aria-expanded",
+                    "false"
+                );
+            }
+
+            updateStatCompactButton(
+                card
+            );
+        }
+    );
+}
+
+function toggleStatCompact(card) {
+    const compact =
+        !card.classList.contains(
+            "stat-compact"
+        );
+
+    card.classList.toggle(
+        "stat-compact",
+        compact
+    );
+
+    if (compact) {
+        card.classList.remove(
+            "expanded"
+        );
+
+        card.setAttribute(
+            "aria-expanded",
+            "false"
+        );
+    }
+
+    updateStatCompactButton(
+        card
+    );
+
+    saveStatsLayout(
+        card.parentElement
+    );
+}
+
+function reorderStatCard(
+    grid,
+    card,
+    target,
+    clientX,
+    clientY
+) {
+    if (
+        !grid
+        ||
+        !card
+        ||
+        !target
+        ||
+        card === target
+        ||
+        target.parentElement !== grid
+    ) {
+        return;
+    }
+
+    const rect =
+        target.getBoundingClientRect();
+
+    const sameRow =
+        Math.abs(
+            clientY -
+            (
+                rect.top
+                +
+                rect.height / 2
+            )
+        ) <
+        rect.height / 2;
+
+    const before =
+        sameRow
+        ? clientX <
+            (
+                rect.left
+                +
+                rect.width / 2
+            )
+        : clientY <
+            (
+                rect.top
+                +
+                rect.height / 2
+            );
+
+    grid.insertBefore(
+        card,
+        before
+            ? target
+            : target.nextSibling
+    );
+}
+
 function toggleStatCard(card) {
     const expanded =
         !card.classList.contains(
@@ -11677,44 +12132,219 @@ function toggleStatCard(card) {
 
 function initializeStatCards() {
     document.querySelectorAll(
-        "[data-stat-card]"
+        "[data-stat-grid]"
     ).forEach(
-        function(card) {
-            if (
-                card.dataset.statReady ===
-                "1"
-            ) {
-                return;
-            }
-
-            card.dataset.statReady =
-                "1";
-
-            card.addEventListener(
-                "click",
-                function() {
-                    toggleStatCard(
-                        card
-                    );
-                }
+        function(grid) {
+            applyStatsLayout(
+                grid
             );
 
-            card.addEventListener(
-                "keydown",
-                function(event) {
+            grid.querySelectorAll(
+                ":scope > [data-stat-card]"
+            ).forEach(
+                function(card) {
                     if (
-                        event.key !== "Enter"
-                        &&
-                        event.key !== " "
+                        card.dataset.statReady ===
+                        "1"
                     ) {
                         return;
                     }
 
-                    event.preventDefault();
+                    card.dataset.statReady =
+                        "1";
 
-                    toggleStatCard(
-                        card
-                    );
+                    const compactButton =
+                        card.querySelector(
+                            "[data-stat-compact-toggle]"
+                        );
+
+                    if (compactButton) {
+                        compactButton.addEventListener(
+                            "click",
+                            function(event) {
+                                event.stopPropagation();
+
+                                toggleStatCompact(
+                                    card
+                                );
+                            }
+                        );
+                    }
+
+                    const handle =
+                        card.querySelector(
+                            "[data-stat-drag-handle]"
+                        );
+
+                    if (handle) {
+                        handle.setAttribute(
+                            "aria-label",
+                            tr("Перетащить плитку")
+                        );
+
+                        handle.setAttribute(
+                            "title",
+                            tr("Перетащить плитку")
+                        );
+
+                        let dragPointerId =
+                            null;
+
+                        handle.addEventListener(
+                            "pointerdown",
+                            function(event) {
+                                if (
+                                    event.button !==
+                                        undefined
+                                    &&
+                                    event.button !== 0
+                                ) {
+                                    return;
+                                }
+
+                                dragPointerId =
+                                    event.pointerId;
+
+                                handle.setPointerCapture(
+                                    event.pointerId
+                                );
+
+                                card.classList.add(
+                                    "stat-dragging"
+                                );
+
+                                event.preventDefault();
+                                event.stopPropagation();
+                            }
+                        );
+
+                        handle.addEventListener(
+                            "pointermove",
+                            function(event) {
+                                if (
+                                    dragPointerId !==
+                                    event.pointerId
+                                ) {
+                                    return;
+                                }
+
+                                const element =
+                                    document.elementFromPoint(
+                                        event.clientX,
+                                        event.clientY
+                                    );
+
+                                const target =
+                                    element
+                                    ? element.closest(
+                                        "[data-stat-card]"
+                                    )
+                                    : null;
+
+                                reorderStatCard(
+                                    grid,
+                                    card,
+                                    target,
+                                    event.clientX,
+                                    event.clientY
+                                );
+                            }
+                        );
+
+                        const finishDrag =
+                            function(event) {
+                                if (
+                                    dragPointerId !==
+                                    event.pointerId
+                                ) {
+                                    return;
+                                }
+
+                                dragPointerId =
+                                    null;
+
+                                card.classList.remove(
+                                    "stat-dragging"
+                                );
+
+                                saveStatsLayout(
+                                    grid
+                                );
+
+                                event.stopPropagation();
+                            };
+
+                        handle.addEventListener(
+                            "pointerup",
+                            finishDrag
+                        );
+
+                        handle.addEventListener(
+                            "pointercancel",
+                            finishDrag
+                        );
+                    }
+
+                    if (
+                        card.classList.contains(
+                            "stat-card-interactive"
+                        )
+                    ) {
+                        card.addEventListener(
+                            "click",
+                            function(event) {
+                                if (
+                                    event.target.closest(
+                                        "button"
+                                    )
+                                ) {
+                                    return;
+                                }
+
+                                if (
+                                    card.classList.contains(
+                                        "stat-compact"
+                                    )
+                                ) {
+                                    return;
+                                }
+
+                                toggleStatCard(
+                                    card
+                                );
+                            }
+                        );
+
+                        card.addEventListener(
+                            "keydown",
+                            function(event) {
+                                if (
+                                    event.target !==
+                                    card
+                                    ||
+                                    card.classList.contains(
+                                        "stat-compact"
+                                    )
+                                    ||
+                                    (
+                                        event.key !==
+                                            "Enter"
+                                        &&
+                                        event.key !==
+                                            " "
+                                    )
+                                ) {
+                                    return;
+                                }
+
+                                event.preventDefault();
+
+                                toggleStatCard(
+                                    card
+                                );
+                            }
+                        );
+                    }
                 }
             );
         }

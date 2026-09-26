@@ -232,7 +232,7 @@ int main()
         ) == std::string::npos
         ||
         home.find(
-            "Home AI Cloud dashboard redesign 0.0.25"
+            "Home AI Cloud dashboard redesign 0.0.26"
         ) == std::string::npos
     ) {
         std::cerr
@@ -501,7 +501,7 @@ int main()
         ) != std::string::npos
         ||
         cameras.find(
-            "Camera Core 0.0.25"
+            "Camera Core 0.0.26"
         ) == std::string::npos
         ||
         cameras.find(
@@ -633,6 +633,26 @@ int main()
         ||
         system.find(
             "initializeStatCards"
+        ) == std::string::npos
+        ||
+        system.find(
+            "data-stat-id=\"cpu\""
+        ) == std::string::npos
+        ||
+        system.find(
+            "data-stat-drag-handle"
+        ) == std::string::npos
+        ||
+        system.find(
+            "data-stat-compact-toggle"
+        ) == std::string::npos
+        ||
+        system.find(
+            "home-ai.stats-layout-v1"
+        ) == std::string::npos
+        ||
+        system.find(
+            "stat-compact"
         ) == std::string::npos
         ||
         system.find(
