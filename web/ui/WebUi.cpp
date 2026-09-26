@@ -2263,22 +2263,65 @@ button:not(.secondary):not(.danger) {
 <span class="section-hint">Основные функции Home AI Cloud</span>
 </div>
 <div class="dashboard-shortcuts">
+)HTML";
+
+        if (
+            uiHasPermission(
+                context,
+                "cameras.view"
+            )
+        ) {
+            page << R"HTML(
 <a class="dashboard-shortcut" href="/cameras">
 <span class="dashboard-shortcut-icon">◉</span>
 <div><strong>Камеры</strong><span>Поиск, просмотр и управление камерами</span></div>
 </a>
+)HTML";
+        }
+
+        if (
+            uiHasPermission(
+                context,
+                "network.view"
+            )
+        ) {
+            page << R"HTML(
 <a class="dashboard-shortcut" href="/network">
 <span class="dashboard-shortcut-icon">⇄</span>
 <div><strong>Сеть и WireGuard</strong><span>Интерфейсы, VPN и удалённый доступ</span></div>
 </a>
+)HTML";
+        }
+
+        if (
+            uiHasPermission(
+                context,
+                "system.view"
+            )
+        ) {
+            page << R"HTML(
 <a class="dashboard-shortcut" href="/system">
 <span class="dashboard-shortcut-icon">▣</span>
 <div><strong>Система</strong><span>Состояние ядра и обновление сервера</span></div>
 </a>
+)HTML";
+        }
+
+        if (
+            uiHasPermission(
+                context,
+                "storage.view"
+            )
+        ) {
+            page << R"HTML(
 <a class="dashboard-shortcut" href="/storage">
 <span class="dashboard-shortcut-icon">◫</span>
 <div><strong>Хранилище</strong><span>Диски, пулы и состояние накопителей</span></div>
 </a>
+)HTML";
+        }
+
+        page << R"HTML(
 </div>
 </div>
 
