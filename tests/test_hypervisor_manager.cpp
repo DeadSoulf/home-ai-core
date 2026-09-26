@@ -66,7 +66,42 @@ int main()
     auto snapshot =
         manager.snapshot(error);
 
-    (void)snapshot;
+    if (
+        !snapshot.host.libvirt_available
+        &&
+        !manager.healthy()
+    ) {
+        std::cerr
+            << "Missing optional libvirt must not degrade Hypervisor Core\n";
+
+        return 1;
+    }
+
+    if (
+        snapshot.host.libvirt_available
+        &&
+        snapshot.host.libvirt_connected
+        &&
+        !manager.healthy()
+    ) {
+        std::cerr
+            << "Connected libvirt must report healthy Hypervisor Core\n";
+
+        return 1;
+    }
+
+    if (
+        snapshot.host.libvirt_available
+        &&
+        !snapshot.host.libvirt_connected
+        &&
+        manager.healthy()
+    ) {
+        std::cerr
+            << "Installed but unreachable libvirt must degrade Hypervisor Core\n";
+
+        return 1;
+    }
 
     manager.shutdown();
 

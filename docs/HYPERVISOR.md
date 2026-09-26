@@ -64,8 +64,12 @@ It also inventories all libvirt domains:
 Home AI Core loads `libvirt.so.0` dynamically. This means the Core can still compile and start
 on a machine where libvirt is not yet installed.
 
-Missing KVM, QEMU or libvirt therefore degrades only the Hypervisor module; it does not stop
-Security, Web, Cameras, Storage or the rest of Home AI Core.
+Missing KVM, QEMU or libvirt does not stop Security, Web, Cameras, Storage or the rest of
+Home AI Core. A completely missing libvirt runtime is treated as an unconfigured optional
+capability rather than a module fault: Hypervisor Core remains healthy in detection-only mode.
+If libvirt is installed but Home AI Core cannot connect to `qemu:///system`, the module is
+reported as degraded because that indicates a daemon, socket or permission problem that needs
+attention.
 
 A normal Debian KVM/libvirt host will eventually require packages similar to:
 

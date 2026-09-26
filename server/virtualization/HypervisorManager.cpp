@@ -319,7 +319,7 @@ struct HypervisorManager::Impl {
 
         if (!library) {
             error =
-                "libvirt runtime library is not installed.";
+                "libvirt is not installed. Hypervisor Core is running in detection-only mode.";
 
             return false;
         }
@@ -476,7 +476,7 @@ struct HypervisorManager::Impl {
 
         if (!libvirt_loaded) {
             result.host.message =
-                "libvirt is not available.";
+                "libvirt is not installed. Hypervisor Core is running in detection-only mode.";
 
             return result;
         }
@@ -860,10 +860,15 @@ bool HypervisorManager::healthy() const
     if (!impl_->initialized)
         return false;
 
-    return
-        impl_->libvirt_loaded
-        &&
-        impl_->last_connected;
+    // libvirt is an optional runtime dependency. Its complete
+    // absence means virtualization management is not configured
+    // yet, but Hypervisor Core itself remains healthy and can
+    // still report KVM/QEMU capability. If libvirt is present,
+    // failure to connect to qemu:///system is actionable.
+    if (!impl_->libvirt_loaded)
+        return true;
+
+    return impl_->last_connected;
 }
 
 std::string
