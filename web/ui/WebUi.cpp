@@ -80,6 +80,39 @@ void navLink(
         << "</a>";
 }
 
+void mobileNavLink(
+    std::ostringstream& page,
+    const WebUiContext& context,
+    const std::string& target,
+    const std::string& label,
+    const std::string& icon
+)
+{
+    page
+        << "<a class=\"mobile-bottom-link"
+        << (
+            context.page == target
+            ? " active"
+            : ""
+        )
+        << "\" href=\""
+        << target
+        << "\""
+        << (
+            context.page == target
+            ? " aria-current=\"page\""
+            : ""
+        )
+        << ">"
+        << "<span class=\"mobile-bottom-icon\">"
+        << icon
+        << "</span>"
+        << "<span>"
+        << htmlEscape(label)
+        << "</span>"
+        << "</a>";
+}
+
 std::string roleDisplay(
     const std::string& role
 )
@@ -1439,6 +1472,381 @@ button:disabled {
         text-align: right;
     }
 }
+
+/* Home AI Cloud dashboard redesign 0.0.22 */
+:root {
+    --bg: #0B1220;
+    --sidebar: rgba(8, 14, 25, 0.94);
+    --surface: #0E1726;
+    --surface-2: #111A2B;
+    --border: #223049;
+    --text: #E8EEF7;
+    --muted: #93A4B8;
+    --accent: #2563EB;
+    --accent-soft: rgba(37, 99, 235, 0.18);
+    --ok: #22C55E;
+    --warn: #F59E0B;
+    --danger: #EF4444;
+}
+
+html,
+body {
+    background:
+        radial-gradient(circle at 100% 0%, rgba(37, 99, 235, 0.13), transparent 34rem),
+        radial-gradient(circle at 35% 110%, rgba(34, 197, 94, 0.06), transparent 28rem),
+        var(--bg);
+}
+
+.sidebar {
+    width: 264px;
+    padding: 22px 16px;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    backdrop-filter: blur(16px);
+}
+
+.brand {
+    gap: 12px;
+    min-height: 48px;
+    padding: 0 10px 20px;
+    margin-bottom: 6px;
+    border-bottom: 0;
+}
+
+.brand-mark {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+    background: linear-gradient(135deg, #2563EB, #60A5FA 60%, #93C5FD);
+    color: white;
+    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.28);
+}
+
+.brand-text strong {
+    font-size: 0.94rem;
+    letter-spacing: 0.01em;
+}
+
+.brand-text small {
+    font-size: 0.74rem;
+}
+
+.nav-group {
+    margin-top: 13px;
+}
+
+.nav-caption {
+    padding: 9px 10px 7px;
+    color: #73849A;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+}
+
+.nav-link {
+    min-height: 42px;
+    gap: 11px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    color: #B8C5D5;
+    margin: 2px 0;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.nav-link:hover {
+    background: #111D30;
+}
+
+.nav-link.active {
+    background: linear-gradient(90deg, rgba(37, 99, 235, 0.24), rgba(37, 99, 235, 0.08));
+    color: white;
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.nav-link.active .nav-icon {
+    color: #7EB0FF;
+}
+
+.nav-icon {
+    color: #87A0BB;
+}
+
+.sidebar-user {
+    margin: 18px 0 0;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(255,255,255,0.025);
+}
+
+.content {
+    margin-left: 264px;
+}
+
+.topbar {
+    min-height: 82px;
+    padding: 18px 30px;
+    background: rgba(11, 18, 32, 0.78);
+    border-bottom: 1px solid rgba(34, 48, 73, 0.72);
+    backdrop-filter: blur(18px);
+}
+
+.topbar h1 {
+    font-size: clamp(1.35rem, 2vw, 1.9rem);
+    letter-spacing: -0.03em;
+}
+
+.topbar-meta {
+    color: #7E91A9;
+}
+
+.page {
+    max-width: 1440px;
+    padding: 26px 30px 50px;
+}
+
+.section-card {
+    padding: 20px;
+    margin-bottom: 16px;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.012)),
+        var(--surface);
+    box-shadow: 0 16px 40px rgba(0,0,0,0.18);
+}
+
+.section-title h2,
+.section-card > h2 {
+    letter-spacing: -0.02em;
+}
+
+.stats-grid,
+.placeholder-grid,
+.storage-grid {
+    gap: 12px;
+}
+
+.stat-card,
+.placeholder-card,
+.storage-card,
+.user-card,
+.audit-entry {
+    border: 1px solid #1F2D43;
+    border-radius: 14px;
+    background: #0E1828;
+}
+
+.stat-card {
+    min-height: 112px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 16px;
+}
+
+.stat-card strong {
+    font-size: 1.45rem;
+    letter-spacing: -0.035em;
+}
+
+input,
+select,
+textarea {
+    border-radius: 10px;
+    border-color: #2A3B56;
+    background: #0B1422;
+}
+
+button,
+.button-row > a {
+    border-radius: 12px;
+}
+
+button:not(.secondary):not(.danger) {
+    background: #2563EB;
+    color: white;
+}
+
+.secondary {
+    background: #111C2E;
+    border: 1px solid var(--border);
+}
+
+.danger {
+    background: #7D2730;
+}
+
+.camera-discovery-row {
+    border-radius: 12px;
+    border-color: #22344E;
+    background: #0E1828;
+}
+
+.update-progress-shell {
+    border-radius: 14px;
+    border-color: #28466D;
+    background: linear-gradient(145deg, rgba(37,99,235,0.12), rgba(37,99,235,0.03));
+}
+
+.dashboard-shortcuts {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.dashboard-shortcut {
+    min-height: 112px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 16px;
+    border: 1px solid #263852;
+    border-radius: 14px;
+    background: #111D30;
+    color: inherit;
+    text-decoration: none;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.dashboard-shortcut:hover {
+    background: #16243A;
+    transform: translateY(-1px);
+}
+
+.dashboard-shortcut-icon {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: #142139;
+    border: 1px solid #243A5A;
+    color: #8BB7F3;
+}
+
+.dashboard-shortcut strong {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.dashboard-shortcut span {
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+
+.mobile-bottom-nav {
+    display: none;
+}
+
+@media (max-width: 1100px) {
+    .dashboard-shortcuts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 860px) {
+    .sidebar {
+        width: min(86vw, 320px);
+        padding:
+            max(14px, env(safe-area-inset-top))
+            12px
+            max(14px, env(safe-area-inset-bottom));
+        background: rgba(8, 14, 25, 0.98);
+    }
+
+    .content {
+        margin-left: 0;
+    }
+
+    .brand {
+        background: transparent;
+    }
+
+    .topbar {
+        min-height: 68px;
+        padding:
+            max(10px, env(safe-area-inset-top))
+            14px
+            10px;
+    }
+
+    .page {
+        padding:
+            16px
+            14px
+            max(102px, calc(env(safe-area-inset-bottom) + 86px));
+    }
+
+    .section-card {
+        padding: 16px;
+        border-radius: 16px;
+    }
+
+    .mobile-bottom-nav {
+        position: fixed;
+        left: 10px;
+        right: 10px;
+        bottom: max(10px, env(safe-area-inset-bottom));
+        z-index: 850;
+        min-height: 68px;
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: 1fr;
+        padding: 7px;
+        border: 1px solid #263550;
+        border-radius: 18px;
+        background: rgba(12, 20, 34, 0.94);
+        backdrop-filter: blur(20px);
+        box-shadow: 0 14px 40px rgba(0,0,0,0.40);
+    }
+
+    .mobile-bottom-link {
+        min-width: 0;
+        display: grid;
+        place-items: center;
+        align-content: center;
+        gap: 2px;
+        padding: 5px 3px;
+        border-radius: 12px;
+        color: #8193A9;
+        text-decoration: none;
+        font-size: 0.68rem;
+    }
+
+    .mobile-bottom-link.active {
+        background: #15243A;
+        color: #DCEBFF;
+    }
+
+    .mobile-bottom-icon {
+        font-size: 1.05rem;
+        line-height: 1;
+    }
+}
+
+@media (max-width: 600px) {
+    .dashboard-shortcuts {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    .dashboard-shortcut {
+        min-height: 100px;
+        padding: 14px;
+    }
+}
+
+@media (max-width: 420px) {
+    .dashboard-shortcuts {
+        grid-template-columns: 1fr;
+    }
+
+    .mobile-bottom-link {
+        font-size: 0.62rem;
+    }
+}
+
 </style>
 </head>
 <body>
@@ -1849,6 +2257,31 @@ button:disabled {
         );
 
         page << R"HTML(
+<div class="section-card">
+<div class="section-title">
+<h2>Быстрый доступ</h2>
+<span class="section-hint">Основные функции Home AI Cloud</span>
+</div>
+<div class="dashboard-shortcuts">
+<a class="dashboard-shortcut" href="/cameras">
+<span class="dashboard-shortcut-icon">◉</span>
+<div><strong>Камеры</strong><span>Поиск, просмотр и управление камерами</span></div>
+</a>
+<a class="dashboard-shortcut" href="/network">
+<span class="dashboard-shortcut-icon">⇄</span>
+<div><strong>Сеть и WireGuard</strong><span>Интерфейсы, VPN и удалённый доступ</span></div>
+</a>
+<a class="dashboard-shortcut" href="/system">
+<span class="dashboard-shortcut-icon">▣</span>
+<div><strong>Система</strong><span>Состояние ядра и обновление сервера</span></div>
+</a>
+<a class="dashboard-shortcut" href="/storage">
+<span class="dashboard-shortcut-icon">◫</span>
+<div><strong>Хранилище</strong><span>Диски, пулы и состояние накопителей</span></div>
+</a>
+</div>
+</div>
+
 <div class="section-card">
 <div class="section-title">
 <h2>Ошибки и предупреждения</h2>
@@ -2618,7 +3051,7 @@ PrivateKey отображается в редакторе и сохраняет�
 <div class="section-card">
 <div class="section-title">
 <h2>Камеры</h2>
-<span class="section-hint">Camera Core 0.0.21</span>
+<span class="section-hint">Camera Core 0.0.22</span>
 </div>
 
 <div class="stats-grid">
@@ -3145,6 +3578,87 @@ ONVIF используется, если он включён; Hikvision и со�
 
     page << R"HTML(
 </main>
+)HTML";
+
+    page << "<nav class=\"mobile-bottom-nav\" aria-label=\"Быстрая навигация\">";
+
+    if (
+        uiHasPermission(
+            context,
+            "system.view"
+        )
+    ) {
+        mobileNavLink(
+            page,
+            context,
+            "/",
+            "Обзор",
+            "⌂"
+        );
+    }
+
+    if (
+        uiHasPermission(
+            context,
+            "cameras.view"
+        )
+    ) {
+        mobileNavLink(
+            page,
+            context,
+            "/cameras",
+            "Камеры",
+            "◉"
+        );
+    }
+
+    if (
+        uiHasPermission(
+            context,
+            "network.view"
+        )
+    ) {
+        mobileNavLink(
+            page,
+            context,
+            "/network",
+            "Сеть",
+            "⇄"
+        );
+    }
+
+    if (
+        uiHasPermission(
+            context,
+            "system.view"
+        )
+    ) {
+        mobileNavLink(
+            page,
+            context,
+            "/system",
+            "Система",
+            "▣"
+        );
+    }
+
+    if (
+        uiHasPermission(
+            context,
+            "system.manage"
+        )
+    ) {
+        mobileNavLink(
+            page,
+            context,
+            "/settings",
+            "Ещё",
+            "⚙"
+        );
+    }
+
+    page << R"HTML(
+</nav>
 </div>
 </div>
 
