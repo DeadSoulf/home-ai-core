@@ -265,3 +265,20 @@ Discovery protocols and service ports are not treated as manufacturer proof. In 
 SADP compatibility does not automatically label a camera as Hikvision, and ports 8000/37777/
 34567 are not used as vendor identity. The UI shows a manufacturer only after the camera
 reports it through authenticated device metadata.
+
+
+## 0.0.22 dashboard redesign
+
+The Web UI uses the approved Home AI Cloud visual language:
+
+- graphite/navy background with a blue primary accent
+- rounded status and content cards with clearer visual hierarchy
+- redesigned fixed desktop sidebar while keeping permission-aware navigation
+- dashboard quick links for cameras, network/WireGuard, system and storage
+- fixed bottom navigation on phones for the most-used sections
+- the existing mobile drawer remains available for the complete menu
+- existing functional routes, forms, APIs and server update workflow are preserved
+
+The redesign is intentionally presentation-first: camera discovery, WireGuard configuration,
+storage management, permissions and Web-based server updates continue to use their existing
+backend logic.
