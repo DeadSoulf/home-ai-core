@@ -18,7 +18,7 @@ Home AI Core is a local-first autonomous server platform designed for:
 
 ## Current development version
 
-0.0.21 — stop guessing camera manufacturers from service ports/SADP
+0.0.22 — redesigned responsive Home AI Cloud dashboard and navigation
 
 The repository root `VERSION` file is the single source of the compiled Core version.
 
