@@ -421,7 +421,23 @@ int main()
         ) == std::string::npos
         ||
         cameras.find(
-            "Camera Core 0.0.16"
+            "class=\"camera-discovery-list\""
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "camera-discovery-row"
+        ) == std::string::npos
+        ||
+        cameras.find(
+            "device.scopes"
+        ) != std::string::npos
+        ||
+        cameras.find(
+            "Найденный XAddr"
+        ) != std::string::npos
+        ||
+        cameras.find(
+            "Camera Core 0.0.17"
         ) == std::string::npos
         ||
         cameras.find(

@@ -618,6 +618,33 @@ small {
     padding: 15px;
 }
 
+.camera-discovery-list {
+    display: grid;
+    gap: 8px;
+}
+
+.camera-discovery-row {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 1fr)
+        auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--surface-2);
+    border: 1px solid #242a34;
+    border-radius: 8px;
+}
+
+.camera-discovery-row strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.camera-discovery-row button {
+    margin: 0;
+}
+
 .stat-card strong {
     display: block;
     margin-top: 8px;
@@ -2579,7 +2606,7 @@ PrivateKey отображается в редакторе и сохраняет�
 <div class="section-card">
 <div class="section-title">
 <h2>Камеры</h2>
-<span class="section-hint">Camera Core 0.0.16</span>
+<span class="section-hint">Camera Core 0.0.17</span>
 </div>
 
 <div class="stats-grid">
@@ -2618,7 +2645,7 @@ PrivateKey отображается в редакторе и сохраняет�
 
 <p class="muted">
 Поиск выполняется в локальной сети через WS-Discovery.
-Найденный XAddr можно перенести в форму камеры.
+Выберите нужную камеру из списка.
 </p>
 
 <div
@@ -2628,7 +2655,7 @@ PrivateKey отображается в редакторе и сохраняет�
 
 <div
     id="camera-discovery-list"
-    class="placeholder-grid"
+    class="camera-discovery-list"
     style="margin-top:14px"></div>
 </div>
 
@@ -2667,15 +2694,9 @@ PrivateKey отображается в редакторе и сохраняет�
     placeholder="Будет заполнен через ONVIF">
 </div>
 
-<div>
-<label for="camera-onvif-xaddr">ONVIF XAddr</label>
 <input
     id="camera-onvif-xaddr"
-    maxlength="2048"
-    autocomplete="off"
-    inputmode="url"
-    placeholder="http://192.168.1.50/onvif/device_service">
-</div>
+    type="hidden">
 
 <div>
 <label for="camera-username">Логин</label>
@@ -2810,9 +2831,9 @@ PrivateKey отображается в редакторе и сохраняет�
 <span class="section-hint">Video / NVR</span>
 </div>
 <div class="placeholder-grid">
-<div class="placeholder-card">ONVIF media profiles / PTZ — NEXT</div>
-<div class="placeholder-card">Live View — NEXT</div>
-<div class="placeholder-card">Запись и архив — NEXT</div>
+<div class="placeholder-card">Запись видео — NEXT</div>
+<div class="placeholder-card">Архив / таймлайн — NEXT</div>
+<div class="placeholder-card">Непрерывный видеопоток — NEXT</div>
 <div class="placeholder-card">Аналитика — NEXT</div>
 </div>
 </div>
@@ -6339,13 +6360,13 @@ async function discoverOnvifCameras() {
                     index
                 ];
 
-            const card =
+            const row =
                 document.createElement(
                     "div"
                 );
 
-            card.className =
-                "placeholder-card";
+            row.className =
+                "camera-discovery-row";
 
             const title =
                 document.createElement(
@@ -6358,50 +6379,7 @@ async function discoverOnvifCameras() {
 
             title.dataset.i18nSkip = "";
 
-            card.appendChild(title);
-
-            const xaddr =
-                document.createElement(
-                    "div"
-                );
-
-            xaddr.className =
-                "muted";
-            xaddr.style.marginTop =
-                "8px";
-            xaddr.textContent =
-                device.xaddr || "-";
-            xaddr.dataset.i18nSkip = "";
-
-            card.appendChild(xaddr);
-
-            if (device.scopes) {
-                const scopes =
-                    document.createElement(
-                        "div"
-                    );
-
-                scopes.className =
-                    "muted";
-                scopes.style.marginTop =
-                    "6px";
-                scopes.textContent =
-                    device.scopes;
-                scopes.dataset.i18nSkip =
-                    "";
-
-                card.appendChild(
-                    scopes
-                );
-            }
-
-            const actions =
-                document.createElement(
-                    "div"
-                );
-
-            actions.className =
-                "button-row";
+            row.appendChild(title);
 
             const use =
                 document.createElement(
@@ -6504,16 +6482,12 @@ async function discoverOnvifCameras() {
                 }
             );
 
-            actions.appendChild(
+            row.appendChild(
                 use
             );
 
-            card.appendChild(
-                actions
-            );
-
             list.appendChild(
-                card
+                row
             );
         }
     }

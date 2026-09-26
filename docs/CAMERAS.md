@@ -172,10 +172,11 @@ credentials. Media-tool error text is redacted before it is returned by the API.
 The Cameras page provides:
 
 - total / online / offline / disabled counters
-- add/edit form with RTSP and ONVIF endpoints
+- add/edit form with automatic ONVIF state kept internally
 - edit without exposing the stored password
 - enable/disable control
-- ONVIF WS-Discovery results
+- compact ONVIF WS-Discovery list showing only the camera IP/address
+- technical XAddr and discovery scopes are not shown in the normal Web UI
 - manufacturer, model, firmware version and serial number
 - persistent device metadata on camera cards
 - ONVIF PTZ capability detection from PTZ service + Media Profile
@@ -281,3 +282,18 @@ waiting keep server stop/restart bounded.
 
 A later recorder milestone will replace the repeated-JPEG preview with a persistent continuous
 video transport shared with recording and archive playback.
+
+
+## Simplified discovery UI
+
+Starting with 0.0.17, WS-Discovery results are presented as a compact user-facing list:
+
+```text
+10.10.10.13    [Use]
+10.10.10.3     [Use]
+10.10.10.10    [Use]
+```
+
+The ONVIF XAddr, scopes and profile URLs remain available internally to Camera Core but are
+not rendered in the discovery list. The XAddr form field is also hidden from the normal camera
+form; selecting a camera stores it automatically.

@@ -156,7 +156,9 @@ Current content:
 - Camera Core status overview
 - persistent RTSP camera registry
 - create, edit and delete cameras
-- separate RTSP URL, ONVIF XAddr, username and password fields
+- RTSP URL, username and password camera form
+- ONVIF XAddr kept as hidden internal state instead of a user-facing field
+- compact ONVIF discovery list showing only camera IP/address and the Use action
 - local encrypted password storage
 - ONLINE/OFFLINE/disabled network state
 - lightweight RTSP endpoint checks

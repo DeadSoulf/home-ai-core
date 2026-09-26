@@ -690,3 +690,4 @@ PTZ не поддерживается этой камерой.	PTZ is not suppor
 PTZ для этой камеры не настроен.	PTZ is not configured for this camera.
 PTZ не поддерживается или ещё не обнаружен через ONVIF.	PTZ is not supported or has not yet been detected via ONVIF.
 Неизвестная PTZ команда.	Unknown PTZ command.
+Выберите нужную камеру из списка.	Select the camera you want from the list.

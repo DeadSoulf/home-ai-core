@@ -19,7 +19,8 @@
 | 0.0.13 | Fix camera inventory projection after ONVIF migration | DEVELOPMENT SNAPSHOT |
 | 0.0.14 | Automatic RTSP discovery from ONVIF Media Profiles | DEVELOPMENT SNAPSHOT |
 | 0.0.15 | ONVIF manufacturer/model/firmware/serial metadata | DEVELOPMENT SNAPSHOT |
-| 0.0.16 | ONVIF PTZ controls + browser Live View preview | IN DEVELOPMENT |
+| 0.0.16 | ONVIF PTZ controls + browser Live View preview | DEVELOPMENT SNAPSHOT |
+| 0.0.17 | Simplified ONVIF discovery list and hidden technical endpoints | IN DEVELOPMENT |
 | next 0.0.x | Recorder + continuous video transport + archive/event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
@@ -231,26 +232,32 @@ Implemented in the 0.0.15 snapshot:
 - hardware ID persistence for diagnostics
 - camera metadata stored separately from encrypted credentials
 
-## Current focus: 0.0.16
+## Development snapshot: 0.0.16
 
-Current Camera Core work:
+Implemented in the 0.0.16 snapshot:
 
 - ONVIF PTZ service discovery
 - PTZ-capable Media Profile detection
-- persistent PTZ XAddr and profile token with automatic SQLite migration
+- persistent PTZ XAddr and profile token
 - authenticated ContinuousMove / Stop commands
-- touch-friendly press-and-hold pan / tilt / zoom controls
-- short PTZ safety timeout plus explicit Stop on release
+- touch-friendly pan / tilt / zoom controls
 - on-demand browser Live View preview
-- Live View refreshes JPEG frames only while enabled
-- Live View automatically stops when the page is left
-- parallel Web client workers so camera frame generation does not block unrelated requests
-- 15-second client socket timeout and clean worker drain during server shutdown
-- PTZ parser/persistence/Web UI test coverage
+- parallel Web client workers for camera operations
 
-0.0.16 intentionally keeps Live View as a JPEG preview. The next recorder milestone will own
-the persistent high-frame-rate stream pipeline and reuse it for browser playback, recording
-and archive.
+## Current focus: 0.0.17
+
+Current Camera Core/Web UI work:
+
+- compact WS-Discovery camera list
+- only the discovered camera IP/address is shown to the user
+- ONVIF XAddr is retained internally and no longer displayed in the normal camera form
+- discovery scopes, hardware URLs and profile URLs are hidden from the user-facing list
+- existing automatic ONVIF selection and stream detection behavior is preserved
+- camera discovery layout remains responsive on desktop and mobile
+- Web UI tests enforce the simplified discovery presentation
+
+0.0.17 is a presentation cleanup only; Camera Core continues to use the full ONVIF discovery
+metadata internally.
 
 ## Later major capabilities
 
