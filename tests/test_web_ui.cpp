@@ -630,6 +630,29 @@ int main()
     }
 
     context.page =
+        "/settings";
+
+    const auto settings =
+        homeai::renderWebUi(
+            context
+        );
+
+    if (
+        settings.find(
+            "name=\"core.name\" value=\"Home AI Core\""
+        ) == std::string::npos
+        ||
+        settings.find(
+            "name=\"core.name\" value=\"<span"
+        ) != std::string::npos
+    ) {
+        std::cerr
+            << "Settings core name input is invalid\n";
+
+        return 1;
+    }
+
+    context.page =
         "/system";
 
     const auto system =

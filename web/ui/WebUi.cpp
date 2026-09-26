@@ -4427,7 +4427,9 @@ ONVIF используется, если он включён; Hikvision и со�
 <input name="core.name" value=")HTML";
 
             page
-                << "<span data-i18n-skip>" << htmlEscape(context.core_name) << "</span>"
+                << htmlEscape(
+                    context.core_name
+                )
                 << R"HTML(">
 </div>
 
