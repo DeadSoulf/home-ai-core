@@ -210,6 +210,18 @@ int main()
         home.find(
             "sidebar.inert"
         ) == std::string::npos
+        ||
+        home.find(
+            "dashboard-shortcuts"
+        ) == std::string::npos
+        ||
+        home.find(
+            "mobile-bottom-nav"
+        ) == std::string::npos
+        ||
+        home.find(
+            "Home AI Cloud dashboard redesign 0.0.22"
+        ) == std::string::npos
     ) {
         std::cerr
             << "Home page structure is invalid\n";
