@@ -218,3 +218,15 @@ Future versions can extend it with:
 - configuration reload
 - module resource limits
 - signed external module packages
+
+
+## Notification Center
+
+Since 0.0.47 the Event Bus supports both topic-specific handlers and global subscribers.
+Events may optionally include a source and severity. Only events with an explicit user-visible
+severity (`info`, `warning`, `error`, `critical`) enter the bounded in-memory
+Notification Center.
+
+0.0.48 exposes recent notifications through the permission-protected
+`GET /api/notifications` endpoint and renders them on the System page. This is intentionally
+an in-memory operational feed; durable retention/export remains a later feature.
