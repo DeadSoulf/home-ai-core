@@ -312,7 +312,11 @@ non-browser API clients. A CSRF token from another session is rejected.
 
 ## Planned hardening
 
-- source/IP-aware login throttling
+Source/IP-aware login throttling is implemented as of 0.0.43.
+
+Remaining hardening:
+
+- trusted reverse-proxy mode with an explicit proxy allowlist before forwarded client IPs are accepted
 - optional MFA
 - encrypted secrets store
 - signed update/module verification
