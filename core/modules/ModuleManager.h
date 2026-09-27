@@ -2,6 +2,8 @@
 
 #include "core/modules/Module.h"
 
+#include <chrono>
+#include <cstddef>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -32,6 +34,9 @@ struct ModuleStatus {
 
     std::vector<std::string>
         dependencies;
+
+    std::size_t restart_count{0};
+    std::size_t watchdog_attempts{0};
 };
 
 class ModuleManager {
@@ -50,6 +55,16 @@ public:
     );
 
     void stopAll();
+
+    bool restartModule(
+        const std::string& name,
+        std::string& error
+    );
+
+    std::size_t watchdogPass(
+        std::size_t max_attempts,
+        std::chrono::seconds cooldown
+    );
 
     std::vector<ModuleStatus>
     snapshot() const;
@@ -71,6 +86,12 @@ private:
         };
 
         std::string message;
+
+        std::size_t restart_count{0};
+        std::size_t watchdog_attempts{0};
+
+        std::chrono::steady_clock::time_point
+            last_watchdog_attempt{};
     };
 
     bool resolveOrder(
