@@ -13,6 +13,9 @@ struct WebUiContext {
     std::string tick_ms;
     std::string web_bind;
     std::string web_port;
+    std::string web_tls_enabled;
+    std::string web_tls_certificate;
+    std::string web_tls_private_key;
     std::string storage_video_mounts;
     std::string storage_personal_mounts;
     std::string storage_vm_mounts;

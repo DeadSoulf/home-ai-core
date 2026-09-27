@@ -32,6 +32,15 @@ int main()
     context.web_port =
         "8080";
 
+    context.web_tls_enabled =
+        "true";
+
+    context.web_tls_certificate =
+        "runtime/tls/server.crt";
+
+    context.web_tls_private_key =
+        "runtime/tls/server.key";
+
     context.username =
         "admin";
 
@@ -595,6 +604,45 @@ int main()
     ) {
         std::cerr
             << "Unknown Web UI route was accepted\n";
+
+        return 1;
+    }
+
+    context.page =
+        "/network";
+
+    const auto network =
+        homeai::renderWebUi(
+            context
+        );
+
+    if (
+        network.find(
+            "name=\"web.tls_enabled\""
+        ) == std::string::npos
+        ||
+        network.find(
+            "name=\"web.tls_certificate\""
+        ) == std::string::npos
+        ||
+        network.find(
+            "name=\"web.tls_private_key\""
+        ) == std::string::npos
+        ||
+        network.find(
+            "Включить встроенный HTTPS"
+        ) == std::string::npos
+        ||
+        network.find(
+            "runtime/tls/server.crt"
+        ) == std::string::npos
+        ||
+        network.find(
+            "runtime/tls/server.key"
+        ) == std::string::npos
+    ) {
+        std::cerr
+            << "HTTPS network settings are missing\n";
 
         return 1;
     }

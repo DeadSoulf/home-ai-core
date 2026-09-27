@@ -7752,6 +7752,12 @@ void WebServer::handleClient(
                     key == "web.bind"
                     ||
                     key == "web.port"
+                    ||
+                    key == "web.tls_enabled"
+                    ||
+                    key == "web.tls_certificate"
+                    ||
+                    key == "web.tls_private_key"
                 ) {
                     return
                         security_.hasPermission(
@@ -7843,6 +7849,9 @@ void WebServer::handleClient(
             "runtime.tick_ms",
             "web.bind",
             "web.port",
+            "web.tls_enabled",
+            "web.tls_certificate",
+            "web.tls_private_key",
             "storage.video_mounts",
             "storage.personal_mounts",
             "storage.vm_mounts",
@@ -7882,6 +7891,59 @@ void WebServer::handleClient(
                     "403 Forbidden",
                     "application/json; charset=utf-8",
                     "{\"error\":\"permission_denied\"}"
+                );
+
+                return;
+            }
+        }
+
+        const auto valid_tls_path =
+            [](const std::string& value) {
+                return
+                    value.rfind("runtime/tls/", 0) == 0
+                    &&
+                    value.find("..") == std::string::npos
+                    &&
+                    value.size() > std::string("runtime/tls/").size();
+            };
+
+        const auto tls_enabled_it =
+            form.find("web.tls_enabled");
+
+        if (
+            tls_enabled_it != form.end()
+            &&
+            tls_enabled_it->second != "true"
+            &&
+            tls_enabled_it->second != "false"
+        ) {
+            sendResponse(
+                client_fd,
+                "400 Bad Request",
+                "application/json; charset=utf-8",
+                "{"error":"invalid_tls_enabled"}"
+            );
+
+            return;
+        }
+
+        for (const auto* tls_key : {
+            "web.tls_certificate",
+            "web.tls_private_key"
+        }) {
+            const auto it =
+                form.find(tls_key);
+
+            if (
+                it != form.end()
+                &&
+                !valid_tls_path(it->second)
+            ) {
+                sendResponse(
+                    client_fd,
+                    "400 Bad Request",
+                    "application/json; charset=utf-8",
+                    "{"error":"invalid_tls_path"}"
                 );
 
                 return;
@@ -8003,6 +8065,24 @@ void WebServer::handleClient(
             config.get(
                 "web.port",
                 "8080"
+            );
+
+        context.web_tls_enabled =
+            config.get(
+                "web.tls_enabled",
+                "false"
+            );
+
+        context.web_tls_certificate =
+            config.get(
+                "web.tls_certificate",
+                "runtime/tls/server.crt"
+            );
+
+        context.web_tls_private_key =
+            config.get(
+                "web.tls_private_key",
+                "runtime/tls/server.key"
             );
 
         context.storage_video_mounts =

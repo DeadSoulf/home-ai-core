@@ -47,6 +47,7 @@ High-level project status, dependencies and execution order are tracked in [MAST
 | 0.0.49 | Host readiness diagnostics | DEVELOPMENT SNAPSHOT |
 | 0.0.50 | Updater immutable build activation + active-build acceptance check | DEVELOPMENT SNAPSHOT |
 | 0.0.51 | Fix first activation when build-prev does not yet exist | DEVELOPMENT SNAPSHOT |
+| 0.0.52 | Web-managed HTTPS configuration | DEVELOPMENT SNAPSHOT |
 | next acceptance | Real Debian host acceptance for Phase A foundation | IN PROGRESS |
 | next 0.0.x | Hypervisor managed virtual disks / ISO / networking / editor / console | PLANNED |
 | next 0.0.x | Storage health and shared pool completion | PLANNED |
@@ -548,3 +549,12 @@ Update/acceptance reliability in this milestone:
 - first immutable-build activation now treats a missing `build-prev` as the normal initial state
 - active-build inspection also handles a missing `build` path safely
 - updater activation regression test remains the acceptance gate
+
+
+## Development snapshot: 0.0.52
+
+- HTTPS enable/disable is exposed in the Network Web UI
+- TLS certificate and private-key paths are visible/editable to users with `network.manage`
+- TLS paths are constrained to `runtime/tls/`
+- configuration API exposes and persists the TLS settings through the existing CSRF-protected path
+- UI clearly states that Web bind/port/TLS changes require a Core restart

@@ -271,6 +271,10 @@ web.tls_certificate=runtime/tls/server.crt
 web.tls_private_key=runtime/tls/server.key
 ```
 
+Starting with 0.0.52 these values can also be changed from the Network page by a user with
+`network.manage`. Certificate and key paths are constrained to `runtime/tls/`, and changes
+take effect after a Core restart.
+
 When enabled, startup fails closed if the certificate is missing, the private key is invalid,
 or the key does not match the certificate. TLS 1.2 or newer is required. HTTPS responses add
 HSTS and authenticated session cookies receive the `Secure` attribute.

@@ -3558,6 +3558,13 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
                 context.web_port
             )
             << R"HTML(</div>
+<div>HTTPS</div><div>)HTML"
+            << (
+                context.web_tls_enabled == "true"
+                ? "<span class=\"status-ok\">ENABLED</span>"
+                : "<span class=\"muted\">DISABLED</span>"
+            )
+            << R"HTML(</div>
 <div>Web Core</div><div class="status-ok">RUNNING</div>
 </div>
 </div>
@@ -3602,6 +3609,51 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
                 )
                 << R"HTML(">
 </div>
+
+<div>
+<label>HTTPS</label>
+<input type="hidden" name="web.tls_enabled" value="false">
+<label style="display:flex;align-items:center;gap:10px;min-height:48px">
+<input
+    type="checkbox"
+    name="web.tls_enabled"
+    value="true")HTML";
+
+            if (context.web_tls_enabled == "true")
+                page << " checked";
+
+            page << R"HTML(>
+<span>Включить встроенный HTTPS</span>
+</label>
+</div>
+
+<div>
+<label>Файл сертификата</label>
+<input
+    name="web.tls_certificate"
+    value=")HTML";
+
+            page
+                << htmlEscape(
+                    context.web_tls_certificate
+                )
+                << R"HTML("
+    placeholder="runtime/tls/server.crt">
+</div>
+
+<div>
+<label>Файл закрытого ключа</label>
+<input
+    name="web.tls_private_key"
+    value=")HTML";
+
+            page
+                << htmlEscape(
+                    context.web_tls_private_key
+                )
+                << R"HTML("
+    placeholder="runtime/tls/server.key">
+</div>
 </div>
 
 <div class="button-row">
@@ -3609,7 +3661,8 @@ style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-
 </div>
 
 <p class="muted">
-Изменение bind address или порта вступит в силу после перезапуска ядра.
+Изменение bind address, порта или HTTPS вступит в силу после перезапуска ядра.
+TLS-файлы должны находиться внутри runtime/tls/.
 </p>
 </form>
 </div>
