@@ -7,8 +7,8 @@ low-level details.
 ## Current baseline
 
 - Branch: `develop`
-- Version: `0.0.49`
-- Current focus: finish the platform foundation before resuming major Hypervisor/Storage expansion.
+- Version: `0.0.50`
+- Current focus: finish real-host Phase A acceptance after fixing updater build activation discovered during acceptance.
 - CI: Debian build/test workflow is active and the current `develop` snapshot passes it.
 - Virtualization test environment note: the current development server may itself run inside a KVM
   guest without VMX/SVM passthrough. Absence of nested `/dev/kvm` in that environment is therefore
@@ -36,7 +36,7 @@ on a suitable environment when hardware integration is involved.
 |---|---:|---|---|---|
 | Core Runtime / Module Manager | ~93% | Runtime, Config, Logger, Event Bus, global event subscriptions, in-memory Notification Center, module dependency ordering, lifecycle, health, reverse shutdown, dependency-safe restart, bounded unhealthy-only runtime watchdog, module API/UI | Real-server acceptance, explicit Web/API restart control, config reload, resource limits, signed external modules | Security, Event Bus |
 | System / Server Admin | ~88% | CPU/RAM/load/uptime/filesystem, health, GPU inventory, systemd integration, host readiness diagnostics for toolchain/helpers/media/TLS/KVM/QEMU/libvirt | Real-server acceptance, processes/services, journal, sensors, power actions, config backup | Core, Security |
-| Update Core | ~85% | Git update, clean-tree guard, FF-only pull, CMake/Ninja, CTest, rollback, restart | Signed releases/modules, production channels, cluster update, downgrade/data migrations | Core, Security |
+| Update Core | ~88% | Git update, clean-tree guard, FF-only pull, CMake/Ninja, CTest, rollback, restart, immutable tested build directories and symlink activation | Signed releases/modules, production channels, cluster update, downgrade/data migrations | Core, Security |
 | Web UI / API | ~84% | Authenticated responsive RU/EN UI, permission-aware routes/navigation, subsystem pages, protected notification feed and host readiness UI | Unified API errors, SSE/WebSocket realtime transport, API docs | Core, Security |
 | Security Core | ~82% | SQLite identity store, PBKDF2, roles/overrides, persistent sessions, audit, HTTPS/TLS, session-bound CSRF, source-aware login throttling, protected config forms | MFA, encrypted secrets store, trusted reverse-proxy mode, signed update/module verification, audit retention/export | Core |
 | Network / WireGuard | ~70% | Interface inventory, DHCP/static IPv4, gateway/DNS, NetworkManager/networkd/ifupdown, guarded helper, rollback, WireGuard profile management | Bridge/VLAN/bonding, advanced routes, DNS diagnostics, firewall, Hypervisor networks | Core, Security |
@@ -69,6 +69,10 @@ This phase must be completed before large new service layers are treated as prod
 | Host requirements diagnostics | DONE in 0.0.49 (CI verified) | Protected readiness API/UI checks update toolchain, storage/network helpers, media tools, HTTPS, KVM/nested virtualization and QEMU/libvirt with actionable messages |
 
 ### Phase A exit gate
+
+Real-host acceptance exposed and 0.0.50 fixes a build-activation defect where a CMake tree was
+renamed after configuration, leaving stale absolute CTest paths. Acceptance now checks the active
+build metadata explicitly.
 
 The platform foundation can be treated as approximately 90–95% complete when:
 

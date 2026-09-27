@@ -1,4 +1,5 @@
 #include "server/update/UpdateManager.h"
+#include "server/update/BuildActivator.h"
 
 #include <algorithm>
 #include <array>
@@ -726,26 +727,31 @@ void UpdateManager::performUpdate()
         return;
     }
 
+    const auto release_name =
+        BuildActivator::
+            releaseDirectoryName(
+                new_head
+            );
+
+    if (release_name.empty()) {
+        rollbackSource(
+            old_head
+        );
+
+        setState(
+            UpdateState::Error,
+            "Unable to derive a safe release build directory."
+        );
+
+        return;
+    }
+
     const auto next_build =
         std::filesystem::path(
             repository_path_
         )
         /
-        "build-next";
-
-    const auto active_build =
-        std::filesystem::path(
-            repository_path_
-        )
-        /
-        "build";
-
-    const auto previous_build =
-        std::filesystem::path(
-            repository_path_
-        )
-        /
-        "build-prev";
+        release_name;
 
     std::error_code fs_error;
 
@@ -928,70 +934,23 @@ void UpdateManager::performUpdate()
         tests.output
     );
 
-    std::filesystem::remove_all(
-        previous_build,
-        fs_error
-    );
-
-    fs_error.clear();
+    std::string activation_error;
 
     if (
-        std::filesystem::exists(
-            active_build
+        !BuildActivator::activate(
+            repository_path_,
+            next_build,
+            activation_error
         )
     ) {
-        std::filesystem::rename(
-            active_build,
-            previous_build,
-            fs_error
-        );
-
-        if (fs_error) {
-            rollbackSource(
-                old_head
-            );
-
-            setState(
-                UpdateState::Error,
-                "Не удалось сохранить предыдущую сборку.",
-                fs_error.message()
-            );
-
-            return;
-        }
-    }
-
-    fs_error.clear();
-
-    std::filesystem::rename(
-        next_build,
-        active_build,
-        fs_error
-    );
-
-    if (fs_error) {
-        if (
-            std::filesystem::exists(
-                previous_build
-            )
-        ) {
-            std::error_code restore_error;
-
-            std::filesystem::rename(
-                previous_build,
-                active_build,
-                restore_error
-            );
-        }
-
         rollbackSource(
             old_head
         );
 
         setState(
             UpdateState::Error,
-            "Не удалось активировать новую сборку.",
-            fs_error.message()
+            "Unable to activate the tested build.",
+            activation_error
         );
 
         return;

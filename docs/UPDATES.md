@@ -46,20 +46,27 @@ check clean working tree
         ↓
 git pull --ff-only
         ↓
-configure build-next with CMake/Ninja
+configure immutable build-release-<commit> with CMake/Ninja
         ↓
 compile
         ↓
-run CTest
+run CTest in that exact directory
         ↓
-keep old build as build-prev
+move current build entry to build-prev
         ↓
-activate new build
+atomically point build -> tested build-release-<commit>
         ↓
 offer restart
 ```
 
 If configuration, compilation, or tests fail, the source tree is reset to the previous commit and the running build is kept.
+
+Build directories are never renamed after CMake configuration. CMake and CTest embed absolute
+paths in generated metadata, so moving `build-next` to `build` can leave the active tree
+pointing at executables that no longer exist. Starting with 0.0.50, each tested build remains in
+an immutable `build-release-<commit>` directory and the stable `build` path is a directory
+symlink switched only after the full test suite succeeds. `build-prev` keeps the previous build
+entry for rollback.
 
 ## Restart
 

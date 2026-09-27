@@ -4,7 +4,7 @@ set -o pipefail
 
 ROOT="${1:-$(pwd)}"
 LOGIN_USER="${HOMEAI_ACCEPTANCE_USER:-}"
-EXPECTED_VERSION="0.0.49"
+EXPECTED_VERSION="0.0.50"
 BUILD_DIR="${HOMEAI_ACCEPTANCE_BUILD_DIR:-$ROOT/build-acceptance}"
 
 pass=0
@@ -126,6 +126,19 @@ if run_check "CMake configure" cmake -S . -B "$BUILD_DIR" -G Ninja -DCMAKE_BUILD
     if run_check "Ninja build" cmake --build "$BUILD_DIR"; then
         run_check "Full CTest suite" ctest --test-dir "$BUILD_DIR" --output-on-failure
     fi
+fi
+
+if [[ -d "$ROOT/build" || -L "$ROOT/build" ]]; then
+    active_ctest=$(ctest --test-dir "$ROOT/build" -N 2>&1 || true)
+
+    if grep -Fq "Could not find executable" <<<"$active_ctest"; then
+        say_fail "Active build contains stale CTest executable paths"
+        printf '%s\n' "$active_ctest" | grep -A3 -B1 -F "Could not find executable" | sed -n '1,16p' | sed 's/^/      /'
+    else
+        say_pass "Active build CTest metadata resolves executable paths"
+    fi
+else
+    say_fail "Active build path is missing: $ROOT/build"
 fi
 
 printf '\n== Service ==\n'

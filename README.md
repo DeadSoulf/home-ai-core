@@ -18,7 +18,7 @@ Home AI Core is a local-first autonomous server platform designed for:
 
 ## Current development version
 
-0.0.49 — platform foundation: recovery, notifications and host readiness
+0.0.50 — updater-safe immutable build activation and Phase A acceptance hardening
 
 The repository root `VERSION` file is the single source of the compiled Core version.
 

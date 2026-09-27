@@ -45,6 +45,7 @@ High-level project status, dependencies and execution order are tracked in [MAST
 | 0.0.47 | Event Bus global subscriptions + Notification Center | DEVELOPMENT SNAPSHOT |
 | 0.0.48 | Protected notifications API + System event feed | DEVELOPMENT SNAPSHOT |
 | 0.0.49 | Host readiness diagnostics | DEVELOPMENT SNAPSHOT |
+| 0.0.50 | Updater immutable build activation + active-build acceptance check | DEVELOPMENT SNAPSHOT |
 | next acceptance | Real Debian host acceptance for Phase A foundation | IN PROGRESS |
 | next 0.0.x | Hypervisor managed virtual disks / ISO / networking / editor / console | PLANNED |
 | next 0.0.x | Storage health and shared pool completion | PLANNED |
@@ -526,3 +527,16 @@ Host readiness diagnostics in this milestone:
 - missing VMX/SVM or `/dev/kvm` is reported as host attention, not a Core crash
 - nested-virtualization guidance is explicit for virtualized development hosts
 - Debian CI passes all 24 tests
+
+
+## Development snapshot: 0.0.50
+
+Update/acceptance reliability in this milestone:
+
+- tested CMake build directories are no longer renamed after configuration
+- updater uses immutable `build-release-<commit>` directories
+- stable `build` path switches through a directory symlink only after CTest succeeds
+- `build-prev` preserves the previous active build entry for rollback
+- managed previous release directories are cleaned only after they are no longer active
+- Update Manager tests simulate two consecutive build activations
+- Phase A acceptance detects stale active CTest executable paths

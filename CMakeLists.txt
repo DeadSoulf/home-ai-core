@@ -100,6 +100,7 @@ add_library(
     server/storage/StorageMonitor.cpp
     server/storage/StoragePool.cpp
     server/storage/DiskOperations.cpp
+    server/update/BuildActivator.cpp
     server/update/UpdateManager.cpp
 
     security/auth/SecurityManager.cpp
