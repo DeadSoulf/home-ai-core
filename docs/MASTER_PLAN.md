@@ -7,7 +7,7 @@ low-level details.
 ## Current baseline
 
 - Branch: `develop`
-- Version: `0.0.44`
+- Version: `0.0.46`
 - Current focus: finish the platform foundation before resuming major Hypervisor/Storage expansion.
 - CI: Debian build/test workflow is active and the current `develop` snapshot passes it.
 - Virtualization test environment note: the current development server may itself run inside a KVM
@@ -34,7 +34,7 @@ on a suitable environment when hardware integration is involved.
 
 | Module | Readiness | Implemented / verified today | In progress / next | Dependencies |
 |---|---:|---|---|---|
-| Core Runtime / Module Manager | ~90% | Runtime, Config, Logger, Event Bus, module dependency ordering, lifecycle, health, reverse shutdown, module API/UI | Per-module restart, watchdog/recovery, config reload, resource limits, signed external modules | Security, Event Bus |
+| Core Runtime / Module Manager | ~92% | Runtime, Config, Logger, Event Bus, module dependency ordering, lifecycle, health, reverse shutdown, dependency-safe restart, bounded unhealthy-only runtime watchdog, module API/UI | Real-server acceptance, Web/API restart control, config reload, resource limits, signed external modules | Security, Event Bus |
 | System / Server Admin | ~85% | CPU/RAM/load/uptime/filesystem, health, GPU inventory, systemd integration | Processes/services, journal, sensors, power actions, config backup | Core, Security |
 | Update Core | ~85% | Git update, clean-tree guard, FF-only pull, CMake/Ninja, CTest, rollback, restart | Signed releases/modules, production channels, cluster update, downgrade/data migrations | Core, Security |
 | Web UI / API | ~82% | Authenticated responsive RU/EN UI, permission-aware routes/navigation, subsystem pages | Unified API errors, SSE/WebSocket events, API docs, notification center | Core, Security |
@@ -64,7 +64,7 @@ This phase must be completed before large new service layers are treated as prod
 | Source-aware login throttling | DONE in 0.0.43 | Independent username and peer-source throttling; forwarded headers are not trusted by default |
 | Configuration-form CSRF compatibility | DONE in 0.0.44 | Legacy settings/config forms follow the same protected mutation path |
 | Documentation consolidation | IN PROGRESS | MASTER_PLAN is the high-level source of truth; ROADMAP and subsystem docs must not contradict implemented state |
-| Module restart + watchdog/recovery | NEXT | Restart one failed/degraded module without restarting the whole Core; bounded retries and clear health transitions |
+| Module restart + watchdog/recovery | DONE in 0.0.46 (CI verified) | Dependency-aware restart, unhealthy-only watchdog, bounded retries/cooldown; real-server acceptance remains |
 | Unified events / notifications | PLANNED | User-visible event feed driven by Event Bus, with persistence policy and permission filtering |
 | Host requirements diagnostics | PLANNED | Explicit checks for KVM, nested virtualization exposure, storage/network/helper requirements and actionable readiness output |
 
@@ -235,15 +235,14 @@ AI Brain
 
 ## Immediate execution order
 
-1. Finish documentation synchronization around 0.0.44.
-2. Implement Module Manager restart/watchdog/recovery.
-3. Add unified Event Bus-backed notifications.
-4. Add host requirements/readiness diagnostics.
-5. Run the Phase A acceptance suite on CI and the real Debian server.
-6. Resume Hypervisor with real managed virtual disk creation.
-7. Continue ISO -> networking -> VM editor -> console -> snapshots/backup.
-8. Close Storage health.
-9. Build Recorder/NVR.
+1. Run real-server acceptance for 0.0.46 watchdog/recovery.
+2. Add unified Event Bus-backed notifications.
+3. Add host requirements/readiness diagnostics.
+4. Run the complete Phase A acceptance suite on the real Debian server.
+5. Resume Hypervisor with real managed virtual disk creation.
+6. Continue ISO -> networking -> VM editor -> console -> snapshots/backup.
+7. Close Storage health.
+8. Build Recorder/NVR.
 
 Update this file after every development snapshot so project state does not have to be reconstructed
 from commit history.
