@@ -7921,7 +7921,7 @@ void WebServer::handleClient(
                 client_fd,
                 "400 Bad Request",
                 "application/json; charset=utf-8",
-                "{"error":"invalid_tls_enabled"}"
+                "{\"error\":\"invalid_tls_enabled\"}"
             );
 
             return;
@@ -7943,7 +7943,7 @@ void WebServer::handleClient(
                     client_fd,
                     "400 Bad Request",
                     "application/json; charset=utf-8",
-                    "{"error":"invalid_tls_path"}"
+                    "{\"error\":\"invalid_tls_path\"}"
                 );
 
                 return;

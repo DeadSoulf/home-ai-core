@@ -47,7 +47,8 @@ High-level project status, dependencies and execution order are tracked in [MAST
 | 0.0.49 | Host readiness diagnostics | DEVELOPMENT SNAPSHOT |
 | 0.0.50 | Updater immutable build activation + active-build acceptance check | DEVELOPMENT SNAPSHOT |
 | 0.0.51 | Fix first activation when build-prev does not yet exist | DEVELOPMENT SNAPSHOT |
-| 0.0.52 | Web-managed HTTPS configuration | DEVELOPMENT SNAPSHOT |
+| 0.0.52 | Web-managed HTTPS configuration foundation | DEVELOPMENT SNAPSHOT |
+| 0.0.53 | Compile fix for validated TLS configuration API | DEVELOPMENT SNAPSHOT |
 | next acceptance | Real Debian host acceptance for Phase A foundation | IN PROGRESS |
 | next 0.0.x | Hypervisor managed virtual disks / ISO / networking / editor / console | PLANNED |
 | next 0.0.x | Storage health and shared pool completion | PLANNED |
@@ -558,3 +559,9 @@ Update/acceptance reliability in this milestone:
 - TLS paths are constrained to `runtime/tls/`
 - configuration API exposes and persists the TLS settings through the existing CSRF-protected path
 - UI clearly states that Web bind/port/TLS changes require a Core restart
+
+
+## Development snapshot: 0.0.53
+
+- corrected JSON error responses in the validated TLS configuration API
+- keeps the 0.0.52 Web-managed HTTPS controls and runtime/tls path restriction

@@ -18,7 +18,7 @@ Home AI Core is a local-first autonomous server platform designed for:
 
 ## Current development version
 
-0.0.52 — Web-managed HTTPS settings and Phase A acceptance hardening
+0.0.53 — Web-managed HTTPS settings and Phase A acceptance hardening
 
 The repository root `VERSION` file is the single source of the compiled Core version.
 

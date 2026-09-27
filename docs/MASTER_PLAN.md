@@ -7,7 +7,7 @@ low-level details.
 ## Current baseline
 
 - Branch: `develop`
-- Version: `0.0.52`
+- Version: `0.0.53`
 - Current focus: finish real-host Phase A acceptance after fixing updater build activation and making HTTPS runtime configuration manageable from the Web UI.
 - CI: Debian build/test workflow is active and the current `develop` snapshot passes it.
 - Virtualization test environment note: the current development server may itself run inside a KVM
