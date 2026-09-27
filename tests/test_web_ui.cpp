@@ -932,8 +932,20 @@ int main()
         ) == std::string::npos
         ||
         system.find(
-            "renderUpdateState"
-        ) == std::string::npos
+            "function renderUpdateProgress"
+        ) != std::string::npos
+        ||
+        system.find(
+            "function renderUpdateState"
+        ) != std::string::npos
+        ||
+        system.find(
+            ".update-progress-shell"
+        ) != std::string::npos
+        ||
+        system.find(
+            ".update-status-card"
+        ) != std::string::npos
         ||
         system.find(
             "id=\"update-progress-bar\""

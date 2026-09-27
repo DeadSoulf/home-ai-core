@@ -32,7 +32,7 @@ The user-facing panel is intentionally minimal. It shows:
 Git SHA values, branch internals, build percentages, individual stages and compiler/test logs
 remain backend diagnostics and are not shown in the normal Web UI.
 
-The top bar shows the concrete available version, for example `Доступна версия 0.0.58`.
+The top bar shows the concrete available version, for example `Доступна версия <version>`.
 
 ## Update sequence
 
