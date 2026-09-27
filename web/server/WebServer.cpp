@@ -1939,6 +1939,77 @@ void WebServer::handleClient(
         return;
     }
 
+    const bool state_changing_request =
+        method == "POST"
+        ||
+        method == "PUT"
+        ||
+        method == "PATCH"
+        ||
+        method == "DELETE";
+
+    if (state_changing_request) {
+        if (
+            isApiPath(path)
+            &&
+            headerValue(
+                headers,
+                "X-HomeAI-Request"
+            ) != "1"
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"error\":\"request_header_required\"}"
+            );
+
+            return;
+        }
+
+        auto csrf_token =
+            headerValue(
+                headers,
+                "X-HomeAI-CSRF"
+            );
+
+        if (
+            csrf_token.empty()
+            &&
+            !isApiPath(path)
+        ) {
+            const auto form =
+                parseForm(body);
+
+            const auto csrf_it =
+                form.find("_csrf");
+
+            if (csrf_it != form.end())
+                csrf_token = csrf_it->second;
+        }
+
+        if (
+            !SecurityManager::
+                validateCsrfToken(
+                    session_token,
+                    csrf_token
+                )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                isApiPath(path)
+                    ? "application/json; charset=utf-8"
+                    : "text/plain; charset=utf-8",
+                isApiPath(path)
+                    ? "{\"error\":\"csrf_validation_failed\"}"
+                    : "403 Forbidden"
+            );
+
+            return;
+        }
+    }
+
     const auto page_permission =
         requiredPermissionForPage(
             path
@@ -2058,6 +2129,13 @@ void WebServer::handleClient(
                 SecurityManager::roleToString(
                     session->role
                 )
+            )
+            << "\",\"csrf_token\":\""
+            << jsonEscape(
+                SecurityManager::
+                    csrfTokenForSession(
+                        session_token
+                    )
             )
             << "\",\"permissions\":[";
 
@@ -7680,6 +7758,12 @@ void WebServer::handleClient(
             SecurityManager::roleToString(
                 session->role
             );
+
+        context.csrf_token =
+            SecurityManager::
+                csrfTokenForSession(
+                    session_token
+                );
 
         context.admin =
             security_.isAdmin(

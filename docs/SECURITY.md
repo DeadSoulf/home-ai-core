@@ -281,9 +281,28 @@ Cluster heartbeat traffic remains a separate concern: keep it on a trusted priva
 WireGuard as documented by Cluster Core. Enabling Web TLS does not automatically change worker
 heartbeat transport.
 
+## CSRF protection
+
+Authenticated state-changing requests use a session-bound CSRF token in addition to normal
+permission checks. The token is derived from the cryptographically random session secret and
+changes automatically with the session; it is not stored as an additional database secret.
+
+Web/API mutation rules:
+
+- authenticated API `POST` / `PUT` / `PATCH` / `DELETE` requests require
+  `X-HomeAI-Request: 1`
+- the same API requests require `X-HomeAI-CSRF` matching the current session
+- normal Web UI forms use the same session-bound token as a hidden `_csrf` value
+- the Web UI automatically adds both protection headers to same-origin mutation requests
+- GET/HEAD/OPTIONS remain read-only and do not require a CSRF token
+- Cluster worker heartbeats are machine-to-machine traffic and keep their independent
+  `X-HomeAI-Cluster-Token` authentication path
+
+The authenticated `GET /api/session` response includes the current `csrf_token` for
+non-browser API clients. A CSRF token from another session is rejected.
+
 ## Planned hardening
 
-- explicit CSRF tokens across all state-changing APIs
 - source/IP-aware login throttling
 - optional MFA
 - encrypted secrets store

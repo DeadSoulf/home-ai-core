@@ -240,7 +240,15 @@ int main()
 
                 if (protected_header) {
                     data +=
-                        "X-HomeAI-Request: 1\r\n";
+                        "X-HomeAI-Request: 1\r\n"
+                        "X-HomeAI-CSRF: "
+                        +
+                        SecurityManager::
+                            csrfTokenForSession(
+                                token
+                            )
+                        +
+                        "\r\n";
                 }
 
                 data +=

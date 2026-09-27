@@ -34,7 +34,8 @@
 | 0.0.38 | Hypervisor safe VM definition preview and validation | DEVELOPMENT SNAPSHOT |
 | 0.0.39 | Hypervisor persistent VM definition with libvirt read-back | DEVELOPMENT SNAPSHOT |
 | 0.0.40 | Hypervisor VM Storage Pool + disk placement preview | DEVELOPMENT SNAPSHOT |
-| 0.0.41 | Security foundation: built-in HTTPS/TLS + Debian CI | IN DEVELOPMENT |
+| 0.0.41 | Security foundation: built-in HTTPS/TLS + Debian CI | DEVELOPMENT SNAPSHOT |
+| 0.0.42 | Security foundation: session-bound CSRF enforcement | IN DEVELOPMENT |
 | next 0.0.x | Recorder + continuous video transport + archive/event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
@@ -412,3 +413,19 @@ Security/platform hardening in this milestone:
 - local self-signed certificate setup helper
 - TLS integration test performing a real client/server handshake
 - HTTP remains the default until an administrator explicitly enables TLS
+
+
+## Development snapshot: 0.0.42
+
+CSRF/security hardening in this milestone:
+
+- session-bound CSRF tokens derived from the random session secret
+- constant-time CSRF token comparison
+- one centralized mutation guard for authenticated Web/API requests
+- `X-HomeAI-CSRF` required for authenticated API mutations
+- `X-HomeAI-Request: 1` enforced centrally for authenticated API mutations
+- protected logout form using the same CSRF token
+- Web UI fetch wrapper injects protection headers only for same-origin mutations
+- authenticated `GET /api/session` exposes the current CSRF token for API clients
+- Cluster heartbeat remains isolated behind its independent cluster token
+- Security, Web UI and API tests cover the new contract

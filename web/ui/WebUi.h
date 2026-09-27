@@ -41,6 +41,7 @@ struct WebUiContext {
     std::string cluster_timeout;
     std::string username;
     std::string role;
+    std::string csrf_token;
     std::vector<std::string> permissions;
     bool admin{false};
 };

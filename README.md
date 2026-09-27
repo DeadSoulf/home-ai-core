@@ -18,7 +18,7 @@ Home AI Core is a local-first autonomous server platform designed for:
 
 ## Current development version
 
-0.0.41 — Security foundation: built-in HTTPS/TLS and Debian CI
+0.0.42 — Security foundation: session-bound CSRF enforcement
 
 The repository root `VERSION` file is the single source of the compiled Core version.
 

@@ -120,6 +120,15 @@ public:
         const std::string& token
     );
 
+    static std::string csrfTokenForSession(
+        const std::string& session_token
+    );
+
+    static bool validateCsrfToken(
+        const std::string& session_token,
+        const std::string& csrf_token
+    );
+
     void logout(
         const std::string& token
     );

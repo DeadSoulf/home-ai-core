@@ -94,6 +94,38 @@ int main()
         return 1;
     }
 
+    const auto csrf_token =
+        homeai::SecurityManager::
+            csrfTokenForSession(
+                *token
+            );
+
+    if (
+        csrf_token.empty()
+        ||
+        !homeai::SecurityManager::
+            validateCsrfToken(
+                *token,
+                csrf_token
+            )
+        ||
+        homeai::SecurityManager::
+            validateCsrfToken(
+                *token,
+                csrf_token + "00"
+            )
+        ||
+        homeai::SecurityManager::
+            validateCsrfToken(
+                "different-session",
+                csrf_token
+            )
+    ) {
+        std::cerr
+            << "CSRF token validation failed\n";
+        return 1;
+    }
+
     auto session =
         security.validateSession(
             *token

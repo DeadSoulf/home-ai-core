@@ -1001,6 +1001,48 @@ SecurityManager::validateSession(
     };
 }
 
+std::string SecurityManager::csrfTokenForSession(
+    const std::string& session_token
+)
+{
+    if (session_token.empty())
+        return {};
+
+    return
+        tokenHash(
+            "home-ai-csrf-v1:" +
+            session_token
+        );
+}
+
+bool SecurityManager::validateCsrfToken(
+    const std::string& session_token,
+    const std::string& csrf_token
+)
+{
+    const auto expected =
+        csrfTokenForSession(
+            session_token
+        );
+
+    if (
+        expected.empty()
+        ||
+        csrf_token.size() !=
+            expected.size()
+    ) {
+        return false;
+    }
+
+    return
+        CRYPTO_memcmp(
+            expected.data(),
+            csrf_token.data(),
+            expected.size()
+        ) == 0;
+}
+
+
 void SecurityManager::logout(
     const std::string& token
 )

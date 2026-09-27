@@ -56,7 +56,8 @@ int main() {
             check(connect(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address)) == 0, "connect");
             std::string data = method + " " + path + " HTTP/1.1\r\nHost: localhost\r\nCookie: homeai_session=" + token +
                 "\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: " + std::to_string(body.size()) +
-                "\r\n" + (header ? "X-HomeAI-Request: 1\r\n" : "") + "\r\n" + body;
+                "\r\n" + (header ? "X-HomeAI-Request: 1\r\nX-HomeAI-CSRF: " +
+                SecurityManager::csrfTokenForSession(token) + "\r\n" : "") + "\r\n" + body;
             check(send(fd, data.data(), data.size(), MSG_NOSIGNAL) == static_cast<ssize_t>(data.size()), "send");
             std::string response; char buffer[4096]; ssize_t n;
             while ((n = recv(fd, buffer, sizeof(buffer), 0)) > 0) response.append(buffer, n);

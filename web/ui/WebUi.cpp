@@ -400,6 +400,9 @@ std::string renderWebUi(
 <script src="/assets/i18n.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="homeai-csrf-token" content=")HTML";
+    page << htmlEscape(context.csrf_token);
+    page << R"HTML(">
 <title>)HTML";
 
     page
@@ -3203,6 +3206,9 @@ button,
         )
         << "</small></div>"
         << "<form method=\"POST\" action=\"/logout\">"
+        << "<input type=\"hidden\" name=\"_csrf\" value=\""
+        << htmlEscape(context.csrf_token)
+        << "\">"
         << "<button type=\"submit\" class=\"secondary\" aria-label=\"Выйти\" title=\"Выйти\"><span class=\"sidebar-user-icon\" aria-hidden=\"true\">⇥</span><span class=\"sidebar-user-label\">Выйти</span></button>"
         << "</form></div>";
 
@@ -5286,6 +5292,100 @@ ONVIF используется, если он включён; Hikvision и со�
 </div>
 
 <script>
+
+const homeAiCsrfToken =
+    document.querySelector(
+        'meta[name="homeai-csrf-token"]'
+    )?.content || "";
+
+const homeAiNativeFetch =
+    window.fetch.bind(window);
+
+window.fetch =
+    function homeAiProtectedFetch(
+        input,
+        init = {}
+    ) {
+        const request =
+            input instanceof Request
+            ? input
+            : null;
+
+        const url =
+            new URL(
+                request
+                ? request.url
+                : String(input),
+                window.location.href
+            );
+
+        const method =
+            String(
+                init.method
+                ||
+                (
+                    request
+                    ? request.method
+                    : "GET"
+                )
+            ).toUpperCase();
+
+        const mutation =
+            method !== "GET"
+            &&
+            method !== "HEAD"
+            &&
+            method !== "OPTIONS";
+
+        if (
+            mutation
+            &&
+            url.origin ===
+                window.location.origin
+        ) {
+            const headers =
+                new Headers(
+                    request
+                    ? request.headers
+                    : undefined
+                );
+
+            const suppliedHeaders =
+                new Headers(
+                    init.headers
+                    || undefined
+                );
+
+            suppliedHeaders.forEach(
+                (value, key) => {
+                    headers.set(
+                        key,
+                        value
+                    );
+                }
+            );
+
+            headers.set(
+                "X-HomeAI-Request",
+                "1"
+            );
+
+            headers.set(
+                "X-HomeAI-CSRF",
+                homeAiCsrfToken
+            );
+
+            init = {
+                ...init,
+                headers
+            };
+        }
+
+        return homeAiNativeFetch(
+            input,
+            init
+        );
+    };
 
 const sidebarPreferenceKey =
     "home-ai.sidebar-collapsed";

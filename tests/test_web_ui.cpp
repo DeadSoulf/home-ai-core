@@ -38,6 +38,9 @@ int main()
     context.role =
         "admin";
 
+    context.csrf_token =
+        "csrf-test-token";
+
     context.admin =
         true;
 
@@ -74,6 +77,24 @@ int main()
         homeai::renderWebUi(
             context
         );
+
+    if (
+        home.find(
+            "name=\"homeai-csrf-token\" content=\"csrf-test-token\""
+        ) == std::string::npos
+        ||
+        home.find(
+            "X-HomeAI-CSRF"
+        ) == std::string::npos
+        ||
+        home.find(
+            "name=\"_csrf\" value=\"csrf-test-token\""
+        ) == std::string::npos
+    ) {
+        std::cerr
+            << "CSRF Web UI integration is missing\n";
+        return 1;
+    }
 
     const auto overview_position =
         home.find(
