@@ -611,33 +611,33 @@ int main()
     context.page =
         "/network";
 
-    const auto network =
+    const auto network_tls =
         homeai::renderWebUi(
             context
         );
 
     if (
-        network.find(
+        network_tls.find(
             "name=\"web.tls_enabled\""
         ) == std::string::npos
         ||
-        network.find(
+        network_tls.find(
             "name=\"web.tls_certificate\""
         ) == std::string::npos
         ||
-        network.find(
+        network_tls.find(
             "name=\"web.tls_private_key\""
         ) == std::string::npos
         ||
-        network.find(
+        network_tls.find(
             "Включить встроенный HTTPS"
         ) == std::string::npos
         ||
-        network.find(
+        network_tls.find(
             "runtime/tls/server.crt"
         ) == std::string::npos
         ||
-        network.find(
+        network_tls.find(
             "runtime/tls/server.key"
         ) == std::string::npos
     ) {
