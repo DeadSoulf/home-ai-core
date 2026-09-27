@@ -46,6 +46,7 @@ High-level project status, dependencies and execution order are tracked in [MAST
 | 0.0.48 | Protected notifications API + System event feed | DEVELOPMENT SNAPSHOT |
 | 0.0.49 | Host readiness diagnostics | DEVELOPMENT SNAPSHOT |
 | 0.0.50 | Updater immutable build activation + active-build acceptance check | DEVELOPMENT SNAPSHOT |
+| 0.0.51 | Fix first activation when build-prev does not yet exist | DEVELOPMENT SNAPSHOT |
 | next acceptance | Real Debian host acceptance for Phase A foundation | IN PROGRESS |
 | next 0.0.x | Hypervisor managed virtual disks / ISO / networking / editor / console | PLANNED |
 | next 0.0.x | Storage health and shared pool completion | PLANNED |
@@ -540,3 +541,10 @@ Update/acceptance reliability in this milestone:
 - managed previous release directories are cleaned only after they are no longer active
 - Update Manager tests simulate two consecutive build activations
 - Phase A acceptance detects stale active CTest executable paths
+
+
+## Development snapshot: 0.0.51
+
+- first immutable-build activation now treats a missing `build-prev` as the normal initial state
+- active-build inspection also handles a missing `build` path safely
+- updater activation regression test remains the acceptance gate

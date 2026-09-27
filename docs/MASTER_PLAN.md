@@ -7,7 +7,7 @@ low-level details.
 ## Current baseline
 
 - Branch: `develop`
-- Version: `0.0.50`
+- Version: `0.0.51`
 - Current focus: finish real-host Phase A acceptance after fixing updater build activation discovered during acceptance.
 - CI: Debian build/test workflow is active and the current `develop` snapshot passes it.
 - Virtualization test environment note: the current development server may itself run inside a KVM
@@ -70,7 +70,7 @@ This phase must be completed before large new service layers are treated as prod
 
 ### Phase A exit gate
 
-Real-host acceptance exposed and 0.0.50 fixes a build-activation defect where a CMake tree was
+Real-host acceptance exposed and 0.0.50–0.0.51 fix a build-activation defect where a CMake tree was
 renamed after configuration, leaving stale absolute CTest paths. Acceptance now checks the active
 build metadata explicitly.
 

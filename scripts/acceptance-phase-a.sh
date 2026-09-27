@@ -4,7 +4,7 @@ set -o pipefail
 
 ROOT="${1:-$(pwd)}"
 LOGIN_USER="${HOMEAI_ACCEPTANCE_USER:-}"
-EXPECTED_VERSION="0.0.50"
+EXPECTED_VERSION="0.0.51"
 BUILD_DIR="${HOMEAI_ACCEPTANCE_BUILD_DIR:-$ROOT/build-acceptance}"
 
 pass=0

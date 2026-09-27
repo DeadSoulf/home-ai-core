@@ -86,6 +86,13 @@ bool BuildActivator::removePrevious(
         );
 
     if (status_error) {
+        if (
+            status_error ==
+            std::errc::no_such_file_or_directory
+        ) {
+            return true;
+        }
+
         error =
             "Unable to inspect previous build: "
             + status_error.message();
@@ -247,18 +254,29 @@ bool BuildActivator::activate(
 
     std::error_code active_status_error;
 
-    const auto active_status =
+    auto active_status =
         std::filesystem::symlink_status(
             active_build,
             active_status_error
         );
 
     if (active_status_error) {
-        error =
-            "Unable to inspect active build: "
-            + active_status_error.message();
+        if (
+            active_status_error ==
+            std::errc::no_such_file_or_directory
+        ) {
+            active_status =
+                std::filesystem::file_status(
+                    std::filesystem::file_type::not_found
+                );
+        }
+        else {
+            error =
+                "Unable to inspect active build: "
+                + active_status_error.message();
 
-        return false;
+            return false;
+        }
     }
 
     const bool had_active =
