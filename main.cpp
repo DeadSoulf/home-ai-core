@@ -939,6 +939,46 @@ int main()
     if (tick_ms < 10)
         tick_ms = 10;
 
+    const bool module_watchdog_enabled =
+        runtime.config().getBool(
+            "modules.watchdog_enabled",
+            true
+        );
+
+    int module_watchdog_interval =
+        runtime.config().getInt(
+            "modules.watchdog_interval_seconds",
+            10
+        );
+
+    if (module_watchdog_interval < 1)
+        module_watchdog_interval = 1;
+
+    int module_watchdog_max_restarts =
+        runtime.config().getInt(
+            "modules.watchdog_max_restarts",
+            3
+        );
+
+    if (module_watchdog_max_restarts < 0)
+        module_watchdog_max_restarts = 0;
+
+    int module_watchdog_cooldown =
+        runtime.config().getInt(
+            "modules.watchdog_cooldown_seconds",
+            30
+        );
+
+    if (module_watchdog_cooldown < 0)
+        module_watchdog_cooldown = 0;
+
+    auto next_watchdog =
+        std::chrono::steady_clock::now()
+        +
+        std::chrono::seconds(
+            module_watchdog_interval
+        );
+
     bool restart_requested = false;
 
     while (!stop_requested) {
@@ -947,6 +987,31 @@ int main()
         ) {
             restart_requested = true;
             break;
+        }
+
+        const auto now =
+            std::chrono::steady_clock::now();
+
+        if (
+            module_watchdog_enabled
+            &&
+            now >= next_watchdog
+        ) {
+            modules.watchdogPass(
+                static_cast<std::size_t>(
+                    module_watchdog_max_restarts
+                ),
+                std::chrono::seconds(
+                    module_watchdog_cooldown
+                )
+            );
+
+            next_watchdog =
+                now
+                +
+                std::chrono::seconds(
+                    module_watchdog_interval
+                );
         }
 
         std::this_thread::sleep_for(
