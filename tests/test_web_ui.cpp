@@ -898,10 +898,10 @@ int main()
     }
 
     if (
-        html.find("notification-list") ==
+        system.find("notification-list") ==
             std::string::npos
         ||
-        html.find("/api/notifications") ==
+        system.find("/api/notifications") ==
             std::string::npos
     ) {
         std::cerr
