@@ -12,15 +12,13 @@ Home AI Core is a local-first autonomous server platform designed for:
 - long-term memory
 - controlled self-development
 
-## Current stable version
+## Release status
 
-0.0.5
+- `main` — stable baseline branch.
+- `develop` — current integration and physical-server acceptance candidate.
+- The repository root `VERSION` file is the single source of the compiled Core version.
 
-## Current development version
-
-0.0.53 — Web-managed HTTPS settings and Phase A acceptance hardening
-
-The repository root `VERSION` file is the single source of the compiled Core version.
+Do not duplicate the current development version in documentation; read it from `VERSION`.
 
 ## Platform
 
@@ -55,6 +53,7 @@ The repository root `VERSION` file is the single source of the compiled Core ver
 - [Hypervisor](docs/HYPERVISOR.md)
 - [Server Updates](docs/UPDATES.md)
 - [Module Manager](docs/MODULES.md)
+- [Physical Debian 13 installation](docs/INSTALL_PHYSICAL.md)
 
 ## Branches
 

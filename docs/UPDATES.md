@@ -23,19 +23,16 @@ Open:
 Система -> Обновление сервера
 ```
 
-The panel shows:
+The user-facing panel is intentionally minimal. It shows:
 
-- configured branch
-- local Git commit
-- remote GitHub commit
-- a live 0–100% progress bar
-- explicit update stages
-- real Ninja compile progress when available
-- real CTest progress when available
-- progress/error message
-- an expandable detailed build/test log
+- the version currently running on the server
+- the version available on the configured GitHub branch
+- Check / Update / Restart controls when allowed
 
-The top bar also shows `Доступно обновление` when the remote commit differs from the local commit.
+Git SHA values, branch internals, build percentages, individual stages and compiler/test logs
+remain backend diagnostics and are not shown in the normal Web UI.
+
+The top bar shows the concrete available version, for example `Доступна версия 0.0.58`.
 
 ## Update sequence
 
@@ -144,9 +141,9 @@ POST /api/update/restart
 ```
 
 
-## Progress model
+## Internal progress model
 
-The Web UI polls update status once per second while the server is running. The update stages are:
+The Web UI polls update status while the server is running, but the detailed progress model is kept for backend diagnostics rather than rendered in the normal update panel. The internal stages are:
 
 ```text
 5%   GitHub check

@@ -97,10 +97,17 @@ else
 fi
 
 branch=$(git branch --show-current 2>/dev/null || true)
-if [[ "$branch" == "develop" ]]; then
-    say_pass "Git branch is develop"
+branch_config="$ROOT/runtime/home-ai.conf"
+if [[ ! -r "$branch_config" ]]; then
+    branch_config="$ROOT/config/home-ai.conf"
+fi
+expected_branch=$(config_value update.branch "$branch_config")
+[[ -n "$expected_branch" ]] || expected_branch=develop
+
+if [[ "$branch" == "$expected_branch" ]]; then
+    say_pass "Git branch matches update channel: $expected_branch"
 else
-    say_fail "Expected develop branch, found '${branch:-detached}'"
+    say_fail "Expected branch $expected_branch, found '${branch:-detached}'"
 fi
 
 if [[ -z "$(git status --porcelain --untracked-files=no)" ]]; then
@@ -193,6 +200,12 @@ done
 printf '\n== Virtualization host ==\n'
 virt=$(systemd-detect-virt 2>/dev/null || true)
 flags=$(grep -Eoc '(vmx|svm)' /proc/cpuinfo 2>/dev/null || true)
+
+if [[ -z "$virt" || "$virt" == "none" ]]; then
+    say_pass "Bare-metal host detected"
+else
+    say_warn "Host is virtualized: $virt"
+fi
 
 if [[ "${flags:-0}" -gt 0 ]]; then
     say_pass "CPU exposes VMX/SVM flags ($flags)"

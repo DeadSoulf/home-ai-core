@@ -55,8 +55,15 @@ jobs:
           set -euo pipefail
           ctest --test-dir build --output-on-failure
 
-      - name: Validate Phase A acceptance script
+      - name: Validate deployment scripts
         shell: bash
         run: |
           set -euo pipefail
           bash -n scripts/acceptance-phase-a.sh
+          bash -n scripts/home-ai-service.sh
+          bash -n scripts/setup-hypervisor.sh
+          bash -n scripts/setup-tls.sh
+          bash -n scripts/prepare-debian-host.sh
+          sh -n scripts/install-storage-helper.sh
+          sh -n scripts/install-network-helper.sh
+          sh -n scripts/bump-version.sh
