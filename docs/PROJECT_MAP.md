@@ -227,6 +227,7 @@ tests/
 
 ```text
 docs/
+├── MASTER_PLAN.md
 ├── PROJECT_MAP.md
 ├── ROADMAP.md
 ├── WORKFLOW.md
