@@ -235,7 +235,10 @@ AI Brain
 
 ## Immediate execution order
 
-1. Run the complete Phase A acceptance suite for 0.0.49 on the real Debian server.
+1. Run the complete Phase A acceptance suite for 0.0.49 on the real Debian server with
+   `bash scripts/acceptance-phase-a.sh /srv/home-ai-core`. For authenticated read-only API
+   verification, set `HOMEAI_ACCEPTANCE_USER=<username>`; the script prompts for the password
+   without placing it in command history.
 2. Fix any host-only acceptance findings without expanding scope.
 3. Resume Hypervisor with real managed virtual disk creation.
 4. Continue ISO -> networking -> VM editor -> console -> snapshots/backup.
@@ -244,3 +247,31 @@ AI Brain
 
 Update this file after every development snapshot so project state does not have to be reconstructed
 from commit history.
+
+
+## Phase A real-host acceptance command
+
+The repository includes a non-destructive acceptance runner:
+
+```bash
+cd /srv/home-ai-core
+bash scripts/acceptance-phase-a.sh /srv/home-ai-core
+```
+
+To include authenticated read-only checks for session, modules, notifications and readiness:
+
+```bash
+cd /srv/home-ai-core
+HOMEAI_ACCEPTANCE_USER=admin bash scripts/acceptance-phase-a.sh /srv/home-ai-core
+```
+
+The password is read interactively and is not written to command history. The acceptance runner
+does not format disks, change network configuration, mutate VMs or call privileged management
+actions. It performs a clean out-of-tree build, the full CTest suite, systemd/service checks,
+helper/tool inventory, Web security-header checks and host virtualization checks.
+
+For the current KVM-based development VM, missing VMX/SVM passthrough and missing `/dev/kvm`
+are reported as warnings because nested virtualization is a host limitation already identified.
+On a non-virtualized physical acceptance host, those conditions are failures. TLS disabled on the
+acceptance host is a failure: Phase A is not closed until the real management interface is
+actually exercised over HTTPS.

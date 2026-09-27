@@ -54,3 +54,9 @@ jobs:
         run: |
           set -euo pipefail
           ctest --test-dir build --output-on-failure
+
+      - name: Validate Phase A acceptance script
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/acceptance-phase-a.sh
