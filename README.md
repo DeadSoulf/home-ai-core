@@ -18,7 +18,7 @@ Home AI Core is a local-first autonomous server platform designed for:
 
 ## Current development version
 
-0.0.44 — CSRF-protected configuration form compatibility
+0.0.46 — bounded Module Manager watchdog recovery
 
 The repository root `VERSION` file is the single source of the compiled Core version.
 
@@ -44,6 +44,7 @@ The repository root `VERSION` file is the single source of the compiled Core ver
 
 ## Documentation
 
+- [Master Plan](docs/MASTER_PLAN.md)
 - [Project Map](docs/PROJECT_MAP.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Development Workflow](docs/WORKFLOW.md)
