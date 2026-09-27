@@ -22,6 +22,18 @@ constexpr int password_iterations =
 constexpr std::int64_t session_seconds =
     8 * 60 * 60;
 
+constexpr int account_failure_limit = 5;
+constexpr int source_failure_limit = 20;
+
+constexpr auto account_lock_duration =
+    std::chrono::seconds(60);
+
+constexpr auto source_lock_duration =
+    std::chrono::minutes(5);
+
+constexpr auto failure_retention =
+    std::chrono::minutes(15);
+
 const std::array<unsigned char, 16>
     dummy_salt = {
         0x48, 0x6f, 0x6d, 0x65,
@@ -710,12 +722,25 @@ SecurityManager::login(
     const std::string& username,
     const std::string& password,
     SessionInfo& session_info,
-    std::string& error
+    std::string& error,
+    const std::string& source
 )
 {
     const auto steady_now =
         std::chrono::
             steady_clock::now();
+
+    const auto account_failure_key =
+        "user:" + username;
+
+    const auto source_failure_key =
+        (
+            !source.empty()
+            &&
+            source.size() <= 128
+        )
+        ? "source:" + source
+        : "";
 
     {
         std::lock_guard<std::mutex>
@@ -725,12 +750,36 @@ SecurityManager::login(
             steady_now
         );
 
-        auto& failure =
-            failures_[username];
+        const auto account_it =
+            failures_.find(
+                account_failure_key
+            );
+
+        const auto source_it =
+            source_failure_key.empty()
+            ? failures_.end()
+            : failures_.find(
+                source_failure_key
+            );
+
+        const bool account_locked =
+            account_it != failures_.end()
+            &&
+            steady_now <
+                account_it->
+                    second.locked_until;
+
+        const bool source_locked =
+            source_it != failures_.end()
+            &&
+            steady_now <
+                source_it->
+                    second.locked_until;
 
         if (
-            steady_now <
-            failure.locked_until
+            account_locked
+            ||
+            source_locked
         ) {
             error =
                 "Too many failed attempts";
@@ -803,31 +852,68 @@ SecurityManager::login(
             std::lock_guard<std::mutex>
                 lock(failure_mutex_);
 
-            auto& failure =
-                failures_[username];
+            const auto now =
+                std::chrono::
+                    steady_clock::now();
 
-            ++failure.failures;
+            const auto record_failure =
+                [&](const std::string& key,
+                    int limit,
+                    const auto& lock_duration) {
+                    if (key.empty())
+                        return;
 
-            if (
-                failure.failures >= 5
-            ) {
-                failure.failures = 0;
+                    auto& failure =
+                        failures_[key];
 
-                failure.locked_until =
-                    std::chrono::
-                        steady_clock::now()
-                    +
-                    std::chrono::
-                        seconds(60);
-            }
+                    failure.last_failure =
+                        now;
+
+                    ++failure.failures;
+
+                    if (
+                        failure.failures >=
+                            limit
+                    ) {
+                        failure.failures = 0;
+                        failure.locked_until =
+                            now +
+                            lock_duration;
+                    }
+                };
+
+            record_failure(
+                account_failure_key,
+                account_failure_limit,
+                account_lock_duration
+            );
+
+            record_failure(
+                source_failure_key,
+                source_failure_limit,
+                source_lock_duration
+            );
+        }
+
+        auto audit_details =
+            user && !user->enabled
+            ? std::string(
+                "account disabled"
+            )
+            : std::string(
+                "invalid credentials"
+            );
+
+        if (!source.empty()) {
+            audit_details +=
+                " source=" +
+                source;
         }
 
         audit(
             "login.failed",
             username,
-            user && !user->enabled
-                ? "account disabled"
-                : "invalid credentials"
+            audit_details
         );
 
         error =
@@ -902,7 +988,7 @@ SecurityManager::login(
             lock(failure_mutex_);
 
         failures_.erase(
-            username
+            account_failure_key
         );
     }
 
@@ -1687,11 +1773,30 @@ void SecurityManager::cleanupFailures(
         iterator !=
             failures_.end();
     ) {
-        if (
-            iterator->second.failures == 0
-            &&
+        const bool lock_expired =
             now >=
-                iterator->second.locked_until
+                iterator->second.locked_until;
+
+        const bool stale_failures =
+            iterator->second.
+                last_failure !=
+                    std::chrono::
+                        steady_clock::
+                            time_point{}
+            &&
+            now -
+                iterator->second.
+                    last_failure >=
+                        failure_retention;
+
+        if (
+            lock_expired
+            &&
+            (
+                iterator->second.failures == 0
+                ||
+                stale_failures
+            )
         ) {
             iterator =
                 failures_.erase(

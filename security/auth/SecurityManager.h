@@ -113,7 +113,8 @@ public:
         const std::string& username,
         const std::string& password,
         SessionInfo& session_info,
-        std::string& error
+        std::string& error,
+        const std::string& source = ""
     );
 
     std::optional<SessionInfo> validateSession(
@@ -201,6 +202,8 @@ private:
         int failures{0};
         std::chrono::steady_clock::
             time_point locked_until{};
+        std::chrono::steady_clock::
+            time_point last_failure{};
     };
 
     static bool validUsername(

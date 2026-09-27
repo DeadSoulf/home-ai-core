@@ -160,11 +160,19 @@ Last-seen is updated periodically rather than on every HTTP request.
 
 ## Login throttling
 
-Repeated failed logins are temporarily throttled.
+Login throttling is applied at two independent levels:
 
-Failure state remains runtime-only and is periodically cleaned to prevent unbounded growth.
+- account key: 5 failed attempts lock that username for 60 seconds
+- source key: 20 failed attempts from one peer IP across any usernames lock that source for 5 minutes
 
-Future hardening should add source/IP-aware limits.
+The source address is taken from the accepted TCP connection with `getpeername()`. Home AI Core
+does **not** trust `X-Forwarded-For` or similar headers by default, because an untrusted client
+could spoof them and bypass source throttling. A future reverse-proxy mode must explicitly define
+trusted proxy addresses before forwarded client IPs can be accepted.
+
+Failure counters are runtime-only and stale unlocked counters expire automatically. A successful
+login clears the account-specific failure state but does not erase accumulated failures for the
+entire source address, so possession of one valid account cannot reset the source-wide limiter.
 
 ## Security audit
 

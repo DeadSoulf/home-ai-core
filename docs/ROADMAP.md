@@ -35,7 +35,8 @@
 | 0.0.39 | Hypervisor persistent VM definition with libvirt read-back | DEVELOPMENT SNAPSHOT |
 | 0.0.40 | Hypervisor VM Storage Pool + disk placement preview | DEVELOPMENT SNAPSHOT |
 | 0.0.41 | Security foundation: built-in HTTPS/TLS + Debian CI | DEVELOPMENT SNAPSHOT |
-| 0.0.42 | Security foundation: session-bound CSRF enforcement | IN DEVELOPMENT |
+| 0.0.42 | Security foundation: session-bound CSRF enforcement | DEVELOPMENT SNAPSHOT |
+| 0.0.43 | Security foundation: source-aware login throttling | IN DEVELOPMENT |
 | next 0.0.x | Recorder + continuous video transport + archive/event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
@@ -429,3 +430,16 @@ CSRF/security hardening in this milestone:
 - authenticated `GET /api/session` exposes the current CSRF token for API clients
 - Cluster heartbeat remains isolated behind its independent cluster token
 - Security, Web UI and API tests cover the new contract
+
+
+## Development snapshot: 0.0.43
+
+Authentication hardening in this milestone:
+
+- account-level login throttling retained at 5 failures / 60 seconds
+- source-wide throttling added at 20 failures / 5 minutes
+- source throttling spans different attempted usernames
+- peer identity comes from the TCP connection rather than spoofable forwarding headers
+- stale failure counters expire automatically
+- successful login clears only the account-specific counter, not the source-wide counter
+- Security Core tests verify that one blocked source does not block another source

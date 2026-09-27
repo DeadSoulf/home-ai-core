@@ -243,6 +243,66 @@ std::string headerValue(
     return {};
 }
 
+std::string peerAddress(
+    int socket_fd
+)
+{
+    sockaddr_storage address{};
+    socklen_t address_size =
+        sizeof(address);
+
+    if (
+        ::getpeername(
+            socket_fd,
+            reinterpret_cast<sockaddr*>(
+                &address
+            ),
+            &address_size
+        ) != 0
+    ) {
+        return "unknown";
+    }
+
+    char buffer[INET6_ADDRSTRLEN]{};
+    const void* source = nullptr;
+
+    if (address.ss_family == AF_INET) {
+        source =
+            &reinterpret_cast<
+                const sockaddr_in*
+            >(
+                &address
+            )->sin_addr;
+    }
+    else if (
+        address.ss_family ==
+            AF_INET6
+    ) {
+        source =
+            &reinterpret_cast<
+                const sockaddr_in6*
+            >(
+                &address
+            )->sin6_addr;
+    }
+    else {
+        return "unknown";
+    }
+
+    if (
+        !::inet_ntop(
+            address.ss_family,
+            source,
+            buffer,
+            sizeof(buffer)
+        )
+    ) {
+        return "unknown";
+    }
+
+    return buffer;
+}
+
 std::string cookieValue(
     const std::string& cookie_header,
     const std::string& name
@@ -1740,11 +1800,14 @@ void WebServer::handleClient(
 
             const auto token =
                 security_.login(
-                    username,
-                    password,
-                    info,
-                    error
-                );
+                username,
+                password,
+                info,
+                error,
+                peerAddress(
+                    client_fd
+                )
+            );
 
             if (!token) {
                 sendRedirect(
@@ -1858,7 +1921,10 @@ void WebServer::handleClient(
                 username,
                 password,
                 info,
-                error
+                error,
+                peerAddress(
+                    client_fd
+                )
             );
 
         if (!token) {
