@@ -861,3 +861,32 @@ VM-пул	VM pool
 VM-пул использует только диски, которым назначена роль VM. Резерв не расходуется при выборе места для будущих виртуальных дисков.	The VM pool uses only disks assigned the VM role. The reserve is not consumed when selecting space for future virtual disks.
 Сохранить настройки VM-пула	Save VM pool settings
 Не удалось сохранить настройки.	Unable to save settings.
+Готовность хоста	Host readiness
+Требование	Requirement
+ГОТОВО	READY
+ТРЕБУЕТ ВНИМАНИЯ	ATTENTION
+Инструменты обновления	Update build toolchain
+git, CMake, Ninja и CTest доступны.	git, CMake, Ninja and CTest are available.
+Перед использованием самообновления установите git, cmake, ninja-build и инструменты ctest/CMake.	Install git, cmake, ninja-build and ctest/CMake tools before using self-update.
+Помощник хранилища	Storage Helper
+Привилегированный помощник хранилища установлен.	Privileged storage helper is installed.
+Перед привилегированными операциями с дисками установите /usr/local/libexec/home-ai-storage-helper.	Install /usr/local/libexec/home-ai-storage-helper before privileged disk actions.
+Сетевой помощник	Network Helper
+Привилегированный сетевой помощник установлен.	Privileged network helper is installed.
+Перед изменением IPv4 установите /usr/local/libexec/home-ai-network-helper.	Install /usr/local/libexec/home-ai-network-helper before privileged IPv4 changes.
+Инструменты камер	Camera media tools
+ffmpeg и ffprobe доступны.	ffmpeg and ffprobe are available.
+Установите ffmpeg/ffprobe для снимков, анализа медиа и будущей записи.	Install ffmpeg/ffprobe for snapshots, media probing and future recorder work.
+Встроенный HTTPS включён.	Built-in HTTPS is enabled.
+Интерфейс управления работает без встроенного TLS; включите HTTPS перед удалённым администрированием.	Management UI is running without built-in TLS; enable HTTPS before remote production administration.
+Ускорение KVM	KVM acceleration
+Аппаратная виртуализация и /dev/kvm доступны.	Hardware virtualization and /dev/kvm are available.
+VMX/SVM не переданы этому хосту. На вложенной VM включите проброс виртуализации на внешнем гипервизоре.	VMX/SVM is not exposed to this host. On a nested VM, enable virtualization passthrough on the outer hypervisor.
+/dev/kvm отсутствует. Настройте KVM или передайте его с внешнего гипервизора.	/dev/kvm is absent. Load/configure KVM or expose it from the outer hypervisor.
+/dev/kvm существует, но служебная учётная запись Home AI Core не имеет к нему доступа.	/dev/kvm exists but the Home AI Core service account cannot access it.
+Менеджер гипервизора не подключён.	Hypervisor manager is not attached.
+QEMU и подключение libvirt qemu:///system доступны.	QEMU and qemu:///system libvirt connection are available.
+Исполняемый файл QEMU недоступен.	QEMU executable is unavailable.
+Библиотека libvirt недоступна.	libvirt runtime library is unavailable.
+libvirt установлен, но qemu:///system не подключён.	libvirt is installed but qemu:///system is not connected.
+Нет данных о требованиях хоста.	No host readiness data is available.
