@@ -40,6 +40,8 @@ High-level project status, dependencies and execution order are tracked in [MAST
 | 0.0.42 | Security foundation: session-bound CSRF enforcement | DEVELOPMENT SNAPSHOT |
 | 0.0.43 | Security foundation: source-aware login throttling | DEVELOPMENT SNAPSHOT |
 | 0.0.44 | CSRF-protected configuration form compatibility | DEVELOPMENT SNAPSHOT |
+| 0.0.45 | Module Manager dependency-safe restart + watchdog engine | DEVELOPMENT SNAPSHOT |
+| 0.0.46 | Runtime bounded module watchdog scheduling/configuration | DEVELOPMENT SNAPSHOT |
 | next 0.0.x | Platform foundation closure: documentation, watchdog/recovery, notifications, host diagnostics | PLANNED |
 | next 0.0.x | Hypervisor managed virtual disks / ISO / networking / editor / console | PLANNED |
 | next 0.0.x | Storage health and shared pool completion | PLANNED |
@@ -462,3 +464,28 @@ CSRF form compatibility in this milestone:
 - `X-HomeAI-Request` and session-bound `X-HomeAI-CSRF` are injected centrally
 - logout remains a normal HTML POST protected by its hidden session-bound CSRF token
 - failed settings saves remain on the current page and show an error instead of silently navigating
+
+
+## Development snapshot: 0.0.45
+
+Module lifecycle recovery in this milestone:
+
+- restart a running module without restarting the whole Core
+- restart scope includes currently running transitive dependents
+- dependents stop before their dependency and start again after it
+- watchdog acts only on `unhealthy`, never on `degraded`
+- bounded retry count per unhealthy episode
+- cooldown-aware recovery attempts
+- restart/watchdog counters tracked in Module Manager state
+- unit tests cover dependency-safe restart order and retry limits
+
+## Development snapshot: 0.0.46
+
+Runtime watchdog integration in this milestone:
+
+- Core main loop schedules watchdog passes
+- watchdog can be enabled or disabled from configuration
+- configurable watchdog interval, retry limit and cooldown
+- invalid negative limits are clamped to safe values
+- default policy remains conservative: only `unhealthy` triggers restart
+- Version Guard, clean Debian build and CTest pass in CI
