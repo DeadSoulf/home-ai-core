@@ -40,6 +40,12 @@ int main() {
         int port = 24000;
         while (port < 25000 && !server.start("127.0.0.1", port)) ++port;
         check(port < 25000, "server start");
+        runtime.events().publish({
+            "test.warning",
+            "Test notification",
+            "test-suite",
+            "warning"
+        });
         auto request = [&](std::string method, std::string path, std::string token = "", std::string body = "", bool header = true) {
             int fd = socket(AF_INET, SOCK_STREAM, 0);
             sockaddr_in address{};
@@ -56,6 +62,11 @@ int main() {
             close(fd); return response;
         };
         check(request("GET", "/api/admin/gpus").find("401 Unauthorized") != std::string::npos, "anonymous access");
+        check(request("GET", "/api/notifications").find("401 Unauthorized") != std::string::npos, "anonymous notifications");
+        const auto notification_response = request("GET", "/api/notifications", *viewer);
+        check(notification_response.find("200 OK") != std::string::npos, "viewer notifications");
+        check(notification_response.find("test.warning") != std::string::npos, "notification topic");
+        check(notification_response.find("Test notification") != std::string::npos, "notification message");
         check(request("GET", "/api/admin/gpus", *viewer).find("403 Forbidden") != std::string::npos, "viewer inventory");
         check(request("GET", "/admin", *viewer).find("403 Forbidden") != std::string::npos, "viewer page");
         check(request("POST", "/api/admin/accelerator", *viewer, "pci_address=").find("403 Forbidden") != std::string::npos, "viewer mutation");

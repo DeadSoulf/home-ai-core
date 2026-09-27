@@ -997,14 +997,28 @@ int main()
             &&
             now >= next_watchdog
         ) {
-            modules.watchdogPass(
-                static_cast<std::size_t>(
-                    module_watchdog_max_restarts
-                ),
-                std::chrono::seconds(
-                    module_watchdog_cooldown
-                )
-            );
+            const auto recovery_attempts =
+                modules.watchdogPass(
+                    static_cast<std::size_t>(
+                        module_watchdog_max_restarts
+                    ),
+                    std::chrono::seconds(
+                        module_watchdog_cooldown
+                    )
+                );
+
+            if (recovery_attempts > 0) {
+                runtime.events().publish({
+                    "module.watchdog.recovery",
+                    "Watchdog recovery attempted for "
+                    + std::to_string(
+                        recovery_attempts
+                    )
+                    + " unhealthy module(s).",
+                    "module-manager",
+                    "warning"
+                });
+            }
 
             next_watchdog =
                 now

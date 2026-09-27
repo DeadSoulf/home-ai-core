@@ -3406,6 +3406,16 @@ button,
 </div>
 </div>
 
+<div class="section-card">
+<div class="section-title">
+<h2>События системы</h2>
+<span class="section-hint">Последние уведомления Event Bus</span>
+</div>
+<div id="notification-list" class="placeholder-grid">
+<div class="placeholder-card">Загрузка событий...</div>
+</div>
+</div>
+
 <div class="section-card update-console">
 <div class="section-title">
 <div>
@@ -13728,6 +13738,167 @@ function moduleHealthClass(health) {
     return "muted";
 }
 
+async function updateNotifications() {
+    const container =
+        document.getElementById(
+            "notification-list"
+        );
+
+    if (!container)
+        return;
+
+    try {
+        const response =
+            await fetch(
+                "/api/notifications",
+                {
+                    cache: "no-store"
+                }
+            );
+
+        if (
+            response.status === 401
+        ) {
+            window.location =
+                "/login";
+            return;
+        }
+
+        if (!response.ok)
+            return;
+
+        const data =
+            await response.json();
+
+        const notifications =
+            Array.isArray(
+                data.notifications
+            )
+            ? data.notifications
+            : [];
+
+        container.replaceChildren();
+
+        for (
+            const notification of
+            notifications
+        ) {
+            const card =
+                document.createElement(
+                    "div"
+                );
+            card.className =
+                "placeholder-card";
+
+            const title =
+                document.createElement(
+                    "strong"
+                );
+
+            title.textContent =
+                notification.source
+                || notification.topic
+                || "Core";
+
+            card.appendChild(title);
+
+            const severity =
+                document.createElement(
+                    "div"
+                );
+
+            if (
+                notification.severity ===
+                    "critical"
+                ||
+                notification.severity ===
+                    "error"
+            ) {
+                severity.className =
+                    "status-error";
+            }
+            else if (
+                notification.severity ===
+                    "warning"
+            ) {
+                severity.className =
+                    "status-warn";
+            }
+            else {
+                severity.className =
+                    "status-ok";
+            }
+
+            severity.textContent =
+                String(
+                    notification.severity
+                    || "info"
+                ).toUpperCase();
+
+            card.appendChild(severity);
+
+            const message =
+                document.createElement(
+                    "div"
+                );
+            message.className = "muted";
+            message.style.marginTop = "8px";
+            message.textContent =
+                notification.message
+                || notification.topic
+                || "";
+
+            card.appendChild(message);
+
+            const timestamp =
+                Number(
+                    notification.timestamp_ms
+                );
+
+            if (
+                Number.isFinite(timestamp)
+                &&
+                timestamp > 0
+            ) {
+                const time =
+                    document.createElement(
+                        "div"
+                    );
+                time.className = "muted";
+                time.style.marginTop = "6px";
+                time.textContent =
+                    new Date(
+                        timestamp
+                    ).toLocaleString();
+
+                card.appendChild(time);
+            }
+
+            container.appendChild(card);
+        }
+
+        if (
+            notifications.length === 0
+        ) {
+            const empty =
+                document.createElement(
+                    "div"
+                );
+            empty.className =
+                "placeholder-card";
+            empty.textContent =
+                "Событий пока нет.";
+            container.appendChild(empty);
+        }
+    }
+    catch (error) {
+        console.error(
+            "Notification feed error:",
+            error
+        );
+    }
+}
+
 async function updateModuleStatus() {
     const container =
         document.getElementById(
@@ -16734,6 +16905,7 @@ document.addEventListener(
         updateSystemStats();
         updateHomeErrors();
         updateModuleStatus();
+        updateNotifications();
         updateStorageStats();
         updateStorageCandidates();
         updateCluster();
@@ -17054,6 +17226,11 @@ document.addEventListener(
 
         setInterval(
             updateModuleStatus,
+            5000
+        );
+
+        setInterval(
+            updateNotifications,
             5000
         );
 

@@ -897,6 +897,18 @@ int main()
         return 1;
     }
 
+    if (
+        html.find("notification-list") ==
+            std::string::npos
+        ||
+        html.find("/api/notifications") ==
+            std::string::npos
+    ) {
+        std::cerr
+            << "Notification UI is missing\n";
+        return 1;
+    }
+
     std::cout
         << "Web UI test passed\n";
 

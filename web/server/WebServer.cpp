@@ -6713,6 +6713,82 @@ void WebServer::handleClient(
 
     if (
         method == "GET" &&
+        path == "/api/notifications"
+    ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "system.view"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"error\":\"permission_denied\"}"
+            );
+
+            return;
+        }
+
+        const auto notifications =
+            runtime_.notifications()
+                .snapshot(50);
+
+        std::ostringstream json;
+
+        json << "{\"notifications\":[";
+
+        bool first_notification = true;
+
+        for (
+            const auto& notification :
+            notifications
+        ) {
+            if (!first_notification)
+                json << ",";
+
+            first_notification = false;
+
+            json
+                << "{"
+                << "\"id\":"
+                << notification.id
+                << ",\"timestamp_ms\":"
+                << notification.timestamp_ms
+                << ",\"topic\":\""
+                << jsonEscape(
+                    notification.topic
+                )
+                << "\",\"source\":\""
+                << jsonEscape(
+                    notification.source
+                )
+                << "\",\"severity\":\""
+                << jsonEscape(
+                    notification.severity
+                )
+                << "\",\"message\":\""
+                << jsonEscape(
+                    notification.message
+                )
+                << "\"}";
+        }
+
+        json << "]}";
+
+        sendResponse(
+            client_fd,
+            "200 OK",
+            "application/json; charset=utf-8",
+            json.str()
+        );
+
+        return;
+    }
+
+    if (
+        method == "GET" &&
         path == "/api/modules"
     ) {
         if (
@@ -6772,7 +6848,11 @@ void WebServer::handleClient(
                     module.message
                 )
                 << "\","
-                << "\"dependencies\":[";
+                << "\"restart_count\":"
+                << module.restart_count
+                << ",\"watchdog_attempts\":"
+                << module.watchdog_attempts
+                << ",\"dependencies\":[";
 
             bool first_dependency = true;
 
