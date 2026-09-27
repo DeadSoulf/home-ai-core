@@ -890,3 +890,6 @@ QEMU и подключение libvirt qemu:///system доступны.	QEMU and
 Библиотека libvirt недоступна.	libvirt runtime library is unavailable.
 libvirt установлен, но qemu:///system не подключён.	libvirt is installed but qemu:///system is not connected.
 Нет данных о требованиях хоста.	No host readiness data is available.
+На сервере	On server
+На GitHub	On GitHub
+Доступна версия	Available version:

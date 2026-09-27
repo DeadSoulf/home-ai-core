@@ -3245,7 +3245,7 @@ button,
         << "<div class=\"topbar-meta topbar-actions\">"
         << "<a id=\"update-badge\" href=\"/system\" "
            "style=\"display:none;margin-right:14px;color:#f2d784;text-decoration:none;font-weight:700\">"
-           "Доступно обновление</a>"
+           "Доступна версия</a>"
         << "<span class=\"topbar-user-summary\">"
         << "<span data-i18n-skip>" << htmlEscape(context.username) << "</span>"
         << " · "
@@ -3428,80 +3428,21 @@ button,
 
 <div class="section-card update-console">
 <div class="section-title">
-<div>
 <h2>Обновление сервера</h2>
-<span class="section-hint">GitHub → build → tests → restart</span>
-</div>
-<div class="update-branch-chip">
-<span>Ветка</span>
-<strong id="update-branch" data-i18n-skip>...</strong>
-</div>
-</div>
-
-<div id="update-status-card" class="update-status-card is-checking" aria-live="polite">
-<div id="update-state-orb" class="update-state-orb" aria-hidden="true">↻</div>
-<div class="update-status-copy">
-<span class="update-status-caption">Состояние</span>
-<strong id="update-state">Проверка обновлений</strong>
-<div id="update-message" class="muted">Проверка состояния обновлений...</div>
-</div>
 </div>
 
 <div class="update-version-flow">
 <article id="update-local-card" class="update-version-card is-current">
-<span class="update-version-label">Локальная версия</span>
+<span class="update-version-label">На сервере</span>
 <strong id="update-local" data-i18n-skip>...</strong>
-<small><span>Версия</span> <span data-i18n-skip>)HTML"
-            << htmlEscape(
-                context.version
-            )
-            << R"HTML(</span></small>
 </article>
 
 <div class="update-flow-arrow" aria-hidden="true">→</div>
 
 <article id="update-remote-card" class="update-version-card">
-<span class="update-version-label">GitHub версия</span>
+<span class="update-version-label">На GitHub</span>
 <strong id="update-remote" data-i18n-skip>...</strong>
-<small id="update-remote-note">Проверка обновлений</small>
 </article>
-</div>
-
-<div class="update-progress-shell">
-<div class="update-progress-head">
-<div class="update-progress-track">
-<div id="update-progress-bar" class="update-progress-bar"></div>
-</div>
-<div id="update-progress-percent" class="update-progress-percent">0%</div>
-</div>
-
-<div id="update-progress-detail" class="update-progress-detail">
-Ожидание...
-</div>
-
-<div id="update-stage-list" class="update-stage-list">
-<div class="update-stage-row pending" data-update-stage="check" data-threshold="5">
-<span class="update-stage-icon">○</span><span>Проверка GitHub</span>
-</div>
-<div class="update-stage-row pending" data-update-stage="download" data-threshold="15">
-<span class="update-stage-icon">○</span><span>Получение изменений</span>
-</div>
-<div class="update-stage-row pending" data-update-stage="configure" data-threshold="25">
-<span class="update-stage-icon">○</span><span>Подготовка CMake</span>
-</div>
-<div class="update-stage-row pending" data-update-stage="build" data-threshold="70">
-<span class="update-stage-icon">○</span><span>Сборка</span>
-</div>
-<div class="update-stage-row pending" data-update-stage="tests" data-threshold="90">
-<span class="update-stage-icon">○</span><span>Тестирование</span>
-</div>
-<div class="update-stage-row pending" data-update-stage="activation" data-threshold="95">
-<span class="update-stage-icon">○</span><span>Активация новой версии</span>
-</div>
-<div class="update-stage-row pending" data-update-stage="restart" data-threshold="100">
-<span class="update-stage-icon">○</span><span>Перезапуск</span>
-</div>
-</div>
 </div>
 
 <div class="button-row update-actions">
@@ -3531,12 +3472,6 @@ button,
 
         page << R"HTML(
 </div>
-
-<details id="update-log-details" style="margin-top:14px">
-<summary>Показать подробный журнал</summary>
-<pre id="update-output"
-style="display:none;white-space:pre-wrap;background:#0f1217;padding:12px;border-radius:8px;overflow:auto;max-height:360px"></pre>
-</details>
 </div>
 )HTML";
     }
@@ -12090,6 +12025,14 @@ async function updateServerUpdateStatus() {
         const data =
             await response.json();
 
+        const localVersion =
+            data.local_version
+            || "-";
+
+        const remoteVersion =
+            data.remote_version
+            || localVersion;
+
         const badge =
             document.getElementById(
                 "update-badge"
@@ -12103,7 +12046,7 @@ async function updateServerUpdateStatus() {
                     "inline";
 
                 badge.textContent =
-                    "Требуется перезапуск";
+                    tr("Требуется перезапуск");
             }
             else if (
                 data.update_available
@@ -12112,7 +12055,9 @@ async function updateServerUpdateStatus() {
                     "inline";
 
                 badge.textContent =
-                    "Доступно обновление";
+                    tr("Доступна версия")
+                    + " "
+                    + remoteVersion;
             }
             else {
                 badge.style.display =
@@ -12120,61 +12065,41 @@ async function updateServerUpdateStatus() {
             }
         }
 
-        const branch =
+        const local =
             document.getElementById(
-                "update-branch"
+                "update-local"
             );
 
-        if (!branch)
-            return;
+        if (local)
+            local.textContent =
+                localVersion;
 
-        branch.textContent =
-            data.branch || "-";
-
-        document.getElementById(
-            "update-local"
-        ).textContent =
-            shortSha(
-                data.local_sha
-            );
-
-        document.getElementById(
-            "update-remote"
-        ).textContent =
-            shortSha(
-                data.remote_sha
-            );
-
-        document.getElementById(
-            "update-message"
-        ).textContent =
-            data.message || "";
-
-        renderUpdateState(
-            data
-        );
-
-        renderUpdateProgress(
-            data
-        );
-
-        const output =
+        const remote =
             document.getElementById(
-                "update-output"
+                "update-remote"
             );
 
-        if (output) {
-            if (data.last_output) {
-                output.style.display =
-                    "block";
+        if (remote)
+            remote.textContent =
+                remoteVersion;
 
-                output.textContent =
-                    data.last_output;
-            }
-            else {
-                output.style.display =
-                    "none";
-            }
+        const remoteCard =
+            document.getElementById(
+                "update-remote-card"
+            );
+
+        if (remoteCard) {
+            remoteCard.classList.toggle(
+                "is-new",
+                Boolean(
+                    data.update_available
+                )
+            );
+
+            remoteCard.classList.toggle(
+                "is-synced",
+                !data.update_available
+            );
         }
 
         const checkButton =

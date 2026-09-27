@@ -29,6 +29,7 @@ struct UpdateStatus {
     std::string state_text;
     std::string local_sha;
     std::string remote_sha;
+    std::string remote_version;
     std::string branch;
     std::string message;
     std::string last_output;
@@ -105,6 +106,7 @@ private:
 
     std::string gitHead() const;
     std::string remoteHead() const;
+    std::string versionAt(const std::string& ref) const;
     std::string currentBranch() const;
 
     void setState(

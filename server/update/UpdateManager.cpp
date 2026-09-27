@@ -560,6 +560,48 @@ void UpdateManager::performCheck()
         return;
     }
 
+    const auto local_version =
+        versionAt(local);
+
+    auto remote_version =
+        local == remote
+        ? local_version
+        : versionAt(remote);
+
+    if (
+        local != remote
+        &&
+        remote_version.empty()
+    ) {
+        const auto fetch =
+            runCommand(
+                "/usr/bin/git",
+                {
+                    "fetch",
+                    "--quiet",
+                    "--no-tags",
+                    remote_,
+                    branch_
+                }
+            );
+
+        if (fetch.exit_code == 0)
+            remote_version = versionAt(remote);
+    }
+
+    if (
+        local_version.empty()
+        ||
+        remote_version.empty()
+    ) {
+        setState(
+            UpdateState::Error,
+            "Не удалось определить VERSION локальной или удалённой версии."
+        );
+
+        return;
+    }
+
     {
         std::lock_guard<std::mutex>
             lock(mutex_);
@@ -569,6 +611,9 @@ void UpdateManager::performCheck()
 
         status_.remote_sha =
             remote;
+
+        status_.remote_version =
+            remote_version;
 
         status_.update_available =
             local != remote;
@@ -956,6 +1001,9 @@ void UpdateManager::performUpdate()
         return;
     }
 
+    const auto new_version =
+        versionAt(new_head);
+
     {
         std::lock_guard<std::mutex>
             lock(mutex_);
@@ -973,6 +1021,9 @@ void UpdateManager::performUpdate()
 
         status_.remote_sha =
             new_head;
+
+        status_.remote_version =
+            new_version;
 
         status_.update_available =
             false;
@@ -1228,6 +1279,30 @@ std::string UpdateManager::remoteHead() const
                 remote_,
                 "refs/heads/" +
                     branch_
+            }
+        );
+
+    if (result.exit_code != 0)
+        return {};
+
+    return firstToken(
+        result.output
+    );
+}
+
+std::string UpdateManager::versionAt(
+    const std::string& ref
+) const
+{
+    if (ref.empty())
+        return {};
+
+    const auto result =
+        runCommand(
+            "/usr/bin/git",
+            {
+                "show",
+                ref + ":VERSION"
             }
         );
 

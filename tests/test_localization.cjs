@@ -16,7 +16,7 @@ const script = '(() => { const catalog = ' + JSON.stringify(fs.readFileSync(path
         if(url.pathname==='/assets/i18n.js') return route.fulfill({contentType:'application/javascript',body:script});
         if(url.pathname==='/api/admin/accelerator') {gpuSelected=new URLSearchParams(route.request().postData()).get('pci_address');return route.fulfill({json:{success:true}});}
         if(url.pathname==='/api/admin/gpus') return route.fulfill({json:{available:true,selected:gpuSelected,selected_present:devices.some(d=>d.pci_address===gpuSelected),devices}});
-        if(url.pathname==='/api/update/status') return route.fulfill({json:{branch:'develop',local_sha:'0123456789abcdef',remote_sha:'0123456789abcdef',state:'ready_to_restart',message:'Обновление установлено и протестировано. Требуется перезапуск.',restart_required:true,last_output:'Original compiler output'}});
+        if(url.pathname==='/api/update/status') return route.fulfill({json:{local_version:'0.0.56',remote_version:'0.0.57',branch:'develop',local_sha:'0123456789abcdef',remote_sha:'fedcba9876543210',state:'update_available',message:'Доступна новая версия в GitHub.',update_available:true,restart_required:false,last_output:'Original compiler output'}});
         if(url.pathname==='/api/modules') return route.fulfill({json:{modules:[{name:'security',state:'running',health:'healthy',message:'Authentication and sessions are ready.',dependencies:[]}]}});
         if(url.pathname==='/api/network/vpn') return route.fulfill({json:{available:true,profiles:[{name:'test-profile',active:false}]}});
         if(url.pathname==='/api/storage') return route.fulfill({json:{volumes:[]}});

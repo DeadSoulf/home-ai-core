@@ -844,11 +844,19 @@ int main()
         ) == std::string::npos
         ||
         system.find(
-            "update-progress-bar"
+            "update-local"
         ) == std::string::npos
         ||
         system.find(
-            "update-status-card"
+            "update-remote"
+        ) == std::string::npos
+        ||
+        system.find(
+            "На сервере"
+        ) == std::string::npos
+        ||
+        system.find(
+            "На GitHub"
         ) == std::string::npos
         ||
         system.find(
@@ -928,15 +936,19 @@ int main()
         ) == std::string::npos
         ||
         system.find(
-            "data-update-stage=\"build\""
-        ) == std::string::npos
-        ||
-        system.find(
-            "<span>70%</span>"
+            "id=\"update-progress-bar\""
         ) != std::string::npos
         ||
         system.find(
-            "<span>100%</span>"
+            "id=\"update-status-card\""
+        ) != std::string::npos
+        ||
+        system.find(
+            "id=\"update-branch\""
+        ) != std::string::npos
+        ||
+        system.find(
+            "id=\"update-log-details\""
         ) != std::string::npos
     ) {
         std::cerr

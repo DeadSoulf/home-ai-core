@@ -7184,6 +7184,19 @@ void WebServer::handleClient(
                 status.state_text
             ) +
             "\","
+            "\"local_version\":\"" +
+            jsonEscape(
+                runtime_.config().get(
+                    "core.version",
+                    "unknown"
+                )
+            ) +
+            "\","
+            "\"remote_version\":\"" +
+            jsonEscape(
+                status.remote_version
+            ) +
+            "\","
             "\"local_sha\":\"" +
             jsonEscape(
                 status.local_sha
