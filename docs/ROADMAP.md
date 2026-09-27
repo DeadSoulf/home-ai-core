@@ -42,7 +42,10 @@ High-level project status, dependencies and execution order are tracked in [MAST
 | 0.0.44 | CSRF-protected configuration form compatibility | DEVELOPMENT SNAPSHOT |
 | 0.0.45 | Module Manager dependency-safe restart + watchdog engine | DEVELOPMENT SNAPSHOT |
 | 0.0.46 | Runtime bounded module watchdog scheduling/configuration | DEVELOPMENT SNAPSHOT |
-| next 0.0.x | Platform foundation closure: documentation, watchdog/recovery, notifications, host diagnostics | PLANNED |
+| 0.0.47 | Event Bus global subscriptions + Notification Center | DEVELOPMENT SNAPSHOT |
+| 0.0.48 | Protected notifications API + System event feed | DEVELOPMENT SNAPSHOT |
+| 0.0.49 | Host readiness diagnostics | DEVELOPMENT SNAPSHOT |
+| next acceptance | Real Debian host acceptance for Phase A foundation | IN PROGRESS |
 | next 0.0.x | Hypervisor managed virtual disks / ISO / networking / editor / console | PLANNED |
 | next 0.0.x | Storage health and shared pool completion | PLANNED |
 | next 0.0.x | Recorder + continuous video transport + archive/event pipeline | PLANNED |
@@ -489,3 +492,37 @@ Runtime watchdog integration in this milestone:
 - invalid negative limits are clamped to safe values
 - default policy remains conservative: only `unhealthy` triggers restart
 - Version Guard, clean Debian build and CTest pass in CI
+
+
+## Development snapshot: 0.0.47
+
+Unified event foundation in this milestone:
+
+- Event Bus supports global subscribers in addition to topic-specific handlers
+- notification events carry source and severity metadata
+- bounded in-memory Notification Center retains recent user-visible events
+- ordinary internal events without severity remain ordinary Event Bus traffic
+- Core startup/stopping events use the new notification metadata
+- unit coverage verifies topic delivery, global delivery, capacity and ordering
+
+## Development snapshot: 0.0.48
+
+Notification Web/API integration in this milestone:
+
+- authenticated `GET /api/notifications` protected by `system.view`
+- System page displays the recent notification feed without unsafe HTML insertion
+- Module Manager API exposes restart/watchdog counters
+- watchdog recovery attempts publish a warning event
+- API/UI tests cover the protected notification path
+
+## Development snapshot: 0.0.49
+
+Host readiness diagnostics in this milestone:
+
+- authenticated `GET /api/system/readiness`
+- System page renders actionable readiness cards
+- checks update toolchain, Storage Helper, Network Helper, ffmpeg/ffprobe and HTTPS
+- checks KVM acceleration separately from QEMU/libvirt availability
+- missing VMX/SVM or `/dev/kvm` is reported as host attention, not a Core crash
+- nested-virtualization guidance is explicit for virtualized development hosts
+- Debian CI passes all 24 tests
