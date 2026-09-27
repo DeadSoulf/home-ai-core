@@ -19,7 +19,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Require VERSION change with Core code
+      - name: Require VERSION change for every release change
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -38,24 +38,14 @@ jobs:
             RANGE="$BEFORE_SHA..HEAD"
           fi
 
-          runtime_pattern='^(core/|server/|security/|web/|config/|main[.]cpp$|CMakeLists[.]txt$)'
+          changed=$(git diff --name-only "$RANGE")
 
-          while IFS= read -r commit; do
-            [[ -n "$commit" ]] || continue
+          if [[ -z "$changed" ]]; then
+            exit 0
+          fi
 
-            parent_count=$(git rev-list --parents -n 1 "$commit" | awk '{print NF - 1}')
-
-            if (( parent_count > 1 )); then
-              continue
-            fi
-
-            changed=$(git diff-tree --no-commit-id --name-only -r "$commit")
-
-            if grep -Eq "$runtime_pattern" <<<"$changed"; then
-              if ! grep -qx "VERSION" <<<"$changed"; then
-                echo "::error::Core/runtime code changed in $commit without advancing VERSION."
-                echo "$changed"
-                exit 1
-              fi
-            fi
-          done < <(git rev-list --reverse "$RANGE")
+          if ! grep -qx "VERSION" <<<"$changed"; then
+            echo "::error::Every develop/main change must advance VERSION because the Web updater is version-based."
+            echo "$changed"
+            exit 1
+          fi

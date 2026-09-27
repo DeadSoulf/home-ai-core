@@ -7,8 +7,8 @@ low-level details.
 ## Current baseline
 
 - Branch: `develop`
-- Version: `0.0.53`
-- Current focus: finish real-host Phase A acceptance after fixing updater build activation and making HTTPS runtime configuration manageable from the Web UI.
+- Version: read from repository root `VERSION`
+- Current focus: install the current `develop` acceptance candidate on bare-metal Debian 13 and close Phase A with real hardware/KVM/TLS/service acceptance.
 - CI: Debian build/test workflow is active and the current `develop` snapshot passes it.
 - Virtualization test environment note: the current development server may itself run inside a KVM
   guest without VMX/SVM passthrough. Absence of nested `/dev/kvm` in that environment is therefore

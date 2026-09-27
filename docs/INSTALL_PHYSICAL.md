@@ -20,11 +20,15 @@ grep -Eoc '(vmx|svm)' /proc/cpuinfo
 
 Для физического гипервизора результат должен быть больше нуля.
 
-## 2. Клонирование
+## 2. Минимальный bootstrap и клонирование
 
-Работайте от обычного пользователя, который затем будет запускать systemd-службу.
+На чистом Debian сначала нужны только CA-сертификаты и Git. Выполните от обычного пользователя
+с sudo-доступом:
 
 ```bash
+sudo apt-get update
+sudo apt-get install -y --no-install-recommends ca-certificates git
+
 sudo install -d -m 0755 -o "$(id -un)" -g "$(id -gn)" /srv/home-ai-core
 git clone --branch develop https://github.com/DeadSoulf/home-ai-core.git /srv/home-ai-core
 cd /srv/home-ai-core
@@ -59,7 +63,8 @@ ctest --test-dir build --output-on-failure
 install -d -m 0700 runtime
 cp config/home-ai.conf runtime/home-ai.conf
 
-bash scripts/setup-tls.sh <DNS-ИМЯ-ИЛИ-IP>
+SERVER_NAME="192.168.1.50"   # замените на реальный IP или DNS-имя
+bash scripts/setup-tls.sh "$SERVER_NAME"
 
 sed -i 's/^web\.tls_enabled=.*/web.tls_enabled=true/' runtime/home-ai.conf
 ```
@@ -114,7 +119,7 @@ sudo bash scripts/setup-hypervisor.sh check
 Откройте:
 
 ```text
-https://<server>:8080/setup
+https://SERVER_IP_OR_NAME:8080/setup
 ```
 
 Создайте первого администратора. Заводского логина или пароля нет.
@@ -128,7 +133,8 @@ https://<server>:8080/setup
 
 ```bash
 cd /srv/home-ai-core
-HOMEAI_ACCEPTANCE_USER=<ADMIN_LOGIN> \
+ADMIN_LOGIN="admin"          # замените на созданного администратора
+HOMEAI_ACCEPTANCE_USER="$ADMIN_LOGIN" \
     bash scripts/acceptance-phase-a.sh /srv/home-ai-core
 ```
 
