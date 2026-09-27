@@ -4,7 +4,6 @@ set -o pipefail
 
 ROOT="${1:-$(pwd)}"
 LOGIN_USER="${HOMEAI_ACCEPTANCE_USER:-}"
-EXPECTED_VERSION="0.0.53"
 BUILD_DIR="${HOMEAI_ACCEPTANCE_BUILD_DIR:-$ROOT/build-acceptance}"
 
 pass=0
@@ -91,10 +90,10 @@ else
 fi
 
 version=$(tr -d '[:space:]' < VERSION)
-if [[ "$version" == "$EXPECTED_VERSION" ]]; then
-    say_pass "Repository VERSION is $EXPECTED_VERSION"
+if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    say_pass "Repository VERSION is $version"
 else
-    say_fail "Expected VERSION $EXPECTED_VERSION, found $version"
+    say_fail "Repository VERSION is invalid: ${version:-empty}"
 fi
 
 branch=$(git branch --show-current 2>/dev/null || true)
@@ -269,6 +268,20 @@ if [[ -r "$runtime_config" ]]; then
     headers_file=$(mktemp)
     body_file=$(mktemp)
     trap 'rm -f "$headers_file" "$body_file" "${cookie_jar:-}" /tmp/home-ai-acceptance.out' EXIT
+
+    runtime_status=$(curl "${curl_tls[@]}" -sS -o "$body_file" -w '%{http_code}' "$base/api/status" 2>/dev/null || true)
+
+    if [[ "$runtime_status" == "200" ]]; then
+        running_version=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("version", ""))' "$body_file" 2>/dev/null || true)
+
+        if [[ "$running_version" == "$version" ]]; then
+            say_pass "Running service version matches repository VERSION: $version"
+        else
+            say_fail "Running service version '${running_version:-unknown}' does not match repository VERSION $version"
+        fi
+    else
+        say_fail "/api/status returned HTTP ${runtime_status:-unreachable}"
+    fi
 
     status=$(curl "${curl_tls[@]}" -sS -D "$headers_file" -o "$body_file" -w '%{http_code}' "$base/login" 2>/dev/null || true)
 
