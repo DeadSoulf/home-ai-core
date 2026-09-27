@@ -63,6 +63,10 @@ int main() {
         };
         check(request("GET", "/api/admin/gpus").find("401 Unauthorized") != std::string::npos, "anonymous access");
         check(request("GET", "/api/notifications").find("401 Unauthorized") != std::string::npos, "anonymous notifications");
+        const auto readiness_response = request("GET", "/api/system/readiness", *viewer);
+        check(readiness_response.find("200 OK") != std::string::npos, "viewer host readiness");
+        check(readiness_response.find("\"update_toolchain\"") != std::string::npos, "host readiness toolchain");
+        check(readiness_response.find("\"kvm\"") != std::string::npos, "host readiness KVM");
         const auto notification_response = request("GET", "/api/notifications", *viewer);
         check(notification_response.find("200 OK") != std::string::npos, "viewer notifications");
         check(notification_response.find("test.warning") != std::string::npos, "notification topic");

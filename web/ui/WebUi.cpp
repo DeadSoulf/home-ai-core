@@ -3397,6 +3397,16 @@ button,
 
 <div class="section-card">
 <div class="section-title">
+<h2>Готовность хоста</h2>
+<span class="section-hint">Зависимости и аппаратные требования</span>
+</div>
+<div id="host-readiness-list" class="placeholder-grid">
+<div class="placeholder-card">Проверка требований хоста...</div>
+</div>
+</div>
+
+<div class="section-card">
+<div class="section-title">
 <h2>Модули ядра</h2>
 <span class="section-hint">Module Manager lifecycle / health</span>
 </div>
@@ -13899,6 +13909,111 @@ async function updateNotifications() {
     }
 }
 
+async function updateHostReadiness() {
+    const container =
+        document.getElementById(
+            "host-readiness-list"
+        );
+
+    if (!container)
+        return;
+
+    try {
+        const response =
+            await fetch(
+                "/api/system/readiness",
+                {
+                    cache: "no-store"
+                }
+            );
+
+        if (
+            response.status === 401
+        ) {
+            window.location = "/login";
+            return;
+        }
+
+        if (!response.ok)
+            return;
+
+        const data =
+            await response.json();
+
+        const checks =
+            Array.isArray(data.checks)
+            ? data.checks
+            : [];
+
+        container.replaceChildren();
+
+        for (const check of checks) {
+            const card =
+                document.createElement(
+                    "div"
+                );
+            card.className =
+                "placeholder-card";
+
+            const title =
+                document.createElement(
+                    "strong"
+                );
+            title.textContent =
+                check.label
+                || check.id
+                || "Requirement";
+            card.appendChild(title);
+
+            const status =
+                document.createElement(
+                    "div"
+                );
+            status.className =
+                check.status === "ready"
+                ? "status-ok"
+                : "status-warn";
+            status.textContent =
+                check.status === "ready"
+                ? "READY"
+                : "ATTENTION";
+            card.appendChild(status);
+
+            if (check.message) {
+                const message =
+                    document.createElement(
+                        "div"
+                    );
+                message.className = "muted";
+                message.style.marginTop = "8px";
+                message.textContent =
+                    check.message;
+                card.appendChild(message);
+            }
+
+            container.appendChild(card);
+        }
+
+        if (checks.length === 0) {
+            const empty =
+                document.createElement(
+                    "div"
+                );
+            empty.className =
+                "placeholder-card";
+            empty.textContent =
+                "Нет данных о требованиях хоста.";
+            container.appendChild(empty);
+        }
+    }
+    catch (error) {
+        console.error(
+            "Host readiness error:",
+            error
+        );
+    }
+}
+
 async function updateModuleStatus() {
     const container =
         document.getElementById(
@@ -16904,6 +17019,7 @@ document.addEventListener(
         initializeStatCards();
         updateSystemStats();
         updateHomeErrors();
+        updateHostReadiness();
         updateModuleStatus();
         updateNotifications();
         updateStorageStats();
@@ -17222,6 +17338,11 @@ document.addEventListener(
         setInterval(
             updateHomeErrors,
             5000
+        );
+
+        setInterval(
+            updateHostReadiness,
+            10000
         );
 
         setInterval(

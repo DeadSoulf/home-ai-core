@@ -4875,6 +4875,272 @@ void WebServer::handleClient(
 
     if (
         method == "GET" &&
+        path == "/api/system/readiness"
+    ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "system.view"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"error\":\"permission_denied\"}"
+            );
+
+            return;
+        }
+
+        struct ReadinessCheck {
+            std::string id;
+            std::string label;
+            std::string status;
+            std::string message;
+        };
+
+        std::vector<ReadinessCheck>
+            checks;
+
+        const auto executable =
+            [](const char* path) {
+                return
+                    ::access(
+                        path,
+                        X_OK
+                    ) == 0;
+            };
+
+        const bool toolchain_ready =
+            executable("/usr/bin/git")
+            &&
+            executable("/usr/bin/cmake")
+            &&
+            executable("/usr/bin/ninja")
+            &&
+            executable("/usr/bin/ctest");
+
+        checks.push_back({
+            "update_toolchain",
+            "Update build toolchain",
+            toolchain_ready
+                ? "ready"
+                : "attention",
+            toolchain_ready
+                ? "git, CMake, Ninja and CTest are available."
+                : "Install git, cmake, ninja-build and ctest/CMake tools before using self-update."
+        });
+
+        DiskOperations disk_operations;
+
+        const bool storage_helper_ready =
+            disk_operations.helperInstalled();
+
+        checks.push_back({
+            "storage_helper",
+            "Storage Helper",
+            storage_helper_ready
+                ? "ready"
+                : "attention",
+            storage_helper_ready
+                ? "Privileged storage helper is installed."
+                : "Install /usr/local/libexec/home-ai-storage-helper before privileged disk actions."
+        });
+
+        NetworkInterfaceManager
+            network_manager;
+
+        const bool network_helper_ready =
+            network_manager.helperInstalled();
+
+        checks.push_back({
+            "network_helper",
+            "Network Helper",
+            network_helper_ready
+                ? "ready"
+                : "attention",
+            network_helper_ready
+                ? "Privileged network helper is installed."
+                : "Install /usr/local/libexec/home-ai-network-helper before privileged IPv4 changes."
+        });
+
+        const bool media_ready =
+            executable("/usr/bin/ffmpeg")
+            &&
+            executable("/usr/bin/ffprobe");
+
+        checks.push_back({
+            "media_tools",
+            "Camera media tools",
+            media_ready
+                ? "ready"
+                : "attention",
+            media_ready
+                ? "ffmpeg and ffprobe are available."
+                : "Install ffmpeg/ffprobe for snapshots, media probing and future recorder work."
+        });
+
+        const bool tls_enabled =
+            runtime_.config().getBool(
+                "web.tls_enabled",
+                false
+            );
+
+        checks.push_back({
+            "https",
+            "HTTPS/TLS",
+            tls_enabled
+                ? "ready"
+                : "attention",
+            tls_enabled
+                ? "Built-in HTTPS is enabled."
+                : "Management UI is running without built-in TLS; enable HTTPS before remote production administration."
+        });
+
+        bool kvm_ready = false;
+        bool qemu_libvirt_ready = false;
+        std::string kvm_message =
+            "Hypervisor manager is not attached.";
+        std::string qemu_message =
+            "Hypervisor manager is not attached.";
+
+        if (hypervisor_) {
+            std::string hypervisor_error;
+
+            const auto hypervisor_snapshot =
+                hypervisor_->snapshot(
+                    hypervisor_error
+                );
+
+            const auto& host =
+                hypervisor_snapshot.host;
+
+            kvm_ready =
+                host.hardware_virtualization
+                &&
+                host.kvm_present
+                &&
+                host.kvm_accessible;
+
+            if (kvm_ready) {
+                kvm_message =
+                    "Hardware virtualization and /dev/kvm are available.";
+            }
+            else if (
+                !host.hardware_virtualization
+            ) {
+                kvm_message =
+                    "VMX/SVM is not exposed to this host. On a nested VM, enable virtualization passthrough on the outer hypervisor.";
+            }
+            else if (!host.kvm_present) {
+                kvm_message =
+                    "/dev/kvm is absent. Load/configure KVM or expose it from the outer hypervisor.";
+            }
+            else if (!host.kvm_accessible) {
+                kvm_message =
+                    "/dev/kvm exists but the Home AI Core service account cannot access it.";
+            }
+
+            qemu_libvirt_ready =
+                host.qemu_available
+                &&
+                host.libvirt_available
+                &&
+                host.libvirt_connected;
+
+            if (qemu_libvirt_ready) {
+                qemu_message =
+                    "QEMU and qemu:///system libvirt connection are available.";
+            }
+            else if (!host.qemu_available) {
+                qemu_message =
+                    "QEMU executable is unavailable.";
+            }
+            else if (!host.libvirt_available) {
+                qemu_message =
+                    "libvirt runtime library is unavailable.";
+            }
+            else if (!host.libvirt_connected) {
+                qemu_message =
+                    hypervisor_error.empty()
+                    ? "libvirt is installed but qemu:///system is not connected."
+                    : hypervisor_error;
+            }
+        }
+
+        checks.push_back({
+            "kvm",
+            "KVM acceleration",
+            kvm_ready
+                ? "ready"
+                : "attention",
+            kvm_message
+        });
+
+        checks.push_back({
+            "qemu_libvirt",
+            "QEMU / libvirt",
+            qemu_libvirt_ready
+                ? "ready"
+                : "attention",
+            qemu_message
+        });
+
+        bool attention = false;
+
+        for (const auto& check : checks) {
+            if (check.status != "ready") {
+                attention = true;
+                break;
+            }
+        }
+
+        std::ostringstream json;
+
+        json
+            << "{\"overall\":\""
+            << (
+                attention
+                ? "attention"
+                : "ready"
+            )
+            << "\",\"checks\":[";
+
+        bool first_check = true;
+
+        for (const auto& check : checks) {
+            if (!first_check)
+                json << ",";
+
+            first_check = false;
+
+            json
+                << "{\"id\":\""
+                << jsonEscape(check.id)
+                << "\",\"label\":\""
+                << jsonEscape(check.label)
+                << "\",\"status\":\""
+                << jsonEscape(check.status)
+                << "\",\"message\":\""
+                << jsonEscape(check.message)
+                << "\"}";
+        }
+
+        json << "]}";
+
+        sendResponse(
+            client_fd,
+            "200 OK",
+            "application/json; charset=utf-8",
+            json.str()
+        );
+
+        return;
+    }
+
+    if (
+        method == "GET" &&
         path == "/api/system"
     ) {
         if (

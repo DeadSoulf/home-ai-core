@@ -909,6 +909,18 @@ int main()
         return 1;
     }
 
+    if (
+        system.find("host-readiness-list") ==
+            std::string::npos
+        ||
+        system.find("/api/system/readiness") ==
+            std::string::npos
+    ) {
+        std::cerr
+            << "Host readiness UI is missing\n";
+        return 1;
+    }
+
     std::cout
         << "Web UI test passed\n";
 
