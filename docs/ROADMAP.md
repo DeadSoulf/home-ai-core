@@ -1,5 +1,7 @@
 # Home AI Core — Roadmap
 
+High-level project status, dependencies and execution order are tracked in [MASTER_PLAN.md](MASTER_PLAN.md).
+
 ## Version plan
 
 | Version | Milestone | Status |
@@ -37,7 +39,10 @@
 | 0.0.41 | Security foundation: built-in HTTPS/TLS + Debian CI | DEVELOPMENT SNAPSHOT |
 | 0.0.42 | Security foundation: session-bound CSRF enforcement | DEVELOPMENT SNAPSHOT |
 | 0.0.43 | Security foundation: source-aware login throttling | DEVELOPMENT SNAPSHOT |
-| 0.0.44 | CSRF-protected configuration form compatibility | IN DEVELOPMENT |
+| 0.0.44 | CSRF-protected configuration form compatibility | DEVELOPMENT SNAPSHOT |
+| next 0.0.x | Platform foundation closure: documentation, watchdog/recovery, notifications, host diagnostics | PLANNED |
+| next 0.0.x | Hypervisor managed virtual disks / ISO / networking / editor / console | PLANNED |
+| next 0.0.x | Storage health and shared pool completion | PLANNED |
 | next 0.0.x | Recorder + continuous video transport + archive/event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
@@ -49,12 +54,14 @@
 
 ## Development priorities
 
-1. Introduce a Module Manager so major subsystems remain isolated and replaceable.
-2. Continue the Storage Core safely before allowing destructive disk operations.
-3. Build Device abstractions before higher-level automation.
-4. Keep core operation local-first and independent of Internet availability.
-5. Keep experimental self-development isolated behind tests, sandboxing and rollback.
-6. Preserve portability between the current Proxmox VM and the future physical Debian server.
+1. Close the platform foundation: documentation consistency, Module Manager restart/watchdog/recovery, unified notifications and host readiness diagnostics.
+2. Resume Hypervisor development with managed virtual disk creation; never accept arbitrary host paths from the Web UI.
+3. Complete Storage health and shared pool capabilities required by Hypervisor, NVR, Files, Backup and AI data.
+4. Build the Recorder/NVR pipeline after Storage is stable.
+5. Build Device abstractions before higher-level Automation.
+6. Keep core operation local-first and independent of Internet availability.
+7. Keep experimental self-development isolated behind tests, sandboxing and rollback.
+8. Preserve portability between the current virtualized development server and the future physical Debian server.
 
 ## Stable: 0.0.5
 
@@ -332,9 +339,9 @@ Current Web UI work:
 
 0.0.22 is a presentation and navigation redesign; existing Web/API functionality remains in place.
 
-## Current focus: 0.0.30
+## Development snapshot: 0.0.30
 
-Current Hypervisor Core work:
+Hypervisor Core foundation in this snapshot:
 
 - KVM device presence and access detection
 - Intel VMX / AMD SVM capability detection
