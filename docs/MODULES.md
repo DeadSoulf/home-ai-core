@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Version 0.0.6 introduces a common lifecycle manager for Home AI Core subsystems.
+Version 0.0.6 introduced the common lifecycle manager. Version 0.0.45 added dependency-safe module restart, and 0.0.46 enables bounded runtime watchdog recovery.
 
 Each managed subsystem follows the lifecycle:
 
@@ -65,6 +65,28 @@ storage-monitor┘
 If a dependency is missing or a cycle is detected, startup is refused.
 
 Shutdown happens in reverse start order, so dependent modules stop before the services they depend on.
+
+## Restart and watchdog recovery
+
+A running module can be restarted without restarting the whole Core. The restart scope includes
+currently running transitive dependents: dependents stop first in reverse dependency order, then
+the target and its dependents start again in topological order.
+
+The runtime watchdog automatically attempts recovery only for modules reporting `unhealthy`.
+A `degraded` module is deliberately not restarted automatically because degraded state can
+represent a valid environmental limitation or resource warning.
+
+Default configuration:
+
+```text
+modules.watchdog_enabled=true
+modules.watchdog_interval_seconds=10
+modules.watchdog_max_restarts=3
+modules.watchdog_cooldown_seconds=30
+```
+
+The retry limit is per unhealthy episode. A later healthy watchdog pass resets the episode attempt
+counter, while total restart count remains tracked for diagnostics.
 
 ## Current managed modules
 
@@ -191,7 +213,8 @@ Future versions can extend it with:
 
 - optional/reloadable modules
 - module configuration schema
-- restart one module without restarting the whole Core
-- watchdog/recovery policies
+- Web/API control for explicitly requested module restart
+- configurable per-module recovery policies
+- configuration reload
 - module resource limits
 - signed external module packages
