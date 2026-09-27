@@ -7,7 +7,7 @@ low-level details.
 ## Current baseline
 
 - Branch: `develop`
-- Version: `0.0.46`
+- Version: `0.0.49`
 - Current focus: finish the platform foundation before resuming major Hypervisor/Storage expansion.
 - CI: Debian build/test workflow is active and the current `develop` snapshot passes it.
 - Virtualization test environment note: the current development server may itself run inside a KVM
@@ -34,10 +34,10 @@ on a suitable environment when hardware integration is involved.
 
 | Module | Readiness | Implemented / verified today | In progress / next | Dependencies |
 |---|---:|---|---|---|
-| Core Runtime / Module Manager | ~92% | Runtime, Config, Logger, Event Bus, module dependency ordering, lifecycle, health, reverse shutdown, dependency-safe restart, bounded unhealthy-only runtime watchdog, module API/UI | Real-server acceptance, Web/API restart control, config reload, resource limits, signed external modules | Security, Event Bus |
-| System / Server Admin | ~85% | CPU/RAM/load/uptime/filesystem, health, GPU inventory, systemd integration | Processes/services, journal, sensors, power actions, config backup | Core, Security |
+| Core Runtime / Module Manager | ~93% | Runtime, Config, Logger, Event Bus, global event subscriptions, in-memory Notification Center, module dependency ordering, lifecycle, health, reverse shutdown, dependency-safe restart, bounded unhealthy-only runtime watchdog, module API/UI | Real-server acceptance, explicit Web/API restart control, config reload, resource limits, signed external modules | Security, Event Bus |
+| System / Server Admin | ~88% | CPU/RAM/load/uptime/filesystem, health, GPU inventory, systemd integration, host readiness diagnostics for toolchain/helpers/media/TLS/KVM/QEMU/libvirt | Real-server acceptance, processes/services, journal, sensors, power actions, config backup | Core, Security |
 | Update Core | ~85% | Git update, clean-tree guard, FF-only pull, CMake/Ninja, CTest, rollback, restart | Signed releases/modules, production channels, cluster update, downgrade/data migrations | Core, Security |
-| Web UI / API | ~82% | Authenticated responsive RU/EN UI, permission-aware routes/navigation, subsystem pages | Unified API errors, SSE/WebSocket events, API docs, notification center | Core, Security |
+| Web UI / API | ~84% | Authenticated responsive RU/EN UI, permission-aware routes/navigation, subsystem pages, protected notification feed and host readiness UI | Unified API errors, SSE/WebSocket realtime transport, API docs | Core, Security |
 | Security Core | ~82% | SQLite identity store, PBKDF2, roles/overrides, persistent sessions, audit, HTTPS/TLS, session-bound CSRF, source-aware login throttling, protected config forms | MFA, encrypted secrets store, trusted reverse-proxy mode, signed update/module verification, audit retention/export | Core |
 | Network / WireGuard | ~70% | Interface inventory, DHCP/static IPv4, gateway/DNS, NetworkManager/networkd/ifupdown, guarded helper, rollback, WireGuard profile management | Bridge/VLAN/bonding, advanced routes, DNS diagnostics, firewall, Hypervisor networks | Core, Security |
 | Camera Core | ~65% | RTSP registry, encrypted credentials, ffprobe metadata, snapshots, ONVIF discovery/profiles/stream URI/PTZ, SADP/LAN discovery, Live JPEG | Continuous video transport, recorder integration, events | Core, Security, Network |
@@ -54,7 +54,7 @@ on a suitable environment when hardware integration is involved.
 
 ## Phase A — close the platform foundation
 
-This phase must be completed before large new service layers are treated as production-capable.
+This phase must be completed before large new service layers are treated as production-capable. The code/CI portion is complete through 0.0.49; real Debian-host acceptance remains.
 
 | Item | State | Acceptance |
 |---|---|---|
@@ -63,10 +63,10 @@ This phase must be completed before large new service layers are treated as prod
 | Session-bound CSRF | DONE in 0.0.42 | Mutation API requires request marker + session CSRF token; cross-session token rejected |
 | Source-aware login throttling | DONE in 0.0.43 | Independent username and peer-source throttling; forwarded headers are not trusted by default |
 | Configuration-form CSRF compatibility | DONE in 0.0.44 | Legacy settings/config forms follow the same protected mutation path |
-| Documentation consolidation | IN PROGRESS | MASTER_PLAN is the high-level source of truth; ROADMAP and subsystem docs must not contradict implemented state |
+| Documentation consolidation | DONE for current foundation | MASTER_PLAN is the high-level source of truth and ROADMAP/subsystem docs are synchronized with the current foundation milestones |
 | Module restart + watchdog/recovery | DONE in 0.0.46 (CI verified) | Dependency-aware restart, unhealthy-only watchdog, bounded retries/cooldown; real-server acceptance remains |
-| Unified events / notifications | PLANNED | User-visible event feed driven by Event Bus, with persistence policy and permission filtering |
-| Host requirements diagnostics | PLANNED | Explicit checks for KVM, nested virtualization exposure, storage/network/helper requirements and actionable readiness output |
+| Unified events / notifications | DONE in 0.0.47–0.0.48 (CI verified) | Event Bus global subscriptions, bounded in-memory Notification Center, protected API and System-page feed; persistence/retention remains a later enhancement |
+| Host requirements diagnostics | DONE in 0.0.49 (CI verified) | Protected readiness API/UI checks update toolchain, storage/network helpers, media tools, HTTPS, KVM/nested virtualization and QEMU/libvirt with actionable messages |
 
 ### Phase A exit gate
 
@@ -235,14 +235,12 @@ AI Brain
 
 ## Immediate execution order
 
-1. Run real-server acceptance for 0.0.46 watchdog/recovery.
-2. Add unified Event Bus-backed notifications.
-3. Add host requirements/readiness diagnostics.
-4. Run the complete Phase A acceptance suite on the real Debian server.
-5. Resume Hypervisor with real managed virtual disk creation.
-6. Continue ISO -> networking -> VM editor -> console -> snapshots/backup.
-7. Close Storage health.
-8. Build Recorder/NVR.
+1. Run the complete Phase A acceptance suite for 0.0.49 on the real Debian server.
+2. Fix any host-only acceptance findings without expanding scope.
+3. Resume Hypervisor with real managed virtual disk creation.
+4. Continue ISO -> networking -> VM editor -> console -> snapshots/backup.
+5. Close Storage health.
+6. Build Recorder/NVR.
 
 Update this file after every development snapshot so project state does not have to be reconstructed
 from commit history.
