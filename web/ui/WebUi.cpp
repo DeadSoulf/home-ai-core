@@ -5387,6 +5387,151 @@ window.fetch =
         );
     };
 
+async function protectedConfigFormSubmit(
+    event
+) {
+    const form =
+        event.target;
+
+    if (
+        !(form instanceof HTMLFormElement)
+        ||
+        form.method.toUpperCase() !==
+            "POST"
+    ) {
+        return;
+    }
+
+    const action =
+        new URL(
+            form.action,
+            window.location.href
+        );
+
+    if (
+        action.origin !==
+            window.location.origin
+        ||
+        action.pathname !==
+            "/api/config"
+    ) {
+        return;
+    }
+
+    event.preventDefault();
+
+    const submitter =
+        event.submitter instanceof
+            HTMLButtonElement
+        ? event.submitter
+        : null;
+
+    if (submitter)
+        submitter.disabled = true;
+
+    try {
+        const data =
+            new FormData(form);
+
+        const parameters =
+            new URLSearchParams();
+
+        for (
+            const [key, value] of
+            data.entries()
+        ) {
+            if (
+                typeof value ===
+                    "string"
+            ) {
+                parameters.append(
+                    key,
+                    value
+                );
+            }
+        }
+
+        const response =
+            await fetch(
+                action.pathname
+                +
+                action.search,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type":
+                            "application/x-www-form-urlencoded"
+                    },
+                    body:
+                        parameters.toString()
+                }
+            );
+
+        if (
+            response.status === 401
+        ) {
+            window.location =
+                "/login";
+            return;
+        }
+
+        if (!response.ok) {
+            const message =
+                await response.text();
+
+            throw new Error(
+                message
+                ||
+                String(
+                    response.status
+                )
+            );
+        }
+
+        const returnTo =
+            String(
+                data.get(
+                    "return_to"
+                )
+                ||
+                window.location.pathname
+            );
+
+        window.location.assign(
+            returnTo.startsWith("/")
+            ? returnTo
+            : window.location.pathname
+        );
+    }
+    catch (error) {
+        window.alert(
+            (
+                typeof tr ===
+                    "function"
+                ? tr(
+                    "Не удалось сохранить настройки."
+                )
+                : "Не удалось сохранить настройки."
+            )
+            +
+            " "
+            +
+            (
+                error?.message
+                || ""
+            )
+        );
+
+        if (submitter)
+            submitter.disabled = false;
+    }
+}
+
+document.addEventListener(
+    "submit",
+    protectedConfigFormSubmit
+);
+
 const sidebarPreferenceKey =
     "home-ai.sidebar-collapsed";
 

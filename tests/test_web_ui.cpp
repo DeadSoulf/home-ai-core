@@ -90,6 +90,14 @@ int main()
         home.find(
             "name=\"_csrf\" value=\"csrf-test-token\""
         ) == std::string::npos
+        ||
+        home.find(
+            "protectedConfigFormSubmit"
+        ) == std::string::npos
+        ||
+        home.find(
+            "action.pathname !=="
+        ) == std::string::npos
     ) {
         std::cerr
             << "CSRF Web UI integration is missing\n";

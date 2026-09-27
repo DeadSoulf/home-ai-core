@@ -36,7 +36,8 @@
 | 0.0.40 | Hypervisor VM Storage Pool + disk placement preview | DEVELOPMENT SNAPSHOT |
 | 0.0.41 | Security foundation: built-in HTTPS/TLS + Debian CI | DEVELOPMENT SNAPSHOT |
 | 0.0.42 | Security foundation: session-bound CSRF enforcement | DEVELOPMENT SNAPSHOT |
-| 0.0.43 | Security foundation: source-aware login throttling | IN DEVELOPMENT |
+| 0.0.43 | Security foundation: source-aware login throttling | DEVELOPMENT SNAPSHOT |
+| 0.0.44 | CSRF-protected configuration form compatibility | IN DEVELOPMENT |
 | next 0.0.x | Recorder + continuous video transport + archive/event pipeline | PLANNED |
 | next 0.0.x | Video analytics | PLANNED |
 | next 0.0.x | Full Storage Core: health, quotas, retention and recorder/file integration | PLANNED |
@@ -443,3 +444,14 @@ Authentication hardening in this milestone:
 - stale failure counters expire automatically
 - successful login clears only the account-specific counter, not the source-wide counter
 - Security Core tests verify that one blocked source does not block another source
+
+
+## Development snapshot: 0.0.44
+
+CSRF form compatibility in this milestone:
+
+- settings forms no longer submit directly to protected API routes
+- Network, Storage, Cluster, Files and general Settings forms use the protected same-origin fetch path
+- `X-HomeAI-Request` and session-bound `X-HomeAI-CSRF` are injected centrally
+- logout remains a normal HTML POST protected by its hidden session-bound CSRF token
+- failed settings saves remain on the current page and show an error instead of silently navigating

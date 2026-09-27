@@ -302,6 +302,7 @@ Web/API mutation rules:
 - the same API requests require `X-HomeAI-CSRF` matching the current session
 - normal Web UI forms use the same session-bound token as a hidden `_csrf` value
 - the Web UI automatically adds both protection headers to same-origin mutation requests
+- legacy settings forms targeting `/api/config` are intercepted and submitted through the same protected fetch path
 - GET/HEAD/OPTIONS remain read-only and do not require a CSRF token
 - Cluster worker heartbeats are machine-to-machine traffic and keep their independent
   `X-HomeAI-Cluster-Token` authentication path

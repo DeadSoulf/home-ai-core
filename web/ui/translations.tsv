@@ -860,3 +860,4 @@ VM-пул	VM pool
 Файл диска не создан.	No disk file was created.
 VM-пул использует только диски, которым назначена роль VM. Резерв не расходуется при выборе места для будущих виртуальных дисков.	The VM pool uses only disks assigned the VM role. The reserve is not consumed when selecting space for future virtual disks.
 Сохранить настройки VM-пула	Save VM pool settings
+Не удалось сохранить настройки.	Unable to save settings.
