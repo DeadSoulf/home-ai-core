@@ -2,6 +2,7 @@
 
 #include "core/config/ConfigManager.h"
 #include "core/events/EventBus.h"
+#include "core/events/NotificationCenter.h"
 
 #include <atomic>
 #include <string>
@@ -18,11 +19,15 @@ public:
     bool isRunning() const;
 
     EventBus& events();
+    NotificationCenter& notifications();
     ConfigManager& config();
 
 private:
     ConfigManager config_;
     EventBus event_bus_;
+    NotificationCenter notification_center_{
+        event_bus_
+    };
 
     std::atomic<bool> running_{false};
 };

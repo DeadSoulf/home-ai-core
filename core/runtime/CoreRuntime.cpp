@@ -62,7 +62,9 @@ void CoreRuntime::start()
 
     event_bus_.publish({
         "core.started",
-        ""
+        "Home AI Core started.",
+        "core",
+        "info"
     });
 }
 
@@ -77,7 +79,9 @@ void CoreRuntime::stop()
 
     event_bus_.publish({
         "core.stopping",
-        ""
+        "Home AI Core is stopping.",
+        "core",
+        "info"
     });
 
     running_ = false;
@@ -95,6 +99,12 @@ bool CoreRuntime::isRunning() const
 EventBus& CoreRuntime::events()
 {
     return event_bus_;
+}
+
+NotificationCenter&
+CoreRuntime::notifications()
+{
+    return notification_center_;
 }
 
 ConfigManager& CoreRuntime::config()

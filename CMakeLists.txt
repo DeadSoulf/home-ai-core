@@ -86,6 +86,7 @@ add_library(
     core/logging/Logger.cpp
     core/config/ConfigManager.cpp
     core/events/EventBus.cpp
+    core/events/NotificationCenter.cpp
     core/modules/Module.cpp
     core/modules/ModuleManager.cpp
     core/runtime/CoreRuntime.cpp
