@@ -15,6 +15,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 
+	"github.com/DeadSoulf/home-ai-core/internal/modules"
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 )
@@ -54,6 +55,7 @@ func defaultFakeSecurity() fakeSecurity {
 				"security.self.read",
 				"security.sessions.manage",
 				"audit.read",
+				"modules.read",
 			},
 		},
 	}
@@ -112,12 +114,13 @@ func testHandlerWithSecurity(state fakeState, securityService SecurityService) h
 		securityService,
 		nil,
 		nil,
+		nil,
 		realtime.New(nodeID, logger),
 	)
 }
 
 func TestHealth(t *testing.T) {
-	handler := testHandler(fakeState{schemaVersion: 3})
+	handler := testHandler(fakeState{schemaVersion: 4})
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
@@ -143,7 +146,7 @@ func TestHealth(t *testing.T) {
 }
 
 func TestCorrelationIDIsEchoed(t *testing.T) {
-	handler := testHandler(fakeState{schemaVersion: 3})
+	handler := testHandler(fakeState{schemaVersion: 4})
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	req.Header.Set("X-Correlation-ID", "mobile-upload-42")
@@ -156,7 +159,7 @@ func TestCorrelationIDIsEchoed(t *testing.T) {
 }
 
 func TestInvalidCorrelationIDFallsBackToRequestID(t *testing.T) {
-	handler := testHandler(fakeState{schemaVersion: 3})
+	handler := testHandler(fakeState{schemaVersion: 4})
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	req.Header.Set("X-Correlation-ID", "contains spaces")
@@ -183,7 +186,7 @@ func TestHealthFailsWhenStateIsUnavailable(t *testing.T) {
 func TestProtectedRouteRequiresAuthentication(t *testing.T) {
 	sec := defaultFakeSecurity()
 	sec.authErr = security.ErrUnauthorized
-	handler := testHandlerWithSecurity(fakeState{schemaVersion: 3}, sec)
+	handler := testHandlerWithSecurity(fakeState{schemaVersion: 4}, sec)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/system", nil)
 	rec := httptest.NewRecorder()
@@ -207,8 +210,9 @@ func TestSystem(t *testing.T) {
 	handler := New(
 		nodeID,
 		logger,
-		fakeState{schemaVersion: 3},
+		fakeState{schemaVersion: 4},
 		defaultFakeSecurity(),
+		nil,
 		nil,
 		nil,
 		realtime.New(nodeID, logger),
@@ -234,8 +238,8 @@ func TestSystem(t *testing.T) {
 	if body.System.NodeID != nodeID {
 		t.Fatalf("node_id = %q, want %q", body.System.NodeID, nodeID)
 	}
-	if body.SchemaVersion != 3 {
-		t.Fatalf("schema_version = %d, want 3", body.SchemaVersion)
+	if body.SchemaVersion != 4 {
+		t.Fatalf("schema_version = %d, want 4", body.SchemaVersion)
 	}
 }
 
@@ -287,7 +291,7 @@ func TestNotFoundUsesErrorEnvelope(t *testing.T) {
 }
 
 func TestMethodNotAllowedUsesErrorEnvelope(t *testing.T) {
-	handler := testHandler(fakeState{schemaVersion: 3})
+	handler := testHandler(fakeState{schemaVersion: 4})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/system", nil)
 	rec := httptest.NewRecorder()
@@ -330,8 +334,9 @@ func TestEventsRouteUpgradesToWebSocket(t *testing.T) {
 	handler := New(
 		nodeID,
 		logger,
-		fakeState{schemaVersion: 3},
+		fakeState{schemaVersion: 4},
 		defaultFakeSecurity(),
+		nil,
 		nil,
 		nil,
 		realtime.New(nodeID, logger, realtime.WithHeartbeat(time.Hour)),
@@ -367,7 +372,7 @@ func TestEventsRouteUpgradesToWebSocket(t *testing.T) {
 }
 
 func TestInvalidSessionModeIsRejectedBeforeLogin(t *testing.T) {
-	handler := testHandler(fakeState{schemaVersion: 3})
+	handler := testHandler(fakeState{schemaVersion: 4})
 
 	req := httptest.NewRequest(
 		http.MethodPost,
@@ -393,7 +398,7 @@ func TestInvalidSessionModeIsRejectedBeforeLogin(t *testing.T) {
 func TestAuthenticationBackendFailureIsUnavailable(t *testing.T) {
 	sec := defaultFakeSecurity()
 	sec.authErr = errors.New("database failed")
-	handler := testHandlerWithSecurity(fakeState{schemaVersion: 3}, sec)
+	handler := testHandlerWithSecurity(fakeState{schemaVersion: 4}, sec)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/system", nil)
 	rec := httptest.NewRecorder()
@@ -408,5 +413,79 @@ func TestAuthenticationBackendFailureIsUnavailable(t *testing.T) {
 	}
 	if body.Error.Code != "authentication_unavailable" {
 		t.Fatalf("error code = %q", body.Error.Code)
+	}
+}
+
+type fakeModules struct {
+	items        []modules.Registered
+	capabilities []string
+}
+
+func (f fakeModules) List(context.Context) ([]modules.Registered, error) {
+	return f.items, nil
+}
+
+func (f fakeModules) Get(_ context.Context, id string) (modules.Registered, error) {
+	for _, item := range f.items {
+		if item.Manifest.ID == id {
+			return item, nil
+		}
+	}
+	return modules.Registered{}, modules.ErrModuleNotFound
+}
+
+func (f fakeModules) Capabilities(context.Context) ([]string, error) {
+	return f.capabilities, nil
+}
+
+func TestModulesAPI(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	const nodeID = "00000000-0000-4000-8000-000000000000"
+	moduleService := fakeModules{
+		items: []modules.Registered{
+			{
+				Manifest: modules.Manifest{
+					SchemaVersion: 1,
+					ID:            "storage",
+					Name:          "Storage",
+					Version:       "0.1.0",
+					Core:          ">=0.1.0 <1.0.0",
+					Lifecycle:     []string{"install"},
+				},
+				Status: "registered",
+			},
+		},
+		capabilities: []string{"host.linux", "storage.block"},
+	}
+	handler := New(
+		nodeID,
+		logger,
+		fakeState{schemaVersion: 4},
+		defaultFakeSecurity(),
+		nil,
+		nil,
+		moduleService,
+		realtime.New(nodeID, logger),
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/modules", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("modules status = %d", rec.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/modules/storage", nil)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("module status = %d", rec.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/modules/capabilities", nil)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("capabilities status = %d", rec.Code)
 	}
 }

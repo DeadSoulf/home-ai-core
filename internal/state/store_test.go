@@ -20,8 +20,8 @@ func TestOpenAppliesMigrationsAndPersistsNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SchemaVersion() error = %v", err)
 	}
-	if version != 3 {
-		t.Fatalf("schema version = %d, want 3", version)
+	if version != 4 {
+		t.Fatalf("schema version = %d, want 4", version)
 	}
 
 	const nodeID = "00000000-0000-4000-8000-000000000001"
@@ -95,7 +95,44 @@ func TestMigrationsAreIdempotent(t *testing.T) {
 	if err := store.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM schema_migrations").Scan(&count); err != nil {
 		t.Fatalf("count migrations: %v", err)
 	}
-	if count != 3 {
-		t.Fatalf("migration rows = %d, want 3", count)
+	if count != 4 {
+		t.Fatalf("migration rows = %d, want 4", count)
+	}
+}
+
+func TestModuleRegistrationPreservesStatus(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer store.Close()
+
+	if err := store.UpsertModule(ctx, ModuleRecord{
+		ID:           "storage",
+		Version:      "1.0.0",
+		Status:       "enabled",
+		ManifestJSON: `{"id":"storage","version":"1.0.0"}`,
+	}); err != nil {
+		t.Fatalf("first UpsertModule() error = %v", err)
+	}
+	if err := store.UpsertModule(ctx, ModuleRecord{
+		ID:           "storage",
+		Version:      "1.1.0",
+		Status:       "registered",
+		ManifestJSON: `{"id":"storage","version":"1.1.0"}`,
+	}); err != nil {
+		t.Fatalf("second UpsertModule() error = %v", err)
+	}
+
+	record, err := store.Module(ctx, "storage")
+	if err != nil {
+		t.Fatalf("Module() error = %v", err)
+	}
+	if record.Status != "enabled" {
+		t.Fatalf("status = %q, want enabled", record.Status)
+	}
+	if record.Version != "1.1.0" {
+		t.Fatalf("version = %q, want 1.1.0", record.Version)
 	}
 }
