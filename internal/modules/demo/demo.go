@@ -29,7 +29,7 @@ func (m *Module) Manifest() modules.Manifest {
 		},
 		API: modules.APIContribution{Namespace: "core-demo"},
 		Events: modules.EventContract{
-			Publishes: []string{"demo.ready"},
+			Publishes: []string{"core-demo.ready"},
 		},
 		UI: modules.UIContract{
 			Navigation: []modules.NavigationItem{
