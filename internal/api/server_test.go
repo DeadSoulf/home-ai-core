@@ -234,8 +234,8 @@ func TestSystem(t *testing.T) {
 	if body.System.NodeID != nodeID {
 		t.Fatalf("node_id = %q, want %q", body.System.NodeID, nodeID)
 	}
-	if body.SchemaVersion != 2 {
-		t.Fatalf("schema_version = %d, want 2", body.SchemaVersion)
+	if body.SchemaVersion != 3 {
+		t.Fatalf("schema_version = %d, want 3", body.SchemaVersion)
 	}
 }
 
