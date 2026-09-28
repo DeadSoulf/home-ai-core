@@ -147,10 +147,3 @@ export type RealtimeEvent = {
   data?: unknown;
 };
 
-export type UpdateStatus = {
-  current_version: string;
-  available_version?: string;
-  available: boolean;
-  published_at?: string;
-  notes?: string;
-};
