@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { api } from "../api/client";
 import { useResource } from "../hooks/useResource";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
@@ -8,7 +8,22 @@ import { PageHeading, Status } from "./Dashboard";
 export function JobsPage({revision}: {revision: number}) {
   const {t, date} = useI18n();
   const load = useCallback(() => api.jobs(), []);
-  const {data, loading, error} = useResource(load, revision);
+  const {data, loading, error, reload} = useResource(load, revision);
+  const [clearing, setClearing] = useState(false);
+  const [actionError, setActionError] = useState("");
+
+  async function clearHistory() {
+    setClearing(true);
+    setActionError("");
+    try {
+      await api.clearJobs();
+      reload();
+    } catch (reason) {
+      setActionError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setClearing(false);
+    }
+  }
 
   if (loading && !data) return <LoadingState />;
   if (error && !data) return <ErrorState message={error} />;
@@ -16,7 +31,20 @@ export function JobsPage({revision}: {revision: number}) {
   return (
     <div className="page">
       <PageHeading title={t("jobs")} subtitle={t("jobsSubtitle")} />
-      <Panel title={t("jobHistory")}>
+      <Panel
+        title={t("jobHistory")}
+        action={
+          <button
+            type="button"
+            className="button secondary"
+            disabled={clearing || !(data || []).some((job) => ["succeeded", "failed", "cancelled"].includes(job.status))}
+            onClick={clearHistory}
+          >
+            {clearing ? t("clearingHistory") : t("clearHistory")}
+          </button>
+        }
+      >
+        {actionError && <div className="form-error">{actionError}</div>}
         <div className="table-wrap">
           <table>
             <thead><tr><th>{t("type")}</th><th>{t("status")}</th><th>{t("progress")}</th><th>{t("created")}</th><th>ID</th></tr></thead>
