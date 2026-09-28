@@ -204,6 +204,7 @@ jobs:
           test -n "$ARM64_PACKAGE"
           test "$(dpkg-deb -f "$AMD64_PACKAGE" Package)" = "home-ai-core"
           test "$(dpkg-deb -f "$AMD64_PACKAGE" Architecture)" = "amd64"
+          dpkg-deb -f "$AMD64_PACKAGE" Depends | grep -q 'pci.ids'
           test "$(dpkg-deb -f "$ARM64_PACKAGE" Architecture)" = "arm64"
 
           dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './usr/bin/home-ai-core'
