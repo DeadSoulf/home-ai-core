@@ -837,11 +837,7 @@ int main()
         ) == std::string::npos
         ||
         modules_page.find(
-            "/api/module-catalog/install"
-        ) == std::string::npos
-        ||
-        modules_page.find(
-            "/api/module-catalog/uninstall"
+            "/api/module-catalog/"
         ) == std::string::npos
         ||
         modules_page.find(
