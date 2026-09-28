@@ -86,10 +86,10 @@ func ValidateManifest(m Manifest) error {
 	if err := uniqueStrings("provided capability", m.Capabilities.Provides, permissionPattern); err != nil {
 		return err
 	}
-	if err := uniqueStrings("event publish", m.Events.Publishes, permissionPattern); err != nil {
+	if err := validatePublishedEvents(m.ID, m.Events.Publishes); err != nil {
 		return err
 	}
-	if err := uniqueStrings("event subscription", m.Events.Subscribes, permissionPattern); err != nil {
+	if err := validateSubscribedEvents(m.Events.Subscribes); err != nil {
 		return err
 	}
 
@@ -126,15 +126,11 @@ func ValidateManifest(m Manifest) error {
 		seenLifecycle[op] = struct{}{}
 	}
 
-	for _, arch := range m.Host.Architectures {
-		if arch != "amd64" && arch != "arm64" {
-			return fmt.Errorf("unsupported architecture %q", arch)
-		}
+	if err := uniqueAllowedArchitectures(m.Host.Architectures); err != nil {
+		return err
 	}
-	for _, pkg := range m.Host.Packages {
-		if !namePattern.MatchString(pkg) {
-			return fmt.Errorf("invalid package name %q", pkg)
-		}
+	if err := uniqueStrings("package", m.Host.Packages, namePattern); err != nil {
+		return err
 	}
 
 	if m.API.Namespace != "" {
@@ -164,6 +160,66 @@ func ValidateManifest(m Manifest) error {
 		}
 	}
 
+	return nil
+}
+
+func validatePublishedEvents(moduleID string, values []string) error {
+	seen := map[string]struct{}{}
+	prefix := moduleID + "."
+	for _, value := range values {
+		if !permissionPattern.MatchString(value) || !strings.HasPrefix(value, prefix) {
+			return fmt.Errorf("published event %q must use module namespace %s*", value, prefix)
+		}
+		if _, exists := seen[value]; exists {
+			return fmt.Errorf("duplicate event publish %q", value)
+		}
+		seen[value] = struct{}{}
+	}
+	return nil
+}
+
+func validateSubscribedEvents(values []string) error {
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		if err := validateEventTopic(value); err != nil {
+			return fmt.Errorf("invalid event subscription %q: %w", value, err)
+		}
+		if _, exists := seen[value]; exists {
+			return fmt.Errorf("duplicate event subscription %q", value)
+		}
+		seen[value] = struct{}{}
+	}
+	return nil
+}
+
+func validateEventTopic(value string) error {
+	if value == "*" {
+		return nil
+	}
+	if strings.HasSuffix(value, ".*") {
+		base := strings.TrimSuffix(value, ".*")
+		if permissionPattern.MatchString(base + ".event") {
+			return nil
+		}
+		return fmt.Errorf("invalid wildcard namespace")
+	}
+	if !permissionPattern.MatchString(value) {
+		return fmt.Errorf("invalid event name")
+	}
+	return nil
+}
+
+func uniqueAllowedArchitectures(values []string) error {
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		if value != "amd64" && value != "arm64" {
+			return fmt.Errorf("unsupported architecture %q", value)
+		}
+		if _, exists := seen[value]; exists {
+			return fmt.Errorf("duplicate architecture %q", value)
+		}
+		seen[value] = struct{}{}
+	}
 	return nil
 }
 
