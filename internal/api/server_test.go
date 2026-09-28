@@ -34,6 +34,10 @@ func (f fakeState) SchemaVersion(context.Context) (int, error) {
 	return f.schemaVersion, f.schemaErr
 }
 
+func (f fakeState) ClearTerminalJobs(context.Context) (int64, error) {
+	return 0, nil
+}
+
 type fakeSecurity struct {
 	initialized bool
 	actor       security.Actor
