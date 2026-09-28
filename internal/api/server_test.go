@@ -133,7 +133,6 @@ func testHandlerWithSecurity(state fakeState, securityService SecurityService) h
 		nil,
 		nil,
 		nil,
-		nil,
 		realtime.New(nodeID, logger),
 	)
 }
@@ -231,7 +230,6 @@ func TestSystem(t *testing.T) {
 		logger,
 		fakeState{schemaVersion: 4},
 		defaultFakeSecurity(),
-		nil,
 		nil,
 		nil,
 		nil,
@@ -356,7 +354,6 @@ func TestEventsRouteUpgradesToWebSocket(t *testing.T) {
 		logger,
 		fakeState{schemaVersion: 4},
 		defaultFakeSecurity(),
-		nil,
 		nil,
 		nil,
 		nil,
@@ -486,7 +483,6 @@ func TestModulesAPI(t *testing.T) {
 		nil,
 		nil,
 		moduleService,
-		nil,
 		realtime.New(nodeID, logger),
 	)
 
