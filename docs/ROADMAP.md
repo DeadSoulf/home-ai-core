@@ -56,6 +56,7 @@ High-level project status, dependencies and execution order are tracked in [MAST
 | 0.0.58 | Physical Debian host preparation, bootstrap and documentation cleanup | DEVELOPMENT SNAPSHOT |
 | 0.0.59 | Remove dead updater UI code before bare-metal acceptance | DEVELOPMENT SNAPSHOT |
 | 0.0.60 | Version-channel guard and final bare-metal installation instructions | DEVELOPMENT SNAPSHOT |
+| 0.0.61 | Modular Core foundation + trusted Project Module Catalog | DEVELOPMENT SNAPSHOT |
 | next acceptance | Bare-metal Debian 13 installation and Phase A acceptance | IN PROGRESS |
 | next 0.0.x | Hypervisor managed virtual disks / ISO / networking / editor / console | PLANNED |
 | next 0.0.x | Storage health and shared pool completion | PLANNED |

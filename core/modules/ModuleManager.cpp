@@ -3,9 +3,104 @@
 #include "core/logging/Logger.h"
 
 #include <algorithm>
+#include <cctype>
 #include <unordered_set>
 
 namespace homeai {
+
+namespace {
+
+bool validModuleId(
+    const std::string& id
+)
+{
+    if (id.empty())
+        return false;
+
+    return std::all_of(
+        id.begin(),
+        id.end(),
+        [](unsigned char ch) {
+            return
+                std::islower(ch)
+                ||
+                std::isdigit(ch)
+                ||
+                ch == '-';
+        }
+    );
+}
+
+}
+
+bool ModuleManager::registerManifest(
+    ModuleManifest manifest,
+    std::string& error
+)
+{
+    if (!validModuleId(manifest.id)) {
+        error =
+            "Invalid module manifest id: "
+            + manifest.id;
+        return false;
+    }
+
+    if (manifest.display_name.empty()) {
+        error =
+            "Module manifest display name cannot be empty: "
+            + manifest.id;
+        return false;
+    }
+
+    if (manifest.version.empty()) {
+        error =
+            "Module manifest version cannot be empty: "
+            + manifest.id;
+        return false;
+    }
+
+    for (
+        const auto& dependency :
+        manifest.dependencies
+    ) {
+        if (
+            !validModuleId(dependency)
+            ||
+            dependency == manifest.id
+        ) {
+            error =
+                "Invalid module dependency for "
+                + manifest.id + ": "
+                + dependency;
+            return false;
+        }
+    }
+
+    const auto id = manifest.id;
+
+    std::lock_guard<std::mutex>
+        lock(mutex_);
+
+    if (manifests_.contains(id)) {
+        error =
+            "Duplicate module manifest: "
+            + id;
+        return false;
+    }
+
+    manifests_.emplace(
+        id,
+        std::move(manifest)
+    );
+    manifest_order_.push_back(id);
+
+    Logger::instance().info(
+        "Module manifest registered: "
+        + id
+    );
+
+    return true;
+}
 
 bool ModuleManager::registerModule(
     std::unique_ptr<IModule> module,
@@ -711,6 +806,86 @@ ModuleManager::snapshot() const
 
         result.push_back(
             std::move(status)
+        );
+    }
+
+    return result;
+}
+
+std::vector<ModuleCatalogEntry>
+ModuleManager::catalogSnapshot() const
+{
+    std::vector<ModuleCatalogEntry>
+        result;
+
+    std::lock_guard<std::mutex>
+        lock(mutex_);
+
+    result.reserve(
+        manifest_order_.size()
+    );
+
+    for (
+        const auto& id :
+        manifest_order_
+    ) {
+        const auto& manifest =
+            manifests_.at(id);
+
+        ModuleCatalogEntry entry;
+        entry.manifest = manifest;
+        entry.installed =
+            manifest.core_component
+            ||
+            manifest.bundled;
+
+        if (
+            !manifest.runtime_modules.empty()
+        ) {
+            entry.running = true;
+
+            for (
+                const auto& runtime_name :
+                manifest.runtime_modules
+            ) {
+                const auto runtime =
+                    modules_.find(
+                        runtime_name
+                    );
+
+                if (
+                    runtime == modules_.end()
+                    ||
+                    runtime->second.state !=
+                        ModuleState::Running
+                ) {
+                    entry.running = false;
+                    break;
+                }
+            }
+        }
+
+        if (manifest.core_component) {
+            entry.state =
+                entry.running
+                ? "core"
+                : "installed";
+        }
+        else if (entry.installed) {
+            entry.state =
+                entry.running
+                ? "running"
+                : "installed";
+        }
+        else if (manifest.installable) {
+            entry.state = "available";
+        }
+        else {
+            entry.state = "planned";
+        }
+
+        result.push_back(
+            std::move(entry)
         );
     }
 

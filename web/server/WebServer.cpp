@@ -7156,6 +7156,150 @@ void WebServer::handleClient(
 
     if (
         method == "GET" &&
+        path == "/api/module-catalog"
+    ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "system.view"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"error\":\"permission_denied\"}"
+            );
+
+            return;
+        }
+
+        const auto catalog =
+            modules_.catalogSnapshot();
+
+        std::ostringstream json;
+        json << "{\"modules\":[";
+
+        bool first_module = true;
+
+        for (
+            const auto& entry :
+            catalog
+        ) {
+            if (!first_module)
+                json << ",";
+
+            first_module = false;
+
+            const auto& manifest =
+                entry.manifest;
+
+            json
+                << "{"
+                << "\"id\":\""
+                << jsonEscape(manifest.id)
+                << "\","
+                << "\"name\":\""
+                << jsonEscape(
+                    manifest.display_name
+                )
+                << "\","
+                << "\"version\":\""
+                << jsonEscape(
+                    manifest.version
+                )
+                << "\","
+                << "\"description\":\""
+                << jsonEscape(
+                    manifest.description
+                )
+                << "\","
+                << "\"state\":\""
+                << jsonEscape(entry.state)
+                << "\","
+                << "\"installed\":"
+                << (
+                    entry.installed
+                    ? "true"
+                    : "false"
+                )
+                << ",\"running\":"
+                << (
+                    entry.running
+                    ? "true"
+                    : "false"
+                )
+                << ",\"installable\":"
+                << (
+                    manifest.installable
+                    ? "true"
+                    : "false"
+                )
+                << ",\"core_component\":"
+                << (
+                    manifest.core_component
+                    ? "true"
+                    : "false"
+                )
+                << ",\"bundled\":"
+                << (
+                    manifest.bundled
+                    ? "true"
+                    : "false"
+                )
+                << ",\"dependencies\":[";
+
+            bool first_dependency = true;
+
+            for (
+                const auto& dependency :
+                manifest.dependencies
+            ) {
+                if (!first_dependency)
+                    json << ",";
+
+                first_dependency = false;
+                json
+                    << "\""
+                    << jsonEscape(dependency)
+                    << "\"";
+            }
+
+            json << "],\"permissions\":[";
+
+            bool first_permission = true;
+
+            for (
+                const auto& permission :
+                manifest.permissions
+            ) {
+                if (!first_permission)
+                    json << ",";
+
+                first_permission = false;
+                json
+                    << "\""
+                    << jsonEscape(permission)
+                    << "\"";
+            }
+
+            json << "]}";
+        }
+
+        json << "]}";
+
+        sendResponse(
+            client_fd,
+            "200 OK",
+            "application/json; charset=utf-8",
+            json.str()
+        );
+
+        return;
+    }
+
+    if (
+        method == "GET" &&
         path == "/api/update/status"
     ) {
         if (

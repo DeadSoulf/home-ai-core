@@ -13,6 +13,48 @@ int main()
     std::vector<std::string> events;
     std::string error;
 
+    if (
+        !manager.registerManifest(
+            {
+                "test-stack",
+                "Test Stack",
+                "1.0.0",
+                "Module catalog test entry.",
+                {},
+                {"system.view"},
+                {"database", "api", "web"},
+                false,
+                true,
+                false
+            },
+            error
+        )
+    ) {
+        std::cerr
+            << "Manifest registration failed: "
+            << error << '\n';
+        return 1;
+    }
+
+    std::string duplicate_error;
+
+    if (
+        manager.registerManifest(
+            {
+                "test-stack",
+                "Duplicate",
+                "1.0.0"
+            },
+            duplicate_error
+        )
+        ||
+        duplicate_error.empty()
+    ) {
+        std::cerr
+            << "Duplicate manifest was accepted\n";
+        return 1;
+    }
+
     auto make_module =
         [&](const std::string& name,
             std::vector<std::string> dependencies) {
@@ -129,6 +171,27 @@ int main()
                 << "Running module status is invalid\n";
             return 1;
         }
+    }
+
+    const auto catalog =
+        manager.catalogSnapshot();
+
+    if (
+        catalog.size() != 1
+        ||
+        catalog.front().manifest.id !=
+            "test-stack"
+        ||
+        !catalog.front().installed
+        ||
+        !catalog.front().running
+        ||
+        catalog.front().state !=
+            "running"
+    ) {
+        std::cerr
+            << "Module catalog snapshot is invalid\n";
+        return 1;
     }
 
     manager.stopAll();

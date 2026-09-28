@@ -193,6 +193,162 @@ int main()
     homeai::ClusterManager cluster_manager;
     homeai::ModuleManager modules;
 
+    std::string module_error;
+
+    const std::vector<
+        homeai::ModuleManifest
+    > project_modules = {
+        {
+            "core",
+            "Home AI Core",
+            HOMEAI_VERSION,
+            "Core Runtime, Web UI, Security, updates and Module Manager.",
+            {},
+            {"system.view", "system.manage"},
+            {"security", "update", "system-monitor", "web"},
+            true,
+            true,
+            false
+        },
+        {
+            "storage",
+            "Storage Core",
+            HOMEAI_VERSION,
+            "Managed disks, storage pools and placement policies.",
+            {},
+            {"storage.view", "storage.manage"},
+            {"storage-monitor"},
+            false,
+            true,
+            false
+        },
+        {
+            "network",
+            "Network Core",
+            HOMEAI_VERSION,
+            "Network interfaces, IPv4 configuration and WireGuard.",
+            {},
+            {"network.view", "network.manage"},
+            {},
+            false,
+            true,
+            false
+        },
+        {
+            "files",
+            "Files Core",
+            HOMEAI_VERSION,
+            "Personal files on managed Storage Core volumes.",
+            {"storage"},
+            {"files.read", "files.write"},
+            {},
+            false,
+            true,
+            false
+        },
+        {
+            "hypervisor",
+            "Hypervisor Core",
+            HOMEAI_VERSION,
+            "KVM, QEMU and libvirt virtual-machine management.",
+            {"storage", "network"},
+            {"hypervisor.view", "hypervisor.manage"},
+            {"hypervisor"},
+            false,
+            true,
+            false
+        },
+        {
+            "cameras",
+            "Camera Core",
+            HOMEAI_VERSION,
+            "Camera discovery, ONVIF, RTSP and camera management.",
+            {"storage", "network"},
+            {"cameras.view", "cameras.manage"},
+            {"cameras"},
+            false,
+            true,
+            false
+        },
+        {
+            "nvr",
+            "NVR Core",
+            "planned",
+            "Continuous recording, archive and event video pipeline.",
+            {"cameras", "storage"},
+            {"cameras.view", "cameras.manage"},
+            {},
+            false,
+            false,
+            false
+        },
+        {
+            "cluster",
+            "Cluster Core",
+            HOMEAI_VERSION,
+            "Controller/worker heartbeat and placement foundation.",
+            {"network"},
+            {"cluster.view", "cluster.manage"},
+            {"cluster"},
+            false,
+            true,
+            false
+        },
+        {
+            "ai",
+            "AI Core",
+            "planned",
+            "Local inference runtime, memory and controlled AI services.",
+            {"storage"},
+            {"ai.use", "ai.manage"},
+            {},
+            false,
+            false,
+            false
+        },
+        {
+            "smart-home",
+            "Smart Home Core",
+            "planned",
+            "Device integrations and unified smart-home model.",
+            {"network"},
+            {"smart_home.view", "smart_home.manage"},
+            {},
+            false,
+            false,
+            false
+        },
+        {
+            "automation",
+            "Automation Core",
+            "planned",
+            "Rules, triggers, scenarios and automation workflows.",
+            {"smart-home"},
+            {"automation.view", "automation.manage"},
+            {},
+            false,
+            false,
+            false
+        }
+    };
+
+    for (
+        const auto& manifest :
+        project_modules
+    ) {
+        if (
+            !modules.registerManifest(
+                manifest,
+                module_error
+            )
+        ) {
+            homeai::Logger::instance().error(
+                module_error
+            );
+            return 1;
+        }
+    }
+
     homeai::WebServer web(
         runtime,
         security,
@@ -203,8 +359,6 @@ int main()
         &hypervisor_manager,
         &cluster_manager
     );
-
-    std::string module_error;
 
     if (
         !modules.registerModule(

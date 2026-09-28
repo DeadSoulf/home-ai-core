@@ -170,6 +170,9 @@ std::string pageTitle(
     if (page == "/system")
         return "Система";
 
+    if (page == "/modules")
+        return "Модули";
+
     if (page == "/admin")
         return "AI / GPU";
 
@@ -360,6 +363,8 @@ bool isWebUiPath(
         path == "/"
         ||
         path == "/system"
+        ||
+        path == "/modules"
         ||
         path == "/network"
         ||
@@ -2712,6 +2717,14 @@ button,
                 "Система",
                 "▣"
             );
+
+            navLink(
+                page,
+                context,
+                "/modules",
+                "Модули",
+                "◇"
+            );
         }
 
         if (
@@ -3092,6 +3105,26 @@ button,
 </div>
 <div id="home-errors" class="error-list">
 <div class="error-ok">Проверка состояния...</div>
+</div>
+</div>
+)HTML";
+    }
+    else if (
+        context.page == "/modules"
+    ) {
+        page << R"HTML(
+<div class="section-card">
+<div class="section-title">
+<h2>Каталог модулей</h2>
+<span class="section-hint">Project Module Catalog</span>
+</div>
+<p class="muted">
+Ядро хранит доверенный каталог проектных модулей, их зависимости и разрешения.
+В 0.0.61 каталог работает в режиме foundation: встроенные компоненты уже отмечаются как
+установленные, а отдельная установка станет доступна по мере выноса модулей из монолита.
+</p>
+<div id="module-catalog-list" class="placeholder-grid">
+<div class="placeholder-card">Загрузка каталога модулей...</div>
 </div>
 </div>
 )HTML";
@@ -13402,6 +13435,187 @@ async function updateHostReadiness() {
     }
 }
 
+async function updateModuleCatalog() {
+    const container =
+        document.getElementById(
+            "module-catalog-list"
+        );
+
+    if (!container)
+        return;
+
+    try {
+        const response =
+            await fetch(
+                "/api/module-catalog",
+                {
+                    cache: "no-store"
+                }
+            );
+
+        if (
+            response.status === 401
+        ) {
+            window.location =
+                "/login";
+            return;
+        }
+
+        if (!response.ok)
+            return;
+
+        const data =
+            await response.json();
+
+        const catalog =
+            Array.isArray(
+                data.modules
+            )
+            ? data.modules
+            : [];
+
+        container.replaceChildren();
+
+        for (const module of catalog) {
+            const card =
+                document.createElement(
+                    "div"
+                );
+            card.className =
+                "placeholder-card";
+
+            const title =
+                document.createElement(
+                    "strong"
+                );
+            title.textContent =
+                module.name || module.id;
+            card.appendChild(title);
+
+            const version =
+                document.createElement(
+                    "div"
+                );
+            version.className = "muted";
+            version.textContent =
+                "Версия: "
+                + (
+                    module.version
+                    || "unknown"
+                );
+            card.appendChild(version);
+
+            const status =
+                document.createElement(
+                    "div"
+                );
+
+            const stateLabels = {
+                core: "CORE",
+                running: "RUNNING",
+                installed: "INSTALLED",
+                available: "AVAILABLE",
+                planned: "PLANNED"
+            };
+
+            status.className =
+                (
+                    module.state === "core"
+                    ||
+                    module.state === "running"
+                )
+                ? "status-ok"
+                : (
+                    module.state === "installed"
+                    ? "status-warn"
+                    : "muted"
+                );
+
+            status.textContent =
+                stateLabels[module.state]
+                || String(
+                    module.state
+                    || "unknown"
+                ).toUpperCase();
+
+            card.appendChild(status);
+
+            if (module.description) {
+                const description =
+                    document.createElement(
+                        "p"
+                    );
+                description.className =
+                    "muted";
+                description.textContent =
+                    module.description;
+                card.appendChild(
+                    description
+                );
+            }
+
+            const dependencies =
+                Array.isArray(
+                    module.dependencies
+                )
+                ? module.dependencies
+                : [];
+
+            if (dependencies.length > 0) {
+                const dependencyText =
+                    document.createElement(
+                        "div"
+                    );
+                dependencyText.className =
+                    "muted";
+                dependencyText.textContent =
+                    "Зависимости: "
+                    + dependencies.join(", ");
+                card.appendChild(
+                    dependencyText
+                );
+            }
+
+            if (
+                !module.installed
+                &&
+                !module.installable
+            ) {
+                const note =
+                    document.createElement(
+                        "div"
+                    );
+                note.className = "muted";
+                note.style.marginTop =
+                    "8px";
+                note.textContent =
+                    "Установка будет включена после выделения модуля в отдельный пакет.";
+                card.appendChild(note);
+            }
+
+            container.appendChild(card);
+        }
+
+        if (catalog.length === 0) {
+            const empty =
+                document.createElement(
+                    "div"
+                );
+            empty.className =
+                "placeholder-card";
+            empty.textContent =
+                "Каталог модулей пуст.";
+            container.appendChild(empty);
+        }
+    }
+    catch (error) {
+        console.error(
+            "Module catalog error:",
+            error
+        );
+    }
+}
+
 async function updateModuleStatus() {
     const container =
         document.getElementById(
@@ -16408,6 +16622,7 @@ document.addEventListener(
         updateSystemStats();
         updateHomeErrors();
         updateHostReadiness();
+        updateModuleCatalog();
         updateModuleStatus();
         updateNotifications();
         updateStorageStats();
