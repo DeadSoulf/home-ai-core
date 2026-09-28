@@ -1,8 +1,8 @@
 [Unit]
 Description=Home-AI-Core control plane
 Documentation=https://github.com/DeadSoulf/home-ai-core
-After=network.target
-Wants=network.target
+After=network.target home-ai-core-update-helper.service
+Wants=network.target home-ai-core-update-helper.service
 
 [Service]
 Type=simple

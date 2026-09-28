@@ -5,7 +5,7 @@ export type Locale = "ru" | "en";
 const strings = {
   en: {
     starting: "Starting Home-AI-Core…", controlPlane: "Control Plane", dashboard: "Dashboard", system: "System",
-    modules: "Modules", jobs: "Jobs", audit: "Audit", realtime: "Realtime", signOut: "Sign out", user: "User",
+    modules: "Modules", updates: "Updates", jobs: "Jobs", audit: "Audit", realtime: "Realtime", signOut: "Sign out", user: "User",
     language: "Language", loading: "Loading…", loadError: "Unable to load data.", requestFailed: "Request failed",
     signIn: "Sign in", signInSubtitle: "Manage your private home infrastructure.", username: "Username",
     password: "Password", signingIn: "Signing in…", privateInfrastructure: "Private home infrastructure",
@@ -27,11 +27,11 @@ const strings = {
     jobsSubtitle: "Persistent background operations and progress.", jobHistory: "Job history", status: "Status",
     progress: "Progress", created: "Created", auditSubtitle: "Security-sensitive actions recorded by Core.",
     recentEvents: "Recent events", time: "Time", actor: "Actor", action: "Action", target: "Target", outcome: "Outcome",
-    noAudit: "No audit events yet."
+    noAudit: "No audit events yet.", updatesSubtitle: "Check and install Home-AI-Core updates from the Web UI.", updateStatus: "Core update status", currentVersion: "Current version", availableVersion: "Available version", published: "Published", checkUpdates: "Check for updates", checking: "Checking…", installUpdate: "Install update", installing: "Installing…", updateAvailable: "An update is available", upToDate: "Home-AI-Core is up to date", updateRestartNotice: "Core will restart automatically during installation. This page will reconnect.", updateStarted: "Update job started:", releaseNotes: "Release notes", noReleaseNotes: "No release notes were provided."
   },
   ru: {
     starting: "Запуск Home-AI-Core…", controlPlane: "Панель управления", dashboard: "Обзор", system: "Система",
-    modules: "Модули", jobs: "Задачи", audit: "Аудит", realtime: "События", signOut: "Выйти", user: "Пользователь",
+    modules: "Модули", updates: "Обновления", jobs: "Задачи", audit: "Аудит", realtime: "События", signOut: "Выйти", user: "Пользователь",
     language: "Язык", loading: "Загрузка…", loadError: "Не удалось загрузить данные.", requestFailed: "Ошибка запроса",
     signIn: "Вход", signInSubtitle: "Управление вашей домашней инфраструктурой.", username: "Логин",
     password: "Пароль", signingIn: "Вход…", privateInfrastructure: "Личная домашняя инфраструктура",
@@ -53,7 +53,7 @@ const strings = {
     jobsSubtitle: "Фоновые операции и их прогресс.", jobHistory: "История задач", status: "Состояние",
     progress: "Прогресс", created: "Создана", auditSubtitle: "Журнал действий, важных для безопасности.",
     recentEvents: "Последние события", time: "Время", actor: "Инициатор", action: "Действие", target: "Объект", outcome: "Результат",
-    noAudit: "Событий аудита пока нет."
+    noAudit: "Событий аудита пока нет.", updatesSubtitle: "Проверка и установка обновлений Home-AI-Core прямо из Web UI.", updateStatus: "Состояние обновления Core", currentVersion: "Текущая версия", availableVersion: "Доступная версия", published: "Опубликовано", checkUpdates: "Проверить обновления", checking: "Проверка…", installUpdate: "Установить обновление", installing: "Установка…", updateAvailable: "Доступно обновление", upToDate: "Установлена последняя версия Home-AI-Core", updateRestartNotice: "Во время установки Core автоматически перезапустится. Эта страница подключится снова.", updateStarted: "Запущена задача обновления:", releaseNotes: "Что изменилось", noReleaseNotes: "Описание изменений отсутствует."
   }
 } as const;
 

@@ -56,6 +56,8 @@ func defaultFakeSecurity() fakeSecurity {
 				"security.sessions.manage",
 				"audit.read",
 				"modules.read",
+				"updates.read",
+				"updates.manage",
 			},
 		},
 	}
@@ -100,6 +102,18 @@ func (f fakeSecurity) ListAudit(context.Context, int) ([]security.AuditEntry, er
 	return []security.AuditEntry{}, nil
 }
 
+func (f fakeSecurity) RecordAudit(
+	context.Context,
+	security.RequestContext,
+	security.Actor,
+	string,
+	string,
+	string,
+	string,
+	map[string]any,
+) {
+}
+
 func testHandler(state fakeState) http.Handler {
 	return testHandlerWithSecurity(state, defaultFakeSecurity())
 }
@@ -112,6 +126,7 @@ func testHandlerWithSecurity(state fakeState, securityService SecurityService) h
 		logger,
 		state,
 		securityService,
+		nil,
 		nil,
 		nil,
 		nil,
@@ -212,6 +227,7 @@ func TestSystem(t *testing.T) {
 		logger,
 		fakeState{schemaVersion: 4},
 		defaultFakeSecurity(),
+		nil,
 		nil,
 		nil,
 		nil,
@@ -336,6 +352,7 @@ func TestEventsRouteUpgradesToWebSocket(t *testing.T) {
 		logger,
 		fakeState{schemaVersion: 4},
 		defaultFakeSecurity(),
+		nil,
 		nil,
 		nil,
 		nil,
@@ -465,6 +482,7 @@ func TestModulesAPI(t *testing.T) {
 		nil,
 		nil,
 		moduleService,
+		nil,
 		realtime.New(nodeID, logger),
 	)
 
