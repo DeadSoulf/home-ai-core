@@ -176,7 +176,7 @@ func (s *Service) findCandidate(ctx context.Context) (candidate, error) {
 	}
 
 	var releases []githubRelease
-	if err := decodeBoundedJSON(resp.Body, maxManifestBytes, &releases); err != nil {
+	if err := decodeBoundedJSONLoose(resp.Body, maxManifestBytes, &releases); err != nil {
 		return candidate{}, fmt.Errorf("decode GitHub releases: %w", err)
 	}
 
@@ -405,6 +405,14 @@ func (s *Service) downloadPackage(
 	}
 	if err := os.Rename(tmp, targetPath); err != nil {
 		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
+}
+
+func decodeBoundedJSONLoose(reader io.Reader, max int64, target any) error {
+	decoder := json.NewDecoder(io.LimitReader(reader, max+1))
+	if err := decoder.Decode(target); err != nil {
 		return err
 	}
 	return nil
