@@ -26,6 +26,9 @@ jobs:
           go-version: '1.27.x'
           check-latest: false
 
+      - name: Resolve modules
+        run: go mod download
+
       - name: Format check
         run: |
           test -z "$(gofmt -l ./cmd ./internal)"
@@ -38,3 +41,12 @@ jobs:
 
       - name: Build
         run: ./scripts/build.sh
+
+      - name: Dependency snapshot
+        if: always()
+        run: |
+          go mod tidy
+          echo '--- go.mod ---'
+          cat go.mod
+          echo '--- go.sum ---'
+          cat go.sum

@@ -13,6 +13,7 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/api"
 	"github.com/DeadSoulf/home-ai-core/internal/config"
 	"github.com/DeadSoulf/home-ai-core/internal/identity"
+	"github.com/DeadSoulf/home-ai-core/internal/state"
 )
 
 func main() {
@@ -35,7 +36,27 @@ func main() {
 		os.Exit(1)
 	}
 
-	handler := api.New(nodeID, logger)
+	startupCtx, startupCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer startupCancel()
+
+	store, err := state.Open(startupCtx, cfg.StateDir)
+	if err != nil {
+		logger.Error("failed to initialize core state", "error", err)
+		os.Exit(1)
+	}
+	defer store.Close()
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		logger.Error("failed to read hostname", "error", err)
+		os.Exit(1)
+	}
+	if err := store.EnsureNode(startupCtx, nodeID, hostname); err != nil {
+		logger.Error("failed to register local node", "error", err)
+		os.Exit(1)
+	}
+
+	handler := api.New(nodeID, logger, store)
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddress,
