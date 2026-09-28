@@ -41,6 +41,7 @@ func PlanInstall(input PlanInput) (Plan, error) {
 	}
 
 	state := map[string]int{}
+	selected := map[string]Manifest{}
 	order := []Manifest{}
 	var visit func(Manifest) error
 	visit = func(m Manifest) error {
@@ -103,6 +104,7 @@ func PlanInstall(input PlanInput) (Plan, error) {
 			capabilities[provided] = struct{}{}
 		}
 		state[m.ID] = 2
+		selected[m.ID] = m
 		if _, installed := input.Installed[m.ID]; !installed {
 			order = append(order, m)
 		}
@@ -110,6 +112,9 @@ func PlanInstall(input PlanInput) (Plan, error) {
 	}
 
 	if err := visit(target); err != nil {
+		return Plan{}, err
+	}
+	if err := validateSelectedConflicts(selected, input.Installed, input.Available); err != nil {
 		return Plan{}, err
 	}
 	return Plan{Order: order}, nil
@@ -122,4 +127,32 @@ func contains(values []string, wanted string) bool {
 		}
 	}
 	return false
+}
+
+
+func validateSelectedConflicts(
+	selected map[string]Manifest,
+	installed map[string]string,
+	available map[string]Manifest,
+) error {
+	for id, manifest := range selected {
+		for _, conflict := range manifest.Conflicts {
+			if _, planned := selected[conflict]; planned {
+				return fmt.Errorf("planned modules %q and %q conflict", id, conflict)
+			}
+			if _, present := installed[conflict]; present {
+				return fmt.Errorf("module %q conflicts with installed module %q", id, conflict)
+			}
+		}
+		for installedID := range installed {
+			installedManifest, ok := available[installedID]
+			if !ok {
+				continue
+			}
+			if contains(installedManifest.Conflicts, id) {
+				return fmt.Errorf("installed module %q conflicts with module %q", installedID, id)
+			}
+		}
+	}
+	return nil
 }
