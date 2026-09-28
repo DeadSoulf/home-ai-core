@@ -60,11 +60,14 @@ export type SystemResponse = {
       addresses: string[];
     }>;
     gpus: Array<{
-      card: string;
+      card?: string;
       vendor?: string;
+      model?: string;
       vendor_id?: string;
       device_id?: string;
+      class?: string;
       driver?: string;
+      modalias?: string;
       pci_address?: string;
     }>;
   };
