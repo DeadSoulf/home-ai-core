@@ -1,0 +1,44 @@
+name: Build initial installer
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build initial installer ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.x'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Test Go
+        run: go test ./...
+
+      - name: Build initial Debian installer
+        run: sh ./scripts/build-deb.sh "${{ matrix.arch }}"
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.arch }}
+          path: build/packages/*.deb
+          if-no-files-found: error
