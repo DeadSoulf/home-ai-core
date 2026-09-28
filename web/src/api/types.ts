@@ -147,3 +147,13 @@ export type RealtimeEvent = {
   data?: unknown;
 };
 
+export type UpdateStatus = {
+  current_version: string;
+  available_version?: string;
+  available: boolean;
+  architecture: string;
+  bundle_file?: string;
+  bundle_size_bytes?: number;
+  published_at?: string;
+  notes?: string;
+};
