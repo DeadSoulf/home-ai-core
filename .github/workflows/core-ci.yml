@@ -52,6 +52,13 @@ jobs:
             python3 -m json.tool "$file" >/dev/null
           done
 
+      - name: Shell syntax check
+        run: |
+          sh -n scripts/build.sh
+          sh -n scripts/build-deb.sh
+          sh -n scripts/server-smoke.sh
+          sh -n packaging/debian/install-local.sh
+
       - name: Install Web dependencies
         working-directory: web
         run: npm ci --ignore-scripts --no-audit --no-fund
@@ -183,3 +190,71 @@ jobs:
           for arch in amd64 arm64; do
             GOOS=linux GOARCH="$arch" CGO_ENABLED=0 go build               -trimpath               -ldflags "-s -w -X github.com/DeadSoulf/home-ai-core/internal/version.Version=$VERSION"               -o "/tmp/home-ai-core-linux-$arch"               ./cmd/home-ai-core
           done
+
+
+      - name: Build Debian packages
+        run: |
+          HOME_AI_SKIP_WEB_BUILD=1 sh ./scripts/build-deb.sh amd64
+          HOME_AI_SKIP_WEB_BUILD=1 sh ./scripts/build-deb.sh arm64
+
+          AMD64_PACKAGE="$(find build/packages -maxdepth 1 -name 'home-ai-core_*_amd64.deb' -print -quit)"
+          ARM64_PACKAGE="$(find build/packages -maxdepth 1 -name 'home-ai-core_*_arm64.deb' -print -quit)"
+
+          test -n "$AMD64_PACKAGE"
+          test -n "$ARM64_PACKAGE"
+          test "$(dpkg-deb -f "$AMD64_PACKAGE" Package)" = "home-ai-core"
+          test "$(dpkg-deb -f "$AMD64_PACKAGE" Architecture)" = "amd64"
+          test "$(dpkg-deb -f "$ARM64_PACKAGE" Architecture)" = "arm64"
+
+          dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './usr/bin/home-ai-core'
+          dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './usr/share/home-ai-core/web/index.html'
+          dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './lib/systemd/system/home-ai-core.service'
+          dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './usr/lib/sysusers.d/home-ai-core.conf'
+          dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './etc/home-ai-core/home-ai-core.env'
+
+
+          PACKAGE_ROOT="$(mktemp -d)"
+          PACKAGE_STATE="$(mktemp -d)"
+          PACKAGE_LOG="$(mktemp)"
+          dpkg-deb -x "$AMD64_PACKAGE" "$PACKAGE_ROOT"
+
+          "$PACKAGE_ROOT/usr/bin/home-ai-core" \
+            --state-dir "$PACKAGE_STATE" \
+            --web-dir "$PACKAGE_ROOT/usr/share/home-ai-core/web" \
+            --listen 127.0.0.1:18081 \
+            >"$PACKAGE_LOG" 2>&1 &
+          PACKAGE_PID=$!
+
+          package_cleanup() {
+            kill "$PACKAGE_PID" 2>/dev/null || true
+            wait "$PACKAGE_PID" 2>/dev/null || true
+            rm -rf "$PACKAGE_ROOT" "$PACKAGE_STATE" "$PACKAGE_LOG"
+          }
+          trap package_cleanup EXIT INT TERM
+
+          PACKAGE_READY=0
+          for _ in $(seq 1 50); do
+            if curl --fail --silent http://127.0.0.1:18081/health >/dev/null; then
+              PACKAGE_READY=1
+              break
+            fi
+            sleep 0.2
+          done
+
+          if [ "$PACKAGE_READY" -ne 1 ]; then
+            cat "$PACKAGE_LOG"
+            exit 1
+          fi
+
+          curl --fail --silent http://127.0.0.1:18081/ | grep -q 'Home-AI-Core'
+          package_cleanup
+          trap - EXIT INT TERM
+
+
+      - name: Upload Debian packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-ai-core-deb-${{ github.sha }}
+          path: build/packages/*.deb
+          if-no-files-found: error
+          retention-days: 14
