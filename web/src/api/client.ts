@@ -157,6 +157,11 @@ export const api = {
     return result.state;
   },
 
+  installUpdate: async (version: string) => {
+    const result = await postJSON<{state: UpdaterState}>("/api/v1/update/install", {version}, true);
+    return result.state;
+  },
+
   modules: async () => {
     const result = await request<{modules: RegisteredModule[]}>("/api/v1/modules");
     return result.modules;
