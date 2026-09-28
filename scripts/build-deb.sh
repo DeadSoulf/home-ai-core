@@ -25,10 +25,14 @@ rm -rf "$STAGE"
 mkdir -p "$STAGE/DEBIAN" "$STAGE/usr/bin" "$STAGE/usr/share/home-ai-core/web" \
   "$STAGE/lib/systemd/system" "$STAGE/usr/lib/sysusers.d" "$STAGE/etc/home-ai-core" "$OUT_DIR"
 
-cd "$ROOT/web"
-npm ci --ignore-scripts --no-audit --no-fund
-npm run build
-cp -a dist/. "$STAGE/usr/share/home-ai-core/web/"
+if [ "${HOME_AI_SKIP_WEB_BUILD:-0}" != "1" ]; then
+  cd "$ROOT/web"
+  npm ci --ignore-scripts --no-audit --no-fund
+  npm run build
+fi
+
+test -f "$ROOT/web/dist/index.html"
+cp -a "$ROOT/web/dist/." "$STAGE/usr/share/home-ai-core/web/"
 
 cd "$ROOT"
 GOOS=linux GOARCH="$GOARCH" CGO_ENABLED=0 go build \
