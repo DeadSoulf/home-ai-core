@@ -17,8 +17,8 @@
 
 ## Repository configuration and key management
 
-- [ ] persistent repository sources
-- [ ] persistent trusted signing keys
+- [x] persistent repository sources
+- [x] persistent trusted signing keys
 - [ ] explicit add/remove repository API
 - [ ] explicit trust/key rotation workflow
 - [ ] repository refresh job
