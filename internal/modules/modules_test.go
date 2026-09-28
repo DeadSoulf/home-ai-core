@@ -120,7 +120,6 @@ func TestRegistryPersistsManifest(t *testing.T) {
 	}
 }
 
-
 func TestManifestAllowsWildcardSubscriptions(t *testing.T) {
 	m := validManifest("monitoring", "1.0.0")
 	m.Events.Subscribes = []string{"system.*", "job.*", "*"}
