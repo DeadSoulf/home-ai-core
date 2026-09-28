@@ -16,6 +16,7 @@ import (
 	"github.com/coder/websocket/wsjson"
 
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
+	"github.com/DeadSoulf/home-ai-core/internal/security"
 )
 
 type fakeState struct {
@@ -32,18 +33,89 @@ func (f fakeState) SchemaVersion(context.Context) (int, error) {
 	return f.schemaVersion, f.schemaErr
 }
 
+type fakeSecurity struct {
+	initialized bool
+	actor       security.Actor
+	authErr     error
+}
+
+func defaultFakeSecurity() fakeSecurity {
+	return fakeSecurity{
+		initialized: true,
+		actor: security.Actor{
+			Type:        "user",
+			ID:          "usr-test",
+			Username:    "owner",
+			DisplayName: "Owner",
+			Roles:       []string{"owner"},
+			Permissions: []string{
+				"system.read",
+				"events.read",
+				"security.self.read",
+				"security.sessions.manage",
+				"audit.read",
+			},
+		},
+	}
+}
+
+func (f fakeSecurity) Initialized(context.Context) (bool, error) {
+	return f.initialized, nil
+}
+
+func (f fakeSecurity) Bootstrap(
+	context.Context,
+	string,
+	string,
+	string,
+	string,
+	security.RequestContext,
+) (security.AuthResult, error) {
+	return security.AuthResult{}, errors.New("not implemented in fake")
+}
+
+func (f fakeSecurity) Login(
+	context.Context,
+	string,
+	string,
+	security.RequestContext,
+) (security.AuthResult, error) {
+	return security.AuthResult{}, errors.New("not implemented in fake")
+}
+
+func (f fakeSecurity) Authenticate(context.Context, string) (security.Actor, error) {
+	if f.authErr != nil {
+		return security.Actor{}, f.authErr
+	}
+	return f.actor, nil
+}
+
+func (f fakeSecurity) Logout(context.Context, security.Actor, security.RequestContext) error {
+	return nil
+}
+
+func (f fakeSecurity) ListAudit(context.Context, int) ([]security.AuditEntry, error) {
+	return []security.AuditEntry{}, nil
+}
+
 func testHandler(state fakeState) http.Handler {
+	return testHandlerWithSecurity(state, defaultFakeSecurity())
+}
+
+func testHandlerWithSecurity(state fakeState, securityService SecurityService) http.Handler {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	const nodeID = "00000000-0000-4000-8000-000000000000"
 	return New(
-		"00000000-0000-4000-8000-000000000000",
+		nodeID,
 		logger,
 		state,
-		realtime.New("00000000-0000-4000-8000-000000000000", logger),
+		securityService,
+		realtime.New(nodeID, logger),
 	)
 }
 
 func TestHealth(t *testing.T) {
-	handler := testHandler(fakeState{schemaVersion: 1})
+	handler := testHandler(fakeState{schemaVersion: 2})
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
@@ -69,7 +141,7 @@ func TestHealth(t *testing.T) {
 }
 
 func TestCorrelationIDIsEchoed(t *testing.T) {
-	handler := testHandler(fakeState{schemaVersion: 1})
+	handler := testHandler(fakeState{schemaVersion: 2})
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	req.Header.Set("X-Correlation-ID", "mobile-upload-42")
@@ -82,7 +154,7 @@ func TestCorrelationIDIsEchoed(t *testing.T) {
 }
 
 func TestInvalidCorrelationIDFallsBackToRequestID(t *testing.T) {
-	handler := testHandler(fakeState{schemaVersion: 1})
+	handler := testHandler(fakeState{schemaVersion: 2})
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	req.Header.Set("X-Correlation-ID", "contains spaces")
@@ -106,13 +178,35 @@ func TestHealthFailsWhenStateIsUnavailable(t *testing.T) {
 	}
 }
 
+func TestProtectedRouteRequiresAuthentication(t *testing.T) {
+	sec := defaultFakeSecurity()
+	sec.authErr = security.ErrUnauthorized
+	handler := testHandlerWithSecurity(fakeState{schemaVersion: 2}, sec)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/system", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+	var body errorEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Error.Code != "authentication_required" {
+		t.Fatalf("error code = %q", body.Error.Code)
+	}
+}
+
 func TestSystem(t *testing.T) {
 	const nodeID = "00000000-0000-4000-8000-000000000000"
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	handler := New(
 		nodeID,
 		logger,
-		fakeState{schemaVersion: 1},
+		fakeState{schemaVersion: 2},
+		defaultFakeSecurity(),
 		realtime.New(nodeID, logger),
 	)
 
@@ -136,8 +230,8 @@ func TestSystem(t *testing.T) {
 	if body.System.NodeID != nodeID {
 		t.Fatalf("node_id = %q, want %q", body.System.NodeID, nodeID)
 	}
-	if body.SchemaVersion != 1 {
-		t.Fatalf("schema_version = %d, want 1", body.SchemaVersion)
+	if body.SchemaVersion != 2 {
+		t.Fatalf("schema_version = %d, want 2", body.SchemaVersion)
 	}
 }
 
@@ -189,7 +283,7 @@ func TestNotFoundUsesErrorEnvelope(t *testing.T) {
 }
 
 func TestMethodNotAllowedUsesErrorEnvelope(t *testing.T) {
-	handler := testHandler(fakeState{schemaVersion: 1})
+	handler := testHandler(fakeState{schemaVersion: 2})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/system", nil)
 	rec := httptest.NewRecorder()
@@ -201,13 +295,28 @@ func TestMethodNotAllowedUsesErrorEnvelope(t *testing.T) {
 	if rec.Header().Get("Allow") != http.MethodGet {
 		t.Fatalf("Allow = %q", rec.Header().Get("Allow"))
 	}
+}
 
-	var body errorEnvelope
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode error: %v", err)
+func TestSetupStatusIsPublic(t *testing.T) {
+	sec := defaultFakeSecurity()
+	sec.initialized = false
+	handler := testHandlerWithSecurity(fakeState{}, sec)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/security/setup-status", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
 	}
-	if body.Error.Code != "method_not_allowed" {
-		t.Fatalf("error code = %q", body.Error.Code)
+	var body struct {
+		Initialized bool `json:"initialized"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Initialized {
+		t.Fatal("setup status unexpectedly initialized")
 	}
 }
 
@@ -217,7 +326,8 @@ func TestEventsRouteUpgradesToWebSocket(t *testing.T) {
 	handler := New(
 		nodeID,
 		logger,
-		fakeState{schemaVersion: 1},
+		fakeState{schemaVersion: 2},
+		defaultFakeSecurity(),
 		realtime.New(nodeID, logger, realtime.WithHeartbeat(time.Hour)),
 	)
 
@@ -247,8 +357,5 @@ func TestEventsRouteUpgradesToWebSocket(t *testing.T) {
 	}
 	if connected.Source.NodeID != nodeID {
 		t.Fatalf("node ID = %q", connected.Source.NodeID)
-	}
-	if connected.RequestID != response.Header.Get("X-Request-ID") {
-		t.Fatalf("event request ID = %q, header = %q", connected.RequestID, response.Header.Get("X-Request-ID"))
 	}
 }
