@@ -135,3 +135,11 @@ export type RealtimeEvent = {
   request_id?: string;
   data?: unknown;
 };
+
+export type UpdateStatus = {
+  current_version: string;
+  available_version?: string;
+  available: boolean;
+  published_at?: string;
+  notes?: string;
+};
