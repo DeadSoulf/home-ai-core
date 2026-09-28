@@ -1,6 +1,15 @@
-# Core API v1 — Initial Surface
+# Core API v1
 
-This document describes the first read-only API surface implemented by Core v0.1.
+Core API v1 is the first stable contract surface for the restarted Home-AI-Core platform.
+
+## Transport rules
+
+- REST base path: `/api/v1/`
+- JSON responses use UTF-8
+- API responses are marked `Cache-Control: no-store`
+- every request receives `X-Request-ID`
+- clients may provide a safe `X-Correlation-ID`, which Core echoes
+- default listener remains loopback-only until authentication is implemented
 
 ## GET /health
 
@@ -22,6 +31,8 @@ Response:
 
 If the Core state database is unavailable, the endpoint returns `503 Service Unavailable` with `status: degraded`.
 
+The health endpoint is operational infrastructure and does not use the normal API error envelope.
+
 ## GET /api/v1/system
 
 Returns read-only information about the local node.
@@ -40,16 +51,84 @@ Initial information includes:
 - Core version
 - Core database schema version
 
-Block-device data currently describes kernel-visible whole devices and deliberately ignores loop/ram/zram devices. Stable storage resource identities will be introduced by the Storage module rather than treating a `/dev/*` path as permanent identity.
+Block-device data deliberately does not create permanent identities from `/dev/*` paths.
 
-GPU discovery is intentionally basic. It reports vendor/device IDs, driver and PCI address where Linux sysfs exposes them. Accelerator/runtime-specific inventory belongs to later AI/Video modules.
+## API errors
 
-This endpoint is intentionally read-only.
+Example:
 
-Authentication is not implemented in Core v0.1; until Phase 5 identity/security work is complete, the default listener remains loopback-only.
+```json
+{
+  "error": {
+    "code": "not_found",
+    "message": "resource not found",
+    "request_id": "95df...",
+    "correlation_id": "mobile-upload-42"
+  }
+}
+```
 
-## Request IDs
+Error codes are stable machine-readable identifiers. Messages are safe for users/logging. Internal errors are not returned.
 
-Core adds an `X-Request-ID` response header to requests.
+## GET /api/v1/events
 
-Future structured errors and audit records will reference the same request identity.
+Upgrades to WebSocket and provides Event Envelope v1.
+
+The server first emits `core.connected`.
+
+A client may then subscribe:
+
+```json
+{
+  "op": "subscribe",
+  "topics": ["system.*", "job.*"]
+}
+```
+
+or unsubscribe:
+
+```json
+{
+  "op": "unsubscribe",
+  "topics": ["system.*"]
+}
+```
+
+Core protocol events are always delivered.
+
+### Event envelope
+
+```json
+{
+  "version": 1,
+  "id": "evt_...",
+  "stream_id": "stream_...",
+  "sequence": 10,
+  "type": "core.heartbeat",
+  "time": "2026-09-28T08:00:00Z",
+  "source": {
+    "node_id": "...",
+    "component": "core"
+  },
+  "request_id": "...",
+  "data": {}
+}
+```
+
+### Heartbeat
+
+`core.heartbeat` is emitted every 30 seconds.
+
+### Reconnect
+
+Realtime v1 does not persist or replay events.
+
+After reconnect, clients must:
+
+1. fetch current authoritative state using REST,
+2. reconnect to `/api/v1/events`,
+3. restore their subscriptions.
+
+A changed `stream_id` indicates that the Core event stream restarted.
+
+Persistent event history/replay belongs to the later Event/Job Engine.

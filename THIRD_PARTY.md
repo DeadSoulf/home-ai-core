@@ -4,7 +4,10 @@
 
 | Component | Upstream project | Version | License | Modified | Home-AI-Core location |
 |---|---|---:|---|---|---|
+| WebSocket transport | github.com/coder/websocket | v1.8.15 | ISC | No | `internal/realtime` |
 | SQLite Go driver | modernc.org/sqlite | v1.59.0 | BSD-3-Clause | No | Go module dependency used by `internal/state` |
+
+`github.com/coder/websocket` is used as a minimal WebSocket transport and has no runtime dependencies of its own.
 
 `modernc.org/sqlite` is a pure-Go SQLite driver/port and includes its own transitive third-party components under their respective upstream licenses. Dependency metadata is managed through Go modules.
 

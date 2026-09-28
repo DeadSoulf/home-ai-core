@@ -13,6 +13,7 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/api"
 	"github.com/DeadSoulf/home-ai-core/internal/config"
 	"github.com/DeadSoulf/home-ai-core/internal/identity"
+	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
 )
 
@@ -56,7 +57,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	handler := api.New(nodeID, logger, store)
+	realtimeHub := realtime.New(nodeID, logger)
+	handler := api.New(nodeID, logger, store, realtimeHub)
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddress,

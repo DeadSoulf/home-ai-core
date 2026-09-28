@@ -2,34 +2,36 @@ package api
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
 
+	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/systeminfo"
 	"github.com/DeadSoulf/home-ai-core/internal/version"
 )
 
 type server struct {
-	nodeID string
-	logger *slog.Logger
-	state  State
-	mux    *http.ServeMux
+	nodeID   string
+	logger   *slog.Logger
+	state    State
+	realtime *realtime.Hub
+	mux      *http.ServeMux
 }
 
-func New(nodeID string, logger *slog.Logger, state State) http.Handler {
+func New(nodeID string, logger *slog.Logger, state State, realtimeHub *realtime.Hub) http.Handler {
 	s := &server{
-		nodeID: nodeID,
-		logger: logger,
-		state:  state,
-		mux:    http.NewServeMux(),
+		nodeID:   nodeID,
+		logger:   logger,
+		state:    state,
+		realtime: realtimeHub,
+		mux:      http.NewServeMux(),
 	}
 
 	s.mux.HandleFunc("GET /health", s.health)
 	s.mux.HandleFunc("GET /api/v1/system", s.system)
+	s.mux.HandleFunc("GET /api/v1/events", s.events)
+	s.mux.HandleFunc("/", s.notFound)
 
 	return s.requestContext(s.mux)
 }
@@ -57,10 +59,14 @@ func (s *server) system(w http.ResponseWriter, r *http.Request) {
 	schemaVersion, err := s.state.SchemaVersion(r.Context())
 	if err != nil {
 		s.logger.Error("failed to read schema version", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]any{
-			"code":    "state_unavailable",
-			"message": "core state is unavailable",
-		})
+		writeAPIError(
+			w,
+			r,
+			http.StatusInternalServerError,
+			"state_unavailable",
+			"core state is unavailable",
+			nil,
+		)
 		return
 	}
 
@@ -71,36 +77,39 @@ func (s *server) system(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *server) events(w http.ResponseWriter, r *http.Request) {
+	s.realtime.ServeHTTP(w, r, requestIDFromContext(r.Context()))
+}
+
+func (s *server) notFound(w http.ResponseWriter, r *http.Request) {
+	writeAPIError(
+		w,
+		r,
+		http.StatusNotFound,
+		"not_found",
+		"resource not found",
+		nil,
+	)
+}
+
 func (s *server) requestContext(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestID := newRequestID()
-		w.Header().Set("X-Request-ID", requestID)
+		r, meta := withRequestMetadata(r)
+		w.Header().Set("X-Request-ID", meta.RequestID)
+		w.Header().Set("X-Correlation-ID", meta.CorrelationID)
 
 		started := time.Now()
 		next.ServeHTTP(w, r)
 
 		s.logger.Info("http request",
-			"request_id", requestID,
+			"request_id", meta.RequestID,
+			"correlation_id", meta.CorrelationID,
 			"method", r.Method,
 			"path", r.URL.Path,
 			"remote", r.RemoteAddr,
 			"duration_ms", time.Since(started).Milliseconds(),
 		)
 	})
-}
-
-func newRequestID() string {
-	var raw [12]byte
-	if _, err := rand.Read(raw[:]); err != nil {
-		return "request-id-unavailable"
-	}
-	return hex.EncodeToString(raw[:])
-}
-
-func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
 }
 
 // Kept as a tiny seam for deterministic handler tests and to avoid repeating

@@ -2,7 +2,10 @@ module github.com/DeadSoulf/home-ai-core
 
 go 1.27
 
-require modernc.org/sqlite v1.59.0
+require (
+	github.com/coder/websocket v1.8.15
+	modernc.org/sqlite v1.59.0
+)
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
