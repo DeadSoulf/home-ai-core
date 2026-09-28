@@ -89,6 +89,7 @@ add_library(
     core/events/NotificationCenter.cpp
     core/modules/Module.cpp
     core/modules/ModuleManager.cpp
+    core/modules/ModuleInstaller.cpp
     core/runtime/CoreRuntime.cpp
 
     server/system/SystemMonitor.cpp
@@ -293,6 +294,22 @@ target_link_libraries(
 add_test(
     NAME module_manager
     COMMAND test-module-manager
+)
+
+add_executable(
+    test-module-installer
+    tests/test_module_installer.cpp
+)
+
+target_link_libraries(
+    test-module-installer
+    PRIVATE
+    homeai-core-lib
+)
+
+add_test(
+    NAME module_installer
+    COMMAND test-module-installer
 )
 
 
