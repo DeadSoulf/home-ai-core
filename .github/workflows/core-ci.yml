@@ -211,3 +211,41 @@ jobs:
           dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './lib/systemd/system/home-ai-core.service'
           dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './usr/lib/sysusers.d/home-ai-core.conf'
           dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './etc/home-ai-core/home-ai-core.env'
+
+
+          PACKAGE_ROOT="$(mktemp -d)"
+          PACKAGE_STATE="$(mktemp -d)"
+          PACKAGE_LOG="$(mktemp)"
+          dpkg-deb -x "$AMD64_PACKAGE" "$PACKAGE_ROOT"
+
+          "$PACKAGE_ROOT/usr/bin/home-ai-core" \
+            --state-dir "$PACKAGE_STATE" \
+            --web-dir "$PACKAGE_ROOT/usr/share/home-ai-core/web" \
+            --listen 127.0.0.1:18081 \
+            >"$PACKAGE_LOG" 2>&1 &
+          PACKAGE_PID=$!
+
+          package_cleanup() {
+            kill "$PACKAGE_PID" 2>/dev/null || true
+            wait "$PACKAGE_PID" 2>/dev/null || true
+            rm -rf "$PACKAGE_ROOT" "$PACKAGE_STATE" "$PACKAGE_LOG"
+          }
+          trap package_cleanup EXIT INT TERM
+
+          PACKAGE_READY=0
+          for _ in $(seq 1 50); do
+            if curl --fail --silent http://127.0.0.1:18081/health >/dev/null; then
+              PACKAGE_READY=1
+              break
+            fi
+            sleep 0.2
+          done
+
+          if [ "$PACKAGE_READY" -ne 1 ]; then
+            cat "$PACKAGE_LOG"
+            exit 1
+          fi
+
+          curl --fail --silent http://127.0.0.1:18081/ | grep -q 'Home-AI-Core'
+          package_cleanup
+          trap - EXIT INT TERM
