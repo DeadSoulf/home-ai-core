@@ -18,6 +18,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
 
 const (
@@ -65,16 +67,24 @@ type Service struct {
 
 func New(currentVersion, stateDir string) *Service {
 	currentVersion = strings.TrimSpace(currentVersion)
-	return &Service{
+	service := &Service{
 		currentVersion: currentVersion,
 		architecture:   runtime.GOARCH,
 		stateDir:       stateDir,
 		client:         &http.Client{Timeout: 30 * time.Second},
 		state:          NewState(currentVersion),
 	}
+	service.loadPersistedState()
+	service.reconcileInstallResult()
+	return service
 }
 
 func (s *Service) State() State {
+	s.reconcileInstallResult()
+	return s.snapshotState()
+}
+
+func (s *Service) snapshotState() State {
 	s.stateMu.RLock()
 	defer s.stateMu.RUnlock()
 	return s.state
@@ -190,6 +200,44 @@ func (s *Service) Download(ctx context.Context, version string) (State, error) {
 	}
 	s.setState(ready)
 	return ready, nil
+}
+
+func (s *Service) Install(ctx context.Context, version string) (State, error) {
+	if !s.opMu.TryLock() {
+		return s.State(), ErrBusy
+	}
+	defer s.opMu.Unlock()
+
+	version = strings.TrimSpace(version)
+	state := s.snapshotState()
+	if state.Phase != PhaseReady || state.AvailableVersion != version {
+		return state, errors.New("requested update is not downloaded and ready")
+	}
+
+	preparedDir := filepath.Join(s.stateDir, "update", "prepared-"+safeVersion(version))
+	if _, err := VerifyPreparedBundle(preparedDir, version); err != nil {
+		s.failState(err)
+		return s.snapshotState(), err
+	}
+
+	state.Phase = PhaseInstalling
+	state.ProgressPercent = 100
+	state.Message = "Starting privileged update installation"
+	state.Error = ""
+	state.UpdatedAt = time.Now().UTC()
+	s.setState(state)
+
+	if err := callUpdaterHelper(ctx, version); err != nil {
+		s.failState(err)
+		return s.snapshotState(), err
+	}
+
+	state = s.snapshotState()
+	state.Phase = PhaseRestarting
+	state.Message = "Update accepted; Home-AI-Core is restarting"
+	state.UpdatedAt = time.Now().UTC()
+	s.setState(state)
+	return state, nil
 }
 
 func (s *Service) findCandidate(ctx context.Context, requestedVersion string) (candidate, error) {
@@ -509,7 +557,7 @@ func (s *Service) setState(state State) {
 }
 
 func (s *Service) updateProgress(progress int, message string) {
-	state := s.State()
+	state := s.snapshotState()
 	state.ProgressPercent = progress
 	state.Message = message
 	state.UpdatedAt = time.Now().UTC()
@@ -517,12 +565,66 @@ func (s *Service) updateProgress(progress int, message string) {
 }
 
 func (s *Service) failState(err error) {
-	state := s.State()
+	state := s.snapshotState()
 	state.Phase = PhaseFailed
 	state.Error = err.Error()
 	state.Message = "Update operation failed"
 	state.UpdatedAt = time.Now().UTC()
 	s.setState(state)
+}
+
+func (s *Service) loadPersistedState() {
+	path := filepath.Join(s.stateDir, "update", "state.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	var state State
+	if err := json.Unmarshal(data, &state); err != nil {
+		return
+	}
+	state.CurrentVersion = s.currentVersion
+	s.state = state
+}
+
+func (s *Service) reconcileInstallResult() {
+	path := filepath.Join(s.stateDir, "update", "install-result.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	var result updaterhelper.Result
+	if err := json.Unmarshal(data, &result); err != nil {
+		return
+	}
+
+	state := s.snapshotState()
+	switch {
+	case result.Status == "succeeded" && result.Version == s.currentVersion:
+		if state.Phase == PhaseSucceeded && state.AvailableVersion == result.Version {
+			return
+		}
+		state.Phase = PhaseSucceeded
+		state.CurrentVersion = s.currentVersion
+		state.AvailableVersion = result.Version
+		state.ProgressPercent = 100
+		state.Message = result.Message
+		if state.Message == "" {
+			state.Message = "Update installed successfully"
+		}
+		state.Error = ""
+		state.UpdatedAt = time.Now().UTC()
+		s.setState(state)
+	case result.Status == "failed" && state.AvailableVersion == result.Version:
+		if state.Phase == PhaseFailed && state.Error == result.Error {
+			return
+		}
+		state.Phase = PhaseFailed
+		state.Message = "Update installation failed; previous version restored"
+		state.Error = result.Error
+		state.UpdatedAt = time.Now().UTC()
+		s.setState(state)
+	}
 }
 
 func (s *Service) persistState(state State) {
