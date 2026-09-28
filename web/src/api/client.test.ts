@@ -27,7 +27,7 @@ describe("API client", () => {
   });
 
   it("uses cookie-mode login and stores only the CSRF token", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({
         actor: {
           type: "user",
@@ -54,8 +54,8 @@ describe("API client", () => {
     const result = await api.login("owner", "secret");
     expect(result.actor.username).toBe("owner");
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [, init] = fetchMock.mock.calls[0] as [unknown, RequestInit];
-    expect(init.credentials).toBe("same-origin");
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init?.credentials).toBe("same-origin");
     expect(String(init.body)).toContain('"session_mode":"cookie"');
     expect(storage.get("home-ai-core.csrf")).toBe("csrf-test");
 
