@@ -31,6 +31,7 @@ export type SystemResponse = {
     cpu: {
       model?: string;
       logical_cpus: number;
+      usage_percent: number;
     };
     memory: {
       total_bytes?: number;
@@ -69,6 +70,7 @@ export type SystemResponse = {
       driver?: string;
       modalias?: string;
       pci_address?: string;
+      utilization_percent?: number;
     }>;
   };
 };
