@@ -33,7 +33,13 @@ jobs:
 
       - name: Format check
         run: |
-          test -z "$(gofmt -l ./cmd ./internal)"
+          UNFORMATTED="$(gofmt -l ./cmd ./internal)"
+          if [ -n "$UNFORMATTED" ]; then
+            echo "The following Go files need gofmt:"
+            echo "$UNFORMATTED"
+            gofmt -d $UNFORMATTED
+            exit 1
+          fi
 
       - name: Test
         run: go test ./...
