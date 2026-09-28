@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -75,6 +76,21 @@ public:
 
     std::vector<ModuleCatalogEntry>
     catalogSnapshot() const;
+
+    std::optional<ModuleManifest>
+    manifest(
+        const std::string& id
+    ) const;
+
+    bool isInstalled(
+        const std::string& id
+    ) const;
+
+    bool setInstalledState(
+        const std::string& id,
+        bool installed,
+        std::string& error
+    );
 
     bool registerModule(
         std::unique_ptr<IModule> module,
@@ -164,6 +180,11 @@ private:
 
     std::vector<std::string>
         manifest_order_;
+
+    std::unordered_map<
+        std::string,
+        bool
+    > installed_overrides_;
 };
 
 }
