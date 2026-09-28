@@ -22,3 +22,4 @@
 - Added Russian Web UI localization with RU/EN switching, browser-language detection and saved preference.
 - Started Phase 9 with signed module repository metadata and Ed25519/SHA-256 package verification.
 - Added driver-independent PCI GPU inventory with model resolution and Web UI driver status; defined automatic hardware driver reconciliation through the future privileged helper.
+- Added the Debian pci.ids hardware database as a package dependency for reliable human-readable PCI device names.
