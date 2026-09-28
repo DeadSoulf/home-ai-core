@@ -1,0 +1,121 @@
+package modules
+
+import (
+	"context"
+	"strings"
+	"testing"
+
+	"github.com/DeadSoulf/home-ai-core/internal/state"
+)
+
+func validManifest(id, ver string) Manifest {
+	return Manifest{
+		SchemaVersion: ManifestSchemaVersion,
+		ID:            id,
+		Name:          "Test Module",
+		Version:       ver,
+		Core:          ">=0.1.0 <1.0.0",
+		Capabilities: Capabilities{
+			Requires: []string{"host.linux"},
+		},
+		UI: UIContract{
+			Navigation: []NavigationItem{
+				{ID: "overview", Title: "Overview", Route: "/modules/" + id},
+			},
+		},
+		Lifecycle: []string{"install", "remove"},
+	}
+}
+
+func TestDecodeManifestRejectsUnknownField(t *testing.T) {
+	raw := `{
+		"schema_version":1,
+		"id":"test",
+		"name":"Test",
+		"version":"0.1.0",
+		"core":">=0.1.0 <1.0.0",
+		"lifecycle":["install"],
+		"unknown":true
+	}`
+	if _, err := DecodeManifest(strings.NewReader(raw)); err == nil {
+		t.Fatal("unknown manifest field was accepted")
+	}
+}
+
+func TestValidateManifestRejectsRouteEscape(t *testing.T) {
+	m := validManifest("storage", "1.0.0")
+	m.UI.Navigation[0].Route = "/system"
+	if err := ValidateManifest(m); err == nil {
+		t.Fatal("navigation route outside module namespace was accepted")
+	}
+}
+
+func TestPlanInstallDependencyFirst(t *testing.T) {
+	base := validManifest("base", "1.2.0")
+	base.Capabilities.Provides = []string{"runtime.base"}
+	base.Capabilities.Requires = []string{"host.linux"}
+
+	app := validManifest("feature", "2.0.0")
+	app.Dependencies = []Dependency{{ID: "base", Version: ">=1.0.0 <2.0.0"}}
+	app.Capabilities.Requires = []string{"runtime.base"}
+
+	plan, err := PlanInstall(PlanInput{
+		CoreVersion:  "0.1.0",
+		Target:       "feature",
+		Available:    map[string]Manifest{"base": base, "feature": app},
+		Capabilities: []string{"host.linux"},
+		Architecture: "amd64",
+	})
+	if err != nil {
+		t.Fatalf("PlanInstall() error = %v", err)
+	}
+	if len(plan.Order) != 2 || plan.Order[0].ID != "base" || plan.Order[1].ID != "feature" {
+		t.Fatalf("unexpected plan: %#v", plan.Order)
+	}
+}
+
+func TestPlanInstallRejectsCycle(t *testing.T) {
+	a := validManifest("a", "1.0.0")
+	b := validManifest("b", "1.0.0")
+	a.Dependencies = []Dependency{{ID: "b", Version: ">=1.0.0"}}
+	b.Dependencies = []Dependency{{ID: "a", Version: ">=1.0.0"}}
+
+	_, err := PlanInstall(PlanInput{
+		CoreVersion:  "0.1.0",
+		Target:       "a",
+		Available:    map[string]Manifest{"a": a, "b": b},
+		Capabilities: []string{"host.linux"},
+		Architecture: "amd64",
+	})
+	if err == nil {
+		t.Fatal("dependency cycle was accepted")
+	}
+}
+
+type testModule struct{ manifest Manifest }
+
+func (m testModule) Manifest() Manifest { return m.manifest }
+func (m testModule) Lifecycle() Lifecycle { return nil }
+
+func TestRegistryPersistsManifest(t *testing.T) {
+	ctx := context.Background()
+	store, err := state.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatalf("state.Open() error = %v", err)
+	}
+	defer store.Close()
+
+	registry := NewRegistry(store)
+	manifest := validManifest("storage", "1.0.0")
+	if err := registry.Register(ctx, testModule{manifest: manifest}); err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+
+	got, err := registry.Get(ctx, "storage")
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if got.Manifest.Version != "1.0.0" || got.Status != "registered" {
+		t.Fatalf("unexpected registered module: %#v", got)
+	}
+}
