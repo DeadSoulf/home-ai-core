@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"runtime"
 	"strconv"
@@ -139,7 +140,7 @@ func (s *Service) fetchReleases(ctx context.Context) ([]githubRelease, error) {
 		return nil, fmt.Errorf("check GitHub releases: HTTP %d", resp.StatusCode)
 	}
 
-	decoder := json.NewDecoder(http.MaxBytesReader(nil, resp.Body, maxReleaseBytes))
+	decoder := json.NewDecoder(io.LimitReader(resp.Body, maxReleaseBytes+1))
 	var releases []githubRelease
 	if err := decoder.Decode(&releases); err != nil {
 		return nil, fmt.Errorf("decode GitHub releases: %w", err)
