@@ -5,6 +5,7 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 ARCH=${1:-$(dpkg --print-architecture 2>/dev/null || echo amd64)}
 VERSION=$(tr -d '\r\n' < "$ROOT/VERSION")
 PKG_VERSION=$(printf '%s' "$VERSION" | sed 's/-/~/g')
+FILE_VERSION=$(printf '%s' "$VERSION" | sed 's/-/./g')
 OUT_DIR="$ROOT/build/packages"
 STAGE="$ROOT/build/deb-$ARCH"
 
@@ -116,6 +117,6 @@ chmod 0755 "$STAGE/usr/libexec/home-ai-core/home-ai-core-update-helper"
 find "$STAGE/usr/share/home-ai-core/web" -type d -exec chmod 0755 {} +
 find "$STAGE/usr/share/home-ai-core/web" -type f -exec chmod 0644 {} +
 
-PACKAGE="$OUT_DIR/home-ai-core_${PKG_VERSION}_${ARCH}.deb"
+PACKAGE="$OUT_DIR/home-ai-core_${FILE_VERSION}_${ARCH}.deb"
 dpkg-deb --root-owner-group --build "$STAGE" "$PACKAGE"
 echo "$PACKAGE"
