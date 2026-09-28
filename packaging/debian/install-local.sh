@@ -6,7 +6,7 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 2
 fi
 
-PACKAGE=\${1:-}
+PACKAGE=${1:-}
 if [ -z "$PACKAGE" ] || [ ! -f "$PACKAGE" ]; then
   echo "usage: sudo $0 <home-ai-core_*.deb>" >&2
   exit 2
@@ -22,8 +22,8 @@ esac
 
 if [ -r /etc/os-release ]; then
   . /etc/os-release
-  if [ "\${ID:-}" != "debian" ] || [ "\${VERSION_ID:-}" != "13" ]; then
-    echo "Home-AI-Core currently supports Debian 13; detected \${PRETTY_NAME:-unknown}" >&2
+  if [ "${ID:-}" != "debian" ] || [ "${VERSION_ID:-}" != "13" ]; then
+    echo "Home-AI-Core currently supports Debian 13; detected ${PRETTY_NAME:-unknown}" >&2
     exit 2
   fi
 fi
