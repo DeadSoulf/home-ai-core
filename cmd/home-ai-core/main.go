@@ -15,6 +15,7 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/events"
 	"github.com/DeadSoulf/home-ai-core/internal/identity"
 	"github.com/DeadSoulf/home-ai-core/internal/jobs"
+	"github.com/DeadSoulf/home-ai-core/internal/modules"
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
@@ -69,6 +70,7 @@ func main() {
 	realtimeHub := realtime.New(nodeID, logger)
 	eventService := events.New(nodeID, store, realtimeHub)
 	jobService := jobs.New(nodeID, store, eventService, 2)
+	moduleRegistry := modules.NewRegistry(store)
 
 	jobCtx, jobCancel := context.WithCancel(context.Background())
 	defer jobCancel()
@@ -78,7 +80,16 @@ func main() {
 		}
 	}()
 
-	handler := api.New(nodeID, logger, store, securityService, jobService, eventService, realtimeHub)
+	handler := api.New(
+		nodeID,
+		logger,
+		store,
+		securityService,
+		jobService,
+		eventService,
+		moduleRegistry,
+		realtimeHub,
+	)
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddress,
