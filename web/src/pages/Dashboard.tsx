@@ -70,7 +70,7 @@ export function Dashboard({revision}: {revision: number}) {
               <div className="list-row" key={job.id}>
                 <div>
                   <strong>{job.type}</strong>
-                  <span>{job.progress_message || job.id}</span>
+                  <span>{job.message || job.id}</span>
                 </div>
                 <Status value={job.status} />
               </div>
