@@ -33,6 +33,15 @@ type Envelope struct {
 	Data      any       `json:"data,omitempty"`
 }
 
+type eventMessage struct {
+	ID        string
+	Type      string
+	Time      time.Time
+	Source    Source
+	RequestID string
+	Data      any
+}
+
 type Command struct {
 	Op     string   `json:"op"`
 	Topics []string `json:"topics,omitempty"`

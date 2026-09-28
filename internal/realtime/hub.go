@@ -2,26 +2,28 @@ package realtime
 
 import (
 	"log/slog"
+	"sort"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
 type Hub struct {
 	nodeID    string
-	streamID  string
 	logger    *slog.Logger
 	heartbeat time.Duration
-	sequence  atomic.Uint64
 
 	mu      sync.RWMutex
 	clients map[*client]struct{}
 }
 
 type client struct {
-	mu     sync.RWMutex
-	topics map[string]struct{}
-	send   chan Envelope
+	mu       sync.RWMutex
+	topics   map[string]struct{}
+	send     chan eventMessage
+	done     chan struct{}
+	closeOnce sync.Once
+	streamID string
+	sequence uint64
 }
 
 type Option func(*Hub)
@@ -37,7 +39,6 @@ func WithHeartbeat(interval time.Duration) Option {
 func New(nodeID string, logger *slog.Logger, options ...Option) *Hub {
 	h := &Hub{
 		nodeID:    nodeID,
-		streamID:  newID("stream_"),
 		logger:    logger,
 		heartbeat: defaultHeartbeat,
 		clients:   make(map[*client]struct{}),
@@ -48,8 +49,8 @@ func New(nodeID string, logger *slog.Logger, options ...Option) *Hub {
 	return h
 }
 
-func (h *Hub) Publish(eventType string, data any, requestID string) Envelope {
-	envelope := h.newEnvelope(eventType, data, requestID)
+func (h *Hub) Publish(eventType string, data any, requestID string) string {
+	message := h.newMessage(eventType, data, requestID)
 
 	h.mu.RLock()
 	clients := make([]*client, 0, len(h.clients))
@@ -59,19 +60,16 @@ func (h *Hub) Publish(eventType string, data any, requestID string) Envelope {
 	h.mu.RUnlock()
 
 	for _, c := range clients {
-		if c.matches(eventType) && !c.deliver(envelope) {
+		if c.matches(eventType) && !c.deliver(message) {
 			h.remove(c)
 		}
 	}
-	return envelope
+	return message.ID
 }
 
-func (h *Hub) newEnvelope(eventType string, data any, requestID string) Envelope {
-	return Envelope{
-		Version:   ProtocolVersion,
+func (h *Hub) newMessage(eventType string, data any, requestID string) eventMessage {
+	return eventMessage{
 		ID:        newID("evt_"),
-		StreamID:  h.streamID,
-		Sequence:  h.sequence.Add(1),
 		Type:      eventType,
 		Time:      time.Now().UTC(),
 		Source:    Source{NodeID: h.nodeID, Component: "core"},
@@ -80,29 +78,54 @@ func (h *Hub) newEnvelope(eventType string, data any, requestID string) Envelope
 	}
 }
 
-func (h *Hub) add() *client {
-	c := &client{
-		topics: map[string]struct{}{},
-		send:   make(chan Envelope, 64),
+func (h *Hub) envelope(c *client, message eventMessage) Envelope {
+	c.sequence++
+	return Envelope{
+		Version:   ProtocolVersion,
+		ID:        message.ID,
+		StreamID:  c.streamID,
+		Sequence:  c.sequence,
+		Type:      message.Type,
+		Time:      message.Time,
+		Source:    message.Source,
+		RequestID: message.RequestID,
+		Data:      message.Data,
 	}
+}
+
+func newClient() *client {
+	return &client{
+		topics:   map[string]struct{}{},
+		send:     make(chan eventMessage, 64),
+		done:     make(chan struct{}),
+		streamID: newID("stream_"),
+	}
+}
+
+func (h *Hub) add(c *client) {
 	h.mu.Lock()
 	h.clients[c] = struct{}{}
 	h.mu.Unlock()
-	return c
 }
 
 func (h *Hub) remove(c *client) {
 	h.mu.Lock()
-	if _, ok := h.clients[c]; ok {
-		delete(h.clients, c)
-		close(c.send)
-	}
+	delete(h.clients, c)
 	h.mu.Unlock()
+	c.close()
 }
 
-func (c *client) deliver(envelope Envelope) bool {
+func (c *client) close() {
+	c.closeOnce.Do(func() {
+		close(c.done)
+	})
+}
+
+func (c *client) deliver(message eventMessage) bool {
 	select {
-	case c.send <- envelope:
+	case <-c.done:
+		return false
+	case c.send <- message:
 		return true
 	default:
 		return false
@@ -113,7 +136,7 @@ func (c *client) matches(eventType string) bool {
 	if eventType == "" {
 		return false
 	}
-	if len(eventType) >= 5 && eventType[:5] == "core." {
+	if strings.HasPrefix(eventType, "core.") {
 		return true
 	}
 
@@ -150,14 +173,6 @@ func (c *client) topicListLocked() []string {
 	for topic := range c.topics {
 		out = append(out, topic)
 	}
-	sortStrings(out)
+	sort.Strings(out)
 	return out
-}
-
-func sortStrings(values []string) {
-	for i := 1; i < len(values); i++ {
-		for j := i; j > 0 && values[j] < values[j-1]; j-- {
-			values[j], values[j-1] = values[j-1], values[j]
-		}
-	}
 }

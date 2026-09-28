@@ -7,7 +7,7 @@
 
 Home-AI-Core needs a stable API contract for the Web UI, future mobile clients, modules and later multi-node communication.
 
-The REST API must provide authoritative state and commands. Realtime transport is used for transient change notifications and progress signals.
+The REST API provides authoritative state and commands. Realtime transport provides transient change notifications and progress signals.
 
 The first realtime implementation must not pretend to provide durable event delivery before the persistent Job/Event Engine exists.
 
@@ -83,9 +83,9 @@ Every server event uses a typed envelope:
 Fields:
 
 - `version`: event-envelope schema version
-- `id`: unique event identifier
-- `stream_id`: identifies the current Core process event stream
-- `sequence`: monotonically increasing sequence within one stream
+- `id`: event identifier shared by all subscribers receiving that event
+- `stream_id`: identifies one WebSocket connection stream
+- `sequence`: strictly increasing delivery sequence within that connection stream
 - `type`: namespaced event type
 - `time`: UTC event creation time
 - `source`: origin node/component
@@ -102,7 +102,7 @@ When a connection is lost:
 2. client fetches authoritative current state through REST,
 3. client re-subscribes to desired realtime topics.
 
-A changed `stream_id` means the Core event stream restarted. Sequence numbers are meaningful only inside one stream.
+Every connection receives a new `stream_id` and its sequence starts at 1. Sequence numbers are transport-order metadata, not persistent event offsets.
 
 Replay/resume tokens are deliberately deferred to the persistent Event/Job Engine phase.
 
@@ -136,17 +136,13 @@ Subscriptions are transient and are not persisted.
 
 Core emits a `core.heartbeat` event every 30 seconds.
 
-Heartbeat is application-level liveness metadata and includes the current UTC timestamp.
-
-The WebSocket protocol implementation may additionally use WebSocket close/ping semantics internally.
-
 ### Limits
 
 - inbound WebSocket control message limit: 64 KiB
 - maximum topics per connection: 64
 - topic maximum length: 128 characters
 - invalid control messages receive a `core.error` event
-- gross protocol violations may close the WebSocket
+- a slow consumer may be disconnected rather than allowing unbounded memory growth
 
 ### Event naming
 
@@ -167,9 +163,10 @@ Future modules own their documented namespace, such as `containers.*` or `virtua
 
 - REST remains the source of truth.
 - Web/mobile clients can use one stable realtime envelope.
+- Per-connection sequence is guaranteed to match delivery order.
 - Reconnect behaviour is explicit and does not risk silent state divergence.
-- Stream and sequence metadata can support diagnostics and later replay evolution.
-- Modules and future nodes can publish into the same namespace model.
+- Slow consumers have bounded memory impact.
+- Persistent event replay can be added later without redefining the transport envelope.
 
 ### Negative
 

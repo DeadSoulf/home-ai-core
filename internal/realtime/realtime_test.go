@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -34,10 +35,12 @@ func TestTopicMatches(t *testing.T) {
 	}
 }
 
-func TestEnvelopeSequence(t *testing.T) {
+func TestConnectionSequence(t *testing.T) {
 	hub := New("node-1", slog.New(slog.NewTextHandler(io.Discard, nil)))
-	first := hub.newEnvelope("core.test", nil, "")
-	second := hub.newEnvelope("core.test", nil, "")
+	client := newClient()
+
+	first := hub.envelope(client, hub.newMessage("core.test", nil, ""))
+	second := hub.envelope(client, hub.newMessage("core.test", nil, ""))
 
 	if first.StreamID == "" || first.StreamID != second.StreamID {
 		t.Fatal("stream ID is missing or changed")
@@ -76,6 +79,9 @@ func TestWebSocketSubscribeAndPublish(t *testing.T) {
 	if connected.Type != "core.connected" || connected.Source.NodeID != "node-1" {
 		t.Fatalf("unexpected connected envelope: %#v", connected)
 	}
+	if connected.Sequence != 1 {
+		t.Fatalf("connected sequence = %d, want 1", connected.Sequence)
+	}
 
 	if err := wsjson.Write(ctx, conn, Command{
 		Op:     "subscribe",
@@ -92,7 +98,7 @@ func TestWebSocketSubscribeAndPublish(t *testing.T) {
 		t.Fatalf("ack type = %q", ack.Type)
 	}
 
-	hub.Publish("system.updated", map[string]any{"reason": "test"}, "req-2")
+	eventID := hub.Publish("system.updated", map[string]any{"reason": "test"}, "req-2")
 
 	var event Envelope
 	if err := wsjson.Read(ctx, conn, &event); err != nil {
@@ -101,8 +107,14 @@ func TestWebSocketSubscribeAndPublish(t *testing.T) {
 	if event.Type != "system.updated" {
 		t.Fatalf("event type = %q", event.Type)
 	}
+	if event.ID != eventID {
+		t.Fatalf("event ID = %q, want %q", event.ID, eventID)
+	}
 	if event.RequestID != "req-2" {
 		t.Fatalf("request ID = %q", event.RequestID)
+	}
+	if event.Sequence != ack.Sequence+1 {
+		t.Fatalf("event sequence = %d after ack %d", event.Sequence, ack.Sequence)
 	}
 }
 
@@ -141,5 +153,8 @@ func TestWebSocketRejectsInvalidCommand(t *testing.T) {
 	}
 	if response.Type != "core.error" {
 		t.Fatalf("response type = %q", response.Type)
+	}
+	if response.Sequence != connected.Sequence+1 {
+		t.Fatalf("response sequence = %d", response.Sequence)
 	}
 }
