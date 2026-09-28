@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, APIError, connectRealtime, setCSRFToken, type RealtimeStatus } from "./api/client";
 import type { Actor } from "./api/types";
 import { Shell } from "./components/Shell";
+import { useI18n } from "./i18n";
 import { FirstRunPage, LoginPage } from "./pages/Auth";
 import { AuditPage } from "./pages/Audit";
 import { Dashboard } from "./pages/Dashboard";
@@ -17,6 +18,7 @@ function currentPath(): string {
 }
 
 export default function App() {
+  const {t} = useI18n();
   const [phase, setPhase] = useState<Phase>("loading");
   const [actor, setActor] = useState<Actor>();
   const [path, setPath] = useState(currentPath);
@@ -89,7 +91,7 @@ export default function App() {
   };
 
   if (phase === "loading") {
-    return <div className="boot-screen"><div className="brand-mark">H</div><span>Starting Home-AI-Core…</span></div>;
+    return <div className="boot-screen"><div className="brand-mark">H</div><span>{t("starting")}</span></div>;
   }
   if (phase === "setup") {
     return <FirstRunPage onAuthenticated={authenticated} />;
