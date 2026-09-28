@@ -2,6 +2,7 @@ package systeminfo
 
 import (
 	"os"
+	"strconv"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -71,6 +72,15 @@ func gpuFromPCIDevice(devicePath string, ids pciIDDatabase) (GPU, bool) {
 		}
 	}
 
+	var utilization *float64
+	if raw := readTrimmed(filepath.Join(devicePath, "gpu_busy_percent")); raw != "" {
+		if value, err := strconv.ParseFloat(raw, 64); err == nil {
+			if value < 0 { value = 0 }
+			if value > 100 { value = 100 }
+			utilization = &value
+		}
+	}
+
 	return GPU{
 		Card:       card,
 		Vendor:     vendor,
@@ -81,6 +91,7 @@ func gpuFromPCIDevice(devicePath string, ids pciIDDatabase) (GPU, bool) {
 		Driver:     driver,
 		Modalias:   readTrimmed(filepath.Join(devicePath, "modalias")),
 		PCIAddress: filepath.Base(devicePath),
+		UtilizationPercent: utilization,
 	}, true
 }
 
