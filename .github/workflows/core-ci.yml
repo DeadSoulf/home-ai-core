@@ -41,6 +41,12 @@ jobs:
             exit 1
           fi
 
+      - name: Schema syntax check
+        run: |
+          for file in schemas/*.json; do
+            python3 -m json.tool "$file" >/dev/null
+          done
+
       - name: Test
         run: go test ./...
 
