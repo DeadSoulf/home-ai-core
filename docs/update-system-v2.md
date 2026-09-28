@@ -1,217 +1,310 @@
 # Update System v2 Plan
 
-## Goal
+## Core rule
 
-Home-AI-Core must update from the Web UI with one clear flow:
+The Debian package is only for the initial installation and emergency recovery.
 
-1. Check GitHub for a newer published package.
-2. Show current and available versions.
-3. User presses **Install update**.
-4. Core downloads the exact package selected during the check.
-5. Package integrity and compatibility are verified.
-6. A privileged installer installs the package.
-7. Home-AI-Core restarts.
-8. Web UI reconnects and confirms the new running version.
+Normal Home-AI-Core updates from the Web UI do **not** build or install a new .deb package.
+They use a small application update bundle containing only the Core binary, Web UI and metadata.
 
-No automatic installation. No background auto-update scheduler. No update jobs mixed into the general job history.
+There is no unattended auto-update. Installation always starts from an explicit Web UI action.
 
-## Separation of responsibilities
+## Update artifact
 
-### 1. Release publishing
-GitHub-side responsibility only.
+For each supported architecture GitHub publishes:
 
-A release contains:
-- one amd64 Debian package,
-- one arm64 Debian package,
-- one update manifest,
-- SHA-256 and size metadata.
+```
+home-ai-core-update_<version>_<arch>.tar.gz
+home-ai-core-update_<version>_<arch>.tar.gz.sha256
+```
 
-Publishing a release is independent from the runtime updater. Runtime code must not depend on GitHub Actions internals.
+Bundle layout:
 
-### 2. Update discovery
-Unprivileged Home-AI-Core responsibility.
+```
+manifest.json
+bin/
+  home-ai-core
+web/
+  index.html
+  assets/...
+```
 
-Endpoint:
-- `GET /api/v1/update`
+The bundle is produced by:
 
-It:
-- reads the current Core version,
-- queries GitHub Releases,
-- selects the newest compatible published release,
-- reads its manifest,
-- returns current version, available version, notes, architecture, package size and availability.
+```bash
+sh ./scripts/build-update-bundle.sh amd64
+sh ./scripts/build-update-bundle.sh arm64
+```
 
-It never downloads or installs anything.
+Output directory:
 
-### 3. Package download
-Unprivileged Home-AI-Core responsibility.
+```
+build/updates/
+```
 
-Endpoint:
-- `POST /api/v1/update/download`
+## Manifest
 
-Input:
-- exact version selected by the user.
+`manifest.json` contains:
 
-It:
-- revalidates that release,
-- downloads the package to `/var/lib/home-ai-core/update/`,
-- verifies expected size,
-- verifies SHA-256,
-- verifies package name, architecture and Debian version,
-- records a simple updater state file.
+- schema version
+- product name
+- Home-AI-Core version
+- architecture
+- every update file
+- SHA-256 for every file
+- exact file size
 
-UI states:
-- idle
-- checking
-- available
-- downloading
-- ready
-- installing
-- restarting
-- succeeded
-- failed
+The archive itself also has a sibling `.sha256` checksum file.
 
-This updater state is separate from the generic Jobs module.
+## Runtime directories
 
-### 4. Privileged installation
-A small root-only installer is used only for the final install operation.
+Initial .deb installation creates:
 
-It must:
-- accept only a package from the dedicated update staging directory,
-- accept only package name `home-ai-core`,
-- reject architecture mismatch,
-- reject downgrade,
-- run `apt-get install <exact staged file>`,
-- write an installation result/status file.
+```
+/var/lib/home-ai-core/update/
+```
 
-It must not:
-- access GitHub,
-- select versions,
-- download files,
-- expose a network port,
-- contain release logic.
+This directory is owned by the unprivileged `home-ai-core` service account and is used only for downloading and staging an update.
 
-### 5. Restart handling
-The package post-install script restarts only `home-ai-core.service`.
+The live installation remains:
 
-The installer itself must not be restarted by the package being installed.
+```
+/usr/bin/home-ai-core
+/usr/share/home-ai-core/web/
+```
 
-The Web UI expects temporary API loss and polls:
-- `GET /health`
-- then `GET /api/v1/system`
+## Runtime update flow
 
-Success means the running Core version equals the selected version.
+### 1. Check
 
-## Web UI
+Web UI button:
 
-Location:
-- System -> Updates
+**Check for updates**
 
-Display:
-- Current version
-- Available version
-- Published date
-- Package size
-- Release notes
-- Last check time
-- Status/progress
-- Error text when applicable
+Core queries GitHub Releases and finds the newest compatible update bundle for the running architecture.
 
-Buttons:
-- **Check for updates**
-- **Download**
-- **Install**
+The UI displays:
 
-For the normal path, after download succeeds the UI may offer one combined primary action:
-- **Download and install**
+- current version
+- available version
+- release date
+- archive size
+- release notes
 
-Installation always requires an explicit user click.
+No files are downloaded during the check.
 
-## API proposal
+### 2. Download
+
+Web UI button:
+
+**Download update**
+
+Core downloads the exact selected bundle into:
+
+```
+/var/lib/home-ai-core/update/
+```
+
+Core verifies:
+
+1. archive SHA-256
+2. archive size
+3. `manifest.json`
+4. product name
+5. architecture
+6. version
+7. every contained file SHA-256
+8. every contained file size
+9. safe relative paths
+
+After verification the updater state becomes `ready`.
+
+### 3. Install
+
+Web UI button:
+
+**Install update**
+
+A minimal privileged installer performs only the local filesystem switch.
+
+It does not access GitHub and does not choose a version.
+
+Installation sequence:
+
+1. verify the already-staged bundle again
+2. stop `home-ai-core.service`
+3. create a backup of the current binary and Web UI
+4. install the new binary
+5. replace the Web UI atomically
+6. start `home-ai-core.service`
+7. verify `/health`
+8. verify the running version
+
+### 4. Rollback
+
+If the new Core does not start or reports the wrong version:
+
+1. stop the failed service
+2. restore the previous binary and Web UI
+3. start the previous version
+4. record update state as `failed`
+
+The previous working version must remain recoverable until the new version has passed verification.
+
+## Updater states
+
+The updater is independent from the generic Jobs subsystem.
+
+States:
+
+```
+idle
+checking
+available
+downloading
+ready
+installing
+restarting
+succeeded
+failed
+```
+
+Go definitions live under:
+
+```
+internal/updater/
+```
+
+## API target
 
 ### GET /api/v1/update
-Returns discovery/status information.
+
+Returns current updater state and discovered release information.
 
 ### POST /api/v1/update/check
-Optional explicit check endpoint if we do not want GET to perform an external request.
+
+Explicitly checks GitHub.
 
 ### POST /api/v1/update/download
+
 Body:
+
 ```json
 {"version":"0.2.0"}
 ```
+
+Downloads and verifies exactly that version.
 
 ### POST /api/v1/update/install
+
 Body:
+
 ```json
 {"version":"0.2.0"}
 ```
 
+Starts installation of an already verified staged update.
+
 ### GET /api/v1/update/state
-Returns the current updater state and progress.
+
+Returns phase, progress, message and any error.
 
 ## Security rules
 
-- Core continues to run as the unprivileged `home-ai-core` user.
-- Only the minimal installer runs as root.
-- CSRF protection is required for download/install actions.
-- Only owner/admin permission may install.
-- Package path is never accepted directly from the browser.
-- Download URL is derived from trusted GitHub release metadata, not supplied by the browser.
+- Network-facing Core always runs as `home-ai-core`, never root.
+- The browser never supplies a local path.
+- The browser never supplies a download URL.
+- GitHub URL is derived by Core from release metadata.
 - SHA-256 verification is mandatory.
-- Package metadata validation is mandatory.
+- Manifest validation is mandatory.
+- Unsafe archive paths are rejected.
+- Architecture mismatch is rejected.
 - Downgrades are rejected by default.
-- Only one update operation may run at a time.
+- Only one updater operation may exist at a time.
+- Install requires authenticated owner/admin permission and CSRF validation.
+- The privileged installer has no network responsibilities.
 
-## Implementation order
+## Initial .deb responsibilities
 
-### Phase 1 — clean package build
-Ensure `scripts/build-deb.sh amd64` and `arm64` build without any updater code.
+The .deb remains responsible for the first machine installation:
 
-### Phase 2 — deterministic release format
-Create a simple release build/publish workflow only after local package build is clean.
-This workflow publishes packages; it does not participate in installation.
+- create `home-ai-core` system user
+- install systemd service
+- install initial Core binary
+- install initial Web UI
+- create state/config/update directories
+- later: install the minimal privileged updater helper
+
+The .deb is not part of the normal Web update path.
+
+## Implementation phases
+
+### Phase 1 — update bundle format
+Status: implemented foundation.
+
+- `scripts/build-update-bundle.sh`
+- deterministic tar.gz
+- manifest with per-file checksums
+- archive SHA-256
+- `internal/updater` manifest/state types
+- update staging directory
+
+### Phase 2 — bundle release publishing
+
+Create a GitHub workflow that only builds and publishes update bundles.
+It has no runtime installation logic.
 
 ### Phase 3 — discovery API
-Implement GitHub release check and manifest parsing only.
-No install code yet.
+
+Implement GitHub release discovery and version comparison.
 
 ### Phase 4 — Web check UI
-Implement current/available version display and **Check for updates**.
 
-### Phase 5 — staged download
-Implement package download, SHA-256 verification and updater state.
+Add System -> Updates with an explicit check button.
 
-### Phase 6 — privileged installer
-Add a new minimal installer with a narrow protocol and strict package validation.
+### Phase 5 — secure bundle download
+
+Download, unpack into a temporary directory and verify all manifest entries.
+
+### Phase 6 — privileged local installer
+
+Implement backup, atomic replacement, restart and rollback.
 
 ### Phase 7 — Web install flow
-Connect the install button, restart detection and success/failure display.
 
-### Phase 8 — failure tests
+Wire download/install/progress/reconnect into the Web UI.
+
+### Phase 8 — failure testing
+
 Test:
+
 - GitHub unavailable
 - no update
 - wrong architecture
-- bad SHA-256
+- bad archive checksum
+- invalid manifest
+- path traversal attempt
 - partial download
-- invalid .deb
-- apt failure
-- Core restart during install
+- corrupt file inside archive
+- service fails after replacement
+- wrong running version
+- rollback
 - already-installed version
 - attempted downgrade
 
 ## Acceptance criteria
 
-The updater is finished only when all of these work:
+The updater is complete when:
 
-1. A newer GitHub release is detected from Web UI.
-2. No shell/SSH command is required.
-3. The exact selected package is downloaded.
-4. Integrity is verified before root installation.
-5. Clicking install upgrades Home-AI-Core.
-6. Web UI survives the restart and reports success.
-7. Failed installation leaves the previous installation recoverable.
-8. Update failures show a clear error in the update page.
-9. No general Jobs polling is required for updater state.
-10. There is no automatic unattended installation.
+1. Initial installation can still be done with one .deb.
+2. Future Web updates do not require another .deb.
+3. Web UI discovers a newer GitHub bundle.
+4. User explicitly starts download/install.
+5. Exact selected version is downloaded.
+6. Archive and all files are verified.
+7. Existing binary/Web UI are backed up.
+8. Core and Web UI are replaced.
+9. Core restarts into the selected version.
+10. Web UI reconnects and confirms success.
+11. Failed upgrade automatically restores the previous version.
+12. SSH is not required for a normal update.
