@@ -85,7 +85,9 @@ if command -v systemctl >/dev/null 2>&1; then
   systemctl enable home-ai-core.service >/dev/null 2>&1 || true
   systemctl enable home-ai-core-update-helper.service >/dev/null 2>&1 || true
   if [ "$1" = "configure" ]; then
-    systemctl restart home-ai-core-update-helper.service || true
+    if [ "${HOME_AI_UPDATE_HELPER_ACTIVE:-0}" != "1" ]; then
+      systemctl restart home-ai-core-update-helper.service || true
+    fi
     systemctl restart home-ai-core.service || true
   fi
 fi
