@@ -42,7 +42,6 @@ func (s *Store) Node(ctx context.Context, id string) (Node, error) {
 		return Node{}, fmt.Errorf("read node record: %w", err)
 	}
 
-	var err error
 	node.CreatedAt, err = time.Parse(time.RFC3339Nano, createdAt)
 	if err != nil {
 		return Node{}, fmt.Errorf("parse node created_at: %w", err)
