@@ -835,6 +835,22 @@ int main()
         modules_page.find(
             "/api/module-catalog"
         ) == std::string::npos
+        ||
+        modules_page.find(
+            "/api/module-catalog/install"
+        ) == std::string::npos
+        ||
+        modules_page.find(
+            "/api/module-catalog/uninstall"
+        ) == std::string::npos
+        ||
+        modules_page.find(
+            "module-management-enabled"
+        ) == std::string::npos
+        ||
+        modules_page.find(
+            "moduleCatalogAction"
+        ) == std::string::npos
     ) {
         std::cerr
             << "Module catalog page is invalid\n";
