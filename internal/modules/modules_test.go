@@ -94,7 +94,7 @@ func TestPlanInstallRejectsCycle(t *testing.T) {
 
 type testModule struct{ manifest Manifest }
 
-func (m testModule) Manifest() Manifest { return m.manifest }
+func (m testModule) Manifest() Manifest   { return m.manifest }
 func (m testModule) Lifecycle() Lifecycle { return nil }
 
 func TestRegistryPersistsManifest(t *testing.T) {
