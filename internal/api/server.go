@@ -29,8 +29,8 @@ func New(nodeID string, logger *slog.Logger, state State, realtimeHub *realtime.
 	}
 
 	s.mux.HandleFunc("GET /health", s.health)
-	s.mux.HandleFunc("GET /api/v1/system", s.system)
-	s.mux.HandleFunc("GET /api/v1/events", s.events)
+	s.mux.HandleFunc("/api/v1/system", s.systemRoute)
+	s.mux.HandleFunc("/api/v1/events", s.eventsRoute)
 	s.mux.HandleFunc("/", s.notFound)
 
 	return s.requestContext(s.mux)
@@ -55,6 +55,15 @@ func (s *server) health(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *server) systemRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		return
+	}
+	s.system(w, r)
+}
+
 func (s *server) system(w http.ResponseWriter, r *http.Request) {
 	schemaVersion, err := s.state.SchemaVersion(r.Context())
 	if err != nil {
@@ -75,6 +84,15 @@ func (s *server) system(w http.ResponseWriter, r *http.Request) {
 		"schema_version": schemaVersion,
 		"system":         systeminfo.Collect(s.nodeID),
 	})
+}
+
+func (s *server) eventsRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		return
+	}
+	s.events(w, r)
 }
 
 func (s *server) events(w http.ResponseWriter, r *http.Request) {
