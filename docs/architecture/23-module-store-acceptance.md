@@ -35,6 +35,20 @@
 - [ ] install/update/remove operations create persistent jobs
 - [ ] lifecycle changes are audited
 
+## Hardware and driver reconciliation
+
+- [x] GPU inventory works without a loaded graphics driver
+- [x] GPU inventory exposes model, hardware IDs, PCI address, modalias and active driver
+- [x] Web UI shows GPU model and missing-driver state
+- [ ] generic PCI/USB device change detection
+- [ ] signed driver profile format
+- [ ] modalias/hardware-ID matching engine
+- [ ] automatic driver.reconcile persistent job
+- [ ] post-install driver binding verification
+- [ ] reboot-required state
+- [ ] ambiguous/proprietary/Secure-Boot cases require explicit UI action
+- [ ] driver changes are audited
+
 ## Package staging and privileged boundary
 
 - [ ] bounded package download
