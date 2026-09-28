@@ -1,60 +1,15 @@
-# Home AI Core
+# Home-AI-Core
 
-Home AI Core is a local-first autonomous server platform designed for:
+Home-AI-Core is a modular home-server platform built on top of Debian 13.
 
-- artificial intelligence
-- smart home control
-- personal data management
-- server management
-- hypervisor management
-- video surveillance and recording
-- automation
-- long-term memory
-- controlled self-development
-
-## Current stable version
-
-0.0.5
-
-## Current development target
-
-0.0.6 — Module Manager
-
-## Platform
-
-- Debian 13
-- Linux x86-64
-- C++20
-
-## Main modules
-
-- Core
-- AI
-- Memory
-- Devices
-- Automation
-- Server
-- Data
-- Security
-- Hypervisor
-- Video
-- Web/API
-
-## Documentation
-
-- [Project Map](docs/PROJECT_MAP.md)
-- [Roadmap](docs/ROADMAP.md)
-- [Development Workflow](docs/WORKFLOW.md)
-- [Security](docs/SECURITY.md)
-- [Storage Monitoring](docs/STORAGE.md)
-
-## Branches
-
-- `main` — stable, tested code
-- `develop` — active development and integration
-
-The development server should normally track `develop`.
+The project keeps the base operating system independent and adds a small core responsible for API access, authentication, permissions, events, jobs, updates and module lifecycle management.
 
 ## Status
 
-The stable 0.0.5 foundation includes Core Runtime, logging, Event Bus, configuration, integrated Web Core, system monitoring, Security Core, authenticated Web/API access, and storage monitoring for mounted video/personal-data disks.
+Architecture reset in progress. No production code is accepted until the v1 core architecture and module contract are documented.
+
+## Core principle
+
+The core must not contain Docker, KVM, NAS, AI or NVR-specific logic. Those capabilities belong to independent modules.
+
+See `docs/architecture/` for the current design.
