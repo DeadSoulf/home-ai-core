@@ -40,7 +40,28 @@ export function SystemPage({revision}: {revision: number}) {
             <dt>{t("ram")}</dt><dd>{bytes(value.system.memory.total_bytes)}</dd>
             <dt>{t("availableRam")}</dt><dd>{bytes(value.system.memory.available_bytes)}</dd>
             <dt>{t("gpuCount")}</dt><dd>{value.system.gpus.length}</dd>
+            <dt>{t("gpu")}</dt><dd>{value.system.gpus.length ? value.system.gpus.map((gpu) => gpu.model || gpu.vendor || gpu.device_id || t("unknown")).join(", ") : "—"}</dd>
           </dl>
+        </Panel>
+
+        <Panel title={t("gpuDevices")} className="wide">
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>{t("model")}</th><th>{t("vendor")}</th><th>{t("pciAddress")}</th><th>{t("deviceId")}</th><th>{t("driver")}</th></tr></thead>
+              <tbody>
+                {value.system.gpus.map((gpu) => (
+                  <tr key={gpu.pci_address || gpu.card || gpu.device_id}>
+                    <td>{gpu.model || t("unknown")}</td>
+                    <td>{gpu.vendor || "—"}</td>
+                    <td className="mono">{gpu.pci_address || "—"}</td>
+                    <td className="mono">{gpu.vendor_id && gpu.device_id ? `${gpu.vendor_id}:${gpu.device_id}` : (gpu.device_id || "—")}</td>
+                    <td>{gpu.driver || <span className="status-badge status-failed">{t("driverMissing")}</span>}</td>
+                  </tr>
+                ))}
+                {value.system.gpus.length === 0 && <tr><td colSpan={5} className="muted">—</td></tr>}
+              </tbody>
+            </table>
+          </div>
         </Panel>
 
         <Panel title={t("blockDevices")} className="wide">
