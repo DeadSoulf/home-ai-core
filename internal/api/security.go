@@ -68,6 +68,12 @@ func (s *server) bootstrap(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, http.StatusBadRequest, "invalid_request", err.Error(), nil)
 		return
 	}
+	mode, ok := validSessionMode(request.SessionMode)
+	if !ok {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_session_mode", "session_mode must be cookie or token", nil)
+		return
+	}
+	request.SessionMode = mode
 
 	result, err := s.security.Bootstrap(
 		r.Context(),
@@ -110,6 +116,12 @@ func (s *server) login(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, http.StatusBadRequest, "invalid_request", err.Error(), nil)
 		return
 	}
+	mode, ok := validSessionMode(request.SessionMode)
+	if !ok {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_session_mode", "session_mode must be cookie or token", nil)
+		return
+	}
+	request.SessionMode = mode
 
 	result, err := s.security.Login(r.Context(), request.Username, request.Password, s.securityRequestContext(r))
 	if err != nil {
@@ -188,7 +200,11 @@ func (s *server) requireAuth(
 		token, source := sessionToken(r)
 		actor, err := s.security.Authenticate(r.Context(), token)
 		if err != nil {
-			writeAPIError(w, r, http.StatusUnauthorized, "authentication_required", "authentication required", nil)
+			if errors.Is(err, security.ErrUnauthorized) {
+				writeAPIError(w, r, http.StatusUnauthorized, "authentication_required", "authentication required", nil)
+				return
+			}
+			writeAPIError(w, r, http.StatusServiceUnavailable, "authentication_unavailable", "authentication is unavailable", nil)
 			return
 		}
 		if permission != "" && !actor.Has(permission) {
@@ -211,6 +227,14 @@ func sessionToken(r *http.Request) (string, authSource) {
 		return cookie.Value, authCookie
 	}
 	return "", authNone
+}
+
+func validSessionMode(mode string) (string, bool) {
+	mode = strings.ToLower(strings.TrimSpace(mode))
+	if mode == "" {
+		mode = "cookie"
+	}
+	return mode, mode == "cookie" || mode == "token"
 }
 
 func (s *server) writeAuthResult(
