@@ -33,7 +33,7 @@ export function UpdatesPage({revision}: {revision: number}) {
   }
 
   async function install() {
-    const target = resource.data?.available_version;
+    const target = manualUpdate?.available_version || resource.data?.available_version;
     if (!target) return;
 
     setInstalling(true);
