@@ -249,3 +249,12 @@ jobs:
           curl --fail --silent http://127.0.0.1:18081/ | grep -q 'Home-AI-Core'
           package_cleanup
           trap - EXIT INT TERM
+
+
+      - name: Upload Debian packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-ai-core-deb-${{ github.sha }}
+          path: build/packages/*.deb
+          if-no-files-found: error
+          retention-days: 14
