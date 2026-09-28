@@ -30,7 +30,7 @@ UMask=0077
 
 NoNewPrivileges=yes
 PrivateTmp=yes
-PrivateDevices=yes
+DevicePolicy=closed
 ProtectSystem=strict
 ProtectHome=yes
 ProtectHostname=yes
