@@ -177,7 +177,7 @@ func installUpdate(ctx context.Context, request updatehelper.Request) (string, e
 		"install",
 		path,
 	)
-	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
+	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive", "HOME_AI_UPDATE_HELPER_ACTIVE=1")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		message := strings.TrimSpace(string(output))
