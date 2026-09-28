@@ -1,26 +1,86 @@
-# Debian Packaging Foundation
+# Debian 13 Installation
 
-Home-AI-Core targets Debian 13 as its first supported host platform.
+Home-AI-Core targets Debian 13 on amd64 and arm64.
 
-## Files
+## Package contents
 
-- `home-ai-core.service` — systemd unit for the unprivileged network-facing Core.
-- `home-ai-core.sysusers` — system user declaration.
-- `home-ai-core.env.example` — optional bootstrap environment overrides.
-
-## Intended installed layout
+The generated Debian package installs:
 
 ```text
 /usr/bin/home-ai-core
-/etc/home-ai-core/
+/usr/share/home-ai-core/web/
+/lib/systemd/system/home-ai-core.service
+/usr/lib/sysusers.d/home-ai-core.conf
+/etc/home-ai-core/home-ai-core.env
+```
+
+Runtime state is created under:
+
+```text
 /var/lib/home-ai-core/
 /run/home-ai-core/
 ```
 
-The `home-ai-core` process runs as the dedicated `home-ai-core` account.
+The network-facing Core runs as the dedicated unprivileged `home-ai-core` user.
 
-The future privileged helper described by ADR-0003 will use a separate systemd unit and a separate security profile. It must not be added to this unit by granting root privileges to the public Core.
+## Build a local package
 
-## Packaging status
+On a build machine with Go 1.27+, Node.js 24+, npm and `dpkg-deb`:
 
-This directory is not yet a complete Debian package definition. The current phase establishes the runtime contract and filesystem ownership model before creating `debian/control`, maintainer scripts and signed package repositories.
+```sh
+sh ./scripts/build-deb.sh amd64
+```
+
+or:
+
+```sh
+sh ./scripts/build-deb.sh arm64
+```
+
+Packages are created in `build/packages/`.
+
+## Install on a clean Debian 13 server
+
+Copy the matching `.deb` plus `packaging/debian/install-local.sh` to the server, then run:
+
+```sh
+sudo sh ./install-local.sh ./home-ai-core_*.deb
+```
+
+The helper validates Debian 13 and amd64/arm64 before installation.
+
+## First-run access
+
+Core remains bound to `127.0.0.1:8080` until secure remote access is implemented.
+
+Use an SSH tunnel from the administrator workstation:
+
+```sh
+ssh -L 8080:127.0.0.1:8080 user@server
+```
+
+Then open `http://127.0.0.1:8080/`.
+
+The one-time bootstrap token is stored at:
+
+```text
+/var/lib/home-ai-core/bootstrap-token
+```
+
+It is deleted after first-owner creation.
+
+## Upgrade behavior
+
+Installing a newer `.deb`:
+
+- preserves `/etc/home-ai-core/home-ai-core.env`
+- preserves `/var/lib/home-ai-core`
+- replaces the binary and Web UI
+- restarts the systemd service
+- lets Core apply forward SQLite migrations at startup
+
+Automatic backup-before-upgrade and rollback remain later Update Manager work.
+
+## Remove behavior
+
+Package removal stops/disables the service but intentionally preserves configuration and state. Persistent state is never silently deleted.
