@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
 import type { Job, UpdateStatus } from "../api/types";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
@@ -31,6 +31,34 @@ export function UpdatesPage({revision}: {revision: number}) {
       setChecking(false);
     }
   }
+
+  useEffect(() => {
+    if (!installJob || !installing) return;
+
+    let stopped = false;
+    const poll = async () => {
+      try {
+        const jobs = await api.jobs();
+        const current = jobs.find((job) => job.id === installJob.id);
+        if (current && !stopped) {
+          setInstallJob(current);
+          if (current.status === "failed" || current.status === "cancelled") {
+            setInstalling(false);
+            setActionError(current.progress_message || t("requestFailed"));
+            return;
+          }
+        }
+      } catch {
+        // The Core may restart while the package is being installed.
+      }
+      if (!stopped) window.setTimeout(poll, 1000);
+    };
+
+    poll();
+    return () => {
+      stopped = true;
+    };
+  }, [installJob?.id, installing, t]);
 
   async function install() {
     const target = manualUpdate?.available_version || resource.data?.available_version;
@@ -109,7 +137,15 @@ export function UpdatesPage({revision}: {revision: number}) {
 
           {actionError && <div className="form-error">{actionError}</div>}
           {lastChecked && <div className="notice">{t("lastChecked")}: {date(lastChecked)}</div>}
-          {installJob && <div className="notice">{t("updateStarted")} <span className="mono">{installJob.id}</span></div>}
+          {installJob && (
+            <div className="notice">
+              <div>{t("updateStarted")} <span className="mono">{installJob.id}</span></div>
+              <div className="progress"><span style={{width: `${Math.min(100, installJob.progress / 100)}%`}} /></div>
+              <div className="small">
+                {(installJob.progress / 100).toFixed(0)}% · {installJob.progress_message || installJob.status}
+              </div>
+            </div>
+          )}
 
           {update.available && (
             <button type="button" className="button primary" disabled={installing} onClick={install}>
