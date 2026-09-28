@@ -1,0 +1,44 @@
+name: bootstrap-web-lock
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - '.github/workflows/bootstrap-web-lock.yml'
+      - 'web/package.json'
+
+permissions:
+  contents: write
+
+jobs:
+  lock:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v7
+        with:
+          ref: develop
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+
+      - name: Generate package lock
+        working-directory: web
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Commit package lock
+        run: |
+          set -eu
+          test -f web/package-lock.json
+          if git diff --quiet -- web/package-lock.json && git ls-files --error-unmatch web/package-lock.json >/dev/null 2>&1; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/package-lock.json
+          git commit -m "chore: lock Web dependencies"
+          git push origin HEAD:develop
