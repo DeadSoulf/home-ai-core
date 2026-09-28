@@ -19,7 +19,6 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
-	"github.com/DeadSoulf/home-ai-core/internal/version"
 	"github.com/DeadSoulf/home-ai-core/internal/webui"
 )
 
