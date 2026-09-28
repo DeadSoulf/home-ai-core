@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
-import type { UpdateStatus } from "../api/types";
+import type { UpdateStatus, UpdaterState } from "../api/types";
 import { useResource } from "../hooks/useResource";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
 import { useI18n } from "../i18n";
@@ -23,6 +23,8 @@ export function SystemPage({revision}: {revision: number}) {
   const [metricsTick, setMetricsTick] = useState(0);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateStatus>();
+  const [updaterState, setUpdaterState] = useState<UpdaterState>();
+  const [downloadingUpdate, setDownloadingUpdate] = useState(false);
   const [updateError, setUpdateError] = useState("");
   const [lastChecked, setLastChecked] = useState<string>();
   const {data, loading, error} = useResource(load, revision + metricsTick);
@@ -38,11 +40,56 @@ export function SystemPage({revision}: {revision: number}) {
     try {
       const result = await api.updateStatus();
       setUpdateInfo(result);
+      setUpdaterState(await api.updaterState());
       setLastChecked(new Date().toISOString());
     } catch (reason) {
       setUpdateError(reason instanceof Error ? reason.message : t("requestFailed"));
     } finally {
       setCheckingUpdate(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!downloadingUpdate) return;
+    let stopped = false;
+    const poll = async () => {
+      try {
+        const state = await api.updaterState();
+        if (stopped) return;
+        setUpdaterState(state);
+        if (state.phase === "ready" || state.phase === "failed") {
+          setDownloadingUpdate(false);
+          if (state.error) setUpdateError(state.error);
+          return;
+        }
+      } catch {
+        // Keep polling while the download request is in flight.
+      }
+      if (!stopped) window.setTimeout(poll, 750);
+    };
+    poll();
+    return () => {
+      stopped = true;
+    };
+  }, [downloadingUpdate]);
+
+  async function downloadUpdate() {
+    const version = updateInfo?.available_version;
+    if (!version) return;
+    setDownloadingUpdate(true);
+    setUpdateError("");
+    try {
+      const state = await api.downloadUpdate(version);
+      setUpdaterState(state);
+    } catch (reason) {
+      setUpdateError(reason instanceof Error ? reason.message : t("requestFailed"));
+      try {
+        setUpdaterState(await api.updaterState());
+      } catch {
+        // Keep the original download error.
+      }
+    } finally {
+      setDownloadingUpdate(false);
     }
   }
 
@@ -101,6 +148,26 @@ export function SystemPage({revision}: {revision: number}) {
             <div className={updateInfo.available ? "update-callout available" : "update-callout current"}>
               <strong>{updateInfo.available ? t("updateAvailable") : t("upToDate")}</strong>
             </div>
+          )}
+          {updaterState && updaterState.phase !== "idle" && (
+            <div className="notice">
+              <div><strong>{updaterState.message || updaterState.phase}</strong></div>
+              <div className="progress"><span style={{width: `${Math.min(100, updaterState.progress_percent || 0)}%`}} /></div>
+              <div className="small">{updaterState.progress_percent || 0}% · {updaterState.phase}</div>
+            </div>
+          )}
+          {updateInfo?.available && updaterState?.phase !== "ready" && (
+            <button
+              type="button"
+              className="button primary"
+              disabled={downloadingUpdate || checkingUpdate}
+              onClick={downloadUpdate}
+            >
+              {downloadingUpdate ? t("downloadingUpdate") : t("downloadUpdate")}
+            </button>
+          )}
+          {updaterState?.phase === "ready" && (
+            <div className="update-callout current"><strong>{t("updateReady")}</strong></div>
           )}
           {updateError && <div className="form-error">{updateError}</div>}
           {lastChecked && <div className="notice">{t("lastChecked")}: {date(lastChecked)}</div>}
