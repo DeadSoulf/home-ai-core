@@ -266,6 +266,22 @@ func (s *Store) RequestJobCancel(ctx context.Context, id string, now time.Time) 
 	return s.Job(ctx, id)
 }
 
+
+func (s *Store) ClearTerminalJobs(ctx context.Context) (int64, error) {
+	result, err := s.db.ExecContext(ctx, `
+		DELETE FROM jobs
+		WHERE status IN ('succeeded', 'failed', 'cancelled')
+	`)
+	if err != nil {
+		return 0, fmt.Errorf("clear terminal jobs: %w", err)
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("read cleared job count: %w", err)
+	}
+	return count, nil
+}
+
 func (s *Store) RecoverInterruptedJobs(ctx context.Context, nodeID string) (int64, error) {
 	result, err := s.db.ExecContext(ctx, `
 		UPDATE jobs
