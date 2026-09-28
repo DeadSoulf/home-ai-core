@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+const contentSecurityPolicy = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'; form-action 'self'; img-src 'self' data:; font-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self' ws: wss:"
+
 type Handler struct {
 	api        http.Handler
 	webDir     string
@@ -38,20 +40,28 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	setSecurityHeaders(w)
+
 	cleanPath := filepath.Clean("/" + r.URL.Path)
 	candidate := filepath.Join(h.webDir, filepath.FromSlash(strings.TrimPrefix(cleanPath, "/")))
 	if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
-		w.Header().Set("X-Content-Type-Options", "nosniff")
 		h.fileServer.ServeHTTP(w, r)
 		return
 	}
 
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
 	http.ServeFile(w, r, h.indexPath)
 }
 
 func (h *Handler) webAvailable() bool {
 	info, err := os.Stat(h.indexPath)
 	return err == nil && !info.IsDir()
+}
+
+func setSecurityHeaders(w http.ResponseWriter) {
+	w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 }
