@@ -7302,6 +7302,140 @@ void WebServer::handleClient(
     }
 
     if (
+        method == "POST"
+        &&
+        (
+            path == "/api/module-catalog/install"
+            ||
+            path == "/api/module-catalog/uninstall"
+        )
+    ) {
+        if (
+            !security_.hasPermission(
+                *session,
+                "system.manage"
+            )
+        ) {
+            sendResponse(
+                client_fd,
+                "403 Forbidden",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"Требуются права администратора.\"}"
+            );
+
+            return;
+        }
+
+        if (!module_installer_) {
+            sendResponse(
+                client_fd,
+                "503 Service Unavailable",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"Module Installer недоступен.\"}"
+            );
+
+            return;
+        }
+
+        const auto form =
+            parseForm(body);
+
+        const auto id_it =
+            form.find("id");
+
+        if (
+            id_it == form.end()
+            ||
+            id_it->second.empty()
+        ) {
+            sendResponse(
+                client_fd,
+                "400 Bad Request",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\"Не указан модуль.\"}"
+            );
+
+            return;
+        }
+
+        const auto& id =
+            id_it->second;
+
+        const bool installing =
+            path ==
+            "/api/module-catalog/install";
+
+        std::string error;
+
+        const bool success =
+            installing
+            ? module_installer_->install(
+                id,
+                error
+            )
+            : module_installer_->uninstall(
+                id,
+                error
+            );
+
+        if (!success) {
+            sendResponse(
+                client_fd,
+                "409 Conflict",
+                "application/json; charset=utf-8",
+                "{\"success\":false,\"message\":\""
+                + jsonEscape(error)
+                + "\"}"
+            );
+
+            return;
+        }
+
+        const auto manifest =
+            modules_.manifest(id);
+
+        const bool restart_required =
+            manifest
+            &&
+            !manifest->runtime_modules.empty();
+
+        security_.audit(
+            installing
+                ? "module.install"
+                : "module.uninstall",
+            session->username,
+            id
+        );
+
+        sendResponse(
+            client_fd,
+            "200 OK",
+            "application/json; charset=utf-8",
+            std::string(
+                "{\"success\":true,\"restart_required\":"
+            )
+            +
+            (
+                restart_required
+                ? "true"
+                : "false"
+            )
+            +
+            ",\"message\":\""
+            +
+            (
+                installing
+                ? "Модуль отмечен для установки."
+                : "Модуль отмечен для удаления."
+            )
+            +
+            "\"}"
+        );
+
+        return;
+    }
+
+    if (
         method == "GET" &&
         path == "/api/update/status"
     ) {
