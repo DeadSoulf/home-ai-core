@@ -55,17 +55,18 @@ jobs:
           set -eu
           STATE_DIR="$(mktemp -d)"
           LOG_FILE="$(mktemp)"
+          COOKIE_JAR="$(mktemp)"
           ./build/home-ai-core --state-dir "$STATE_DIR" --listen 127.0.0.1:18080 >"$LOG_FILE" 2>&1 &
           PID=$!
           cleanup() {
             kill "$PID" 2>/dev/null || true
             wait "$PID" 2>/dev/null || true
-            rm -rf "$STATE_DIR" "$LOG_FILE"
+            rm -rf "$STATE_DIR" "$LOG_FILE" "$COOKIE_JAR"
           }
           trap cleanup EXIT INT TERM
 
           ready=0
-          for _ in $(seq 1 50); do
+          for _ in $(seq 1 75); do
             if curl --fail --silent http://127.0.0.1:18080/health >/tmp/home-ai-health.json; then
               ready=1
               break
@@ -78,7 +79,35 @@ jobs:
             exit 1
           fi
 
-          curl --fail --silent http://127.0.0.1:18080/api/v1/system >/tmp/home-ai-system.json
+          curl --fail --silent             http://127.0.0.1:18080/api/v1/security/setup-status             >/tmp/home-ai-setup.json
+
+          test -f "$STATE_DIR/bootstrap-token"
+          BOOTSTRAP_TOKEN="$(tr -d '\r\n' < "$STATE_DIR/bootstrap-token")"
+
+          UNAUTH_STATUS="$(curl --silent --output /tmp/home-ai-unauth.json --write-out '%{http_code}'             http://127.0.0.1:18080/api/v1/system)"
+          test "$UNAUTH_STATUS" = "401"
+
+          curl --fail --silent             --cookie-jar "$COOKIE_JAR"             -H "Content-Type: application/json"             -H "X-Home-AI-Bootstrap-Token: $BOOTSTRAP_TOKEN"             --data '{"username":"owner","display_name":"CI Owner","password":"integration-test-owner-passphrase","session_mode":"cookie"}'             http://127.0.0.1:18080/api/v1/security/bootstrap             >/tmp/home-ai-bootstrap.json
+
+          test ! -f "$STATE_DIR/bootstrap-token"
+
+          curl --fail --silent             --cookie "$COOKIE_JAR"             http://127.0.0.1:18080/api/v1/system             >/tmp/home-ai-system.json
+
+          curl --fail --silent             --cookie "$COOKIE_JAR"             http://127.0.0.1:18080/api/v1/auth/me             >/tmp/home-ai-me.json
+
+          curl --fail --silent             --cookie "$COOKIE_JAR"             http://127.0.0.1:18080/api/v1/audit             >/tmp/home-ai-audit.json
+
+          CSRF_TOKEN="$(python3 - <<'PY'
+          import json
+          with open("/tmp/home-ai-bootstrap.json", "r", encoding="utf-8") as f:
+              print(json.load(f)["csrf_token"])
+          PY
+          )"
+
+          curl --fail --silent             --cookie "$COOKIE_JAR"             -H "X-CSRF-Token: $CSRF_TOKEN"             -X POST             http://127.0.0.1:18080/api/v1/auth/logout             >/dev/null
+
+          REVOKED_STATUS="$(curl --silent --output /tmp/home-ai-revoked.json --write-out '%{http_code}'             --cookie "$COOKIE_JAR"             http://127.0.0.1:18080/api/v1/system)"
+          test "$REVOKED_STATUS" = "401"
 
           python3 - <<'PY'
           import json
@@ -87,11 +116,24 @@ jobs:
               health = json.load(f)
           assert health["status"] == "ok"
 
+          with open("/tmp/home-ai-setup.json", "r", encoding="utf-8") as f:
+              setup = json.load(f)
+          assert setup["initialized"] is False
+
           with open("/tmp/home-ai-system.json", "r", encoding="utf-8") as f:
               system = json.load(f)
-          assert system["schema_version"] >= 1
+          assert system["schema_version"] >= 2
           assert system["system"]["node_id"]
           assert system["system"]["cpu"]["logical_cpus"] >= 1
+
+          with open("/tmp/home-ai-me.json", "r", encoding="utf-8") as f:
+              me = json.load(f)
+          assert me["actor"]["username"] == "owner"
+          assert "system.read" in me["actor"]["permissions"]
+
+          with open("/tmp/home-ai-audit.json", "r", encoding="utf-8") as f:
+              audit = json.load(f)
+          assert any(event["action"] == "security.bootstrap" for event in audit["events"])
           PY
 
           test -f "$STATE_DIR/core.db"

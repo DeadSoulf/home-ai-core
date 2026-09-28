@@ -1,0 +1,112 @@
+package security
+
+import (
+	"context"
+	"os"
+	"testing"
+
+	"github.com/DeadSoulf/home-ai-core/internal/state"
+)
+
+func TestPasswordHashAndVerify(t *testing.T) {
+	hash, err := HashPassword("correct horse battery staple")
+	if err != nil {
+		t.Fatalf("HashPassword() error = %v", err)
+	}
+	ok, err := VerifyPassword(hash, "correct horse battery staple")
+	if err != nil {
+		t.Fatalf("VerifyPassword() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("password did not verify")
+	}
+	ok, err = VerifyPassword(hash, "wrong password")
+	if err != nil {
+		t.Fatalf("wrong VerifyPassword() error = %v", err)
+	}
+	if ok {
+		t.Fatal("wrong password verified")
+	}
+}
+
+func TestBootstrapLoginAuthenticateLogout(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	store, err := state.Open(ctx, dir)
+	if err != nil {
+		t.Fatalf("state.Open() error = %v", err)
+	}
+	defer store.Close()
+
+	service, err := New(ctx, store, dir)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	tokenBytes, err := os.ReadFile(service.BootstrapTokenPath())
+	if err != nil {
+		t.Fatalf("read bootstrap token: %v", err)
+	}
+
+	result, err := service.Bootstrap(
+		ctx,
+		string(tokenBytes),
+		"Owner",
+		"Home Owner",
+		"correct horse battery staple",
+		RequestContext{RequestID: "req-1", CorrelationID: "corr-1"},
+	)
+	if err != nil {
+		t.Fatalf("Bootstrap() error = %v", err)
+	}
+	if result.Actor.Username != "owner" || !result.Actor.Has("system.read") {
+		t.Fatalf("unexpected bootstrap actor: %#v", result.Actor)
+	}
+	if _, err := os.Stat(service.BootstrapTokenPath()); !os.IsNotExist(err) {
+		t.Fatal("bootstrap token still exists after initialization")
+	}
+
+	actor, err := service.Authenticate(ctx, result.Token)
+	if err != nil {
+		t.Fatalf("Authenticate() error = %v", err)
+	}
+	if actor.ID != result.Actor.ID {
+		t.Fatalf("actor ID = %q", actor.ID)
+	}
+	if !actor.ValidCSRF(result.CSRFToken) {
+		t.Fatal("CSRF token did not validate")
+	}
+
+	login, err := service.Login(
+		ctx,
+		"owner",
+		"correct horse battery staple",
+		RequestContext{RequestID: "req-2"},
+	)
+	if err != nil {
+		t.Fatalf("Login() error = %v", err)
+	}
+	if login.Token == "" || login.CSRFToken == "" {
+		t.Fatal("login secrets are empty")
+	}
+
+	if _, err := service.Login(ctx, "owner", "wrong password", RequestContext{}); err != ErrInvalidCredentials {
+		t.Fatalf("wrong password error = %v", err)
+	}
+
+	if err := service.Logout(ctx, actor, RequestContext{RequestID: "req-3"}); err != nil {
+		t.Fatalf("Logout() error = %v", err)
+	}
+	if _, err := service.Authenticate(ctx, result.Token); err != ErrUnauthorized {
+		t.Fatalf("revoked session authentication error = %v", err)
+	}
+
+	audit, err := service.ListAudit(ctx, 100)
+	if err != nil {
+		t.Fatalf("ListAudit() error = %v", err)
+	}
+	if len(audit) < 4 {
+		t.Fatalf("audit records = %d, want at least 4", len(audit))
+	}
+}
