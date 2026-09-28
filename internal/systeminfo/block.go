@@ -39,7 +39,7 @@ func blockDevices(sysBlockRoot string) []BlockDevice {
 			SizeBytes:  sectors * sectorSize,
 			Rotational: readBool01(filepath.Join(base, "queue", "rotational")),
 			Removable:  readBool01(filepath.Join(base, "removable")),
-			Partitions: partitions(base, entry.Name(), mounts),
+			Partitions: partitions(base, mounts),
 		}
 		devices = append(devices, device)
 	}
@@ -65,7 +65,7 @@ type mountInfo struct {
 	Mountpoint string
 }
 
-func partitions(diskPath, diskName string, mounts map[string][]mountInfo) []Partition {
+func partitions(diskPath string, mounts map[string][]mountInfo) []Partition {
 	entries, err := os.ReadDir(diskPath)
 	if err != nil {
 		return []Partition{}
