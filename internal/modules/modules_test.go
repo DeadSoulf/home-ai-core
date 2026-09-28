@@ -119,3 +119,63 @@ func TestRegistryPersistsManifest(t *testing.T) {
 		t.Fatalf("unexpected registered module: %#v", got)
 	}
 }
+
+
+func TestManifestAllowsWildcardSubscriptions(t *testing.T) {
+	m := validManifest("monitoring", "1.0.0")
+	m.Events.Subscribes = []string{"system.*", "job.*", "*"}
+	m.Events.Publishes = []string{"monitoring.ready"}
+	if err := ValidateManifest(m); err != nil {
+		t.Fatalf("ValidateManifest() error = %v", err)
+	}
+}
+
+func TestManifestRejectsForeignPublishNamespace(t *testing.T) {
+	m := validManifest("monitoring", "1.0.0")
+	m.Events.Publishes = []string{"system.updated"}
+	if err := ValidateManifest(m); err == nil {
+		t.Fatal("foreign event namespace was accepted")
+	}
+}
+
+func TestPlanInstallRejectsBidirectionalConflict(t *testing.T) {
+	base := validManifest("base", "1.0.0")
+	feature := validManifest("feature", "1.0.0")
+	base.Conflicts = []string{"feature"}
+
+	_, err := PlanInstall(PlanInput{
+		CoreVersion:  "0.1.0",
+		Target:       "feature",
+		Available:    map[string]Manifest{"base": base, "feature": feature},
+		Installed:    map[string]string{"base": "1.0.0"},
+		Capabilities: []string{"host.linux"},
+		Architecture: "amd64",
+	})
+	if err == nil {
+		t.Fatal("conflict declared by installed module was not detected")
+	}
+}
+
+func TestRegistryCapabilitiesIncludeProvidedCapabilities(t *testing.T) {
+	ctx := context.Background()
+	store, err := state.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatalf("state.Open() error = %v", err)
+	}
+	defer store.Close()
+
+	registry := NewRegistry(store)
+	manifest := validManifest("storage", "1.0.0")
+	manifest.Capabilities.Provides = []string{"storage.block"}
+	if err := registry.Register(ctx, testModule{manifest: manifest}); err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+
+	capabilities, err := registry.Capabilities(ctx)
+	if err != nil {
+		t.Fatalf("Capabilities() error = %v", err)
+	}
+	if !contains(capabilities, "storage.block") {
+		t.Fatalf("provided capability missing: %#v", capabilities)
+	}
+}
