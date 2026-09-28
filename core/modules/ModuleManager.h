@@ -39,8 +39,43 @@ struct ModuleStatus {
     std::size_t watchdog_attempts{0};
 };
 
+struct ModuleManifest {
+    std::string id;
+    std::string display_name;
+    std::string version;
+    std::string description;
+
+    std::vector<std::string>
+        dependencies;
+
+    std::vector<std::string>
+        permissions;
+
+    std::vector<std::string>
+        runtime_modules;
+
+    bool core_component{false};
+    bool bundled{false};
+    bool installable{false};
+};
+
+struct ModuleCatalogEntry {
+    ModuleManifest manifest;
+    bool installed{false};
+    bool running{false};
+    std::string state;
+};
+
 class ModuleManager {
 public:
+    bool registerManifest(
+        ModuleManifest manifest,
+        std::string& error
+    );
+
+    std::vector<ModuleCatalogEntry>
+    catalogSnapshot() const;
+
     bool registerModule(
         std::unique_ptr<IModule> module,
         std::string& error
@@ -121,6 +156,14 @@ private:
 
     std::vector<std::string>
         started_order_;
+
+    std::unordered_map<
+        std::string,
+        ModuleManifest
+    > manifests_;
+
+    std::vector<std::string>
+        manifest_order_;
 };
 
 }
