@@ -56,7 +56,7 @@ describe("API client", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [, init] = fetchMock.mock.calls[0];
     expect(init?.credentials).toBe("same-origin");
-    expect(String(init.body)).toContain('"session_mode":"cookie"');
+    expect(String(init?.body)).toContain('"session_mode":"cookie"');
     expect(storage.get("home-ai-core.csrf")).toBe("csrf-test");
 
     vi.unstubAllGlobals();
