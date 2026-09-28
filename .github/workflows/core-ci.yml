@@ -163,7 +163,7 @@ jobs:
 
           with open("/tmp/home-ai-system.json", "r", encoding="utf-8") as f:
               system = json.load(f)
-          assert system["schema_version"] >= 5
+          assert system["schema_version"] >= 6
           assert system["system"]["node_id"]
           assert system["system"]["cpu"]["logical_cpus"] >= 1
 
