@@ -416,7 +416,6 @@ func TestAuthenticationBackendFailureIsUnavailable(t *testing.T) {
 	}
 }
 
-
 type fakeModules struct {
 	items        []modules.Registered
 	capabilities []string
