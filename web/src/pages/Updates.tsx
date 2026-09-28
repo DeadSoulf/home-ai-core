@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { api } from "../api/client";
-import type { Job } from "../api/types";
+import type { Job, UpdateStatus } from "../api/types";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
 import { useResource } from "../hooks/useResource";
 import { useI18n } from "../i18n";
@@ -8,13 +8,29 @@ import { PageHeading } from "./Dashboard";
 
 export function UpdatesPage({revision}: {revision: number}) {
   const {t, date} = useI18n();
-  const [refresh, setRefresh] = useState(0);
   const [installing, setInstalling] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [manualUpdate, setManualUpdate] = useState<UpdateStatus>();
+  const [lastChecked, setLastChecked] = useState<string>();
   const [installJob, setInstallJob] = useState<Job>();
   const [actionError, setActionError] = useState("");
 
   const load = useCallback(() => api.updates(), []);
-  const resource = useResource(load, revision + refresh);
+  const resource = useResource(load, revision);
+
+  async function checkUpdates() {
+    setChecking(true);
+    setActionError("");
+    try {
+      const result = await api.updates();
+      setManualUpdate(result);
+      setLastChecked(new Date().toISOString());
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : t("requestFailed"));
+    } finally {
+      setChecking(false);
+    }
+  }
 
   async function install() {
     const target = resource.data?.available_version;
@@ -55,7 +71,7 @@ export function UpdatesPage({revision}: {revision: number}) {
 
   if (resource.loading && !resource.data) return <LoadingState />;
   if (resource.error && !resource.data) return <ErrorState message={resource.error} />;
-  const update = resource.data!;
+  const update = manualUpdate || resource.data!;
 
   return (
     <div className="page">
@@ -68,10 +84,10 @@ export function UpdatesPage({revision}: {revision: number}) {
             <button
               type="button"
               className="button secondary"
-              disabled={resource.loading || installing}
-              onClick={() => setRefresh((value) => value + 1)}
+              disabled={checking || installing}
+              onClick={checkUpdates}
             >
-              {resource.loading ? t("checking") : t("checkUpdates")}
+              {checking ? t("checking") : t("checkUpdates")}
             </button>
           }
         >
@@ -92,6 +108,7 @@ export function UpdatesPage({revision}: {revision: number}) {
           </div>
 
           {actionError && <div className="form-error">{actionError}</div>}
+          {lastChecked && <div className="notice">{t("lastChecked")}: {date(lastChecked)}</div>}
           {installJob && <div className="notice">{t("updateStarted")} <span className="mono">{installJob.id}</span></div>}
 
           {update.available && (
