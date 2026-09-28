@@ -130,6 +130,7 @@ func (s *Service) Check(ctx context.Context) (Status, error) {
 
 func (s *Service) Install(
 	ctx context.Context,
+	version string,
 	actor security.Actor,
 	meta security.RequestContext,
 ) (state.JobRecord, error) {
@@ -139,6 +140,9 @@ func (s *Service) Install(
 	item, err := s.findCandidate(ctx)
 	if err != nil {
 		return state.JobRecord{}, err
+	}
+	if item.Version != strings.TrimSpace(version) {
+		return state.JobRecord{}, fmt.Errorf("requested update %q is no longer the latest available release %q", version, item.Version)
 	}
 	return s.jobs.Submit(ctx, state.JobRecord{
 		Type:          jobTypeInstall,
