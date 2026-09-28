@@ -27,9 +27,9 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request, requestID string
 	defer h.remove(c)
 
 	if err := h.write(ctx, conn, h.newEnvelope("core.connected", map[string]any{
-		"protocol_version": ProtocolVersion,
+		"protocol_version":  ProtocolVersion,
 		"heartbeat_seconds": int(h.heartbeat.Seconds()),
-		"subscriptions": []string{},
+		"subscriptions":     []string{},
 	}, requestID)); err != nil {
 		return
 	}
