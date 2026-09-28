@@ -1,21 +1,21 @@
 package modules
 
 type Manifest struct {
-	SchemaVersion int            `json:"schema_version"`
-	ID            string         `json:"id"`
-	Name          string         `json:"name"`
-	Description   string         `json:"description,omitempty"`
-	Version       string         `json:"version"`
-	Core          string         `json:"core"`
-	Dependencies  []Dependency   `json:"dependencies,omitempty"`
-	Conflicts     []string       `json:"conflicts,omitempty"`
-	Permissions   []string       `json:"permissions,omitempty"`
-	Capabilities  Capabilities   `json:"capabilities,omitempty"`
+	SchemaVersion int              `json:"schema_version"`
+	ID            string           `json:"id"`
+	Name          string           `json:"name"`
+	Description   string           `json:"description,omitempty"`
+	Version       string           `json:"version"`
+	Core          string           `json:"core"`
+	Dependencies  []Dependency     `json:"dependencies,omitempty"`
+	Conflicts     []string         `json:"conflicts,omitempty"`
+	Permissions   []string         `json:"permissions,omitempty"`
+	Capabilities  Capabilities     `json:"capabilities,omitempty"`
 	Host          HostRequirements `json:"host,omitempty"`
-	API           APIContribution `json:"api,omitempty"`
-	Events        EventContract  `json:"events,omitempty"`
-	UI            UIContract     `json:"ui,omitempty"`
-	Lifecycle     []string       `json:"lifecycle"`
+	API           APIContribution  `json:"api,omitempty"`
+	Events        EventContract    `json:"events,omitempty"`
+	UI            UIContract       `json:"ui,omitempty"`
+	Lifecycle     []string         `json:"lifecycle"`
 }
 
 type Dependency struct {
