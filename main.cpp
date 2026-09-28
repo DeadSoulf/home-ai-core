@@ -1,5 +1,6 @@
 #include "core/logging/Logger.h"
 #include "core/modules/Module.h"
+#include "core/modules/ModuleInstaller.h"
 #include "core/modules/ModuleManager.h"
 #include "core/runtime/CoreRuntime.h"
 #include "security/auth/SecurityManager.h"
@@ -292,7 +293,7 @@ int main()
             {"cluster"},
             false,
             true,
-            false
+            true
         },
         {
             "ai",
@@ -349,6 +350,26 @@ int main()
         }
     }
 
+    homeai::ModuleInstaller module_installer(
+        modules,
+        runtime.config().get(
+            "modules.registry_file",
+            "runtime/modules/installed.tsv"
+        )
+    );
+
+    if (
+        !module_installer.load(
+            module_error
+        )
+    ) {
+        homeai::Logger::instance().error(
+            "Unable to load Module Installer state: "
+            + module_error
+        );
+        return 1;
+    }
+
     homeai::WebServer web(
         runtime,
         security,
@@ -357,7 +378,8 @@ int main()
         homeai::GpuMonitor(),
         &camera_manager,
         &hypervisor_manager,
-        &cluster_manager
+        &cluster_manager,
+        &module_installer
     );
 
     if (
@@ -881,104 +903,111 @@ int main()
     }
 
     if (
-        !modules.registerModule(
-            std::make_unique<
-                homeai::CallbackModule
-            >(
-                "cluster",
-                std::vector<std::string>{
-                    "system-monitor"
-                },
-                [&](std::string& error) {
-                    int controller_port =
-                        runtime.config().getInt(
-                            "cluster.controller_port",
-                            8080
-                        );
-
-                    if (
-                        controller_port < 1
-                        ||
-                        controller_port > 65535
-                    ) {
-                        controller_port = 8080;
-                    }
-
-                    return
-                        cluster_manager.initialize(
-                            runtime.config().getBool(
-                                "cluster.enabled",
-                                false
-                            ),
-                            runtime.config().get(
-                                "cluster.node_id",
-                                ""
-                            ),
-                            runtime.config().get(
-                                "cluster.node_name",
-                                ""
-                            ),
-                            runtime.config().get(
-                                "cluster.role",
-                                "controller"
-                            ),
-                            runtime.config().get(
-                                "cluster.advertise_address",
-                                ""
-                            ),
-                            runtime.config().get(
-                                "cluster.controller_host",
-                                ""
-                            ),
-                            static_cast<std::uint16_t>(
-                                controller_port
-                            ),
-                            runtime.config().get(
-                                "cluster.shared_token",
-                                ""
-                            ),
-                            runtime.config().getInt(
-                                "cluster.heartbeat_interval_seconds",
-                                5
-                            ),
-                            runtime.config().getInt(
-                                "cluster.timeout_seconds",
-                                20
-                            ),
-                            error
-                        );
-                },
-                [&](std::string& error) {
-                    return
-                        cluster_manager.start(
-                            error
-                        );
-                },
-                [&]() {
-                    cluster_manager.stop();
-                },
-                [&]() {
-                    return
-                        cluster_manager.healthy()
-                        ? homeai::ModuleHealth::
-                            Healthy
-                        : homeai::ModuleHealth::
-                            Degraded;
-                },
-                [&]() {
-                    return
-                        cluster_manager.
-                            healthMessage();
-                }
-            ),
-            module_error
+        modules.isInstalled(
+            "cluster"
         )
     ) {
-        homeai::Logger::instance().error(
-            module_error
-        );
-        return 1;
-    }
+        if (
+            !modules.registerModule(
+                std::make_unique<
+                    homeai::CallbackModule
+                >(
+                    "cluster",
+                    std::vector<std::string>{
+                        "system-monitor"
+                    },
+                    [&](std::string& error) {
+                        int controller_port =
+                            runtime.config().getInt(
+                                "cluster.controller_port",
+                                8080
+                            );
+    
+                        if (
+                            controller_port < 1
+                            ||
+                            controller_port > 65535
+                        ) {
+                            controller_port = 8080;
+                        }
+    
+                        return
+                            cluster_manager.initialize(
+                                runtime.config().getBool(
+                                    "cluster.enabled",
+                                    false
+                                ),
+                                runtime.config().get(
+                                    "cluster.node_id",
+                                    ""
+                                ),
+                                runtime.config().get(
+                                    "cluster.node_name",
+                                    ""
+                                ),
+                                runtime.config().get(
+                                    "cluster.role",
+                                    "controller"
+                                ),
+                                runtime.config().get(
+                                    "cluster.advertise_address",
+                                    ""
+                                ),
+                                runtime.config().get(
+                                    "cluster.controller_host",
+                                    ""
+                                ),
+                                static_cast<std::uint16_t>(
+                                    controller_port
+                                ),
+                                runtime.config().get(
+                                    "cluster.shared_token",
+                                    ""
+                                ),
+                                runtime.config().getInt(
+                                    "cluster.heartbeat_interval_seconds",
+                                    5
+                                ),
+                                runtime.config().getInt(
+                                    "cluster.timeout_seconds",
+                                    20
+                                ),
+                                error
+                            );
+                    },
+                    [&](std::string& error) {
+                        return
+                            cluster_manager.start(
+                                error
+                            );
+                    },
+                    [&]() {
+                        cluster_manager.stop();
+                    },
+                    [&]() {
+                        return
+                            cluster_manager.healthy()
+                            ? homeai::ModuleHealth::
+                                Healthy
+                            : homeai::ModuleHealth::
+                                Degraded;
+                    },
+                    [&]() {
+                        return
+                            cluster_manager.
+                                healthMessage();
+                    }
+                ),
+                module_error
+            )
+        ) {
+            homeai::Logger::instance().error(
+                module_error
+            );
+            return 1;
+        }
+    
+        }
 
     if (
         !modules.registerModule(
@@ -992,8 +1021,7 @@ int main()
                     "system-monitor",
                     "storage-monitor",
                     "cameras",
-                    "hypervisor",
-                    "cluster"
+                    "hypervisor"
                 },
                 [](std::string&) {
                     return true;
