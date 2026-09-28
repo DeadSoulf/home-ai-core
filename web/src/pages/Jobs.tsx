@@ -2,9 +2,11 @@ import { useCallback } from "react";
 import { api } from "../api/client";
 import { useResource } from "../hooks/useResource";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
+import { useI18n } from "../i18n";
 import { PageHeading, Status } from "./Dashboard";
 
 export function JobsPage({revision}: {revision: number}) {
+  const {t, date} = useI18n();
   const load = useCallback(() => api.jobs(), []);
   const {data, loading, error} = useResource(load, revision);
 
@@ -13,11 +15,11 @@ export function JobsPage({revision}: {revision: number}) {
 
   return (
     <div className="page">
-      <PageHeading title="Jobs" subtitle="Persistent background operations and progress." />
-      <Panel title="Job history">
+      <PageHeading title={t("jobs")} subtitle={t("jobsSubtitle")} />
+      <Panel title={t("jobHistory")}>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Type</th><th>Status</th><th>Progress</th><th>Created</th><th>ID</th></tr></thead>
+            <thead><tr><th>{t("type")}</th><th>{t("status")}</th><th>{t("progress")}</th><th>{t("created")}</th><th>ID</th></tr></thead>
             <tbody>
               {(data || []).map((job) => (
                 <tr key={job.id}>
@@ -27,11 +29,11 @@ export function JobsPage({revision}: {revision: number}) {
                     <div className="progress"><span style={{width: `${Math.min(100, job.progress / 100)}%`}} /></div>
                     <span className="small">{(job.progress / 100).toFixed(0)}%</span>
                   </td>
-                  <td>{new Date(job.created_at).toLocaleString()}</td>
+                  <td>{date(job.created_at)}</td>
                   <td className="mono">{job.id}</td>
                 </tr>
               ))}
-              {(data || []).length === 0 && <tr><td colSpan={5} className="muted">No jobs yet.</td></tr>}
+              {(data || []).length === 0 && <tr><td colSpan={5} className="muted">{t("noJobs")}</td></tr>}
             </tbody>
           </table>
         </div>

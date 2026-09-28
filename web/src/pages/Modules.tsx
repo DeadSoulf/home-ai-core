@@ -2,9 +2,11 @@ import { useCallback } from "react";
 import { api } from "../api/client";
 import { useResource } from "../hooks/useResource";
 import { EmptyState, ErrorState, LoadingState, Panel } from "../components/Panel";
+import { useI18n } from "../i18n";
 import { PageHeading, Status } from "./Dashboard";
 
 export function ModulesPage({revision}: {revision: number}) {
+  const {t} = useI18n();
   const load = useCallback(async () => {
     const [modules, capabilities] = await Promise.all([api.modules(), api.capabilities()]);
     return {modules, capabilities};
@@ -17,9 +19,9 @@ export function ModulesPage({revision}: {revision: number}) {
 
   return (
     <div className="page">
-      <PageHeading title="Modules" subtitle="Registered platform capabilities. Installation arrives in Phase 9." />
+      <PageHeading title={t("modules")} subtitle={t("modulesSubtitle")} />
 
-      <Panel title="Host capabilities">
+      <Panel title={t("hostCapabilities")}>
         <div className="tag-list">
           {value.capabilities.map((capability) => <span className="tag" key={capability}>{capability}</span>)}
         </div>
@@ -35,7 +37,7 @@ export function ModulesPage({revision}: {revision: number}) {
               </div>
               <Status value={module.status} />
             </div>
-            <p>{module.manifest.description || "No description."}</p>
+            <p>{module.manifest.description || t("noDescription")}</p>
             <div className="tag-list">
               {(module.manifest.capabilities?.provides || []).map((capability) => (
                 <span className="tag" key={capability}>{capability}</span>
@@ -44,7 +46,7 @@ export function ModulesPage({revision}: {revision: number}) {
           </article>
         ))}
         {value.modules.length === 0 && (
-          <EmptyState>No modules are registered yet. This is expected before the Module Store phase.</EmptyState>
+          <EmptyState>{t("noModules")}</EmptyState>
         )}
       </div>
     </div>

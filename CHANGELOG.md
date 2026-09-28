@@ -18,3 +18,5 @@
 - Added Module SDK v1 with strict manifests, dependency/conflict planning, lifecycle contracts, capability discovery and persistent read-only module registry APIs.
 - Added Phase 8A Web UI foundation with first-run/login flows, Dashboard/System/Modules/Jobs/Audit pages, realtime refresh and same-origin static serving from Core.
 - Added Debian 13 installation packages for amd64/arm64, packaged-artifact smoke tests and physical-server installation tooling.
+
+- Added Russian Web UI localization with RU/EN switching, browser-language detection and saved preference.

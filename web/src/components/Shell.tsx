@@ -1,13 +1,14 @@
 import type { ReactNode } from "react";
 import type { RealtimeStatus } from "../api/client";
 import type { Actor } from "../api/types";
+import { LanguageSwitch, useI18n } from "../i18n";
 
 const nav = [
-  ["/", "Dashboard"],
-  ["/system", "System"],
-  ["/modules", "Modules"],
-  ["/jobs", "Jobs"],
-  ["/audit", "Audit"],
+  ["/", "dashboard"],
+  ["/system", "system"],
+  ["/modules", "modules"],
+  ["/jobs", "jobs"],
+  ["/audit", "audit"],
 ] as const;
 
 export function Shell(props: {
@@ -18,6 +19,7 @@ export function Shell(props: {
   onLogout: () => void;
   children: ReactNode;
 }) {
+  const {t, status} = useI18n();
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -25,7 +27,7 @@ export function Shell(props: {
           <div className="brand-mark">H</div>
           <div>
             <strong>Home-AI-Core</strong>
-            <span>Control Plane</span>
+            <span>{t("controlPlane")}</span>
           </div>
         </div>
 
@@ -36,22 +38,23 @@ export function Shell(props: {
               className={props.path === href ? "nav-item active" : "nav-item"}
               onClick={() => props.onNavigate(href)}
             >
-              {label}
+              {t(label)}
             </button>
           ))}
         </nav>
 
         <div className="sidebar-footer">
+          <LanguageSwitch />
           <div className="connection-state">
             <span className={`status-dot ${props.realtime}`} />
-            Realtime: {props.realtime}
+            {t("realtime")}: {status(props.realtime)}
           </div>
           <div className="user-summary">
-            <strong>{props.actor.display_name || props.actor.username || "User"}</strong>
+            <strong>{props.actor.display_name || props.actor.username || t("user")}</strong>
             <span>{props.actor.roles.join(", ") || props.actor.type}</span>
           </div>
           <button className="button secondary full" onClick={props.onLogout}>
-            Sign out
+            {t("signOut")}
           </button>
         </div>
       </aside>

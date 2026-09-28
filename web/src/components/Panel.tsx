@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useI18n } from "../i18n";
 
 export function Panel(props: {
   title: string;
@@ -22,9 +23,11 @@ export function EmptyState({children}: {children: ReactNode}) {
 }
 
 export function ErrorState({message}: {message?: string}) {
-  return <div className="error-state">{message || "Unable to load data."}</div>;
+  const {t} = useI18n();
+  return <div className="error-state">{message || t("loadError")}</div>;
 }
 
 export function LoadingState() {
-  return <div className="loading-state">Loading…</div>;
+  const {t} = useI18n();
+  return <div className="loading-state">{t("loading")}</div>;
 }

@@ -134,3 +134,9 @@ tbody tr:last-child td { border-bottom: 0; }
   .metric-grid, .two-column, .card-grid { grid-template-columns: 1fr; }
   .wide { grid-column: auto; }
 }
+
+.language-switch { display: inline-flex; width: fit-content; padding: 3px; gap: 2px; border: 1px solid #303946; border-radius: 9px; background: #11161d; }
+.language-switch button { border: 0; border-radius: 6px; padding: 5px 9px; background: transparent; color: #8d9aad; font-size: 11px; font-weight: 700; }
+.language-switch button:hover { color: #fff; background: #1d242e; }
+.language-switch button.active { color: #fff; background: #2b3d62; }
+.auth-toolbar { display: flex; justify-content: flex-end; margin-bottom: 12px; }

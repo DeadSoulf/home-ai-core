@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { api } from "../api/client";
 import { useResource } from "../hooks/useResource";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
+import { useI18n } from "../i18n";
 
 function formatBytes(value = 0): string {
   const units = ["B", "KiB", "MiB", "GiB", "TiB"];
@@ -15,6 +16,7 @@ function formatBytes(value = 0): string {
 }
 
 export function Dashboard({revision}: {revision: number}) {
+  const {t} = useI18n();
   const load = useCallback(async () => {
     const [system, modules, jobs] = await Promise.all([
       api.system(),
@@ -35,20 +37,20 @@ export function Dashboard({revision}: {revision: number}) {
 
   return (
     <div className="page">
-      <PageHeading title="Dashboard" subtitle="Current state of this Home-AI-Core node." />
+      <PageHeading title={t("dashboard")} subtitle={t("dashboardSubtitle")} />
       <div className="metric-grid">
-        <Metric label="Node" value={data.system.system.hostname} detail={data.system.system.architecture} />
-        <Metric label="CPU" value={String(data.system.system.cpu.logical_cpus)} detail={data.system.system.cpu.model || "logical CPUs"} />
-        <Metric label="Memory" value={formatBytes(data.system.system.memory.total_bytes)} detail={`${formatBytes(data.system.system.memory.available_bytes)} available`} />
-        <Metric label="Modules" value={String(data.modules.length)} detail="registered" />
-        <Metric label="Jobs" value={String(runningJobs)} detail="active" />
-        <Metric label="Core" value={data.system.version} detail={`schema ${data.system.schema_version}`} />
+        <Metric label={t("node")} value={data.system.system.hostname} detail={data.system.system.architecture} />
+        <Metric label={t("cpu")} value={String(data.system.system.cpu.logical_cpus)} detail={data.system.system.cpu.model || t("logicalCpus")} />
+        <Metric label={t("memory")} value={formatBytes(data.system.system.memory.total_bytes)} detail={`${formatBytes(data.system.system.memory.available_bytes)} ${t("available")}`} />
+        <Metric label={t("modules")} value={String(data.modules.length)} detail={t("registered")} />
+        <Metric label={t("jobs")} value={String(runningJobs)} detail={t("active")} />
+        <Metric label={t("core")} value={data.system.version} detail={`${t("schema")} ${data.system.schema_version}`} />
       </div>
 
       <div className="two-column">
-        <Panel title="Storage overview">
+        <Panel title={t("storageOverview")}>
           <div className="list">
-            {data.system.system.block_devices.length === 0 && <span className="muted">No block devices reported.</span>}
+            {data.system.system.block_devices.length === 0 && <span className="muted">{t("noBlockDevices")}</span>}
             {data.system.system.block_devices.slice(0, 6).map((disk) => (
               <div className="list-row" key={disk.name}>
                 <div>
@@ -61,9 +63,9 @@ export function Dashboard({revision}: {revision: number}) {
           </div>
         </Panel>
 
-        <Panel title="Recent jobs">
+        <Panel title={t("recentJobs")}>
           <div className="list">
-            {data.jobs.length === 0 && <span className="muted">No jobs yet.</span>}
+            {data.jobs.length === 0 && <span className="muted">{t("noJobs")}</span>}
             {data.jobs.slice(0, 6).map((job) => (
               <div className="list-row" key={job.id}>
                 <div>
@@ -102,5 +104,6 @@ export function Metric({label, value, detail}: {label: string; value: string; de
 }
 
 export function Status({value}: {value: string}) {
-  return <span className={`status-badge status-${value.replaceAll("_", "-")}`}>{value}</span>;
+  const {status} = useI18n();
+  return <span className={`status-badge status-${value.replaceAll("_", "-")}`}>{status(value)}</span>;
 }
