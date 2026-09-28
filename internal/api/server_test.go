@@ -8,7 +8,12 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/coder/websocket"
+	"github.com/coder/websocket/wsjson"
 
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 )
@@ -180,5 +185,71 @@ func TestNotFoundUsesErrorEnvelope(t *testing.T) {
 	}
 	if body.Error.Code != "not_found" {
 		t.Fatalf("error code = %q", body.Error.Code)
+	}
+}
+
+
+func TestMethodNotAllowedUsesErrorEnvelope(t *testing.T) {
+	handler := testHandler(fakeState{schemaVersion: 1})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/system", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if rec.Header().Get("Allow") != http.MethodGet {
+		t.Fatalf("Allow = %q", rec.Header().Get("Allow"))
+	}
+
+	var body errorEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if body.Error.Code != "method_not_allowed" {
+		t.Fatalf("error code = %q", body.Error.Code)
+	}
+}
+
+func TestEventsRouteUpgradesToWebSocket(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	const nodeID = "00000000-0000-4000-8000-000000000000"
+	handler := New(
+		nodeID,
+		logger,
+		fakeState{schemaVersion: 1},
+		realtime.New(nodeID, logger, realtime.WithHeartbeat(time.Hour)),
+	)
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/api/v1/events"
+	conn, response, err := websocket.Dial(ctx, wsURL, nil)
+	if err != nil {
+		t.Fatalf("websocket dial: %v", err)
+	}
+	defer conn.Close(websocket.StatusNormalClosure, "test complete")
+
+	if response == nil || response.Header.Get("X-Request-ID") == "" {
+		t.Fatal("websocket upgrade missing X-Request-ID")
+	}
+
+	var connected realtime.Envelope
+	if err := wsjson.Read(ctx, conn, &connected); err != nil {
+		t.Fatalf("read connected event: %v", err)
+	}
+	if connected.Type != "core.connected" {
+		t.Fatalf("event type = %q", connected.Type)
+	}
+	if connected.Source.NodeID != nodeID {
+		t.Fatalf("node ID = %q", connected.Source.NodeID)
+	}
+	if connected.RequestID != response.Header.Get("X-Request-ID") {
+		t.Fatalf("event request ID = %q, header = %q", connected.RequestID, response.Header.Get("X-Request-ID"))
 	}
 }
