@@ -36,6 +36,9 @@
 - [x] API routes cannot be shadowed by SPA routing
 - [x] missing Web bundle preserves API-only behaviour
 - [x] Debian runtime defines the Web UI install directory
+- [x] UI responses set a restrictive Content-Security-Policy
+- [x] UI responses deny framing and referrer leakage
+- [x] static assets use MIME sniffing protection
 
 ## Validation
 
@@ -43,6 +46,8 @@
 - [x] API client unit tests
 - [x] Go Web UI handler tests
 - [x] production Vite build
+- [x] committed npm dependency lock
+- [x] CI installs Web dependencies with `npm ci`
 - [x] existing Go unit/vet/smoke/cross-build checks remain required
 
 ## Deferred to Phase 8.5 / later
