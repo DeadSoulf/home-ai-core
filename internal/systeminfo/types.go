@@ -26,14 +26,24 @@ type MemoryInfo struct {
 }
 
 type BlockDevice struct {
-	Name       string `json:"name"`
-	Path       string `json:"path"`
-	MajorMinor string `json:"major_minor,omitempty"`
-	Model      string `json:"model,omitempty"`
-	Serial     string `json:"serial,omitempty"`
-	SizeBytes  uint64 `json:"size_bytes,omitempty"`
-	Rotational bool   `json:"rotational"`
-	Removable  bool   `json:"removable"`
+	Name       string      `json:"name"`
+	Path       string      `json:"path"`
+	MajorMinor string      `json:"major_minor,omitempty"`
+	Vendor     string      `json:"vendor,omitempty"`
+	Model      string      `json:"model,omitempty"`
+	Serial     string      `json:"serial,omitempty"`
+	SizeBytes  uint64      `json:"size_bytes,omitempty"`
+	Rotational bool        `json:"rotational"`
+	Removable  bool        `json:"removable"`
+	Partitions []Partition `json:"partitions"`
+}
+
+type Partition struct {
+	Name        string   `json:"name"`
+	Path        string   `json:"path"`
+	SizeBytes   uint64   `json:"size_bytes,omitempty"`
+	Filesystem  string   `json:"filesystem,omitempty"`
+	Mountpoints []string `json:"mountpoints"`
 }
 
 type NetworkInterface struct {
