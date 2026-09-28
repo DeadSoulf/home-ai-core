@@ -11,7 +11,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   test:
@@ -208,8 +208,10 @@ jobs:
           test "$(dpkg-deb -f "$ARM64_PACKAGE" Architecture)" = "arm64"
 
           dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './usr/bin/home-ai-core'
+          dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './usr/libexec/home-ai-core/home-ai-core-update-helper'
           dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './usr/share/home-ai-core/web/index.html'
           dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './lib/systemd/system/home-ai-core.service'
+          dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './lib/systemd/system/home-ai-core-update-helper.service'
           dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './usr/lib/sysusers.d/home-ai-core.conf'
           dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './etc/home-ai-core/home-ai-core.env'
 
@@ -251,11 +253,71 @@ jobs:
           package_cleanup
           trap - EXIT INT TERM
 
+          python3 - <<'PY'
+          import glob
+          import hashlib
+          import json
+          import os
+
+          version = open("VERSION", encoding="utf-8").read().strip()
+          debian_version = version.replace("-", "~")
+          packages = {}
+          for arch in ("amd64", "arm64"):
+              matches = glob.glob(f"build/packages/home-ai-core_*_{arch}.deb")
+              if len(matches) != 1:
+                  raise SystemExit(f"expected exactly one {arch} package, got {matches}")
+              path = matches[0]
+              h = hashlib.sha256()
+              with open(path, "rb") as package:
+                  for chunk in iter(lambda: package.read(1024 * 1024), b""):
+                      h.update(chunk)
+              packages[arch] = {
+                  "file": os.path.basename(path),
+                  "sha256": h.hexdigest(),
+                  "size_bytes": os.path.getsize(path),
+                  "debian_version": debian_version,
+              }
+
+          manifest = {
+              "schema_version": 1,
+              "version": version,
+              "packages": packages,
+          }
+          with open("build/packages/home-ai-core-update.json", "w", encoding="utf-8") as out:
+              json.dump(manifest, out, indent=2, sort_keys=True)
+              out.write("\n")
+          PY
+
 
       - name: Upload Debian packages
         uses: actions/upload-artifact@v4
         with:
           name: home-ai-core-deb-${{ github.sha }}
-          path: build/packages/*.deb
+          path: |
+            build/packages/*.deb
+            build/packages/home-ai-core-update.json
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish development release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          VERSION="$(tr -d '\r\n' < VERSION)"
+          TAG="v$VERSION"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              build/packages/*.deb \
+              build/packages/home-ai-core-update.json \
+              --clobber
+          else
+            gh release create "$TAG" \
+              build/packages/*.deb \
+              build/packages/home-ai-core-update.json \
+              --target "$GITHUB_SHA" \
+              --title "Home-AI-Core $VERSION" \
+              --notes "Automated Home-AI-Core development build $VERSION. Install from Web UI on nodes that already include the Core update helper." \
+              --prerelease
+          fi
