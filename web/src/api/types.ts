@@ -42,11 +42,19 @@ export type SystemResponse = {
       name: string;
       path: string;
       major_minor?: string;
+      vendor?: string;
       model?: string;
       serial?: string;
       size_bytes?: number;
       rotational: boolean;
       removable: boolean;
+      partitions: Array<{
+        name: string;
+        path: string;
+        size_bytes?: number;
+        filesystem?: string;
+        mountpoints: string[];
+      }>;
     }>;
     network_interfaces: Array<{
       name: string;
