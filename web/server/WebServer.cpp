@@ -1579,7 +1579,11 @@ void WebServer::handleClient(
         &&
         path == "/api/cluster/heartbeat"
     ) {
-        if (!cluster_) {
+        if (
+            !modules_.isInstalled("cluster")
+            ||
+            !cluster_
+        ) {
             sendResponse(
                 client_fd,
                 "503 Service Unavailable",
@@ -3204,7 +3208,11 @@ void WebServer::handleClient(
             return;
         }
 
-        if (!cluster_) {
+        if (
+            !modules_.isInstalled("cluster")
+            ||
+            !cluster_
+        ) {
             sendResponse(
                 client_fd,
                 "503 Service Unavailable",
@@ -8317,6 +8325,20 @@ void WebServer::handleClient(
         &&
         isWebUiPath(path)
     ) {
+        if (
+            path == "/cluster"
+            &&
+            !modules_.isInstalled(
+                "cluster"
+            )
+        ) {
+            sendRedirect(
+                client_fd,
+                "/modules"
+            );
+            return;
+        }
+
         auto& config =
             runtime_.config();
 
