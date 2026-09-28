@@ -7,6 +7,7 @@ import type {
   RegisteredModule,
   SetupStatus,
   SystemResponse,
+  UpdateStatus,
 } from "./types";
 
 type APIErrorBody = {
@@ -140,6 +141,10 @@ export const api = {
 
   system: () => request<SystemResponse>("/api/v1/system"),
 
+  updateStatus: async () => {
+    const result = await request<{update: UpdateStatus}>("/api/v1/update");
+    return result.update;
+  },
 
   modules: async () => {
     const result = await request<{modules: RegisteredModule[]}>("/api/v1/modules");
