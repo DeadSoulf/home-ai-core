@@ -279,3 +279,48 @@ Home AI Core
 ```
 
 The extraction sequence keeps the current working implementation operational while one subsystem at a time moves from `bundled=true` to a separately installable package. Large modules should ultimately run outside the Core process so a module crash cannot terminate the Core Web/Security control plane.
+
+
+## 0.0.62 Module Installer
+
+Version 0.0.62 adds the first safe install/uninstall path for trusted project modules.
+
+The installer intentionally has no arbitrary package URL, command, script, or shell execution surface.
+It only changes a local installation-state registry:
+
+```text
+runtime/modules/installed.tsv
+```
+
+The registry is written atomically with owner-only permissions. Unknown/stale entries are ignored,
+while malformed state values fail closed.
+
+Installer rules:
+
+- Core components cannot be removed.
+- Only manifests explicitly marked `installable=true` can change installation state.
+- Installation is refused when a declared dependency is not installed.
+- Uninstallation is refused while another installed module depends on the target.
+- Runtime-backed modules report a restart-required transition.
+- The authenticated mutation API remains behind the normal `system.manage`, request-header and
+  session-bound CSRF guards.
+
+API:
+
+```text
+POST /api/module-catalog/install
+POST /api/module-catalog/uninstall
+```
+
+Both accept URL-encoded `id=<module-id>`.
+
+### First migration module: Cluster Core
+
+Cluster Core is the first bundled subsystem controlled by Module Installer. It remains installed by
+default for upgrade compatibility, but an administrator can remove it from the Modules page. After
+restart, its lifecycle module is not registered and Cluster Web access redirects back to the module
+catalog. It can then be installed again from the same catalog and restored on the next restart.
+
+This milestone deliberately keeps the Cluster implementation compiled into the Core binary. The next
+extraction stage can move its implementation into a separately delivered module package without
+changing the catalog/install-state contract introduced here.
