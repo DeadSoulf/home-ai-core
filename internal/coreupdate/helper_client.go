@@ -7,24 +7,11 @@ import (
 	"fmt"
 	"net"
 	"time"
+
+	"github.com/DeadSoulf/home-ai-core/internal/updatehelper"
 )
 
-type helperRequest struct {
-	Operation     string `json:"operation"`
-	PackagePath   string `json:"package_path"`
-	SHA256        string `json:"sha256"`
-	Version       string `json:"version"`
-	DebianVersion string `json:"debian_version"`
-	Architecture  string `json:"architecture"`
-}
-
-type helperResponse struct {
-	OK      bool   `json:"ok"`
-	Message string `json:"message,omitempty"`
-	Error   string `json:"error,omitempty"`
-}
-
-func callHelper(ctx context.Context, socketPath string, request helperRequest) error {
+func callHelper(ctx context.Context, socketPath string, request updatehelper.Request) error {
 	dialer := net.Dialer{Timeout: 5 * time.Second}
 	conn, err := dialer.DialContext(ctx, "unix", socketPath)
 	if err != nil {
@@ -37,10 +24,8 @@ func callHelper(ctx context.Context, socketPath string, request helperRequest) e
 		return fmt.Errorf("send update helper request: %w", err)
 	}
 
-	var response helperResponse
+	var response updatehelper.Response
 	if err := json.NewDecoder(conn).Decode(&response); err != nil {
-		// During a successful self-update the package postinst restarts Core.
-		// The current process normally terminates before this path is observed.
 		if errors.Is(err, net.ErrClosed) {
 			return err
 		}
