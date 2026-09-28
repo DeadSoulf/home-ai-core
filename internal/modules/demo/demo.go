@@ -44,9 +44,15 @@ func (m *Module) Lifecycle() modules.Lifecycle { return lifecycle{} }
 
 type lifecycle struct{}
 
-func (lifecycle) Install(context.Context, modules.OperationContext, modules.Progress) error { return nil }
-func (lifecycle) Upgrade(context.Context, modules.OperationContext, modules.Progress) error { return nil }
-func (lifecycle) Remove(context.Context, modules.OperationContext, modules.Progress) error  { return nil }
+func (lifecycle) Install(context.Context, modules.OperationContext, modules.Progress) error {
+	return nil
+}
+func (lifecycle) Upgrade(context.Context, modules.OperationContext, modules.Progress) error {
+	return nil
+}
+func (lifecycle) Remove(context.Context, modules.OperationContext, modules.Progress) error {
+	return nil
+}
 func (lifecycle) Backup(context.Context, modules.OperationContext, modules.Progress, io.Writer) error {
 	return nil
 }
