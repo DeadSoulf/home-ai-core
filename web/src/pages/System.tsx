@@ -4,7 +4,6 @@ import { useResource } from "../hooks/useResource";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
 import { useI18n } from "../i18n";
 import { PageHeading } from "./Dashboard";
-import { UpdatesPage } from "./Updates";
 
 function bytes(value = 0) {
   return new Intl.NumberFormat(undefined, {maximumFractionDigits: 1}).format(value / 1024 ** 3) + " GiB";
@@ -123,7 +122,6 @@ export function SystemPage({revision}: {revision: number}) {
         </Panel>
       </div>
 
-      <UpdatesPage revision={revision} />
     </div>
   );
 }
