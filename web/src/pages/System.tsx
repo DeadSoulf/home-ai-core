@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "../api/client";
+import { APIError, api } from "../api/client";
 import type { UpdateStatus, UpdaterState } from "../api/types";
 import { useResource } from "../hooks/useResource";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
@@ -25,6 +25,7 @@ export function SystemPage({revision}: {revision: number}) {
   const [updateInfo, setUpdateInfo] = useState<UpdateStatus>();
   const [updaterState, setUpdaterState] = useState<UpdaterState>();
   const [downloadingUpdate, setDownloadingUpdate] = useState(false);
+  const [installingUpdate, setInstallingUpdate] = useState(false);
   const [updateError, setUpdateError] = useState("");
   const [lastChecked, setLastChecked] = useState<string>();
   const {data, loading, error} = useResource(load, revision + metricsTick);
@@ -32,6 +33,10 @@ export function SystemPage({revision}: {revision: number}) {
   useEffect(() => {
     const timer = window.setInterval(() => setMetricsTick((value) => value + 1), 2000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    api.updaterState().then(setUpdaterState).catch(() => undefined);
   }, []);
 
   async function checkUpdate() {
@@ -91,6 +96,48 @@ export function SystemPage({revision}: {revision: number}) {
     } finally {
       setDownloadingUpdate(false);
     }
+  }
+
+  async function installUpdate() {
+    const version = updaterState?.available_version || updateInfo?.available_version;
+    if (!version) return;
+
+    setInstallingUpdate(true);
+    setUpdateError("");
+    try {
+      const state = await api.installUpdate(version);
+      setUpdaterState(state);
+    } catch (reason) {
+      if (reason instanceof APIError) {
+        setUpdateError(reason.message);
+        setInstallingUpdate(false);
+        return;
+      }
+      // Core may stop immediately after the privileged helper accepts the update.
+    }
+    waitForUpdatedVersion(version);
+  }
+
+  function waitForUpdatedVersion(version: string) {
+    const deadline = Date.now() + 3 * 60 * 1000;
+    const poll = async () => {
+      try {
+        const system = await api.system();
+        if (system.version === version) {
+          window.location.reload();
+          return;
+        }
+      } catch {
+        // Core is expected to be briefly unavailable during replacement.
+      }
+      if (Date.now() < deadline) {
+        window.setTimeout(poll, 1500);
+      } else {
+        setInstallingUpdate(false);
+        setUpdateError(t("requestFailed"));
+      }
+    };
+    window.setTimeout(poll, 1000);
   }
 
   if (loading && !data) return <LoadingState />;
@@ -167,7 +214,18 @@ export function SystemPage({revision}: {revision: number}) {
             </button>
           )}
           {updaterState?.phase === "ready" && (
-            <div className="update-callout current"><strong>{t("updateReady")}</strong></div>
+            <>
+              <div className="update-callout current"><strong>{t("updateReady")}</strong></div>
+              <button
+                type="button"
+                className="button primary"
+                disabled={installingUpdate}
+                onClick={installUpdate}
+              >
+                {installingUpdate ? t("installing") : t("installUpdate")}
+              </button>
+              <div className="notice">{t("updateRestartNotice")}</div>
+            </>
           )}
           {updateError && <div className="form-error">{updateError}</div>}
           {lastChecked && <div className="notice">{t("lastChecked")}: {date(lastChecked)}</div>}
