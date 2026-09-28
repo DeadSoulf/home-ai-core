@@ -51,7 +51,7 @@ export function JobsPage({revision}: {revision: number}) {
             <tbody>
               {(data || []).map((job) => (
                 <tr key={job.id}>
-                  <td><strong>{job.type}</strong><div className="muted small">{job.progress_message}</div></td>
+                  <td><strong>{job.type}</strong><div className="muted small">{job.message}</div></td>
                   <td><Status value={job.status} /></td>
                   <td>
                     <div className="progress"><span style={{width: `${Math.min(100, job.progress / 100)}%`}} /></div>
