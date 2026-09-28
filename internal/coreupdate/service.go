@@ -18,7 +18,7 @@ import (
 
 	"github.com/DeadSoulf/home-ai-core/internal/jobs"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
-	"github.com/DeadSoulf/home-ai-core/internal/state"
+	"github.com/DeadSoulf/home-ai-core/internal/state"\n\t"github.com/DeadSoulf/home-ai-core/internal/updatehelper"
 )
 
 const (
@@ -329,7 +329,7 @@ func (s *Service) installHandler(ctx context.Context, job state.JobRecord, repor
 	if err := reporter.Progress(ctx, 7500, "installing update package"); err != nil {
 		return nil, err
 	}
-	err = callHelper(ctx, s.helperSocket, helperRequest{
+	err = callHelper(ctx, s.helperSocket, updatehelper.Request{
 		Operation:     "install-core-update",
 		PackagePath:   targetPath,
 		SHA256:        expectedHash,
