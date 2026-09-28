@@ -26,6 +26,7 @@ type SecurityService interface {
 	Authenticate(context.Context, string) (security.Actor, error)
 	Logout(context.Context, security.Actor, security.RequestContext) error
 	ListAudit(context.Context, int) ([]security.AuditEntry, error)
+	RecordAudit(context.Context, security.RequestContext, security.Actor, string, string, string, string, map[string]any)
 }
 
 func (s *server) setupStatus(w http.ResponseWriter, r *http.Request) {
