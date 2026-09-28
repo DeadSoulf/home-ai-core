@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 
-BASE_URL=\${HOME_AI_BASE_URL:-http://127.0.0.1:8080}
-SERVICE=\${HOME_AI_SERVICE:-home-ai-core.service}
+BASE_URL=${HOME_AI_BASE_URL:-http://127.0.0.1:8080}
+SERVICE=${HOME_AI_SERVICE:-home-ai-core.service}
 
 echo "== Home-AI-Core server smoke test =="
 
