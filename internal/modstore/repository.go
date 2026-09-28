@@ -59,8 +59,9 @@ func VerifyIndex(raw []byte, signature Signature, trust TrustStore) (RepositoryI
 	if err := decoder.Decode(&index); err != nil {
 		return RepositoryIndex{}, fmt.Errorf("decode repository index: %w", err)
 	}
-	if decoder.More() {
-		return RepositoryIndex{}, errors.New("repository index contains trailing JSON values")
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		return RepositoryIndex{}, errors.New("repository index must contain exactly one JSON value")
 	}
 	if err := ValidateIndex(index); err != nil {
 		return RepositoryIndex{}, err
