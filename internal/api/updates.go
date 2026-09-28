@@ -2,8 +2,10 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/DeadSoulf/home-ai-core/internal/coreupdate"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
@@ -12,7 +14,7 @@ import (
 
 type UpdateService interface {
 	Check(context.Context) (coreupdate.Status, error)
-	Install(context.Context, security.Actor, security.RequestContext) (state.JobRecord, error)
+	Install(context.Context, string, security.Actor, security.RequestContext) (state.JobRecord, error)
 }
 
 func (s *server) updatesCollection(
@@ -56,8 +58,18 @@ func (s *server) updateInstall(
 		return
 	}
 
+	var input struct {
+		Version string `json:"version"`
+	}
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil || strings.TrimSpace(input.Version) == "" {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_update_request", "update version is required", nil)
+		return
+	}
+
 	meta := s.securityRequestContext(r)
-	job, err := s.updates.Install(r.Context(), actor, meta)
+	job, err := s.updates.Install(r.Context(), strings.TrimSpace(input.Version), actor, meta)
 	switch {
 	case errors.Is(err, coreupdate.ErrNoUpdate):
 		writeAPIError(w, r, http.StatusConflict, "no_update_available", "no update is available", nil)
