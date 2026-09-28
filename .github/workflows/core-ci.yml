@@ -26,12 +26,17 @@ jobs:
           go-version: '1.27.x'
           check-latest: false
 
-      - name: Dependency lock check
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+
+      - name: Go dependency lock check
         run: |
           go mod tidy
           git diff --exit-code -- go.mod go.sum
 
-      - name: Format check
+      - name: Go format check
         run: |
           UNFORMATTED="$(gofmt -l ./cmd ./internal)"
           if [ -n "$UNFORMATTED" ]; then
@@ -47,13 +52,29 @@ jobs:
             python3 -m json.tool "$file" >/dev/null
           done
 
-      - name: Test
+      - name: Install Web dependencies
+        working-directory: web
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Web typecheck
+        working-directory: web
+        run: npm run typecheck
+
+      - name: Web tests
+        working-directory: web
+        run: npm test
+
+      - name: Web production build
+        working-directory: web
+        run: npm run build
+
+      - name: Go tests
         run: go test ./...
 
-      - name: Vet
+      - name: Go vet
         run: go vet ./...
 
-      - name: Build
+      - name: Core build
         run: ./scripts/build.sh
 
       - name: Integration smoke test
@@ -62,7 +83,7 @@ jobs:
           STATE_DIR="$(mktemp -d)"
           LOG_FILE="$(mktemp)"
           COOKIE_JAR="$(mktemp)"
-          ./build/home-ai-core --state-dir "$STATE_DIR" --listen 127.0.0.1:18080 >"$LOG_FILE" 2>&1 &
+          ./build/home-ai-core             --state-dir "$STATE_DIR"             --web-dir "$GITHUB_WORKSPACE/web/dist"             --listen 127.0.0.1:18080             >"$LOG_FILE" 2>&1 &
           PID=$!
           cleanup() {
             kill "$PID" 2>/dev/null || true
@@ -85,6 +106,11 @@ jobs:
             exit 1
           fi
 
+          curl --fail --silent http://127.0.0.1:18080/ >/tmp/home-ai-index.html
+          curl --fail --silent http://127.0.0.1:18080/system >/tmp/home-ai-system-page.html
+          grep -q "Home-AI-Core" /tmp/home-ai-index.html
+          grep -q "Home-AI-Core" /tmp/home-ai-system-page.html
+
           curl --fail --silent             http://127.0.0.1:18080/api/v1/security/setup-status             >/tmp/home-ai-setup.json
 
           test -f "$STATE_DIR/bootstrap-token"
@@ -100,6 +126,8 @@ jobs:
           curl --fail --silent             --cookie "$COOKIE_JAR"             http://127.0.0.1:18080/api/v1/system             >/tmp/home-ai-system.json
 
           curl --fail --silent             --cookie "$COOKIE_JAR"             http://127.0.0.1:18080/api/v1/auth/me             >/tmp/home-ai-me.json
+
+          curl --fail --silent             --cookie "$COOKIE_JAR"             http://127.0.0.1:18080/api/v1/modules             >/tmp/home-ai-modules.json
 
           curl --fail --silent             --cookie "$COOKIE_JAR"             http://127.0.0.1:18080/api/v1/audit             >/tmp/home-ai-audit.json
 
@@ -128,7 +156,7 @@ jobs:
 
           with open("/tmp/home-ai-system.json", "r", encoding="utf-8") as f:
               system = json.load(f)
-          assert system["schema_version"] >= 2
+          assert system["schema_version"] >= 4
           assert system["system"]["node_id"]
           assert system["system"]["cpu"]["logical_cpus"] >= 1
 
@@ -136,6 +164,10 @@ jobs:
               me = json.load(f)
           assert me["actor"]["username"] == "owner"
           assert "system.read" in me["actor"]["permissions"]
+
+          with open("/tmp/home-ai-modules.json", "r", encoding="utf-8") as f:
+              modules = json.load(f)
+          assert "modules" in modules
 
           with open("/tmp/home-ai-audit.json", "r", encoding="utf-8") as f:
               audit = json.load(f)

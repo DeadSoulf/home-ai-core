@@ -11,23 +11,27 @@ import (
 const (
 	defaultListen   = "127.0.0.1:8080"
 	defaultStateDir = "/var/lib/home-ai-core"
+	defaultWebDir   = "/usr/share/home-ai-core/web"
 )
 
 type Config struct {
 	ListenAddress string
 	StateDir      string
+	WebDir        string
 }
 
 func Load(args []string) (Config, error) {
 	cfg := Config{
 		ListenAddress: envOrDefault("HOME_AI_LISTEN", defaultListen),
 		StateDir:      envOrDefault("HOME_AI_STATE_DIR", defaultStateDir),
+		WebDir:        envOrDefault("HOME_AI_WEB_DIR", defaultWebDir),
 	}
 
 	fs := flag.NewFlagSet("home-ai-core", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	fs.StringVar(&cfg.ListenAddress, "listen", cfg.ListenAddress, "HTTP listen address")
 	fs.StringVar(&cfg.StateDir, "state-dir", cfg.StateDir, "persistent state directory")
+	fs.StringVar(&cfg.WebDir, "web-dir", cfg.WebDir, "built Web UI directory")
 
 	if err := fs.Parse(args); err != nil {
 		return Config{}, err
@@ -40,6 +44,9 @@ func Load(args []string) (Config, error) {
 	}
 	if strings.TrimSpace(cfg.StateDir) == "" {
 		return Config{}, fmt.Errorf("state directory must not be empty")
+	}
+	if strings.TrimSpace(cfg.WebDir) == "" {
+		return Config{}, fmt.Errorf("web directory must not be empty")
 	}
 
 	return cfg, nil

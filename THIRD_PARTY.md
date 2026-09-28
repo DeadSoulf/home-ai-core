@@ -4,6 +4,12 @@
 
 | Component | Upstream project | Version | License | Modified | Home-AI-Core location |
 |---|---|---:|---|---|---|
+| React UI runtime | react / react-dom | 19.3.0 | MIT | No | `web/` |
+| Vite build tool | vite | 8.3.1 | MIT | No | `web/` |
+| Vite React plugin | @vitejs/plugin-react | 6.1.1 | MIT | No | `web/` |
+| TypeScript compiler | typescript | 7.0.2 | Apache-2.0 | No | `web/` |
+| Web test runner | vitest | 5.0.2 | MIT | No | `web/` |
+| React type definitions | @types/react / @types/react-dom | 19.3.0 | MIT | No | `web/` |
 | WebSocket transport | github.com/coder/websocket | v1.8.15 | ISC | No | `internal/realtime` |
 | Password hashing | golang.org/x/crypto/argon2 | v0.57.0 | BSD-3-Clause | No | `internal/security` |
 | SQLite Go driver | modernc.org/sqlite | v1.59.0 | BSD-3-Clause | No | Go module dependency used by `internal/state` |

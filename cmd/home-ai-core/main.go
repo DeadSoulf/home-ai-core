@@ -19,6 +19,7 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
+	"github.com/DeadSoulf/home-ai-core/internal/webui"
 )
 
 func main() {
@@ -80,7 +81,7 @@ func main() {
 		}
 	}()
 
-	handler := api.New(
+	apiHandler := api.New(
 		nodeID,
 		logger,
 		store,
@@ -90,6 +91,7 @@ func main() {
 		moduleRegistry,
 		realtimeHub,
 	)
+	handler := webui.New(apiHandler, cfg.WebDir)
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddress,
@@ -108,6 +110,7 @@ func main() {
 		logger.Info("home-ai-core starting",
 			"listen", cfg.ListenAddress,
 			"state_dir", cfg.StateDir,
+			"web_dir", cfg.WebDir,
 			"node_id", nodeID,
 		)
 
