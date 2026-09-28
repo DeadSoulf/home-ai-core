@@ -3119,15 +3119,27 @@ button,
 <span class="section-hint">Project Module Catalog</span>
 </div>
 <p class="muted">
-Ядро хранит доверенный каталог проектных модулей, их зависимости и разрешения.
-В 0.0.61 каталог работает в режиме foundation: встроенные компоненты уже отмечаются как
-установленные, а отдельная установка станет доступна по мере выноса модулей из монолита.
+Module Installer работает только с доверенным проектным каталогом и локальным реестром.
+В 0.0.62 Cluster Core — первый модуль, для которого можно проверить цикл установки и удаления.
+Операция применяется после перезапуска Home AI Core.
 </p>
+<p id="module-catalog-message" class="muted" role="status" aria-live="polite"></p>
 <div id="module-catalog-list" class="placeholder-grid">
 <div class="placeholder-card">Загрузка каталога модулей...</div>
 </div>
 </div>
 )HTML";
+
+        if (
+            uiHasPermission(
+                context,
+                "system.manage"
+            )
+        ) {
+            page << R"HTML(
+<div id="module-management-enabled" hidden></div>
+)HTML";
+        }
     }
     else if (
         context.page == "/system"
@@ -13435,6 +13447,88 @@ async function updateHostReadiness() {
     }
 }
 
+async function moduleCatalogAction(
+    id,
+    action
+) {
+    const message =
+        document.getElementById(
+            "module-catalog-message"
+        );
+
+    if (
+        action === "uninstall"
+        &&
+        !window.confirm(
+            "Удалить модуль "
+            + id
+            + "? Изменение вступит в силу после перезапуска ядра."
+        )
+    ) {
+        return;
+    }
+
+    if (message) {
+        message.className = "muted";
+        message.textContent =
+            action === "install"
+            ? "Установка модуля..."
+            : "Удаление модуля...";
+    }
+
+    try {
+        const response =
+            await fetch(
+                "/api/module-catalog/"
+                + action,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type":
+                            "application/x-www-form-urlencoded"
+                    },
+                    body:
+                        new URLSearchParams(
+                            {id}
+                        ).toString()
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.message
+                || data.error
+                || "Операция не выполнена."
+            );
+        }
+
+        if (message) {
+            message.className = "status-ok";
+            message.textContent =
+                data.message
+                +
+                (
+                    data.restart_required
+                    ? " Требуется перезапуск Home AI Core."
+                    : ""
+                );
+        }
+
+        await updateModuleCatalog();
+    }
+    catch (error) {
+        if (message) {
+            message.className =
+                "status-error";
+            message.textContent =
+                error.message;
+        }
+    }
+}
+
 async function updateModuleCatalog() {
     const container =
         document.getElementById(
@@ -13473,6 +13567,13 @@ async function updateModuleCatalog() {
             )
             ? data.modules
             : [];
+
+        const canManage =
+            Boolean(
+                document.getElementById(
+                    "module-management-enabled"
+                )
+            );
 
         container.replaceChildren();
 
@@ -13515,7 +13616,11 @@ async function updateModuleCatalog() {
                 running: "RUNNING",
                 installed: "INSTALLED",
                 available: "AVAILABLE",
-                planned: "PLANNED"
+                planned: "PLANNED",
+                install_pending_restart:
+                    "INSTALL PENDING RESTART",
+                uninstall_pending_restart:
+                    "UNINSTALL PENDING RESTART"
             };
 
             status.className =
@@ -13527,6 +13632,12 @@ async function updateModuleCatalog() {
                 ? "status-ok"
                 : (
                     module.state === "installed"
+                    ||
+                    module.state ===
+                        "install_pending_restart"
+                    ||
+                    module.state ===
+                        "uninstall_pending_restart"
                     ? "status-warn"
                     : "muted"
                 );
@@ -13591,6 +13702,67 @@ async function updateModuleCatalog() {
                 note.textContent =
                     "Установка будет включена после выделения модуля в отдельный пакет.";
                 card.appendChild(note);
+            }
+
+            if (
+                canManage
+                &&
+                module.installable
+                &&
+                !module.core_component
+            ) {
+                const actions =
+                    document.createElement(
+                        "div"
+                    );
+                actions.className =
+                    "button-row";
+                actions.style.marginTop =
+                    "12px";
+
+                const button =
+                    document.createElement(
+                        "button"
+                    );
+                button.type = "button";
+                button.className =
+                    module.installed
+                    ? "danger"
+                    : "secondary";
+                button.textContent =
+                    module.installed
+                    ? "Удалить"
+                    : "Установить";
+
+                const pending =
+                    module.state ===
+                        "install_pending_restart"
+                    ||
+                    module.state ===
+                        "uninstall_pending_restart";
+
+                button.disabled = pending;
+
+                if (pending) {
+                    button.textContent =
+                        "Требуется перезапуск";
+                }
+                else {
+                    button.addEventListener(
+                        "click",
+                        function() {
+                            moduleCatalogAction(
+                                module.id,
+                                module.installed
+                                ? "uninstall"
+                                : "install"
+                            );
+                        }
+                    );
+                }
+
+                actions.appendChild(button);
+                card.appendChild(actions);
             }
 
             container.appendChild(card);
