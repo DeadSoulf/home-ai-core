@@ -9,12 +9,13 @@ import { Dashboard } from "./pages/Dashboard";
 import { JobsPage } from "./pages/Jobs";
 import { ModulesPage } from "./pages/Modules";
 import { SystemPage } from "./pages/System";
+import { UpdatesPage } from "./pages/Updates";
 
 type Phase = "loading" | "setup" | "login" | "app";
 
 function currentPath(): string {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
-  return ["/", "/system", "/modules", "/jobs", "/audit"].includes(path) ? path : "/";
+  return ["/", "/system", "/modules", "/updates", "/jobs", "/audit"].includes(path) ? path : "/";
 }
 
 export default function App() {
@@ -107,6 +108,9 @@ export default function App() {
       break;
     case "/modules":
       page = <ModulesPage revision={revision} />;
+      break;
+    case "/updates":
+      page = <UpdatesPage revision={revision} />;
       break;
     case "/jobs":
       page = <JobsPage revision={revision} />;
