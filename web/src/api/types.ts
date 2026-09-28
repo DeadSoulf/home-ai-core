@@ -98,7 +98,8 @@ export type Job = {
   type: string;
   status: string;
   progress: number;
-  progress_message?: string;
+  message?: string;
+  error_message?: string;
   actor_type?: string;
   actor_id?: string;
   request_id?: string;
