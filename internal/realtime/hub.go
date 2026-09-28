@@ -18,13 +18,13 @@ type Hub struct {
 }
 
 type client struct {
-	mu       sync.RWMutex
-	topics   map[string]struct{}
-	send     chan eventMessage
-	done     chan struct{}
+	mu        sync.RWMutex
+	topics    map[string]struct{}
+	send      chan eventMessage
+	done      chan struct{}
 	closeOnce sync.Once
-	streamID string
-	sequence uint64
+	streamID  string
+	sequence  uint64
 }
 
 type Option func(*Hub)
