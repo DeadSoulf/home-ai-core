@@ -26,6 +26,7 @@ type Envelope struct {
 	ID        string    `json:"id"`
 	StreamID  string    `json:"stream_id"`
 	Sequence  uint64    `json:"sequence"`
+	Cursor    int64     `json:"cursor,omitempty"`
 	Type      string    `json:"type"`
 	Time      time.Time `json:"time"`
 	Source    Source    `json:"source"`
@@ -33,8 +34,19 @@ type Envelope struct {
 	Data      any       `json:"data,omitempty"`
 }
 
+type PublishedEvent struct {
+	ID        string
+	Cursor    int64
+	Type      string
+	Time      time.Time
+	Source    Source
+	RequestID string
+	Data      any
+}
+
 type eventMessage struct {
 	ID        string
+	Cursor    int64
 	Type      string
 	Time      time.Time
 	Source    Source

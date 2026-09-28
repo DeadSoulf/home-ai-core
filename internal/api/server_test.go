@@ -110,12 +110,14 @@ func testHandlerWithSecurity(state fakeState, securityService SecurityService) h
 		logger,
 		state,
 		securityService,
+		nil,
+		nil,
 		realtime.New(nodeID, logger),
 	)
 }
 
 func TestHealth(t *testing.T) {
-	handler := testHandler(fakeState{schemaVersion: 2})
+	handler := testHandler(fakeState{schemaVersion: 3})
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
@@ -141,7 +143,7 @@ func TestHealth(t *testing.T) {
 }
 
 func TestCorrelationIDIsEchoed(t *testing.T) {
-	handler := testHandler(fakeState{schemaVersion: 2})
+	handler := testHandler(fakeState{schemaVersion: 3})
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	req.Header.Set("X-Correlation-ID", "mobile-upload-42")
@@ -154,7 +156,7 @@ func TestCorrelationIDIsEchoed(t *testing.T) {
 }
 
 func TestInvalidCorrelationIDFallsBackToRequestID(t *testing.T) {
-	handler := testHandler(fakeState{schemaVersion: 2})
+	handler := testHandler(fakeState{schemaVersion: 3})
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	req.Header.Set("X-Correlation-ID", "contains spaces")
@@ -181,7 +183,7 @@ func TestHealthFailsWhenStateIsUnavailable(t *testing.T) {
 func TestProtectedRouteRequiresAuthentication(t *testing.T) {
 	sec := defaultFakeSecurity()
 	sec.authErr = security.ErrUnauthorized
-	handler := testHandlerWithSecurity(fakeState{schemaVersion: 2}, sec)
+	handler := testHandlerWithSecurity(fakeState{schemaVersion: 3}, sec)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/system", nil)
 	rec := httptest.NewRecorder()
@@ -205,8 +207,10 @@ func TestSystem(t *testing.T) {
 	handler := New(
 		nodeID,
 		logger,
-		fakeState{schemaVersion: 2},
+		fakeState{schemaVersion: 3},
 		defaultFakeSecurity(),
+		nil,
+		nil,
 		realtime.New(nodeID, logger),
 	)
 
@@ -230,8 +234,8 @@ func TestSystem(t *testing.T) {
 	if body.System.NodeID != nodeID {
 		t.Fatalf("node_id = %q, want %q", body.System.NodeID, nodeID)
 	}
-	if body.SchemaVersion != 2 {
-		t.Fatalf("schema_version = %d, want 2", body.SchemaVersion)
+	if body.SchemaVersion != 3 {
+		t.Fatalf("schema_version = %d, want 3", body.SchemaVersion)
 	}
 }
 
@@ -283,7 +287,7 @@ func TestNotFoundUsesErrorEnvelope(t *testing.T) {
 }
 
 func TestMethodNotAllowedUsesErrorEnvelope(t *testing.T) {
-	handler := testHandler(fakeState{schemaVersion: 2})
+	handler := testHandler(fakeState{schemaVersion: 3})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/system", nil)
 	rec := httptest.NewRecorder()
@@ -326,8 +330,10 @@ func TestEventsRouteUpgradesToWebSocket(t *testing.T) {
 	handler := New(
 		nodeID,
 		logger,
-		fakeState{schemaVersion: 2},
+		fakeState{schemaVersion: 3},
 		defaultFakeSecurity(),
+		nil,
+		nil,
 		realtime.New(nodeID, logger, realtime.WithHeartbeat(time.Hour)),
 	)
 
@@ -361,7 +367,7 @@ func TestEventsRouteUpgradesToWebSocket(t *testing.T) {
 }
 
 func TestInvalidSessionModeIsRejectedBeforeLogin(t *testing.T) {
-	handler := testHandler(fakeState{schemaVersion: 2})
+	handler := testHandler(fakeState{schemaVersion: 3})
 
 	req := httptest.NewRequest(
 		http.MethodPost,
@@ -387,7 +393,7 @@ func TestInvalidSessionModeIsRejectedBeforeLogin(t *testing.T) {
 func TestAuthenticationBackendFailureIsUnavailable(t *testing.T) {
 	sec := defaultFakeSecurity()
 	sec.authErr = errors.New("database failed")
-	handler := testHandlerWithSecurity(fakeState{schemaVersion: 2}, sec)
+	handler := testHandlerWithSecurity(fakeState{schemaVersion: 3}, sec)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/system", nil)
 	rec := httptest.NewRecorder()

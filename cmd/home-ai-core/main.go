@@ -12,7 +12,9 @@ import (
 
 	"github.com/DeadSoulf/home-ai-core/internal/api"
 	"github.com/DeadSoulf/home-ai-core/internal/config"
+	"github.com/DeadSoulf/home-ai-core/internal/events"
 	"github.com/DeadSoulf/home-ai-core/internal/identity"
+	"github.com/DeadSoulf/home-ai-core/internal/jobs"
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
@@ -65,7 +67,18 @@ func main() {
 	}
 
 	realtimeHub := realtime.New(nodeID, logger)
-	handler := api.New(nodeID, logger, store, securityService, realtimeHub)
+	eventService := events.New(nodeID, store, realtimeHub)
+	jobService := jobs.New(nodeID, store, eventService, 2)
+
+	jobCtx, jobCancel := context.WithCancel(context.Background())
+	defer jobCancel()
+	go func() {
+		if err := jobService.Run(jobCtx); err != nil && !errors.Is(err, context.Canceled) {
+			logger.Error("job engine stopped", "error", err)
+		}
+	}()
+
+	handler := api.New(nodeID, logger, store, securityService, jobService, eventService, realtimeHub)
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddress,
