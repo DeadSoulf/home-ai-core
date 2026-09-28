@@ -20,11 +20,28 @@ type JobService interface {
 func (s *server) jobsCollection(
 	w http.ResponseWriter,
 	r *http.Request,
-	_ security.Actor,
-	_ authSource,
+	actor security.Actor,
+	source authSource,
 ) {
+	if r.Method == http.MethodDelete {
+		if !actor.Has("jobs.cancel") {
+			writeAPIError(w, r, http.StatusForbidden, "permission_denied", "permission denied", nil)
+			return
+		}
+		if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+			writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+			return
+		}
+		count, err := s.state.ClearTerminalJobs(r.Context())
+		if err != nil {
+			writeAPIError(w, r, http.StatusInternalServerError, "jobs_clear_failed", "failed to clear completed jobs", nil)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"deleted": count})
+		return
+	}
 	if r.Method != http.MethodGet {
-		methodNotAllowed(w, r, http.MethodGet)
+		methodNotAllowed(w, r, http.MethodGet, http.MethodDelete)
 		return
 	}
 
