@@ -5,6 +5,7 @@
 #include "server/hardware/GpuMonitor.h"
 
 #include "core/logging/Logger.h"
+#include "core/modules/ModuleInstaller.h"
 #include "core/modules/ModuleManager.h"
 #include "core/runtime/CoreRuntime.h"
 #include "security/auth/SecurityManager.h"
@@ -962,12 +963,14 @@ WebServer::WebServer(
     GpuMonitor gpu_monitor,
     CameraManager* cameras,
     HypervisorManager* hypervisor,
-    ClusterManager* cluster
+    ClusterManager* cluster,
+    ModuleInstaller* module_installer
 )
     : runtime_(runtime),
       security_(security),
       updates_(updates),
       modules_(modules),
+      module_installer_(module_installer),
       gpu_monitor_(std::move(gpu_monitor)),
       cameras_(cameras),
       hypervisor_(hypervisor),
