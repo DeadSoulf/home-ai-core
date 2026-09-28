@@ -24,7 +24,7 @@ const strings = {
     flash: "SSD / flash", unknown: "Unknown", modulesSubtitle: "Registered platform capabilities. Installation arrives in Phase 9.",
     hostCapabilities: "Host capabilities", noDescription: "No description.",
     noModules: "No modules are registered yet. This is expected before the Module Store phase.",
-    jobsSubtitle: "Persistent background operations and progress.", jobHistory: "Job history", status: "Status",
+    jobsSubtitle: "Persistent background operations and progress.", jobHistory: "Job history", clearHistory: "Clear history", clearingHistory: "Clearing…", status: "Status",
     progress: "Progress", created: "Created", auditSubtitle: "Security-sensitive actions recorded by Core.",
     recentEvents: "Recent events", time: "Time", actor: "Actor", action: "Action", target: "Target", outcome: "Outcome",
     noAudit: "No audit events yet.", updatesSubtitle: "Check and install Home-AI-Core updates from the Web UI.", updateStatus: "Core update status", currentVersion: "Current version", availableVersion: "Available version", published: "Published", checkUpdates: "Check for updates", checking: "Checking…", lastChecked: "Last checked", installUpdate: "Install update", installing: "Installing…", updateAvailable: "An update is available", upToDate: "Home-AI-Core is up to date", updateRestartNotice: "Core will restart automatically during installation. This page will reconnect.", updateStarted: "Update job started:", releaseNotes: "Release notes", noReleaseNotes: "No release notes were provided."
@@ -50,7 +50,7 @@ const strings = {
     flash: "SSD / Flash", unknown: "Неизвестно", modulesSubtitle: "Зарегистрированные возможности платформы. Установка модулей появится на этапе 9.",
     hostCapabilities: "Возможности хоста", noDescription: "Описание отсутствует.",
     noModules: "Модули пока не зарегистрированы. Это нормально до этапа Module Store.",
-    jobsSubtitle: "Фоновые операции и их прогресс.", jobHistory: "История задач", status: "Состояние",
+    jobsSubtitle: "Фоновые операции и их прогресс.", jobHistory: "История задач", clearHistory: "Очистить историю", clearingHistory: "Очистка…", status: "Состояние",
     progress: "Прогресс", created: "Создана", auditSubtitle: "Журнал действий, важных для безопасности.",
     recentEvents: "Последние события", time: "Время", actor: "Инициатор", action: "Действие", target: "Объект", outcome: "Результат",
     noAudit: "Событий аудита пока нет.", updatesSubtitle: "Проверка и установка обновлений Home-AI-Core прямо из Web UI.", updateStatus: "Состояние обновления Core", currentVersion: "Текущая версия", availableVersion: "Доступная версия", published: "Опубликовано", checkUpdates: "Проверить обновления", checking: "Проверка…", lastChecked: "Последняя проверка", installUpdate: "Установить обновление", installing: "Установка…", updateAvailable: "Доступно обновление", upToDate: "Установлена последняя версия Home-AI-Core", updateRestartNotice: "Во время установки Core автоматически перезапустится. Эта страница подключится снова.", updateStarted: "Запущена задача обновления:", releaseNotes: "Что изменилось", noReleaseNotes: "Описание изменений отсутствует."
