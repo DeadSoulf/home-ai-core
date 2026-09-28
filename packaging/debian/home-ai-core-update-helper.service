@@ -1,0 +1,30 @@
+[Unit]
+Description=Home-AI-Core privileged update helper
+Documentation=https://github.com/DeadSoulf/home-ai-core
+After=local-fs.target network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/home-ai-core/home-ai-core-update-helper
+User=root
+Group=root
+Restart=always
+RestartSec=1s
+TimeoutStopSec=15s
+UMask=0077
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectHostname=yes
+ProtectClock=yes
+ProtectKernelTunables=yes
+ProtectKernelLogs=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
