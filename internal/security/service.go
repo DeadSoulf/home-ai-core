@@ -206,11 +206,11 @@ func (s *Service) Login(
 	}
 
 	now := s.now().UTC()
-	result, err := s.createSession(ctx, user, now)
-	if err != nil {
+	if err := s.store.UpdateLastLogin(ctx, user.ID, now); err != nil {
 		return AuthResult{}, err
 	}
-	if err := s.store.UpdateLastLogin(ctx, user.ID, now); err != nil {
+	result, err := s.createSession(ctx, user, now)
+	if err != nil {
 		return AuthResult{}, err
 	}
 
