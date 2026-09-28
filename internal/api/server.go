@@ -20,7 +20,6 @@ type server struct {
 	jobs                JobService
 	eventHistoryService EventHistoryService
 	modules             ModuleService
-	updates             UpdateService
 	realtime            *realtime.Hub
 	mux                 *http.ServeMux
 }
@@ -33,7 +32,6 @@ func New(
 	jobService JobService,
 	eventHistoryService EventHistoryService,
 	moduleService ModuleService,
-	updateService UpdateService,
 	realtimeHub *realtime.Hub,
 ) http.Handler {
 	s := &server{
@@ -44,7 +42,6 @@ func New(
 		jobs:                jobService,
 		eventHistoryService: eventHistoryService,
 		modules:             moduleService,
-		updates:             updateService,
 		realtime:            realtimeHub,
 		mux:                 http.NewServeMux(),
 	}
@@ -78,8 +75,6 @@ func New(
 	s.mux.HandleFunc("/api/v1/modules", s.requireAuth("modules.read", s.modulesCollection))
 	s.mux.HandleFunc("/api/v1/modules/capabilities", s.requireAuth("modules.read", s.moduleCapabilities))
 	s.mux.HandleFunc("/api/v1/modules/", s.requireAuth("modules.read", s.moduleResource))
-	s.mux.HandleFunc("/api/v1/updates", s.requireAuth("updates.read", s.updatesCollection))
-	s.mux.HandleFunc("/api/v1/updates/install", s.requireAuth("updates.manage", s.updateInstall))
 	s.mux.HandleFunc("/api/v1/audit", s.requireAuth(
 		"audit.read",
 		func(w http.ResponseWriter, r *http.Request, actor security.Actor, _ authSource) {
