@@ -84,3 +84,8 @@ Automatic backup-before-upgrade and rollback remain later Update Manager work.
 ## Remove behavior
 
 Package removal stops/disables the service but intentionally preserves configuration and state. Persistent state is never silently deleted.
+
+
+## Hardware identification database
+
+The Debian package depends on `pci.ids` so Home-AI-Core can resolve PCI vendor/device identifiers into human-readable hardware model names. Hardware inventory still falls back to numeric IDs if a database entry is unavailable.
