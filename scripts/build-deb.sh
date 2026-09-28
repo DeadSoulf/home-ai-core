@@ -83,7 +83,9 @@ install -d -o root -g home-ai-core -m 0750 /etc/home-ai-core
 if command -v systemctl >/dev/null 2>&1; then
   systemctl daemon-reload || true
   systemctl enable home-ai-core.service >/dev/null 2>&1 || true
+  systemctl enable home-ai-core-update-helper.service >/dev/null 2>&1 || true
   if [ "$1" = "configure" ]; then
+    systemctl restart home-ai-core-update-helper.service || true
     systemctl restart home-ai-core.service || true
   fi
 fi
