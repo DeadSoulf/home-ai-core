@@ -52,6 +52,7 @@ func (s *Service) verifyBootstrapToken(candidate string) bool {
 		return false
 	}
 	expected := strings.TrimSpace(string(data))
+	candidate = strings.TrimSpace(candidate)
 	if !validBootstrapToken(candidate) || !validBootstrapToken(expected) {
 		return false
 	}
