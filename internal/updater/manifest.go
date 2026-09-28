@@ -1,6 +1,7 @@
 package updater
 
 import (
+	"encoding/hex"
 	"errors"
 	"path/filepath"
 	"strings"
@@ -36,14 +37,22 @@ func (m Manifest) Validate() error {
 
 	haveCore := false
 	haveWeb := false
+	seen := make(map[string]struct{}, len(m.Files))
 	for _, file := range m.Files {
 		clean := filepath.ToSlash(filepath.Clean(file.Path))
 		if clean != file.Path || strings.HasPrefix(clean, "../") || strings.HasPrefix(clean, "/") {
 			return errors.New("update manifest contains unsafe path")
 		}
-		if len(file.SHA256) != 64 || file.SizeBytes < 0 {
+		if len(file.SHA256) != 64 || strings.ToLower(file.SHA256) != file.SHA256 || file.SizeBytes < 0 {
 			return errors.New("update manifest contains invalid file metadata")
 		}
+		if _, err := hex.DecodeString(file.SHA256); err != nil {
+			return errors.New("update manifest contains invalid checksum")
+		}
+		if _, exists := seen[clean]; exists {
+			return errors.New("update manifest contains duplicate file path")
+		}
+		seen[clean] = struct{}{}
 		if clean == "bin/home-ai-core" {
 			haveCore = true
 		}
