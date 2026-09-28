@@ -12,6 +12,7 @@ import (
 
 	"github.com/DeadSoulf/home-ai-core/internal/api"
 	"github.com/DeadSoulf/home-ai-core/internal/config"
+	"github.com/DeadSoulf/home-ai-core/internal/coreupdate"
 	"github.com/DeadSoulf/home-ai-core/internal/events"
 	"github.com/DeadSoulf/home-ai-core/internal/identity"
 	"github.com/DeadSoulf/home-ai-core/internal/jobs"
@@ -20,6 +21,7 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
 	"github.com/DeadSoulf/home-ai-core/internal/webui"
+	"github.com/DeadSoulf/home-ai-core/internal/version"
 )
 
 func main() {
@@ -72,6 +74,11 @@ func main() {
 	eventService := events.New(nodeID, store, realtimeHub)
 	jobService := jobs.New(nodeID, store, eventService, 2)
 	moduleRegistry := modules.NewRegistry(store)
+	updateService, err := coreupdate.New(version.Version, cfg.StateDir, jobService)
+	if err != nil {
+		logger.Error("failed to initialize Core update service", "error", err)
+		os.Exit(1)
+	}
 
 	jobCtx, jobCancel := context.WithCancel(context.Background())
 	defer jobCancel()
@@ -89,6 +96,7 @@ func main() {
 		jobService,
 		eventService,
 		moduleRegistry,
+		updateService,
 		realtimeHub,
 	)
 	handler := webui.New(apiHandler, cfg.WebDir)
