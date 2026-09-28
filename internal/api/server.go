@@ -13,14 +13,14 @@ import (
 )
 
 type server struct {
-	nodeID   string
-	logger   *slog.Logger
-	state    State
-	security SecurityService
-	jobs     JobService
+	nodeID              string
+	logger              *slog.Logger
+	state               State
+	security            SecurityService
+	jobs                JobService
 	eventHistoryService EventHistoryService
-	realtime *realtime.Hub
-	mux      *http.ServeMux
+	realtime            *realtime.Hub
+	mux                 *http.ServeMux
 }
 
 func New(
@@ -33,14 +33,14 @@ func New(
 	realtimeHub *realtime.Hub,
 ) http.Handler {
 	s := &server{
-		nodeID:   nodeID,
-		logger:   logger,
-		state:    state,
-		security: securityService,
-		jobs: jobService,
+		nodeID:              nodeID,
+		logger:              logger,
+		state:               state,
+		security:            securityService,
+		jobs:                jobService,
 		eventHistoryService: eventHistoryService,
-		realtime: realtimeHub,
-		mux:      http.NewServeMux(),
+		realtime:            realtimeHub,
+		mux:                 http.NewServeMux(),
 	}
 
 	s.mux.HandleFunc("GET /health", s.health)
