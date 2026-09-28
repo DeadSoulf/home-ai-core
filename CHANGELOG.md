@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Enable and start the privileged Core update helper automatically during Debian package installation.
+
 - Restarted project architecture from a clean working tree.
 - Preserved the previous implementation in `archive/pre-restart-2026-09-28`.
 - Defined the Home-AI-Core v1 product scope, module boundaries, multi-node direction, AI trust model and future mobile-sync requirements.
