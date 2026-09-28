@@ -1,0 +1,134 @@
+export type Actor = {
+  type: string;
+  id: string;
+  username?: string;
+  display_name?: string;
+  roles: string[];
+  permissions: string[];
+};
+
+export type SetupStatus = {
+  initialized: boolean;
+  bootstrap: string;
+};
+
+export type AuthResponse = {
+  actor: Actor;
+  expires_at: string;
+  csrf_token?: string;
+  token?: string;
+};
+
+export type SystemResponse = {
+  version: string;
+  schema_version: number;
+  system: {
+    node_id: string;
+    hostname: string;
+    os: string;
+    kernel?: string;
+    architecture: string;
+    cpu: {
+      model?: string;
+      logical_cpus: number;
+    };
+    memory: {
+      total_bytes?: number;
+      available_bytes?: number;
+    };
+    uptime_seconds?: number;
+    block_devices: Array<{
+      name: string;
+      path: string;
+      major_minor?: string;
+      model?: string;
+      serial?: string;
+      size_bytes?: number;
+      rotational: boolean;
+      removable: boolean;
+    }>;
+    network_interfaces: Array<{
+      name: string;
+      index: number;
+      mac?: string;
+      mtu: number;
+      up: boolean;
+      loopback: boolean;
+      multicast: boolean;
+      oper_state?: string;
+      speed_bps?: number;
+      addresses: string[];
+    }>;
+    gpus: Array<{
+      card: string;
+      vendor?: string;
+      vendor_id?: string;
+      device_id?: string;
+      driver?: string;
+      pci_address?: string;
+    }>;
+  };
+};
+
+export type RegisteredModule = {
+  manifest: {
+    schema_version: number;
+    id: string;
+    name: string;
+    description?: string;
+    version: string;
+    core: string;
+    permissions?: string[];
+    capabilities?: {
+      requires?: string[];
+      provides?: string[];
+    };
+    lifecycle: string[];
+  };
+  status: "registered" | "enabled" | "disabled" | "error";
+  error?: string;
+};
+
+export type Job = {
+  id: string;
+  node_id: string;
+  type: string;
+  status: string;
+  progress: number;
+  progress_message?: string;
+  actor_type?: string;
+  actor_id?: string;
+  request_id?: string;
+  correlation_id?: string;
+  created_at: string;
+};
+
+export type AuditEntry = {
+  id: string;
+  occurred_at: string;
+  actor_type: string;
+  actor_id?: string;
+  action: string;
+  target_type?: string;
+  target_id?: string;
+  request_id?: string;
+  correlation_id?: string;
+  outcome: string;
+  metadata: Record<string, unknown>;
+};
+
+export type RealtimeEvent = {
+  version: number;
+  id: string;
+  stream_id: string;
+  sequence: number;
+  cursor?: number;
+  type: string;
+  time: string;
+  source: {
+    node_id: string;
+    component: string;
+  };
+  request_id?: string;
+  data?: unknown;
+};
