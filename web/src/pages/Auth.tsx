@@ -1,15 +1,12 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { api, APIError } from "../api/client";
 import type { Actor } from "../api/types";
+import { LanguageSwitch, useI18n } from "../i18n";
 
-function messageFor(error: unknown): string {
-  if (error instanceof APIError && error.code === "bootstrap_local_only") {
-    return "First-owner setup is restricted to localhost. Use an SSH tunnel to 127.0.0.1:8080 and open the UI through that tunnel.";
-  }
-  return error instanceof Error ? error.message : "Request failed";
-}
 
 export function LoginPage({onAuthenticated}: {onAuthenticated: (actor: Actor) => void}) {
+  const {t} = useI18n();
+  const messageFor = (error: unknown) => error instanceof APIError && error.code === "bootstrap_local_only" ? t("bootstrapLocalOnly") : error instanceof Error ? error.message : t("requestFailed");
   const [username, setUsername] = useState("owner");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -30,19 +27,19 @@ export function LoginPage({onAuthenticated}: {onAuthenticated: (actor: Actor) =>
   }
 
   return (
-    <AuthLayout title="Sign in" subtitle="Manage your private home infrastructure.">
+    <AuthLayout title={t("signIn")} subtitle={t("signInSubtitle")}>
       <form onSubmit={submit} className="auth-form">
         <label>
-          Username
+          {t("username")}
           <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
         </label>
         <label>
-          Password
+          {t("password")}
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
         </label>
         {error && <div className="form-error">{error}</div>}
         <button className="button primary" disabled={busy}>
-          {busy ? "Signing in…" : "Sign in"}
+          {busy ? t("signingIn") : t("signIn")}
         </button>
       </form>
     </AuthLayout>
@@ -50,6 +47,8 @@ export function LoginPage({onAuthenticated}: {onAuthenticated: (actor: Actor) =>
 }
 
 export function FirstRunPage({onAuthenticated}: {onAuthenticated: (actor: Actor) => void}) {
+  const {t} = useI18n();
+  const messageFor = (error: unknown) => error instanceof APIError && error.code === "bootstrap_local_only" ? t("bootstrapLocalOnly") : error instanceof Error ? error.message : t("requestFailed");
   const [bootstrapToken, setBootstrapToken] = useState("");
   const [username, setUsername] = useState("owner");
   const [displayName, setDisplayName] = useState("Home Owner");
@@ -77,30 +76,30 @@ export function FirstRunPage({onAuthenticated}: {onAuthenticated: (actor: Actor)
   }
 
   return (
-    <AuthLayout title="Create the first owner" subtitle="Initialize this Home-AI-Core node.">
+    <AuthLayout title={t("createOwner")} subtitle={t("createOwnerSubtitle")}>
       <div className="notice">
-        First setup is intentionally local-only. Read the one-time bootstrap token from the server state directory and access this page through localhost, for example via an SSH tunnel.
+        {t("bootstrapNotice")}
       </div>
       <form onSubmit={submit} className="auth-form">
         <label>
-          Bootstrap token
+          {t("bootstrapToken")}
           <input value={bootstrapToken} onChange={(e) => setBootstrapToken(e.target.value)} autoComplete="off" />
         </label>
         <label>
-          Username
+          {t("username")}
           <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
         </label>
         <label>
-          Display name
+          {t("displayName")}
           <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
         </label>
         <label>
-          Password
+          {t("password")}
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
         </label>
         {error && <div className="form-error">{error}</div>}
         <button className="button primary" disabled={busy}>
-          {busy ? "Initializing…" : "Initialize Home-AI-Core"}
+          {busy ? t("initializing") : t("initialize")}
         </button>
       </form>
     </AuthLayout>
@@ -108,14 +107,16 @@ export function FirstRunPage({onAuthenticated}: {onAuthenticated: (actor: Actor)
 }
 
 function AuthLayout(props: {title: string; subtitle: string; children: ReactNode}) {
+  const {t} = useI18n();
   return (
     <main className="auth-screen">
       <section className="auth-card">
+        <div className="auth-toolbar"><LanguageSwitch /></div>
         <div className="brand auth-brand">
           <div className="brand-mark">H</div>
           <div>
             <strong>Home-AI-Core</strong>
-            <span>Private home infrastructure</span>
+            <span>{t("privateInfrastructure")}</span>
           </div>
         </div>
         <h1>{props.title}</h1>
