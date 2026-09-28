@@ -15,6 +15,7 @@ class CoreRuntime;
 class SecurityManager;
 class UpdateManager;
 class ModuleManager;
+class ModuleInstaller;
 class CameraManager;
 class HypervisorManager;
 class ClusterManager;
@@ -29,7 +30,8 @@ public:
         GpuMonitor gpu_monitor = GpuMonitor(),
         CameraManager* cameras = nullptr,
         HypervisorManager* hypervisor = nullptr,
-        ClusterManager* cluster = nullptr
+        ClusterManager* cluster = nullptr,
+        ModuleInstaller* module_installer = nullptr
     );
 
     ~WebServer();
@@ -57,6 +59,7 @@ private:
     SecurityManager& security_;
     UpdateManager& updates_;
     ModuleManager& modules_;
+    ModuleInstaller* module_installer_{nullptr};
     GpuMonitor gpu_monitor_;
     CameraManager* cameras_{nullptr};
     HypervisorManager* hypervisor_{nullptr};
