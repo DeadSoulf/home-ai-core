@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
+import type { UpdateStatus } from "../api/types";
 import { useResource } from "../hooks/useResource";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
 import { useI18n } from "../i18n";
@@ -9,16 +10,41 @@ function bytes(value = 0) {
   return new Intl.NumberFormat(undefined, {maximumFractionDigits: 1}).format(value / 1024 ** 3) + " GiB";
 }
 
+function fileBytes(value = 0) {
+  if (value >= 1024 ** 3) return bytes(value);
+  if (value >= 1024 ** 2) return new Intl.NumberFormat(undefined, {maximumFractionDigits: 1}).format(value / 1024 ** 2) + " MiB";
+  if (value >= 1024) return new Intl.NumberFormat(undefined, {maximumFractionDigits: 1}).format(value / 1024) + " KiB";
+  return value + " B";
+}
+
 export function SystemPage({revision}: {revision: number}) {
-  const {t, status} = useI18n();
+  const {t, status, date} = useI18n();
   const load = useCallback(() => api.system(), []);
   const [metricsTick, setMetricsTick] = useState(0);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateStatus>();
+  const [updateError, setUpdateError] = useState("");
+  const [lastChecked, setLastChecked] = useState<string>();
   const {data, loading, error} = useResource(load, revision + metricsTick);
 
   useEffect(() => {
     const timer = window.setInterval(() => setMetricsTick((value) => value + 1), 2000);
     return () => window.clearInterval(timer);
   }, []);
+
+  async function checkUpdate() {
+    setCheckingUpdate(true);
+    setUpdateError("");
+    try {
+      const result = await api.updateStatus();
+      setUpdateInfo(result);
+      setLastChecked(new Date().toISOString());
+    } catch (reason) {
+      setUpdateError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setCheckingUpdate(false);
+    }
+  }
 
   if (loading && !data) return <LoadingState />;
   if (error && !data) return <ErrorState message={error} />;
@@ -49,6 +75,36 @@ export function SystemPage({revision}: {revision: number}) {
             <dt>{t("gpuCount")}</dt><dd>{value.system.gpus.length}</dd>
             <dt>{t("gpu")}</dt><dd>{value.system.gpus.length ? value.system.gpus.map((gpu) => gpu.model || gpu.vendor || gpu.device_id || t("unknown")).join(", ") : "—"}</dd>
           </dl>
+        </Panel>
+
+        <Panel
+          title={t("updateStatus")}
+          action={
+            <button
+              type="button"
+              className="button secondary"
+              disabled={checkingUpdate}
+              onClick={checkUpdate}
+            >
+              {checkingUpdate ? t("checking") : t("checkUpdates")}
+            </button>
+          }
+        >
+          <dl className="details">
+            <dt>{t("currentVersion")}</dt><dd className="mono">{updateInfo?.current_version || value.version}</dd>
+            <dt>{t("availableVersion")}</dt><dd className="mono">{updateInfo?.available_version || "—"}</dd>
+            <dt>{t("architecture")}</dt><dd>{updateInfo?.architecture || value.system.architecture}</dd>
+            <dt>{t("size")}</dt><dd>{updateInfo?.bundle_size_bytes ? fileBytes(updateInfo.bundle_size_bytes) : "—"}</dd>
+            {updateInfo?.published_at && <><dt>{t("published")}</dt><dd>{date(updateInfo.published_at)}</dd></>}
+          </dl>
+          {updateInfo && (
+            <div className={updateInfo.available ? "update-callout available" : "update-callout current"}>
+              <strong>{updateInfo.available ? t("updateAvailable") : t("upToDate")}</strong>
+            </div>
+          )}
+          {updateError && <div className="form-error">{updateError}</div>}
+          {lastChecked && <div className="notice">{t("lastChecked")}: {date(lastChecked)}</div>}
+          {updateInfo?.notes && <pre className="release-notes">{updateInfo.notes}</pre>}
         </Panel>
 
         <Panel title={t("gpuDevices")} className="wide">
