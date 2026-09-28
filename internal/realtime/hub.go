@@ -68,6 +68,31 @@ func (h *Hub) Publish(eventType string, data any, requestID string) string {
 	return message.ID
 }
 
+func (h *Hub) PublishEvent(event PublishedEvent) {
+	message := eventMessage{
+		ID:        event.ID,
+		Cursor:    event.Cursor,
+		Type:      event.Type,
+		Time:      event.Time,
+		Source:    event.Source,
+		RequestID: event.RequestID,
+		Data:      event.Data,
+	}
+
+	h.mu.RLock()
+	clients := make([]*client, 0, len(h.clients))
+	for c := range h.clients {
+		clients = append(clients, c)
+	}
+	h.mu.RUnlock()
+
+	for _, c := range clients {
+		if c.matches(message.Type) && !c.deliver(message) {
+			h.remove(c)
+		}
+	}
+}
+
 func (h *Hub) newMessage(eventType string, data any, requestID string) eventMessage {
 	return eventMessage{
 		ID:        newID("evt_"),
@@ -86,6 +111,7 @@ func (h *Hub) envelope(c *client, message eventMessage) Envelope {
 		ID:        message.ID,
 		StreamID:  c.streamID,
 		Sequence:  c.sequence,
+		Cursor:    message.Cursor,
 		Type:      message.Type,
 		Time:      message.Time,
 		Source:    message.Source,
