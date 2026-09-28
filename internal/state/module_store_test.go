@@ -24,7 +24,7 @@ func TestModuleStoreConfigurationPersists(t *testing.T) {
 	if err := store.UpsertModuleRepository(ctx, ModuleRepositoryRecord{
 		ID: "official", IndexURL: "https://modules.example.invalid/index.json",
 		SignatureURL: "https://modules.example.invalid/index.json.sig",
-		KeyID: "official-2026", Enabled: true,
+		KeyID:        "official-2026", Enabled: true,
 	}); err != nil {
 		t.Fatalf("UpsertModuleRepository() error = %v", err)
 	}
