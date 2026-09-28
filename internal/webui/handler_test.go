@@ -34,6 +34,12 @@ func TestServesSPAAndAssetsWithoutInterceptingAPI(t *testing.T) {
 		if !strings.Contains(rec.Body.String(), "home-ai") {
 			t.Fatalf("%s did not serve SPA index: %q", path, rec.Body.String())
 		}
+		if rec.Header().Get("Content-Security-Policy") != contentSecurityPolicy {
+			t.Fatalf("%s missing CSP", path)
+		}
+		if rec.Header().Get("X-Frame-Options") != "DENY" {
+			t.Fatalf("%s missing clickjacking protection", path)
+		}
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/assets/app.js", nil)
@@ -42,12 +48,18 @@ func TestServesSPAAndAssetsWithoutInterceptingAPI(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), "console.log") {
 		t.Fatalf("asset was not served: %q", rec.Body.String())
 	}
+	if rec.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatal("asset missing nosniff header")
+	}
 
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/system", nil)
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	if !strings.Contains(rec.Body.String(), `"api":true`) {
 		t.Fatalf("API was intercepted: %q", rec.Body.String())
+	}
+	if rec.Header().Get("Content-Security-Policy") != "" {
+		t.Fatal("Web UI headers leaked into API response")
 	}
 }
 
