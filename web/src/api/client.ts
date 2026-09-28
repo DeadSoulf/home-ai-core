@@ -8,6 +8,7 @@ import type {
   SetupStatus,
   SystemResponse,
   UpdateStatus,
+  UpdaterState,
 } from "./types";
 
 type APIErrorBody = {
@@ -144,6 +145,16 @@ export const api = {
   updateStatus: async () => {
     const result = await request<{update: UpdateStatus}>("/api/v1/update");
     return result.update;
+  },
+
+  updaterState: async () => {
+    const result = await request<{state: UpdaterState}>("/api/v1/update/state");
+    return result.state;
+  },
+
+  downloadUpdate: async (version: string) => {
+    const result = await postJSON<{state: UpdaterState}>("/api/v1/update/download", {version}, true);
+    return result.state;
   },
 
   modules: async () => {
