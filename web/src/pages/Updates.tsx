@@ -43,8 +43,13 @@ export function UpdatesPage({revision}: {revision: number}) {
         if (current && !stopped) {
           setInstallJob(current);
           if (current.status === "failed" || current.status === "cancelled") {
+            stopped = true;
             setInstalling(false);
             setActionError(current.progress_message || t("requestFailed"));
+            return;
+          }
+          if (current.status === "succeeded") {
+            stopped = true;
             return;
           }
         }
