@@ -100,7 +100,6 @@ func TestMigrationsAreIdempotent(t *testing.T) {
 	}
 }
 
-
 func TestModuleRegistrationPreservesStatus(t *testing.T) {
 	ctx := context.Background()
 	store, err := Open(ctx, t.TempDir())
@@ -113,7 +112,7 @@ func TestModuleRegistrationPreservesStatus(t *testing.T) {
 		ID:           "storage",
 		Version:      "1.0.0",
 		Status:       "enabled",
-		ManifestJSON: "{"id":"storage","version":"1.0.0"}",
+		ManifestJSON: `{"id":"storage","version":"1.0.0"}`,
 	}); err != nil {
 		t.Fatalf("first UpsertModule() error = %v", err)
 	}
@@ -121,7 +120,7 @@ func TestModuleRegistrationPreservesStatus(t *testing.T) {
 		ID:           "storage",
 		Version:      "1.1.0",
 		Status:       "registered",
-		ManifestJSON: "{"id":"storage","version":"1.1.0"}",
+		ManifestJSON: `{"id":"storage","version":"1.1.0"}`,
 	}); err != nil {
 		t.Fatalf("second UpsertModule() error = %v", err)
 	}
