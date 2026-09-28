@@ -116,6 +116,25 @@ int main()
         UpdateManager updates;
         ModuleManager modules;
 
+        check(
+            modules.registerManifest(
+                {
+                    "cluster",
+                    "Cluster Core",
+                    "0.0.62",
+                    "Cluster API test",
+                    {},
+                    {"cluster.view", "cluster.manage"},
+                    {"cluster"},
+                    false,
+                    true,
+                    true
+                },
+                error
+            ),
+            "cluster manifest"
+        );
+
         WebServer server(
             runtime,
             security,
