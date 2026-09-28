@@ -36,25 +36,41 @@ export function UpdatesPage({revision}: {revision: number}) {
     if (!installJob || !installing) return;
 
     let stopped = false;
+    const target = manualUpdate?.available_version || resource.data?.available_version;
     const poll = async () => {
+      if (stopped) return;
       try {
-        const jobs = await api.jobs();
-        const current = jobs.find((job) => job.id === installJob.id);
-        if (current && !stopped) {
-          setInstallJob(current);
-          if (current.status === "failed" || current.status === "cancelled") {
-            stopped = true;
-            setInstalling(false);
-            setActionError(current.error_message || current.message || t("requestFailed"));
-            return;
-          }
-          if (current.status === "succeeded") {
-            stopped = true;
+        const current = await api.job(installJob.id);
+        if (stopped) return;
+        setInstallJob(current);
+
+        if (current.status === "failed" || current.status === "cancelled") {
+          setInstalling(false);
+          setActionError(current.error_message || current.message || t("requestFailed"));
+          return;
+        }
+
+        if (current.status === "succeeded" && target) {
+          const system = await api.system();
+          if (system.version === target) {
+            window.location.reload();
             return;
           }
         }
       } catch {
-        // The Core may restart while the package is being installed.
+        // During package installation Core restarts. Verify the installed version
+        // directly as soon as the API becomes reachable again.
+        if (target) {
+          try {
+            const system = await api.system();
+            if (system.version === target) {
+              window.location.reload();
+              return;
+            }
+          } catch {
+            // Still restarting.
+          }
+        }
       }
       if (!stopped) window.setTimeout(poll, 1000);
     };
@@ -63,7 +79,7 @@ export function UpdatesPage({revision}: {revision: number}) {
     return () => {
       stopped = true;
     };
-  }, [installJob?.id, installing, t]);
+  }, [installJob?.id, installing, manualUpdate?.available_version, resource.data?.available_version, t]);
 
   async function install() {
     const target = manualUpdate?.available_version || resource.data?.available_version;
@@ -72,35 +88,14 @@ export function UpdatesPage({revision}: {revision: number}) {
     setInstalling(true);
     setActionError("");
     try {
-      const job = await api.installUpdate();
+      const job = await api.installUpdate(target);
       setInstallJob(job);
-      waitForVersion(target);
     } catch (error) {
       setInstalling(false);
       setActionError(error instanceof Error ? error.message : t("requestFailed"));
     }
   }
 
-  function waitForVersion(target: string) {
-    const deadline = Date.now() + 10 * 60 * 1000;
-    const check = async () => {
-      try {
-        const system = await api.system();
-        if (system.version === target) {
-          window.location.reload();
-          return;
-        }
-      } catch {
-        // Core is expected to be briefly unavailable during package restart.
-      }
-      if (Date.now() < deadline) {
-        window.setTimeout(check, 2000);
-      } else {
-        setInstalling(false);
-      }
-    };
-    window.setTimeout(check, 2000);
-  }
 
   if (resource.loading && !resource.data) return <LoadingState />;
   if (resource.error && !resource.data) return <ErrorState message={resource.error} />;
@@ -144,7 +139,7 @@ export function UpdatesPage({revision}: {revision: number}) {
           {lastChecked && <div className="notice">{t("lastChecked")}: {date(lastChecked)}</div>}
           {installJob && (
             <div className="notice">
-              <div>{t("updateStarted")} <span className="mono">{installJob.id}</span></div>
+              <div><strong>{installJob.message || t("installing")}</strong></div>
               <div className="progress"><span style={{width: `${Math.min(100, installJob.progress / 100)}%`}} /></div>
               <div className="small">
                 {(installJob.progress / 100).toFixed(0)}% · {installJob.message || installJob.status}
