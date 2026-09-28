@@ -14,6 +14,7 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/config"
 	"github.com/DeadSoulf/home-ai-core/internal/identity"
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
+	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
 )
 
@@ -57,8 +58,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	securityService, err := security.New(startupCtx, store, cfg.StateDir)
+	if err != nil {
+		logger.Error("failed to initialize security", "error", err)
+		os.Exit(1)
+	}
+
 	realtimeHub := realtime.New(nodeID, logger)
-	handler := api.New(nodeID, logger, store, realtimeHub)
+	handler := api.New(nodeID, logger, store, securityService, realtimeHub)
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddress,
