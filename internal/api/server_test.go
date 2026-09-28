@@ -360,7 +360,6 @@ func TestEventsRouteUpgradesToWebSocket(t *testing.T) {
 	}
 }
 
-
 func TestInvalidSessionModeIsRejectedBeforeLogin(t *testing.T) {
 	handler := testHandler(fakeState{schemaVersion: 2})
 
