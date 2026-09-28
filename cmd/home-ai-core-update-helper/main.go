@@ -222,20 +222,20 @@ func validateStagedPackage(path, expectedHash string) (string, error) {
 }
 
 func dpkgFields(ctx context.Context, path string) (map[string]string, error) {
-	cmd := exec.CommandContext(ctx, "/usr/bin/dpkg-deb", "-f", path, "Package", "Version", "Architecture")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("inspect Debian package: %w", err)
+	fields := make(map[string]string, 3)
+	for _, field := range []string{"Package", "Version", "Architecture"} {
+		cmd := exec.CommandContext(ctx, "/usr/bin/dpkg-deb", "-f", path, field)
+		output, err := cmd.Output()
+		if err != nil {
+			return nil, fmt.Errorf("inspect Debian package field %s: %w", field, err)
+		}
+		value := strings.TrimSpace(string(output))
+		if value == "" {
+			return nil, fmt.Errorf("Debian package field %s is empty", field)
+		}
+		fields[field] = value
 	}
-	values := strings.Split(strings.TrimSpace(string(output)), "\n")
-	if len(values) != 3 {
-		return nil, errors.New("unexpected dpkg-deb metadata")
-	}
-	return map[string]string{
-		"Package":      strings.TrimSpace(values[0]),
-		"Version":      strings.TrimSpace(values[1]),
-		"Architecture": strings.TrimSpace(values[2]),
-	}, nil
+	return fields, nil
 }
 
 func installedVersion(ctx context.Context) (string, error) {
