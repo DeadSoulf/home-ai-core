@@ -18,7 +18,8 @@ import (
 
 	"github.com/DeadSoulf/home-ai-core/internal/jobs"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
-	"github.com/DeadSoulf/home-ai-core/internal/state"\n\t"github.com/DeadSoulf/home-ai-core/internal/updatehelper"
+	"github.com/DeadSoulf/home-ai-core/internal/state"
+	"github.com/DeadSoulf/home-ai-core/internal/updatehelper"
 )
 
 const (
