@@ -19,6 +19,8 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
+	"github.com/DeadSoulf/home-ai-core/internal/updater"
+	"github.com/DeadSoulf/home-ai-core/internal/version"
 	"github.com/DeadSoulf/home-ai-core/internal/webui"
 )
 
@@ -72,6 +74,7 @@ func main() {
 	eventService := events.New(nodeID, store, realtimeHub)
 	jobService := jobs.New(nodeID, store, eventService, 2)
 	moduleRegistry := modules.NewRegistry(store)
+	updaterService := updater.New(version.Version)
 	jobCtx, jobCancel := context.WithCancel(context.Background())
 	defer jobCancel()
 	go func() {
@@ -88,6 +91,7 @@ func main() {
 		jobService,
 		eventService,
 		moduleRegistry,
+		updaterService,
 		realtimeHub,
 	)
 	handler := webui.New(apiHandler, cfg.WebDir)
