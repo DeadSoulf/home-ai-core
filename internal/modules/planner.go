@@ -129,7 +129,6 @@ func contains(values []string, wanted string) bool {
 	return false
 }
 
-
 func validateSelectedConflicts(
 	selected map[string]Manifest,
 	installed map[string]string,
