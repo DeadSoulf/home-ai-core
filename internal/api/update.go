@@ -15,6 +15,7 @@ type UpdaterService interface {
 	Check(context.Context) (updater.ReleaseStatus, error)
 	State() updater.State
 	Download(context.Context, string) (updater.State, error)
+	Install(context.Context, string) (updater.State, error)
 }
 
 func (s *server) updateStatus(w http.ResponseWriter, r *http.Request) {
@@ -87,5 +88,46 @@ func (s *server) updateDownload(
 		writeAPIError(w, r, http.StatusBadGateway, "update_download_failed", err.Error(), nil)
 	default:
 		writeJSON(w, http.StatusOK, map[string]any{"state": state})
+	}
+}
+
+func (s *server) updateInstall(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	if s.updater == nil {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "updater_unavailable", "updater is unavailable", nil)
+		return
+	}
+
+	var input struct {
+		Version string `json:"version"`
+	}
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil || strings.TrimSpace(input.Version) == "" {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_update_request", "update version is required", nil)
+		return
+	}
+
+	state, err := s.updater.Install(r.Context(), strings.TrimSpace(input.Version))
+	switch {
+	case errors.Is(err, updater.ErrBusy):
+		writeAPIError(w, r, http.StatusConflict, "update_busy", err.Error(), nil)
+	case err != nil:
+		s.logger.Error("update install failed", "error", err)
+		writeAPIError(w, r, http.StatusBadGateway, "update_install_failed", err.Error(), nil)
+	default:
+		writeJSON(w, http.StatusAccepted, map[string]any{"state": state})
 	}
 }
