@@ -20,3 +20,4 @@
 - Added Debian 13 installation packages for amd64/arm64, packaged-artifact smoke tests and physical-server installation tooling.
 
 - Added Russian Web UI localization with RU/EN switching, browser-language detection and saved preference.
+- Started Phase 9 with signed module repository metadata and Ed25519/SHA-256 package verification.

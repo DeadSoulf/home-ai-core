@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://home-ai-core.local/schemas/module-repository-v1.schema.json",
+  "title": "Home-AI-Core Module Repository v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "generated_at", "releases"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "releases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["manifest", "package"],
+        "properties": {
+          "manifest": {"$ref": "module-manifest-v1.schema.json"},
+          "package": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["url", "sha256", "size_bytes", "signature"],
+            "properties": {
+              "url": {"type": "string", "pattern": "^https://"},
+              "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "size_bytes": {"type": "integer", "minimum": 1},
+              "signature": {"$ref": "#/$defs/signature"}
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key_id", "algorithm", "value"],
+      "properties": {
+        "key_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "algorithm": {"const": "ed25519"},
+        "value": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}
