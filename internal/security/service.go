@@ -307,6 +307,16 @@ func (s *Service) ListAudit(ctx context.Context, limit int) ([]AuditEntry, error
 	return entries, nil
 }
 
+func (s *Service) RecordAudit(
+	ctx context.Context,
+	meta RequestContext,
+	actor Actor,
+	action, targetType, targetID, outcome string,
+	metadata map[string]any,
+) {
+	s.audit(ctx, meta, actor, action, targetType, targetID, outcome, metadata)
+}
+
 func (s *Service) audit(
 	ctx context.Context,
 	meta RequestContext,
