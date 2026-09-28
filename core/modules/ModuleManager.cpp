@@ -834,10 +834,19 @@ ModuleManager::catalogSnapshot() const
 
         ModuleCatalogEntry entry;
         entry.manifest = manifest;
+
+        const auto installed_override =
+            installed_overrides_.find(id);
+
         entry.installed =
-            manifest.core_component
-            ||
-            manifest.bundled;
+            installed_override !=
+                installed_overrides_.end()
+            ? installed_override->second
+            : (
+                manifest.core_component
+                ||
+                manifest.bundled
+            );
 
         if (
             !manifest.runtime_modules.empty()
@@ -871,6 +880,26 @@ ModuleManager::catalogSnapshot() const
                 ? "core"
                 : "installed";
         }
+        else if (
+            !entry.installed
+            &&
+            entry.running
+        ) {
+            entry.state =
+                "uninstall_pending_restart";
+        }
+        else if (
+            entry.installed
+            &&
+            manifest.installable
+            &&
+            !manifest.runtime_modules.empty()
+            &&
+            !entry.running
+        ) {
+            entry.state =
+                "install_pending_restart";
+        }
         else if (entry.installed) {
             entry.state =
                 entry.running
@@ -890,6 +919,84 @@ ModuleManager::catalogSnapshot() const
     }
 
     return result;
+}
+
+std::optional<ModuleManifest>
+ModuleManager::manifest(
+    const std::string& id
+) const
+{
+    std::lock_guard<std::mutex>
+        lock(mutex_);
+
+    const auto it =
+        manifests_.find(id);
+
+    if (it == manifests_.end())
+        return std::nullopt;
+
+    return it->second;
+}
+
+bool ModuleManager::isInstalled(
+    const std::string& id
+) const
+{
+    std::lock_guard<std::mutex>
+        lock(mutex_);
+
+    const auto it =
+        manifests_.find(id);
+
+    if (it == manifests_.end())
+        return false;
+
+    const auto installed_override =
+        installed_overrides_.find(id);
+
+    if (
+        installed_override !=
+            installed_overrides_.end()
+    ) {
+        return installed_override->second;
+    }
+
+    return
+        it->second.core_component
+        ||
+        it->second.bundled;
+}
+
+bool ModuleManager::setInstalledState(
+    const std::string& id,
+    bool installed,
+    std::string& error
+)
+{
+    std::lock_guard<std::mutex>
+        lock(mutex_);
+
+    const auto it =
+        manifests_.find(id);
+
+    if (it == manifests_.end()) {
+        error =
+            "Unknown project module: "
+            + id;
+        return false;
+    }
+
+    if (it->second.core_component) {
+        error =
+            "Core component installation state cannot be changed: "
+            + id;
+        return false;
+    }
+
+    installed_overrides_[id] =
+        installed;
+
+    return true;
 }
 
 bool ModuleManager::hasModule(
