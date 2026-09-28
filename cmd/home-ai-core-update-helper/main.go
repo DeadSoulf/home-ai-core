@@ -239,7 +239,7 @@ func dpkgFields(ctx context.Context, path string) (map[string]string, error) {
 }
 
 func installedVersion(ctx context.Context) (string, error) {
-	cmd := exec.CommandContext(ctx, "/usr/bin/dpkg-query", "-W", "-f=\${Version}", "home-ai-core")
+	cmd := exec.CommandContext(ctx, "/usr/bin/dpkg-query", "-W", "-f=${Version}", "home-ai-core")
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("read installed Home-AI-Core version: %w", err)
