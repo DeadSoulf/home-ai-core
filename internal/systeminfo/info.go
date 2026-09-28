@@ -21,7 +21,10 @@ func Collect(nodeID string) Info {
 		UptimeSeconds:     uptime(),
 		BlockDevices:      blockDevices("/sys/block"),
 		NetworkInterfaces: networkInterfaces("/sys/class/net"),
-		GPUs:              gpus("/sys/class/drm"),
+		GPUs: gpus("/sys/bus/pci/devices", []string{
+			"/usr/share/misc/pci.ids",
+			"/usr/share/hwdata/pci.ids",
+		}),
 	}
 }
 

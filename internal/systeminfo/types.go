@@ -49,10 +49,13 @@ type NetworkInterface struct {
 }
 
 type GPU struct {
-	Card       string `json:"card"`
+	Card       string `json:"card,omitempty"`
 	Vendor     string `json:"vendor,omitempty"`
+	Model      string `json:"model,omitempty"`
 	VendorID   string `json:"vendor_id,omitempty"`
 	DeviceID   string `json:"device_id,omitempty"`
+	Class      string `json:"class,omitempty"`
 	Driver     string `json:"driver,omitempty"`
+	Modalias   string `json:"modalias,omitempty"`
 	PCIAddress string `json:"pci_address,omitempty"`
 }

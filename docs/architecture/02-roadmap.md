@@ -79,6 +79,8 @@
 - Compatibility validation.
 - Core/module update orchestration.
 - Rollback.
+- Hardware driver reconciliation using trusted signed profiles.
+- Automatic driver jobs for newly detected PCI/USB hardware through the privileged helper.
 
 ## Phase 10 — Containers
 - Docker Engine integration.
