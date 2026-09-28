@@ -15,8 +15,9 @@ type Info struct {
 }
 
 type CPUInfo struct {
-	Model       string `json:"model,omitempty"`
-	LogicalCPUs int    `json:"logical_cpus"`
+	Model        string  `json:"model,omitempty"`
+	LogicalCPUs  int     `json:"logical_cpus"`
+	UsagePercent float64 `json:"usage_percent"`
 }
 
 type MemoryInfo struct {
@@ -57,5 +58,6 @@ type GPU struct {
 	Class      string `json:"class,omitempty"`
 	Driver     string `json:"driver,omitempty"`
 	Modalias   string `json:"modalias,omitempty"`
-	PCIAddress string `json:"pci_address,omitempty"`
+	PCIAddress        string   `json:"pci_address,omitempty"`
+	UtilizationPercent *float64 `json:"utilization_percent,omitempty"`
 }
