@@ -312,6 +312,27 @@ add_test(
     COMMAND test-module-installer
 )
 
+add_executable(
+    test-module-installer-api
+    tests/test_module_installer_api.cpp
+)
+
+target_link_libraries(
+    test-module-installer-api
+    PRIVATE
+    homeai-core-lib
+)
+
+add_test(
+    NAME module_installer_api
+    COMMAND test-module-installer-api
+)
+
+set_tests_properties(
+    module_installer_api
+    PROPERTIES TIMEOUT 30
+)
+
 
 add_executable(
     test-user-management
