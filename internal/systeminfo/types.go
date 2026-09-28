@@ -1,0 +1,58 @@
+package systeminfo
+
+type Info struct {
+	NodeID            string             `json:"node_id"`
+	Hostname          string             `json:"hostname"`
+	OS                string             `json:"os"`
+	Kernel            string             `json:"kernel,omitempty"`
+	Architecture      string             `json:"architecture"`
+	CPU               CPUInfo            `json:"cpu"`
+	Memory            MemoryInfo         `json:"memory"`
+	UptimeSeconds     uint64             `json:"uptime_seconds,omitempty"`
+	BlockDevices      []BlockDevice      `json:"block_devices"`
+	NetworkInterfaces []NetworkInterface `json:"network_interfaces"`
+	GPUs              []GPU              `json:"gpus"`
+}
+
+type CPUInfo struct {
+	Model       string `json:"model,omitempty"`
+	LogicalCPUs int    `json:"logical_cpus"`
+}
+
+type MemoryInfo struct {
+	TotalBytes     uint64 `json:"total_bytes,omitempty"`
+	AvailableBytes uint64 `json:"available_bytes,omitempty"`
+}
+
+type BlockDevice struct {
+	Name       string `json:"name"`
+	Path       string `json:"path"`
+	MajorMinor string `json:"major_minor,omitempty"`
+	Model      string `json:"model,omitempty"`
+	Serial     string `json:"serial,omitempty"`
+	SizeBytes  uint64 `json:"size_bytes,omitempty"`
+	Rotational bool   `json:"rotational"`
+	Removable  bool   `json:"removable"`
+}
+
+type NetworkInterface struct {
+	Name      string   `json:"name"`
+	Index     int      `json:"index"`
+	MAC       string   `json:"mac,omitempty"`
+	MTU       int      `json:"mtu"`
+	Up        bool     `json:"up"`
+	Loopback  bool     `json:"loopback"`
+	Multicast bool     `json:"multicast"`
+	OperState string   `json:"oper_state,omitempty"`
+	SpeedBPS  uint64   `json:"speed_bps,omitempty"`
+	Addresses []string `json:"addresses"`
+}
+
+type GPU struct {
+	Card       string `json:"card"`
+	Vendor     string `json:"vendor,omitempty"`
+	VendorID   string `json:"vendor_id,omitempty"`
+	DeviceID   string `json:"device_id,omitempty"`
+	Driver     string `json:"driver,omitempty"`
+	PCIAddress string `json:"pci_address,omitempty"`
+}

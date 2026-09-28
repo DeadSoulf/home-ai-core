@@ -4,31 +4,24 @@ import (
 	"bufio"
 	"os"
 	"runtime"
-	"strconv"
 	"strings"
 )
-
-type Info struct {
-	NodeID           string `json:"node_id"`
-	Hostname         string `json:"hostname"`
-	OS               string `json:"os"`
-	Architecture     string `json:"architecture"`
-	CPUCount         int    `json:"cpu_count"`
-	MemoryTotalBytes uint64 `json:"memory_total_bytes,omitempty"`
-	UptimeSeconds    uint64 `json:"uptime_seconds,omitempty"`
-}
 
 func Collect(nodeID string) Info {
 	hostname, _ := os.Hostname()
 
 	return Info{
-		NodeID:           nodeID,
-		Hostname:         hostname,
-		OS:               operatingSystem(),
-		Architecture:     runtime.GOARCH,
-		CPUCount:         runtime.NumCPU(),
-		MemoryTotalBytes: memoryTotal(),
-		UptimeSeconds:    uptime(),
+		NodeID:            nodeID,
+		Hostname:          hostname,
+		OS:                operatingSystem(),
+		Kernel:            readTrimmed("/proc/sys/kernel/osrelease"),
+		Architecture:      runtime.GOARCH,
+		CPU:               cpuInfo(),
+		Memory:            memoryInfo(),
+		UptimeSeconds:     uptime(),
+		BlockDevices:      blockDevices("/sys/block"),
+		NetworkInterfaces: networkInterfaces("/sys/class/net"),
+		GPUs:              gpus("/sys/class/drm"),
 	}
 }
 
@@ -60,42 +53,4 @@ func operatingSystem() string {
 		return value
 	}
 	return runtime.GOOS
-}
-
-func memoryTotal() uint64 {
-	file, err := os.Open("/proc/meminfo")
-	if err != nil {
-		return 0
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		if len(fields) < 2 || fields[0] != "MemTotal:" {
-			continue
-		}
-		kib, err := strconv.ParseUint(fields[1], 10, 64)
-		if err != nil {
-			return 0
-		}
-		return kib * 1024
-	}
-	return 0
-}
-
-func uptime() uint64 {
-	data, err := os.ReadFile("/proc/uptime")
-	if err != nil {
-		return 0
-	}
-	fields := strings.Fields(string(data))
-	if len(fields) == 0 {
-		return 0
-	}
-	seconds, err := strconv.ParseFloat(fields[0], 64)
-	if err != nil || seconds < 0 {
-		return 0
-	}
-	return uint64(seconds)
 }
