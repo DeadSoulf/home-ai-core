@@ -45,7 +45,7 @@ export function UpdatesPage({revision}: {revision: number}) {
           if (current.status === "failed" || current.status === "cancelled") {
             stopped = true;
             setInstalling(false);
-            setActionError(current.progress_message || t("requestFailed"));
+            setActionError(current.error_message || current.message || t("requestFailed"));
             return;
           }
           if (current.status === "succeeded") {
@@ -147,7 +147,7 @@ export function UpdatesPage({revision}: {revision: number}) {
               <div>{t("updateStarted")} <span className="mono">{installJob.id}</span></div>
               <div className="progress"><span style={{width: `${Math.min(100, installJob.progress / 100)}%`}} /></div>
               <div className="small">
-                {(installJob.progress / 100).toFixed(0)}% · {installJob.progress_message || installJob.status}
+                {(installJob.progress / 100).toFixed(0)}% · {installJob.message || installJob.status}
               </div>
             </div>
           )}
