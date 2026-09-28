@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
+	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/systeminfo"
 	"github.com/DeadSoulf/home-ai-core/internal/version"
 )
@@ -15,22 +16,56 @@ type server struct {
 	nodeID   string
 	logger   *slog.Logger
 	state    State
+	security SecurityService
 	realtime *realtime.Hub
 	mux      *http.ServeMux
 }
 
-func New(nodeID string, logger *slog.Logger, state State, realtimeHub *realtime.Hub) http.Handler {
+func New(
+	nodeID string,
+	logger *slog.Logger,
+	state State,
+	securityService SecurityService,
+	realtimeHub *realtime.Hub,
+) http.Handler {
 	s := &server{
 		nodeID:   nodeID,
 		logger:   logger,
 		state:    state,
+		security: securityService,
 		realtime: realtimeHub,
 		mux:      http.NewServeMux(),
 	}
 
 	s.mux.HandleFunc("GET /health", s.health)
-	s.mux.HandleFunc("/api/v1/system", s.systemRoute)
-	s.mux.HandleFunc("/api/v1/events", s.eventsRoute)
+	s.mux.HandleFunc("/api/v1/security/setup-status", s.setupStatus)
+	s.mux.HandleFunc("/api/v1/security/bootstrap", s.bootstrap)
+	s.mux.HandleFunc("/api/v1/auth/login", s.login)
+	s.mux.HandleFunc("/api/v1/auth/me", s.requireAuth(
+		"security.self.read",
+		func(w http.ResponseWriter, r *http.Request, actor security.Actor, _ authSource) {
+			s.me(w, r, actor)
+		},
+	))
+	s.mux.HandleFunc("/api/v1/auth/logout", s.requireAuth("", s.logout))
+	s.mux.HandleFunc("/api/v1/system", s.requireAuth(
+		"system.read",
+		func(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
+			s.systemRoute(w, r)
+		},
+	))
+	s.mux.HandleFunc("/api/v1/events", s.requireAuth(
+		"events.read",
+		func(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
+			s.eventsRoute(w, r)
+		},
+	))
+	s.mux.HandleFunc("/api/v1/audit", s.requireAuth(
+		"audit.read",
+		func(w http.ResponseWriter, r *http.Request, actor security.Actor, _ authSource) {
+			s.audit(w, r, actor)
+		},
+	))
 	s.mux.HandleFunc("/", s.notFound)
 
 	return s.requestContext(s.mux)
@@ -57,8 +92,7 @@ func (s *server) health(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) systemRoute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.Header().Set("Allow", http.MethodGet)
-		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
 	s.system(w, r)
@@ -88,8 +122,7 @@ func (s *server) system(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) eventsRoute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.Header().Set("Allow", http.MethodGet)
-		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
 	s.events(w, r)
@@ -130,6 +163,4 @@ func (s *server) requestContext(next http.Handler) http.Handler {
 	})
 }
 
-// Kept as a tiny seam for deterministic handler tests and to avoid repeating
-// timeout boilerplate in health dependencies.
 var contextWithTimeout = context.WithTimeout
