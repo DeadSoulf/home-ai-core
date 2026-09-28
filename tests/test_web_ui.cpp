@@ -569,6 +569,7 @@ int main()
     const std::string routes[] = {
         "/",
         "/system",
+        "/modules",
         "/network",
         "/storage",
         "/cameras",
@@ -811,6 +812,32 @@ int main()
         std::cerr
             << "Settings core name input is invalid\n";
 
+        return 1;
+    }
+
+    context.page =
+        "/modules";
+
+    const auto modules_page =
+        homeai::renderWebUi(
+            context
+        );
+
+    if (
+        modules_page.find(
+            "Каталог модулей"
+        ) == std::string::npos
+        ||
+        modules_page.find(
+            "module-catalog-list"
+        ) == std::string::npos
+        ||
+        modules_page.find(
+            "/api/module-catalog"
+        ) == std::string::npos
+    ) {
+        std::cerr
+            << "Module catalog page is invalid\n";
         return 1;
     }
 
