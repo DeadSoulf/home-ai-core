@@ -1,15 +1,48 @@
 # Home-AI-Core
 
-Home-AI-Core is a modular home-server platform built on top of Debian 13.
+Home-AI-Core is a modular private home-server platform built on Debian 13.
 
-The project keeps the base operating system independent and adds a small core responsible for API access, authentication, permissions, events, jobs, updates and module lifecycle management.
+Its long-term goal is to unify personal storage, photos/video, backups, applications, video surveillance, smart-home services, local AI and multiple physical servers behind one secure control plane and Web UI.
 
-## Status
+## Current foundation
 
-Architecture reset in progress. No production code is accepted until the v1 core architecture and module contract are documented.
+The restarted project currently includes:
 
-## Core principle
+- Go control-plane daemon
+- Web UI with first-run setup/login
+- SQLite state and migrations
+- users, sessions, RBAC, CSRF protection and audit
+- persistent jobs and durable events
+- WebSocket realtime transport
+- Module SDK v1 and persistent module registry
+- read-only hardware discovery
+- systemd service hardening
+- Debian 13 package builds for amd64 and arm64
 
-The core must not contain Docker, KVM, NAS, AI or NVR-specific logic. Those capabilities belong to independent modules.
+## Installation status
 
-See `docs/architecture/` for the current design.
+The project is entering its first physical-server validation phase.
+
+Local Debian packages can be built with:
+
+```sh
+sh ./scripts/build-deb.sh amd64
+```
+
+or:
+
+```sh
+sh ./scripts/build-deb.sh arm64
+```
+
+See `packaging/debian/README.md` for installation and first-run instructions.
+
+The default Core listener remains `127.0.0.1:8080`; remote first-run access uses an SSH tunnel until the secure remote-access phase is implemented.
+
+## Architecture principle
+
+The Core remains small.
+
+Docker/containers, storage/NAS, virtualization, AI, NVR, backup, network/VPN and other product capabilities belong to independent modules rather than the Core itself.
+
+See `docs/architecture/` and `docs/decisions/` for the current contracts and ADRs.
