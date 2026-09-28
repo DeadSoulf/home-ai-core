@@ -51,12 +51,12 @@
 
 ## Package staging and privileged boundary
 
-- [ ] bounded package download
-- [ ] verified staging directory
+- [x] bounded package download
+- [x] verified staging directory
 - [ ] archive path traversal protection
 - [ ] package layout contract
-- [ ] dedicated privileged helper/service boundary
-- [ ] allowlisted privileged operations only
+- [x] dedicated privileged helper/service boundary
+- [x] allowlisted privileged operations only
 - [ ] no arbitrary shell strings from repository metadata
 - [ ] install/upgrade/remove execution
 
@@ -66,7 +66,7 @@
 - [ ] atomic current-version switch
 - [ ] failed install leaves previous version active
 - [ ] failed upgrade restores previous version
-- [ ] interrupted operation recovery
+- [x] interrupted operation recovery
 - [ ] rollback events and audit records
 
 ## Core/module updates
@@ -75,7 +75,7 @@
 - [ ] compatible update selection
 - [ ] Core update metadata and signature verification
 - [ ] Core/module compatibility ordering
-- [ ] update status in Web UI
+- [x] update status in Web UI
 
 ## Validation
 
