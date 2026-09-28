@@ -27,9 +27,7 @@ func (s *Store) UpsertModule(ctx context.Context, record ModuleRecord) error {
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			version = excluded.version,
-			status = excluded.status,
 			manifest_json = excluded.manifest_json,
-			error_message = excluded.error_message,
 			updated_at = excluded.updated_at
 	`,
 		record.ID,
