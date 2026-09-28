@@ -73,6 +73,7 @@ elif ! getent passwd home-ai-core >/dev/null 2>&1; then
   useradd --system --home-dir /var/lib/home-ai-core --shell /usr/sbin/nologin --user-group home-ai-core
 fi
 install -d -o home-ai-core -g home-ai-core -m 0700 /var/lib/home-ai-core
+install -d -o home-ai-core -g home-ai-core -m 0700 /var/lib/home-ai-core/update
 install -d -o root -g home-ai-core -m 0750 /etc/home-ai-core
 if command -v systemctl >/dev/null 2>&1; then
   systemctl daemon-reload || true
