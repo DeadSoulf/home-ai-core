@@ -157,3 +157,15 @@ export type UpdateStatus = {
   published_at?: string;
   notes?: string;
 };
+
+export type UpdaterState = {
+  phase: "idle" | "checking" | "available" | "downloading" | "ready" | "installing" | "restarting" | "succeeded" | "failed";
+  current_version?: string;
+  available_version?: string;
+  progress_percent?: number;
+  message?: string;
+  error?: string;
+  updated_at: string;
+  published_at?: string;
+  bundle_size_bytes?: number;
+};
