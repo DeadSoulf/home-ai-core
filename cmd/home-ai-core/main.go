@@ -74,7 +74,7 @@ func main() {
 	eventService := events.New(nodeID, store, realtimeHub)
 	jobService := jobs.New(nodeID, store, eventService, 2)
 	moduleRegistry := modules.NewRegistry(store)
-	updaterService := updater.New(version.Version)
+	updaterService := updater.New(version.Version, cfg.StateDir)
 	jobCtx, jobCancel := context.WithCancel(context.Background())
 	defer jobCancel()
 	go func() {
