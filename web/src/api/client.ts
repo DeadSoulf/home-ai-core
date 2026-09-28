@@ -166,6 +166,16 @@ export const api = {
     return result.jobs;
   },
 
+  clearJobs: async () => {
+    const headers = new Headers();
+    const token = getCSRFToken();
+    if (token) headers.set("X-CSRF-Token", token);
+    return request<{deleted: number}>("/api/v1/jobs", {
+      method: "DELETE",
+      headers,
+    });
+  },
+
   audit: async () => {
     const result = await request<{events: AuditEntry[]}>("/api/v1/audit?limit=100");
     return result.events;
