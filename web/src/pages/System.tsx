@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
 import { useResource } from "../hooks/useResource";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
@@ -13,7 +13,13 @@ function bytes(value = 0) {
 export function SystemPage({revision}: {revision: number}) {
   const {t, status} = useI18n();
   const load = useCallback(() => api.system(), []);
-  const {data, loading, error} = useResource(load, revision);
+  const [metricsTick, setMetricsTick] = useState(0);
+  const {data, loading, error} = useResource(load, revision + metricsTick);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setMetricsTick((value) => value + 1), 2000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   if (loading && !data) return <LoadingState />;
   if (error && !data) return <ErrorState message={error} />;
@@ -38,6 +44,7 @@ export function SystemPage({revision}: {revision: number}) {
           <dl className="details">
             <dt>CPU</dt><dd>{value.system.cpu.model || t("unknown")}</dd>
             <dt>{t("logicalCpus")}</dt><dd>{value.system.cpu.logical_cpus}</dd>
+            <dt>CPU load</dt><dd>{value.system.cpu.usage_percent.toFixed(1)}%</dd>
             <dt>{t("ram")}</dt><dd>{bytes(value.system.memory.total_bytes)}</dd>
             <dt>{t("availableRam")}</dt><dd>{bytes(value.system.memory.available_bytes)}</dd>
             <dt>{t("gpuCount")}</dt><dd>{value.system.gpus.length}</dd>
@@ -48,18 +55,19 @@ export function SystemPage({revision}: {revision: number}) {
         <Panel title={t("gpuDevices")} className="wide">
           <div className="table-wrap">
             <table>
-              <thead><tr><th>{t("model")}</th><th>{t("vendor")}</th><th>{t("pciAddress")}</th><th>{t("deviceId")}</th><th>{t("driver")}</th></tr></thead>
+              <thead><tr><th>{t("model")}</th><th>{t("vendor")}</th><th>Load</th><th>{t("pciAddress")}</th><th>{t("deviceId")}</th><th>{t("driver")}</th></tr></thead>
               <tbody>
                 {value.system.gpus.map((gpu) => (
                   <tr key={gpu.pci_address || gpu.card || gpu.device_id}>
                     <td>{gpu.model || t("unknown")}</td>
                     <td>{gpu.vendor || "—"}</td>
+                    <td>{gpu.utilization_percent === undefined ? "—" : gpu.utilization_percent.toFixed(1) + "%"}</td>
                     <td className="mono">{gpu.pci_address || "—"}</td>
                     <td className="mono">{gpu.vendor_id && gpu.device_id ? `${gpu.vendor_id}:${gpu.device_id}` : (gpu.device_id || "—")}</td>
                     <td>{gpu.driver || <span className="status-badge status-failed">{t("driverMissing")}</span>}</td>
                   </tr>
                 ))}
-                {value.system.gpus.length === 0 && <tr><td colSpan={5} className="muted">—</td></tr>}
+                {value.system.gpus.length === 0 && <tr><td colSpan={6} className="muted">—</td></tr>}
               </tbody>
             </table>
           </div>
