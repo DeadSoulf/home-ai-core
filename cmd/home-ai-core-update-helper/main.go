@@ -82,17 +82,18 @@ func main() {
 	}()
 
 	logger.Info("update helper ready", "socket", socketPath)
-	for {
-		conn, err := listener.AcceptUnix()
-		if err != nil {
-			if ctx.Err() != nil {
-				return
-			}
-			logger.Error("accept failed", "error", err)
-			continue
+	conn, err := listener.AcceptUnix()
+	if err != nil {
+		if ctx.Err() != nil {
+			return
 		}
-		go handleConnection(ctx, logger, conn, uint32(uid))
+		logger.Error("accept failed", "error", err)
+		os.Exit(1)
 	}
+	// Handle one privileged request and exit. systemd restarts the service,
+	// which also guarantees that an upgraded helper binary is picked up
+	// immediately after a successful self-update.
+	handleConnection(ctx, logger, conn, uint32(uid))
 }
 
 func handleConnection(parent context.Context, logger *slog.Logger, conn *net.UnixConn, expectedUID uint32) {
