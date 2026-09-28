@@ -359,3 +359,49 @@ func TestEventsRouteUpgradesToWebSocket(t *testing.T) {
 		t.Fatalf("node ID = %q", connected.Source.NodeID)
 	}
 }
+
+
+func TestInvalidSessionModeIsRejectedBeforeLogin(t *testing.T) {
+	handler := testHandler(fakeState{schemaVersion: 2})
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/auth/login",
+		strings.NewReader(`{"username":"owner","password":"not-used-here","session_mode":"invalid"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+	var body errorEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Error.Code != "invalid_session_mode" {
+		t.Fatalf("error code = %q", body.Error.Code)
+	}
+}
+
+func TestAuthenticationBackendFailureIsUnavailable(t *testing.T) {
+	sec := defaultFakeSecurity()
+	sec.authErr = errors.New("database failed")
+	handler := testHandlerWithSecurity(fakeState{schemaVersion: 2}, sec)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/system", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+	}
+	var body errorEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Error.Code != "authentication_unavailable" {
+		t.Fatalf("error code = %q", body.Error.Code)
+	}
+}
