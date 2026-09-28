@@ -3,8 +3,6 @@ name: Release Debian packages
 on:
   push:
     branches: [main]
-    paths:
-      - VERSION
   workflow_dispatch:
 
 permissions:
