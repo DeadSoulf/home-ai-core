@@ -1,0 +1,99 @@
+name: core-ci
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  pull_request:
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.x'
+          check-latest: false
+
+      - name: Dependency lock check
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+      - name: Format check
+        run: |
+          test -z "$(gofmt -l ./cmd ./internal)"
+
+      - name: Test
+        run: go test ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: ./scripts/build.sh
+
+      - name: Integration smoke test
+        run: |
+          set -eu
+          STATE_DIR="$(mktemp -d)"
+          LOG_FILE="$(mktemp)"
+          ./build/home-ai-core --state-dir "$STATE_DIR" --listen 127.0.0.1:18080 >"$LOG_FILE" 2>&1 &
+          PID=$!
+          cleanup() {
+            kill "$PID" 2>/dev/null || true
+            wait "$PID" 2>/dev/null || true
+            rm -rf "$STATE_DIR" "$LOG_FILE"
+          }
+          trap cleanup EXIT INT TERM
+
+          ready=0
+          for _ in $(seq 1 50); do
+            if curl --fail --silent http://127.0.0.1:18080/health >/tmp/home-ai-health.json; then
+              ready=1
+              break
+            fi
+            sleep 0.2
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            cat "$LOG_FILE"
+            exit 1
+          fi
+
+          curl --fail --silent http://127.0.0.1:18080/api/v1/system >/tmp/home-ai-system.json
+
+          python3 - <<'PY'
+          import json
+
+          with open("/tmp/home-ai-health.json", "r", encoding="utf-8") as f:
+              health = json.load(f)
+          assert health["status"] == "ok"
+
+          with open("/tmp/home-ai-system.json", "r", encoding="utf-8") as f:
+              system = json.load(f)
+          assert system["schema_version"] >= 1
+          assert system["system"]["node_id"]
+          assert system["system"]["cpu"]["logical_cpus"] >= 1
+          PY
+
+          test -f "$STATE_DIR/core.db"
+          test -f "$STATE_DIR/identity/node-id"
+
+      - name: Cross-build Linux targets
+        run: |
+          VERSION="$(cat VERSION)"
+          for arch in amd64 arm64; do
+            GOOS=linux GOARCH="$arch" CGO_ENABLED=0 go build               -trimpath               -ldflags "-s -w -X github.com/DeadSoulf/home-ai-core/internal/version.Version=$VERSION"               -o "/tmp/home-ai-core-linux-$arch"               ./cmd/home-ai-core
+          done
