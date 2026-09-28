@@ -188,7 +188,6 @@ func TestNotFoundUsesErrorEnvelope(t *testing.T) {
 	}
 }
 
-
 func TestMethodNotAllowedUsesErrorEnvelope(t *testing.T) {
 	handler := testHandler(fakeState{schemaVersion: 1})
 
