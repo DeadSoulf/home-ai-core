@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	ErrSigningKeyNotFound  = errors.New("module signing key not found")
-	ErrRepositoryNotFound  = errors.New("module repository not found")
+	ErrSigningKeyNotFound = errors.New("module signing key not found")
+	ErrRepositoryNotFound = errors.New("module repository not found")
 )
 
 type ModuleSigningKeyRecord struct {
