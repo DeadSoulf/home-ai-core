@@ -76,17 +76,28 @@ export function SystemPage({revision}: {revision: number}) {
         <Panel title={t("blockDevices")} className="wide">
           <div className="table-wrap">
             <table>
-              <thead><tr><th>{t("device")}</th><th>{t("model")}</th><th>{t("size")}</th><th>{t("type")}</th><th>{t("serial")}</th></tr></thead>
+              <thead><tr><th>{t("device")}</th><th>{t("model")}</th><th>{t("size")}</th><th>{t("type")}</th><th>{t("serial")}</th><th>Filesystem / mount</th></tr></thead>
               <tbody>
-                {value.system.block_devices.map((disk) => (
+                {value.system.block_devices.flatMap((disk) => [
                   <tr key={disk.name}>
-                    <td className="mono">{disk.path}</td>
-                    <td>{disk.model || "—"}</td>
+                    <td className="mono"><strong>{disk.path}</strong></td>
+                    <td>{[disk.vendor, disk.model].filter(Boolean).join(" ") || "—"}</td>
                     <td>{bytes(disk.size_bytes)}</td>
                     <td>{disk.rotational ? "HDD" : t("flash")}</td>
                     <td className="mono">{disk.serial || "—"}</td>
-                  </tr>
-                ))}
+                    <td>{disk.partitions.length ? disk.partitions.length + " partition(s)" : "No partitions"}</td>
+                  </tr>,
+                  ...disk.partitions.map((part) => (
+                    <tr key={part.name}>
+                      <td className="mono">↳ {part.path}</td>
+                      <td className="muted">Partition</td>
+                      <td>{bytes(part.size_bytes)}</td>
+                      <td>{part.filesystem || "—"}</td>
+                      <td>—</td>
+                      <td className="mono">{part.mountpoints.join(", ") || "—"}</td>
+                    </tr>
+                  )),
+                ])}
               </tbody>
             </table>
           </div>
