@@ -1,5 +1,6 @@
 import { useCallback, useState, type FormEvent } from "react";
 import { api } from "../api/client";
+import type { BlockNode } from "../api/types";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
 import { useResource } from "../hooks/useResource";
 import { useI18n } from "../i18n";
@@ -10,10 +11,10 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
   const load = useCallback(async () => {
     const folders = await api.fileFolders();
     if (!canManage) {
-      return {folders, pools: [], users: []};
+      return {folders, pools: [], users: [], system: undefined};
     }
-    const [pools, users] = await Promise.all([api.filePools(), api.users()]);
-    return {folders, pools, users};
+    const [pools, users, system] = await Promise.all([api.filePools(), api.users(), api.system()]);
+    return {folders, pools, users, system};
   }, [canManage]);
   const resource = useResource(load, revision);
 
@@ -81,6 +82,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
   const folders = resource.data?.folders || [];
   const pools = resource.data?.pools || [];
   const users = resource.data?.users || [];
+  const mountOptions = nasMountOptions(resource.data?.system?.system.block_tree || []);
   const userName = new Map(users.map((user) => [user.id, user.display_name || user.username]));
 
   return (
@@ -144,15 +146,22 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
               </label>
               <label>
                 {t("filePoolRoot")}
-                <input
+                <select
                   required
                   value={poolRoot}
                   onChange={(event) => setPoolRoot(event.target.value)}
-                  placeholder="/srv/home-ai/storage"
-                />
+                >
+                  <option value="">{t("fileChooseMountedStorage")}</option>
+                  {mountOptions.map((mount) => (
+                    <option key={mount.path} value={mount.path}>
+                      {mount.path} · {mount.filesystem || "filesystem"} · {mount.device || "—"}
+                    </option>
+                  ))}
+                </select>
               </label>
+              {mountOptions.length === 0 && <div className="notice">{t("fileNoMountedStorage")}</div>}
               <p className="muted small">{t("filePoolFoundationNotice")}</p>
-              <button className="button primary" type="submit" disabled={busy !== ""}>
+              <button className="button primary" type="submit" disabled={busy !== "" || mountOptions.length === 0}>
                 {busy === "pool" ? t("working") : t("fileCreatePool")}
               </button>
             </form>
@@ -228,3 +237,30 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
     </div>
   );
 }
+
+type NASMountOption = {
+  path: string;
+  filesystem?: string;
+  device?: string;
+};
+
+function nasMountOptions(nodes: BlockNode[]): NASMountOption[] {
+  const byPath = new Map<string, NASMountOption>();
+  const visit = (node: BlockNode) => {
+    if (!node.system && node.filesystem) {
+      for (const mountpoint of node.mountpoints || []) {
+        if (mountpoint.startsWith("/mnt/home-ai-core/")) {
+          byPath.set(mountpoint, {
+            path: mountpoint,
+            filesystem: node.filesystem,
+            device: node.path || node.name,
+          });
+        }
+      }
+    }
+    for (const child of node.children || []) visit(child);
+  };
+  for (const node of nodes) visit(node);
+  return [...byPath.values()].sort((a, b) => a.path.localeCompare(b.path));
+}
+
