@@ -23,6 +23,7 @@ func applyFilesystemStatsNode(node *BlockNode, stats map[string]updaterhelper.Fi
 	}
 	if stat, ok := stats[node.Path]; ok {
 		node.FreeBytes = stat.FreeBytes
+		node.FreeKnown = true
 	}
 	for i := range node.Children {
 		applyFilesystemStatsNode(&node.Children[i], stats)
@@ -32,5 +33,6 @@ func applyFilesystemStatsNode(node *BlockNode, stats map[string]updaterhelper.Fi
 		// capacity. Filesystem free space remains on child nodes so callers can
 		// sum the tree without double-counting.
 		node.FreeBytes = node.UnallocatedBytes
+		node.FreeKnown = true
 	}
 }
