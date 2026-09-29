@@ -136,7 +136,7 @@ tbody tr:last-child td { border-bottom: 0; }
 @media (max-width: 760px) {
   .app-shell { grid-template-columns: 1fr; }
   .sidebar { position: static; height: auto; }
-  .sidebar nav { grid-template-columns: repeat(6, 1fr); overflow-x: auto; }
+  .sidebar nav { grid-template-columns: repeat(5, 1fr); overflow-x: auto; }
   .nav-item { text-align: center; font-size: 12px; white-space: nowrap; }
   .sidebar-footer { margin-top: 0; grid-template-columns: 1fr 1fr; align-items: center; }
   .user-summary { display: none; }
@@ -155,7 +155,6 @@ tbody tr:last-child td { border-bottom: 0; }
 
 .update-callout { margin: 18px 0; display: grid; gap: 5px; border-radius: 10px; padding: 12px 14px; }
 .update-callout strong { font-size: 13px; }
-.update-callout span { color: #a8b1bf; font-size: 12px; line-height: 1.45; }
 .update-callout.available { border: 1px solid #31549a; background: #1b2d50; }
 .update-callout.current { border: 1px solid #28513f; background: #18342a; }
 .update-action-stack { display: grid; gap: 12px; margin-top: 12px; margin-bottom: 16px; align-items: start; }
