@@ -104,4 +104,3 @@ func TestTransientPackageCommand(t *testing.T) {
 		}
 	}
 }
-
