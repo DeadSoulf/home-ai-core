@@ -117,6 +117,12 @@ export function StorageDevices({
     setError("");
     setMessage("");
     try {
+      if (node.mountpoints.length > 0) {
+        await api.storageOperation({
+          operation: "unmount",
+          device: node.path,
+        });
+      }
       const result = await api.storageOperation({
         operation: "format",
         device: node.path,
@@ -257,7 +263,6 @@ export function StorageDevices({
               const formattable =
                 !!node.path &&
                 node.type === "part" &&
-                !mounted &&
                 !node.system;
               const deletable =
                 !!node.path &&
@@ -482,7 +487,10 @@ export function StorageDevices({
         </table>
       </div>
 
-      <div className="storage-protection">{t("systemDiskProtection")}</div>
+      {devices.some((disk) => disk.system) && (
+        <div className="storage-protection">{t("systemDiskProtection")}</div>
+      )}
+      <div className="storage-hint">{t("usbFormatHint")}</div>
     </div>
   );
 }
