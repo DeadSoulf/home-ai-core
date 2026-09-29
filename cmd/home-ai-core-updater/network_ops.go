@@ -693,4 +693,3 @@ func sortWireGuardTunnels(items []updaterhelper.WireGuardTunnelStat) {
 		}
 	}
 }
-
