@@ -372,12 +372,12 @@ func (s *Service) audit(
 
 func actorFromSession(record state.SessionRecord) Actor {
 	return Actor{
-		Type:        "user",
-		ID:          record.User.ID,
-		Username:    record.User.Username,
-		DisplayName: record.User.DisplayName,
-		SessionID:   record.ID,
-		Roles:       record.Roles,
+		Type:                "user",
+		ID:                  record.User.ID,
+		Username:            record.User.Username,
+		DisplayName:         record.User.DisplayName,
+		SessionID:           record.ID,
+		Roles:               record.Roles,
 		Permissions:         record.Permissions,
 		ResourcePermissions: permissionScopes(record.ResourcePermissions),
 		csrfHash:            record.CSRFHash,
