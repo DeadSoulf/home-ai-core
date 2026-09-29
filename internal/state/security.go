@@ -9,7 +9,10 @@ import (
 	"time"
 )
 
-var ErrAlreadyInitialized = errors.New("security already initialized")
+var (
+	ErrAlreadyInitialized = errors.New("security already initialized")
+	ErrUserExists          = errors.New("user already exists")
+)
 
 type UserRecord struct {
 	ID           string
@@ -19,6 +22,11 @@ type UserRecord struct {
 	Disabled     bool
 	CreatedAt    time.Time
 	LastLoginAt  *time.Time
+}
+
+type UserAccountRecord struct {
+	User  UserRecord
+	Roles []string
 }
 
 type ResourcePermissionRecord struct {
@@ -92,6 +100,142 @@ func (s *Store) CreateOwner(ctx context.Context, id, username, displayName, pass
 	}
 
 	return UserRecord{ID: id, Username: username, DisplayName: displayName, PasswordHash: passwordHash, CreatedAt: now.UTC()}, nil
+}
+
+func (s *Store) CreateUser(
+	ctx context.Context,
+	id, username, displayName, passwordHash, roleID string,
+	now time.Time,
+) (UserRecord, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return UserRecord{}, fmt.Errorf("begin user creation: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var count int
+	if err := tx.QueryRowContext(
+		ctx,
+		"SELECT COUNT(*) FROM users WHERE username = ? COLLATE NOCASE",
+		username,
+	).Scan(&count); err != nil {
+		return UserRecord{}, fmt.Errorf("check existing user: %w", err)
+	}
+	if count != 0 {
+		return UserRecord{}, ErrUserExists
+	}
+
+	timestamp := now.UTC().Format(time.RFC3339Nano)
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO users(id, username, display_name, password_hash, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, id, username, displayName, passwordHash, timestamp, timestamp); err != nil {
+		return UserRecord{}, fmt.Errorf("insert user: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, "INSERT INTO user_roles(user_id, role_id) VALUES (?, ?)", id, roleID); err != nil {
+		return UserRecord{}, fmt.Errorf("assign user role: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return UserRecord{}, fmt.Errorf("commit user creation: %w", err)
+	}
+
+	return UserRecord{
+		ID:           id,
+		Username:     username,
+		DisplayName:  displayName,
+		PasswordHash: passwordHash,
+		CreatedAt:    now.UTC(),
+	}, nil
+}
+
+func (s *Store) ListUsers(ctx context.Context) ([]UserAccountRecord, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, username, display_name, password_hash, disabled, created_at, last_login_at
+		FROM users
+		ORDER BY username COLLATE NOCASE
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list users: %w", err)
+	}
+
+	var users []UserRecord
+	for rows.Next() {
+		var user UserRecord
+		var disabled int
+		var createdAt string
+		var lastLoginAt sql.NullString
+		if err := rows.Scan(
+			&user.ID,
+			&user.Username,
+			&user.DisplayName,
+			&user.PasswordHash,
+			&disabled,
+			&createdAt,
+			&lastLoginAt,
+		); err != nil {
+			_ = rows.Close()
+			return nil, fmt.Errorf("scan user: %w", err)
+		}
+		user.Disabled = disabled == 1
+		user.CreatedAt, err = time.Parse(time.RFC3339Nano, createdAt)
+		if err != nil {
+			_ = rows.Close()
+			return nil, fmt.Errorf("parse user created_at: %w", err)
+		}
+		if lastLoginAt.Valid {
+			parsed, err := time.Parse(time.RFC3339Nano, lastLoginAt.String)
+			if err != nil {
+				_ = rows.Close()
+				return nil, fmt.Errorf("parse user last_login_at: %w", err)
+			}
+			user.LastLoginAt = &parsed
+		}
+		users = append(users, user)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, fmt.Errorf("iterate users: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, fmt.Errorf("close user rows: %w", err)
+	}
+
+	result := make([]UserAccountRecord, 0, len(users))
+	for _, user := range users {
+		roles, err := s.userRoles(ctx, user.ID)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, UserAccountRecord{User: user, Roles: roles})
+	}
+	return result, nil
+}
+
+func (s *Store) userRoles(ctx context.Context, userID string) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT r.name
+		FROM roles r
+		JOIN user_roles ur ON ur.role_id = r.id
+		WHERE ur.user_id = ?
+		ORDER BY r.name
+	`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("read user roles: %w", err)
+	}
+	defer rows.Close()
+
+	var roles []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, fmt.Errorf("scan user role: %w", err)
+		}
+		roles = append(roles, name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate user roles: %w", err)
+	}
+	return roles, nil
 }
 
 func (s *Store) UserByUsername(ctx context.Context, username string) (UserRecord, error) {
