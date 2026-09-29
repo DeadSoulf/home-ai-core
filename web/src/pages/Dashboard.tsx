@@ -117,6 +117,7 @@ export function Dashboard({revision}: {revision: number}) {
                         : "";
                 const details = [
                   disk.display_name ? disk.name : "",
+                  disk.transport ? disk.transport.toUpperCase() : "",
                   t("freeSpace") + ": " + (free === undefined ? "—" : formatBytes(free)),
                   disk.temperature_c !== undefined ? disk.temperature_c + "°C" : "",
                   health,
