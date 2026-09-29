@@ -618,6 +618,11 @@ func (s *Service) reconcileInstallResult() {
 	state := s.snapshotState()
 	switch {
 	case result.Status == "succeeded" && result.Version == s.currentVersion:
+		// A stale successful install result must not overwrite state for a newer
+		// update that has already been discovered, downloaded, or prepared.
+		if state.AvailableVersion != "" && state.AvailableVersion != result.Version {
+			return
+		}
 		if state.Phase == PhaseSucceeded && state.AvailableVersion == result.Version {
 			return
 		}
