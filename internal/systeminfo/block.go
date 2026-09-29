@@ -7,23 +7,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
-	"sync"
-	"time"
 )
 
 const sectorSize = uint64(512)
-
-type filesystemFreeCacheEntry struct {
-	bytes     uint64
-	expiresAt time.Time
-}
-
-var filesystemFreeCache = struct {
-	sync.Mutex
-	items map[string]filesystemFreeCacheEntry
-}{items: map[string]filesystemFreeCacheEntry{}}
 
 type lsblkOutput struct {
 	BlockDevices []lsblkNode `json:"blockdevices"`
@@ -113,9 +100,6 @@ func convertLsblkNode(item lsblkNode) BlockNode {
 
 	freeBytes := item.FreeBytes
 	var unallocatedBytes uint64
-	if freeBytes == 0 && len(mountpoints) == 0 && item.Path != "" && item.Filesystem != "" {
-		freeBytes = offlineFilesystemFreeBytes(item.Path, item.Filesystem)
-	}
 	if item.Type == "disk" {
 		var partitionBytes uint64
 		for _, child := range children {
@@ -150,138 +134,6 @@ func convertLsblkNode(item lsblkNode) BlockNode {
 		System:      system,
 		Children:    children,
 	}
-}
-
-func offlineFilesystemFreeBytes(device, filesystem string) uint64 {
-	key := device + "|" + strings.ToLower(strings.TrimSpace(filesystem))
-	now := time.Now()
-
-	filesystemFreeCache.Lock()
-	if cached, ok := filesystemFreeCache.items[key]; ok && now.Before(cached.expiresAt) {
-		filesystemFreeCache.Unlock()
-		return cached.bytes
-	}
-	filesystemFreeCache.Unlock()
-
-	var value uint64
-	switch strings.ToLower(strings.TrimSpace(filesystem)) {
-	case "ext2", "ext3", "ext4":
-		value = extFilesystemFreeBytes(device)
-	case "xfs":
-		value = xfsFilesystemFreeBytes(device)
-	case "vfat", "fat", "fat32":
-		value = fatFilesystemFreeBytes(device)
-	}
-
-	filesystemFreeCache.Lock()
-	filesystemFreeCache.items[key] = filesystemFreeCacheEntry{
-		bytes:     value,
-		expiresAt: now.Add(30 * time.Second),
-	}
-	filesystemFreeCache.Unlock()
-	return value
-}
-
-func extFilesystemFreeBytes(device string) uint64 {
-	output, err := exec.Command("/usr/sbin/dumpe2fs", "-h", device).CombinedOutput()
-	if err != nil {
-		return 0
-	}
-	var freeBlocks, blockSize uint64
-	for _, line := range strings.Split(string(output), "\n") {
-		key, value, ok := strings.Cut(line, ":")
-		if !ok {
-			continue
-		}
-		number, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64)
-		if err != nil {
-			continue
-		}
-		switch strings.TrimSpace(key) {
-		case "Free blocks":
-			freeBlocks = number
-		case "Block size":
-			blockSize = number
-		}
-	}
-	if freeBlocks == 0 || blockSize == 0 {
-		return 0
-	}
-	return freeBlocks * blockSize
-}
-
-func fatFilesystemFreeBytes(device string) uint64 {
-	output, err := exec.Command("/usr/sbin/fsck.fat", "-n", "-v", device).CombinedOutput()
-	if err != nil {
-		return 0
-	}
-	var clusterSize uint64
-	var usedClusters, totalClusters uint64
-	for _, line := range strings.Split(string(output), "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.Contains(trimmed, "bytes per cluster") {
-			fields := strings.Fields(trimmed)
-			if len(fields) > 0 {
-				clusterSize, _ = strconv.ParseUint(fields[0], 10, 64)
-			}
-		}
-		if !strings.Contains(trimmed, "clusters") || !strings.Contains(trimmed, "/") {
-			continue
-		}
-		for _, field := range strings.Fields(trimmed) {
-			if !strings.Contains(field, "/") {
-				continue
-			}
-			parts := strings.SplitN(strings.Trim(field, ",;()"), "/", 2)
-			if len(parts) != 2 {
-				continue
-			}
-			used, errUsed := strconv.ParseUint(parts[0], 10, 64)
-			total, errTotal := strconv.ParseUint(parts[1], 10, 64)
-			if errUsed == nil && errTotal == nil && total >= used {
-				usedClusters = used
-				totalClusters = total
-			}
-		}
-	}
-	if clusterSize == 0 || totalClusters == 0 || totalClusters < usedClusters {
-		return 0
-	}
-	return (totalClusters - usedClusters) * clusterSize
-}
-
-func xfsFilesystemFreeBytes(device string) uint64 {
-	output, err := exec.Command(
-		"/usr/sbin/xfs_db",
-		"-r",
-		"-c", "sb 0",
-		"-c", "p blocksize fdblocks",
-		device,
-	).CombinedOutput()
-	if err != nil {
-		return 0
-	}
-	var freeBlocks, blockSize uint64
-	for _, line := range strings.Split(string(output), "\n") {
-		key, value, ok := strings.Cut(line, "=")
-		if !ok {
-			continue
-		}
-		number, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64)
-		if err != nil {
-			continue
-		}
-		switch strings.TrimSpace(key) {
-		case "fdblocks":
-			freeBlocks = number
-		case "blocksize":
-			blockSize = number
-		}
-	}
-	if freeBlocks == 0 || blockSize == 0 {
-		return 0
-	}
-	return freeBlocks * blockSize
 }
 
 func blockDevices(sysBlockRoot string) []BlockDevice {
