@@ -34,6 +34,7 @@ type BlockNode struct {
 	Filesystem  string      `json:"filesystem,omitempty"`
 	SizeBytes   uint64      `json:"size_bytes,omitempty"`
 	FreeBytes        uint64      `json:"free_bytes,omitempty"`
+	FreeKnown        bool        `json:"free_known"`
 	UnallocatedBytes uint64      `json:"unallocated_bytes,omitempty"`
 	PartitionTable   string      `json:"partition_table,omitempty"`
 	Mountpoints      []string    `json:"mountpoints"`
