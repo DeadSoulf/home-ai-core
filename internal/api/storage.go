@@ -31,6 +31,7 @@ func (s *server) storageOperation(
 		Filesystem string `json:"filesystem,omitempty"`
 		Label      string `json:"label,omitempty"`
 		Confirm    string `json:"confirm,omitempty"`
+		SizeMiB    uint64 `json:"size_mib,omitempty"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
@@ -53,6 +54,7 @@ func (s *server) storageOperation(
 		Filesystem: input.Filesystem,
 		Label:      input.Label,
 		Confirm:    input.Confirm,
+		SizeMiB:    input.SizeMiB,
 	})
 	if err != nil {
 		s.logger.Error("storage operation failed", "operation", input.Operation, "device", input.Device, "error", err)
@@ -68,7 +70,7 @@ func (s *server) storageOperation(
 		"block_device",
 		input.Device,
 		"success",
-		map[string]any{"mountpoint": input.Mountpoint, "filesystem": input.Filesystem},
+		map[string]any{"mountpoint": input.Mountpoint, "filesystem": input.Filesystem, "size_mib": input.SizeMiB},
 	)
 	writeJSON(w, http.StatusOK, map[string]any{"message": message})
 }
