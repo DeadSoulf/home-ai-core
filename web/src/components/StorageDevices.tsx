@@ -52,7 +52,16 @@ export function StorageDevices({
 
   async function format(partition: Partition) {
     const confirmation = `FORMAT ${partition.path}`;
-    if (!window.confirm(t("formatDiskWarning").replace("{device}", partition.path))) return;
+    const typed = window.prompt(
+      t("formatTypeConfirmation")
+        .replace("{device}", partition.path)
+        .replace("{confirmation}", confirmation),
+      "",
+    );
+    if (typed !== confirmation) {
+      if (typed !== null) setError(t("formatConfirmationMismatch"));
+      return;
+    }
 
     setBusy(partition.path);
     setError("");
