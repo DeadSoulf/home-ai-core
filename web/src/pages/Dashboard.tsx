@@ -61,7 +61,7 @@ function diskFreeBytes(root: BlockNode): number | undefined {
   if (unknownFilesystem) return undefined;
 
   const unallocated = root.unallocated_bytes || 0;
-  if (!foundFilesystem && unallocated === 0) return undefined;
+  if (!foundFilesystem && lvmFree === 0 && unallocated === 0) return undefined;
   return filesystemFree + lvmFree + unallocated;
 }
 
