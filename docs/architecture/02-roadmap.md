@@ -89,7 +89,11 @@
 - Application runtime abstraction.
 
 ## Phase 11 — Storage and Personal Cloud foundation
-- Block devices, SMART, filesystems and mounts.
+
+Low-level Storage v1 groundwork landed ahead of this phase: block-device inventory, SMART, filesystems, mounts, guarded partition operations and LVM inspection/deactivation are already available through the Core/helper boundary.
+
+Remaining Phase 11 work is the higher-level storage product layer:
+
 - ZFS/Btrfs/LVM providers where appropriate.
 - Storage pools and datasets/volumes.
 - User/family file spaces.
