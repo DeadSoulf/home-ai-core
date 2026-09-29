@@ -603,4 +603,3 @@ func TestCreateUserWithBearerSession(t *testing.T) {
 		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusCreated, rec.Body.String())
 	}
 }
-
