@@ -33,6 +33,8 @@ const strings = {
     unmount: "Unmount", format: "Format", working: "Working…", filesystem: "Filesystem", volumeLabel: "Volume label",
     optional: "Optional", cancel: "Cancel", formatWarning: "Formatting permanently deletes all data on this partition.",
     formatDiskWarning: "Format {device}? All data on this partition will be permanently deleted.",
+    formatTypeConfirmation: "Formatting {device} permanently deletes its data. Type {confirmation} to continue.",
+    formatConfirmationMismatch: "Formatting cancelled: confirmation text did not match.",
     systemDiskProtection: "Destructive operations are disabled for the disk that contains the running system."
   },
   ru: {
@@ -65,6 +67,8 @@ const strings = {
     unmount: "Размонтировать", format: "Форматировать", working: "Выполняется…", filesystem: "Файловая система", volumeLabel: "Метка тома",
     optional: "Необязательно", cancel: "Отмена", formatWarning: "Форматирование безвозвратно удалит все данные на этом разделе.",
     formatDiskWarning: "Форматировать {device}? Все данные на этом разделе будут безвозвратно удалены.",
+    formatTypeConfirmation: "Форматирование {device} безвозвратно удалит данные. Для продолжения введите {confirmation}.",
+    formatConfirmationMismatch: "Форматирование отменено: текст подтверждения не совпал.",
     systemDiskProtection: "Разрушительные операции отключены для диска, на котором находится работающая система."
   }
 } as const;
