@@ -13,6 +13,7 @@ import (
 
 type UpdaterService interface {
 	Check(context.Context) (updater.ReleaseStatus, error)
+	CheckFresh(context.Context) (updater.ReleaseStatus, error)
 	State() updater.State
 	Download(context.Context, string) (updater.State, error)
 	Install(context.Context, string) (updater.State, error)
@@ -31,13 +32,7 @@ func (s *server) updateStatus(w http.ResponseWriter, r *http.Request) {
 	var status updater.ReleaseStatus
 	var err error
 	if r.URL.Query().Get("fresh") == "1" {
-		if fresh, ok := s.updater.(interface {
-			CheckFresh(context.Context) (updater.ReleaseStatus, error)
-		}); ok {
-			status, err = fresh.CheckFresh(r.Context())
-		} else {
-			status, err = s.updater.Check(r.Context())
-		}
+		status, err = s.updater.CheckFresh(r.Context())
 	} else {
 		status, err = s.updater.Check(r.Context())
 	}
