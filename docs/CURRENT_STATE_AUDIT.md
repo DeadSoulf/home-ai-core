@@ -36,7 +36,7 @@ Core Foundation
 | Core REST API | KEEP | Common control plane for Web, voice, clients, modules, AI and cluster |
 | SQLite state + migrations | KEEP | Local durable control metadata and safe upgrades |
 | Stable node identity | KEEP | Direct foundation for future cluster membership/resource ownership |
-| Authentication / sessions | KEEP | Multi-user Home-AI requires identity |
+| Authentication / sessions | KEEP | Owner/member accounts and sessions now provide the identity base for household users |
 | RBAC / permissions | KEEP + EXTEND | Global RBAC plus resource-scoped grant foundation now exists for users, rooms, devices, files, cameras and AI tool access |
 | CSRF and Web security | KEEP | Required for privileged local administration |
 | Audit log | KEEP | Essential for AI actions, security, storage and automation changes |
@@ -52,7 +52,7 @@ Core Foundation
 | Privileged helper boundary | KEEP | Correct security boundary for host/storage/network operations |
 | Update System v2 | KEEP | Successfully tested Web-driven lifecycle; critical product infrastructure |
 | Rollback support | KEEP / TEST | Needed for reliable commercial/product updates |
-| Web UI shell | KEEP | Current main user interface |
+| Web UI shell | KEEP | Main interface is permission-aware and includes household user management |
 | CI / release workflows | KEEP | Needed for safe evolution and commercial-quality releases |
 | Third-party license policy | KEEP | Important because commercial distribution is a goal |
 
@@ -101,9 +101,9 @@ Future cluster design may keep local SQLite for node-local state while adding a 
 
 The security boundary is correct.
 
-The implementation is currently too concentrated in `cmd/home-ai-core-updater/main.go`, which mixes update and storage operations.
+The first extraction refactor is complete: routing, update operations, storage operations and Unix helpers are physically separated while preserving the existing socket/protocol contract.
 
-Keep the boundary; refactor the implementation.
+A later package-level split can improve isolation further, but it no longer blocks the product roadmap.
 
 ## Deprioritize — not part of the main product path
 
@@ -246,9 +246,9 @@ Still required:
 
 ## Current technical debt
 
-1. Split `cmd/home-ai-core-updater/main.go` into routing, update and storage implementation packages.
-2. Perform a real rollback acceptance test after the successful `0.1.58-dev` Web update.
-3. Resource-scoped grants are implemented; add management API/UI and domain-aware hierarchy when NAS/Smart Home resources exist.
+1. Perform a real rollback acceptance test after the successful `0.1.58-dev` Web update.
+2. Resource-scoped grants are implemented; add domain-aware grant management when NAS/Smart Home resources exist.
+3. Continue package-level helper isolation only when it provides concrete testability/security value.
 4. Define event-retention boundaries before Smart Home and NVR create high event volume.
 5. Keep cluster-critical state abstract enough that single-node SQLite assumptions do not leak into future APIs.
 6. Define a signed stable release channel before commercial/stable deployment.
@@ -261,10 +261,9 @@ They are strategic assets for the final product.
 
 The next engineering sequence should be:
 
-1. finish/refactor the Core foundation;
-2. build NAS/File Storage;
-3. build the native Smart Home domain;
-4. build NVR/Cameras;
-5. build the local AI Agent on top of those domain APIs;
-6. add Voice/remote clients;
-7. add cluster scheduling/failover.
+1. build NAS/File Storage on the completed Core/multi-user foundation;
+2. build the native Smart Home domain;
+3. build NVR/Cameras;
+4. build the local AI Agent on top of those domain APIs;
+5. add Voice/remote clients;
+6. add cluster scheduling/failover.
