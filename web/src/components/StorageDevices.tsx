@@ -187,6 +187,7 @@ export function StorageDevices({
       setPartitionProgress({device: node.path, text: t("partitionCreated")});
       window.setTimeout(() => setPartitionProgress(null), 1200);
     } catch (reason) {
+      setPartitionProgress(null);
       setError(reason instanceof Error ? reason.message : t("requestFailed"));
     } finally {
       setBusy("");
