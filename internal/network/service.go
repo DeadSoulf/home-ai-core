@@ -30,9 +30,9 @@ type Request struct {
 }
 
 type WireGuardStatus struct {
-	Available bool                                 `json:"available"`
-	Error     string                               `json:"error,omitempty"`
-	Tunnels   []updaterhelper.WireGuardTunnelStat  `json:"tunnels"`
+	Available bool                                `json:"available"`
+	Error     string                              `json:"error,omitempty"`
+	Tunnels   []updaterhelper.WireGuardTunnelStat `json:"tunnels"`
 }
 
 func Execute(ctx context.Context, input Request) (string, error) {
