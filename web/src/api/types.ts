@@ -77,28 +77,6 @@ export type SystemResponse = {
     };
     uptime_seconds?: number;
     block_tree: BlockNode[];
-    block_devices: Array<{
-      name: string;
-      display_name?: string;
-      path: string;
-      major_minor?: string;
-      vendor?: string;
-      model?: string;
-      serial?: string;
-      size_bytes?: number;
-      rotational: boolean;
-      removable: boolean;
-      system: boolean;
-      partitions: Array<{
-        name: string;
-        path: string;
-        size_bytes?: number;
-        filesystem?: string;
-        uuid?: string;
-        label?: string;
-        mountpoints: string[];
-      }>;
-    }>;
     network_interfaces: Array<{
       name: string;
       index: number;
