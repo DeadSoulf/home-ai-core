@@ -7,10 +7,23 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 )
 
 const sectorSize = uint64(512)
+
+type filesystemFreeCacheEntry struct {
+	bytes     uint64
+	expiresAt time.Time
+}
+
+var filesystemFreeCache = struct {
+	sync.Mutex
+	items map[string]filesystemFreeCacheEntry
+}{items: map[string]filesystemFreeCacheEntry{}}
 
 type lsblkOutput struct {
 	BlockDevices []lsblkNode `json:"blockdevices"`
@@ -97,13 +110,29 @@ func convertLsblkNode(item lsblkNode) BlockNode {
 		children = append(children, node)
 	}
 
+	freeBytes := item.FreeBytes
+	if freeBytes == 0 && len(mountpoints) == 0 && item.Path != "" && item.Filesystem != "" {
+		freeBytes = offlineFilesystemFreeBytes(item.Path, item.Filesystem)
+	}
+	if item.Type == "disk" {
+		var partitionBytes uint64
+		for _, child := range children {
+			if child.Type == "part" {
+				partitionBytes += child.SizeBytes
+			}
+		}
+		if item.SizeBytes > partitionBytes {
+			freeBytes += item.SizeBytes - partitionBytes
+		}
+	}
+
 	return BlockNode{
 		Name:        item.Name,
 		Path:        item.Path,
 		Type:        item.Type,
 		Filesystem:  item.Filesystem,
 		SizeBytes:   item.SizeBytes,
-		FreeBytes:   item.FreeBytes,
+		FreeBytes:   freeBytes,
 		Mountpoints: mountpoints,
 		ParentName:  item.ParentName,
 		Label:       item.Label,
@@ -116,6 +145,96 @@ func convertLsblkNode(item lsblkNode) BlockNode {
 		System:      system,
 		Children:    children,
 	}
+}
+
+func offlineFilesystemFreeBytes(device, filesystem string) uint64 {
+	key := device + "|" + strings.ToLower(strings.TrimSpace(filesystem))
+	now := time.Now()
+
+	filesystemFreeCache.Lock()
+	if cached, ok := filesystemFreeCache.items[key]; ok && now.Before(cached.expiresAt) {
+		filesystemFreeCache.Unlock()
+		return cached.bytes
+	}
+	filesystemFreeCache.Unlock()
+
+	var value uint64
+	switch strings.ToLower(strings.TrimSpace(filesystem)) {
+	case "ext2", "ext3", "ext4":
+		value = extFilesystemFreeBytes(device)
+	case "xfs":
+		value = xfsFilesystemFreeBytes(device)
+	}
+
+	filesystemFreeCache.Lock()
+	filesystemFreeCache.items[key] = filesystemFreeCacheEntry{
+		bytes:     value,
+		expiresAt: now.Add(30 * time.Second),
+	}
+	filesystemFreeCache.Unlock()
+	return value
+}
+
+func extFilesystemFreeBytes(device string) uint64 {
+	output, err := exec.Command("/usr/sbin/dumpe2fs", "-h", device).CombinedOutput()
+	if err != nil {
+		return 0
+	}
+	var freeBlocks, blockSize uint64
+	for _, line := range strings.Split(string(output), "\n") {
+		key, value, ok := strings.Cut(line, ":")
+		if !ok {
+			continue
+		}
+		number, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64)
+		if err != nil {
+			continue
+		}
+		switch strings.TrimSpace(key) {
+		case "Free blocks":
+			freeBlocks = number
+		case "Block size":
+			blockSize = number
+		}
+	}
+	if freeBlocks == 0 || blockSize == 0 {
+		return 0
+	}
+	return freeBlocks * blockSize
+}
+
+func xfsFilesystemFreeBytes(device string) uint64 {
+	output, err := exec.Command(
+		"/usr/sbin/xfs_db",
+		"-r",
+		"-c", "sb 0",
+		"-c", "p blocksize fdblocks",
+		device,
+	).CombinedOutput()
+	if err != nil {
+		return 0
+	}
+	var freeBlocks, blockSize uint64
+	for _, line := range strings.Split(string(output), "\n") {
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		number, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64)
+		if err != nil {
+			continue
+		}
+		switch strings.TrimSpace(key) {
+		case "fdblocks":
+			freeBlocks = number
+		case "blocksize":
+			blockSize = number
+		}
+	}
+	if freeBlocks == 0 || blockSize == 0 {
+		return 0
+	}
+	return freeBlocks * blockSize
 }
 
 func blockDevices(sysBlockRoot string) []BlockDevice {
