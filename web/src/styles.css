@@ -301,3 +301,17 @@ tbody tr:last-child td { border-bottom: 0; }
 }
 .storage-capacity-summary strong { color: #e5edf7; }
 .storage-tree-wrap .form-error { white-space: pre-line; }
+
+
+.user-form { display: grid; gap: 14px; }
+.user-form label { display: grid; gap: 7px; color: #c9d2df; font-size: 13px; }
+.user-form input {
+  width: 100%; border: 1px solid #303a49; background: #10151c; color: #fff;
+  border-radius: 9px; padding: 10px 11px; outline: none;
+}
+.user-form input:focus { border-color: #5c85ff; box-shadow: 0 0 0 3px #4f7cff22; }
+.user-form .button { width: fit-content; }
+.account-access-note { margin: 18px 0 0; padding-top: 14px; border-top: 1px solid #252d38; }
+@media (max-width: 760px) {
+  .sidebar nav { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(92px, 1fr); }
+}

@@ -4,11 +4,12 @@ import type { Actor } from "../api/types";
 import { LanguageSwitch, useI18n } from "../i18n";
 
 const nav = [
-  ["/", "dashboard"],
-  ["/system", "system"],
-  ["/modules", "modules"],
-  ["/jobs", "jobs"],
-  ["/audit", "audit"],
+  ["/", "dashboard", ""],
+  ["/system", "system", "system.read"],
+  ["/modules", "modules", "modules.read"],
+  ["/jobs", "jobs", "jobs.read"],
+  ["/audit", "audit", "audit.read"],
+  ["/users", "users", "security.users.read"],
 ] as const;
 
 export function Shell(props: {
@@ -33,7 +34,9 @@ export function Shell(props: {
         </div>
 
         <nav aria-label="Main navigation">
-          {nav.map(([href, label]) => (
+          {nav
+            .filter(([, , permission]) => !permission || props.actor.permissions.includes(permission))
+            .map(([href, label]) => (
             <button
               key={href}
               className={props.path === href ? "nav-item active" : "nav-item"}

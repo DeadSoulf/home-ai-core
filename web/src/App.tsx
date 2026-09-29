@@ -4,17 +4,19 @@ import type { Actor } from "./api/types";
 import { Shell } from "./components/Shell";
 import { useI18n } from "./i18n";
 import { FirstRunPage, LoginPage } from "./pages/Auth";
+import { AccountPage } from "./pages/Account";
 import { AuditPage } from "./pages/Audit";
 import { Dashboard } from "./pages/Dashboard";
 import { JobsPage } from "./pages/Jobs";
 import { ModulesPage } from "./pages/Modules";
 import { SystemPage } from "./pages/System";
+import { UsersPage } from "./pages/Users";
 
 type Phase = "loading" | "setup" | "login" | "app";
 
 function currentPath(): string {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
-  return ["/", "/system", "/modules", "/jobs", "/audit"].includes(path) ? path : "/";
+  return ["/", "/system", "/modules", "/jobs", "/audit", "/users"].includes(path) ? path : "/";
 }
 
 export default function App() {
@@ -55,7 +57,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (phase !== "app") {
+    if (phase !== "app" || !actor?.permissions.includes("events.read")) {
       setRealtime("disconnected");
       return;
     }
@@ -67,10 +69,10 @@ export default function App() {
       },
       setRealtime,
     );
-  }, [phase]);
+  }, [phase, actor]);
 
   useEffect(() => {
-    if (phase !== "app") {
+    if (phase !== "app" || !actor?.permissions.includes("updates.read")) {
       setAvailableUpdate(undefined);
       return;
     }
@@ -110,7 +112,7 @@ export default function App() {
       document.removeEventListener("visibilitychange", refreshWhenVisible);
       window.removeEventListener("home-ai-core:update-status", updateStatusEvent);
     };
-  }, [phase]);
+  }, [phase, actor]);
 
   const authenticated = (nextActor: Actor) => {
     setActor(nextActor);
@@ -144,22 +146,31 @@ export default function App() {
     return <LoginPage onAuthenticated={authenticated} />;
   }
 
+  const has = (permission: string) => actor.permissions.includes(permission);
+  const dashboardAllowed = has("system.read") && has("modules.read") && has("jobs.read");
+  const accountPage = <AccountPage actor={actor} />;
+
   let page;
   switch (path) {
     case "/system":
-      page = <SystemPage revision={revision} />;
+      page = has("system.read") ? <SystemPage revision={revision} /> : accountPage;
       break;
     case "/modules":
-      page = <ModulesPage revision={revision} />;
+      page = has("modules.read") ? <ModulesPage revision={revision} /> : accountPage;
       break;
     case "/jobs":
-      page = <JobsPage revision={revision} />;
+      page = has("jobs.read") ? <JobsPage revision={revision} /> : accountPage;
       break;
     case "/audit":
-      page = <AuditPage revision={revision} />;
+      page = has("audit.read") ? <AuditPage revision={revision} /> : accountPage;
+      break;
+    case "/users":
+      page = has("security.users.read")
+        ? <UsersPage revision={revision} canManage={has("security.users.manage")} />
+        : accountPage;
       break;
     default:
-      page = <Dashboard revision={revision} />;
+      page = dashboardAllowed ? <Dashboard revision={revision} /> : accountPage;
   }
 
   return (
