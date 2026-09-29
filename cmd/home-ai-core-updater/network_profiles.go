@@ -19,6 +19,11 @@ func inspectNetworkProfiles(ctx context.Context) (string, []updaterhelper.Networ
 	backend := detectNetworkBackend(ctx)
 	names := listNetworkInterfaceNames()
 	result := make([]updaterhelper.NetworkProfileStat, 0, len(names))
+	var ifupdownProfiles map[string]updaterhelper.NetworkProfileStat
+	if backend == "ifupdown" {
+		ifupdownProfiles = inspectIfupdownProfiles(names)
+	}
+
 	for _, name := range names {
 		if name == "lo" || wireGuardConfigExists(name) {
 			continue
@@ -30,13 +35,7 @@ func inspectNetworkProfiles(ctx context.Context) (string, []updaterhelper.Networ
 		case "systemd-networkd":
 			profile = inspectNetworkdProfile(name)
 		case "ifupdown":
-			profile = updaterhelper.NetworkProfileStat{
-				Interface: name,
-				Backend:   backend,
-				Supported: false,
-				Source:    "/etc/network/interfaces",
-				Error:     "persistent profile editing for ifupdown is not supported yet",
-			}
+			profile = ifupdownProfiles[name]
 		default:
 			profile = updaterhelper.NetworkProfileStat{
 				Interface: name,
@@ -95,7 +94,7 @@ func saveNetworkProfile(ctx context.Context, request updaterhelper.Request) (str
 	case "systemd-networkd":
 		return saveNetworkdProfile(ctx, iface, method, address, gateway, dns)
 	case "ifupdown":
-		return "", errors.New("ifupdown is active; persistent Home-AI profile editing is not supported yet")
+		return saveIfupdownProfile(ctx, iface, method, address, gateway, dns)
 	default:
 		return "", errors.New("no supported persistent network backend detected")
 	}
