@@ -15,7 +15,19 @@ type Request struct {
 	Filesystem      string `json:"filesystem,omitempty"`
 	Label           string `json:"label,omitempty"`
 	Confirm         string `json:"confirm,omitempty"`
-	SizeMiB         uint64 `json:"size_mib,omitempty"`
+	SizeMiB         uint64   `json:"size_mib,omitempty"`
+	Interface       string   `json:"interface,omitempty"`
+	Address         string   `json:"address,omitempty"`
+	Gateway         string   `json:"gateway,omitempty"`
+	MTU             int      `json:"mtu,omitempty"`
+	Tunnel          string   `json:"tunnel,omitempty"`
+	ListenPort      int      `json:"listen_port,omitempty"`
+	PrivateKey      string   `json:"private_key,omitempty"`
+	PeerPublicKey   string   `json:"peer_public_key,omitempty"`
+	PresharedKey    string   `json:"preshared_key,omitempty"`
+	AllowedIPs      []string `json:"allowed_ips,omitempty"`
+	Endpoint        string   `json:"endpoint,omitempty"`
+	Keepalive       int      `json:"keepalive,omitempty"`
 }
 
 type FilesystemStat struct {
@@ -49,6 +61,25 @@ type LVMStat struct {
 	MetadataPercent *float64 `json:"metadata_percent,omitempty"`
 }
 
+type WireGuardPeerStat struct {
+	PublicKey       string   `json:"public_key"`
+	Endpoint        string   `json:"endpoint,omitempty"`
+	AllowedIPs      []string `json:"allowed_ips,omitempty"`
+	LatestHandshake int64    `json:"latest_handshake,omitempty"`
+	TransferRX      uint64   `json:"transfer_rx,omitempty"`
+	TransferTX      uint64   `json:"transfer_tx,omitempty"`
+	Keepalive       int      `json:"keepalive,omitempty"`
+}
+
+type WireGuardTunnelStat struct {
+	Name       string              `json:"name"`
+	Active     bool                `json:"active"`
+	Address    string              `json:"address,omitempty"`
+	PublicKey  string              `json:"public_key,omitempty"`
+	ListenPort int                 `json:"listen_port,omitempty"`
+	Peers      []WireGuardPeerStat `json:"peers,omitempty"`
+}
+
 type Response struct {
 	OK                bool             `json:"ok"`
 	Message           string           `json:"message,omitempty"`
@@ -59,7 +90,10 @@ type Response struct {
 	RollbackVersion   string           `json:"rollback_version,omitempty"`
 	FilesystemStats   []FilesystemStat `json:"filesystem_stats,omitempty"`
 	DiskHealth        []DiskHealthStat `json:"disk_health,omitempty"`
-	LVM               []LVMStat        `json:"lvm,omitempty"`
+	LVM                []LVMStat             `json:"lvm,omitempty"`
+	WireGuardAvailable bool                  `json:"wireguard_available,omitempty"`
+	WireGuardError     string                `json:"wireguard_error,omitempty"`
+	WireGuardTunnels   []WireGuardTunnelStat `json:"wireguard_tunnels,omitempty"`
 }
 
 type Result struct {
