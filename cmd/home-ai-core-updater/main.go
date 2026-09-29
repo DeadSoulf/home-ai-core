@@ -904,10 +904,10 @@ func inspectDiskHealth(ctx context.Context) []updaterhelper.DiskHealthStat {
 
 		stat.SmartAvailable =
 			decoded.SmartStatus != nil ||
-			decoded.Temperature != nil ||
-			decoded.PowerOnTime != nil ||
-			decoded.NVMe != nil ||
-			decoded.ATAAttributes != nil
+				decoded.Temperature != nil ||
+				decoded.PowerOnTime != nil ||
+				decoded.NVMe != nil ||
+				decoded.ATAAttributes != nil
 		if decoded.SmartStatus != nil {
 			if decoded.SmartStatus.Passed {
 				stat.Health = "ok"
@@ -1014,10 +1014,10 @@ func inspectLVM(ctx context.Context) []updaterhelper.LVMStat {
 			vgSize, _ := strconv.ParseFloat(strings.TrimSpace(item.VGSize), 64)
 			vgFree, _ := strconv.ParseFloat(strings.TrimSpace(item.VGFree), 64)
 			stat := updaterhelper.LVMStat{
-				Device:    strings.TrimSpace(item.Path),
-				Name:      lvmMapperName(strings.TrimSpace(item.VGName), strings.TrimSpace(item.LVName)),
-				VGName:    strings.TrimSpace(item.VGName),
-				LVName:    strings.TrimSpace(item.LVName),
+				Device:      strings.TrimSpace(item.Path),
+				Name:        lvmMapperName(strings.TrimSpace(item.VGName), strings.TrimSpace(item.LVName)),
+				VGName:      strings.TrimSpace(item.VGName),
+				LVName:      strings.TrimSpace(item.LVName),
 				SizeBytes:   uint64(size),
 				VGSizeBytes: uint64(vgSize),
 				VGFreeBytes: uint64(vgFree),
@@ -1866,7 +1866,7 @@ func peerUID(conn *net.UnixConn) (uint32, error) {
 		return 0, err
 	}
 	var (
-		uid uint32
+		uid     uint32
 		credErr error
 	)
 	if err := raw.Control(func(fd uintptr) {
