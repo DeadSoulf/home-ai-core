@@ -85,7 +85,10 @@ PY
 rm -f "$BUNDLE" "$BUNDLE.sha256"
 (
   cd "$STAGE"
-  tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf - manifest.json bin web
+  {
+    printf '%s\0' manifest.json bin/home-ai-core
+    find web -type f -print0
+  } | sort -z | tar --null --no-recursion --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf - -T -
 ) | gzip -n > "$BUNDLE"
 
 (
