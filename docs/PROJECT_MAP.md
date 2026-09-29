@@ -4,9 +4,9 @@
 > Каноническая конечная цель: [PRODUCT_VISION.md](PRODUCT_VISION.md)  
 > Аудит уже сделанного: [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)
 
-**Текущая подтверждённая версия:** `0.1.58-dev`  
-**Опубликован для проверки:** `0.1.59-dev`  
-**Состояние:** фундамент Core работает; `0.1.59-dev` содержит Network Management v1 и WireGuard foundation  
+**Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
+**Опубликован для проверки:** `0.1.63-dev`  
+**Состояние:** Network Management v2 реализован; `0.1.63-dev` содержит persistent DHCP/static/DNS profiles и sandbox-safe network/WireGuard commands  
 **Обновлено:** 2026-09-29
 
 ## Конечный продукт
@@ -417,7 +417,11 @@ AI не может расширять собственные права.
 |---|---|
 | `0.1.57-dev` | последняя версия до cleanup |
 | `0.1.58-dev` | ✅ первая подтверждённая версия после cleanup, установлена через Web |
-| `0.1.59-dev` | 🧪 опубликована; Network Management v1 + WireGuard foundation, ожидает живую Web-установку |
+| `0.1.59-dev` | ✅ Network Management v1 установлен; на живом сервере обнаружена sandbox-проблема установки WireGuard |
+| `0.1.60-dev` | hotfix | APT для WireGuard вынесен в transient systemd service |
+| `0.1.61-dev` | UI | branding + обновлённый экран авторизации |
+| `0.1.62-dev` | UI | упрощён интерфейс статуса обновлений |
+| `0.1.63-dev` | 🧪 опубликована | Network Management v2: persistent profiles + safe ip/wg execution; ожидает живую проверку |
 
 ## 10. Правило ведения карты
 
