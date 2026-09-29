@@ -35,6 +35,7 @@ type BlockDevice struct {
 	SizeBytes  uint64      `json:"size_bytes,omitempty"`
 	Rotational bool        `json:"rotational"`
 	Removable  bool        `json:"removable"`
+	System     bool        `json:"system"`
 	Partitions []Partition `json:"partitions"`
 }
 
@@ -43,6 +44,8 @@ type Partition struct {
 	Path        string   `json:"path"`
 	SizeBytes   uint64   `json:"size_bytes,omitempty"`
 	Filesystem  string   `json:"filesystem,omitempty"`
+	UUID        string   `json:"uuid,omitempty"`
+	Label       string   `json:"label,omitempty"`
 	Mountpoints []string `json:"mountpoints"`
 }
 
