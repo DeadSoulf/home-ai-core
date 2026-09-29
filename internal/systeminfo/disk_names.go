@@ -16,11 +16,6 @@ func ApplyDiskNames(info *Info, names map[string]string) {
 	for i := range info.BlockTree {
 		applyBlockNodeName(&info.BlockTree[i], names)
 	}
-	for i := range info.BlockDevices {
-		if name := names[DiskStableID(info.BlockDevices[i].Path, info.BlockDevices[i].Serial)]; name != "" {
-			info.BlockDevices[i].DisplayName = name
-		}
-	}
 }
 
 func applyBlockNodeName(node *BlockNode, names map[string]string) {
