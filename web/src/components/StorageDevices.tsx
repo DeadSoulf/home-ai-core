@@ -569,6 +569,15 @@ export function StorageDevices({
                         <strong className={node.display_name ? "storage-display-name" : "mono"}>{node.display_name || node.name}</strong>
                         {node.display_name && <span className="storage-device-path mono">{node.name}</span>}
                         {node.system && <span className="status-badge storage-system">{t("systemDisk")}</span>}
+                        {node.type === "disk" && node.transport && (
+                          <span className="storage-inline-label">{node.transport.toUpperCase()}</span>
+                        )}
+                        {node.type === "disk" && node.health === "ok" && (
+                          <span className="status-badge status-success">{t("diskHealthOk")}</span>
+                        )}
+                        {node.type === "disk" && node.health === "failed" && (
+                          <span className="status-badge status-failed">{t("diskHealthFailed")}</span>
+                        )}
                         {node.label && <span className="storage-inline-label">{node.label}</span>}
                       </div>
                       {depth === 0 && (node.vendor || node.model) && (
