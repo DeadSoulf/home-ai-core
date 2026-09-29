@@ -155,8 +155,8 @@ export const api = {
     size_mib?: number;
   }) => postJSON<{message: string}>("/api/v1/storage/operation", input, true),
 
-  updateStatus: async () => {
-    const result = await request<{update: UpdateStatus}>("/api/v1/update");
+  updateStatus: async (fresh = false) => {
+    const result = await request<{update: UpdateStatus}>(fresh ? "/api/v1/update?fresh=1" : "/api/v1/update");
     return result.update;
   },
 
