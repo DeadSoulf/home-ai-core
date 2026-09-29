@@ -597,6 +597,7 @@ export function StorageDevices({
                       {node.type === "lvm" && (node.lvm_vg_name || node.lvm_lv_name) && (
                         <div className="storage-tree-model">
                           {"VG: " + (node.lvm_vg_name || "—") + " · LV: " + (node.lvm_lv_name || "—")}
+                          {node.lvm_vg_free_bytes !== undefined && node.lvm_vg_size_bytes ? " · " + t("freeSpace") + " VG: " + bytes(node.lvm_vg_free_bytes) : ""}
                           {node.lvm_data_percent !== undefined ? " · " + t("lvmDataUsed") + ": " + node.lvm_data_percent.toFixed(1) + "%" : ""}
                         </div>
                       )}
