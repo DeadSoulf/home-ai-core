@@ -15,7 +15,7 @@ const strings = {
     initialize: "Initialize Home-AI-Core", bootstrapLocalOnly: "First-owner setup is restricted to localhost.",
     dashboardSubtitle: "Current state of this Home-AI-Core node.", node: "Node", cpu: "CPU", memory: "Memory",
     core: "Core", available: "available", registered: "registered", active: "active", logicalCpus: "logical CPUs",
-    schema: "schema", storageOverview: "Storage overview", freeSpace: "Free", noBlockDevices: "No block devices reported.",
+    schema: "schema", storageOverview: "Storage overview", freeSpace: "Free", noBlockDevices: "No disks detected.",
     recentJobs: "Recent jobs", noJobs: "No jobs yet.", systemSubtitle: "Read-only hardware and operating-system inventory.",
     hostname: "Hostname", nodeId: "Node ID", os: "OS", kernel: "Kernel", architecture: "Architecture",
     coreVersion: "Core version", compute: "Compute", ram: "RAM", availableRam: "Available RAM", gpuCount: "GPU count", gpu: "GPU", gpuDevices: "Graphics devices", vendor: "Vendor", driver: "Driver", driverMissing: "Driver not installed", pciAddress: "PCI address", deviceId: "Device ID",
@@ -42,7 +42,7 @@ const strings = {
     deletePartitionConfirmation: "Delete {device}? Its filesystem and all data will become inaccessible. Type only the device name: {confirmation}.",
     partitionConfirmationMismatch: "Partition operation cancelled: confirmation text did not match.",
     invalidPartitionSize: "Enter a valid partition size greater than zero.",
-    collapsePartitions: "Collapse partitions", expandPartitions: "Expand partitions", renameDisk: "Rename",
+    collapsePartitions: "Collapse partitions", expandPartitions: "Expand partitions", renameDisk: "Change label",
     renameDiskPrompt: "Enter a new filesystem label for {device}.", diskNameRequired: "The new name cannot be empty.",
     deleteAllPartitions: "Delete all partitions",
     deleteAllPartitionsConfirmation: "Delete ALL partitions on {device}? All data on this disk will become inaccessible. Type only the disk name: {confirmation}.",
@@ -54,7 +54,17 @@ const strings = {
     partitionsDeletedAll: "All partitions deleted.",
     partitionRefreshing: "Refreshing disk information…",
     collapseAllDisks: "Collapse all",
-    expandAllDisks: "Expand all"
+    expandAllDisks: "Expand all",
+    mountPoints: "Mount point",
+    parentDisk: "Parent",
+    diskTypeDisk: "Disk",
+    diskTypePartition: "Partition",
+    diskTypeOptical: "Optical",
+    diskDisplayName: "Disk name",
+    diskDisplayNamePlaceholder: "For example: Archive",
+    diskDisplayNamePrompt: "Enter a Home-AI-Core name for {device}.",
+    diskNameSaved: "Disk name saved.",
+    renamePhysicalDisk: "Rename disk"
   },
   ru: {
     starting: "Запуск Home-AI-Core…", controlPlane: "Панель управления", dashboard: "Обзор", system: "Система",
@@ -68,7 +78,7 @@ const strings = {
     initialize: "Инициализировать Home-AI-Core", bootstrapLocalOnly: "Создание первого владельца разрешено только с localhost.",
     dashboardSubtitle: "Текущее состояние этого узла Home-AI-Core.", node: "Узел", cpu: "Процессор", memory: "Память",
     core: "Ядро", available: "доступно", registered: "зарегистрировано", active: "активно", logicalCpus: "логических CPU",
-    schema: "схема", storageOverview: "Накопители", freeSpace: "Свободно", noBlockDevices: "Блочные устройства не обнаружены.",
+    schema: "схема", storageOverview: "Накопители", freeSpace: "Свободно", noBlockDevices: "Диски не обнаружены.",
     recentJobs: "Последние задачи", noJobs: "Задач пока нет.", systemSubtitle: "Аппаратная конфигурация и операционная система в режиме только для чтения.",
     hostname: "Имя хоста", nodeId: "ID узла", os: "ОС", kernel: "Ядро Linux", architecture: "Архитектура",
     coreVersion: "Версия Core", compute: "Вычислительные ресурсы", ram: "ОЗУ", availableRam: "Доступно ОЗУ", gpuCount: "Количество GPU", gpu: "GPU", gpuDevices: "Графические устройства", vendor: "Производитель", driver: "Драйвер", driverMissing: "Драйвер не установлен", pciAddress: "PCI-адрес", deviceId: "ID устройства",
@@ -95,7 +105,7 @@ const strings = {
     deletePartitionConfirmation: "Удалить {device}? Файловая система и все данные раздела станут недоступны. Введите только имя раздела: {confirmation}.",
     partitionConfirmationMismatch: "Операция с разделом отменена: текст подтверждения не совпал.",
     invalidPartitionSize: "Введите корректный размер раздела больше нуля.",
-    collapsePartitions: "Свернуть разделы", expandPartitions: "Развернуть разделы", renameDisk: "Переименовать",
+    collapsePartitions: "Свернуть разделы", expandPartitions: "Развернуть разделы", renameDisk: "Изменить метку",
     renameDiskPrompt: "Введите новое имя (метку файловой системы) для {device}.", diskNameRequired: "Новое имя не может быть пустым.",
     deleteAllPartitions: "Удалить все разделы",
     deleteAllPartitionsConfirmation: "Удалить ВСЕ разделы на {device}? Все данные на диске станут недоступны. Введите только имя диска: {confirmation}.",
@@ -107,7 +117,17 @@ const strings = {
     partitionsDeletedAll: "Все разделы удалены.",
     partitionRefreshing: "Обновление информации о дисках…",
     collapseAllDisks: "Свернуть всё",
-    expandAllDisks: "Развернуть всё"
+    expandAllDisks: "Развернуть всё",
+    mountPoints: "Точка монтирования",
+    parentDisk: "Родитель",
+    diskTypeDisk: "Диск",
+    diskTypePartition: "Раздел",
+    diskTypeOptical: "Оптический",
+    diskDisplayName: "Имя диска",
+    diskDisplayNamePlaceholder: "Например: Архив",
+    diskDisplayNamePrompt: "Введите имя диска {device} в Home-AI-Core.",
+    diskNameSaved: "Имя диска сохранено.",
+    renamePhysicalDisk: "Переименовать диск"
   }
 } as const;
 
