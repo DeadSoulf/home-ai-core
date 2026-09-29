@@ -25,7 +25,7 @@ command -v gzip >/dev/null 2>&1 || { echo "gzip is required" >&2; exit 2; }
 command -v sha256sum >/dev/null 2>&1 || { echo "sha256sum is required" >&2; exit 2; }
 
 rm -rf "$STAGE"
-mkdir -p "$STAGE/bin" "$STAGE/web" "$OUT_DIR"
+mkdir -p "$STAGE/bin" "$STAGE/helper" "$STAGE/web" "$OUT_DIR"
 
 if [ "${HOME_AI_SKIP_WEB_BUILD:-0}" != "1" ]; then
   cd "$ROOT/web"
@@ -43,7 +43,13 @@ GOOS=linux GOARCH="$GOARCH" CGO_ENABLED=0 go build \
   -o "$STAGE/bin/home-ai-core" \
   ./cmd/home-ai-core
 
-chmod 0755 "$STAGE/bin/home-ai-core"
+GOOS=linux GOARCH="$GOARCH" CGO_ENABLED=0 go build \
+  -trimpath \
+  -ldflags "-s -w -X github.com/DeadSoulf/home-ai-core/internal/updaterhelper.HelperVersion=$VERSION" \
+  -o "$STAGE/helper/home-ai-core-updater" \
+  ./cmd/home-ai-core-updater
+
+chmod 0755 "$STAGE/bin/home-ai-core" "$STAGE/helper/home-ai-core-updater"
 find "$STAGE/web" -type d -exec chmod 0755 {} +
 find "$STAGE/web" -type f -exec chmod 0644 {} +
 
@@ -74,6 +80,8 @@ manifest = {
     "product": "home-ai-core",
     "version": version,
     "architecture": arch,
+    "helper_protocol": 2,
+    "helper_version": version,
     "files": files,
 }
 (stage / "manifest.json").write_text(
@@ -86,7 +94,7 @@ rm -f "$BUNDLE" "$BUNDLE.sha256"
 (
   cd "$STAGE"
   {
-    printf '%s\0' manifest.json bin/home-ai-core
+    printf '%s\0' manifest.json bin/home-ai-core helper/home-ai-core-updater
     find web -type f -print0
   } | sort -z | tar --null --no-recursion --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf - -T -
 ) | gzip -n > "$BUNDLE"
