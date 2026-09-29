@@ -938,6 +938,8 @@ type lvsJSON struct {
 			LVName          string `json:"lv_name"`
 			VGName          string `json:"vg_name"`
 			Size            string `json:"lv_size"`
+			VGSize          string `json:"vg_size"`
+			VGFree          string `json:"vg_free"`
 			Attr            string `json:"lv_attr"`
 			DataPercent     string `json:"data_percent"`
 			MetadataPercent string `json:"metadata_percent"`
@@ -955,7 +957,7 @@ func inspectLVM(ctx context.Context) []updaterhelper.LVMStat {
 		"--reportformat", "json",
 		"--units", "b",
 		"--nosuffix",
-		"-o", "lv_path,lv_name,vg_name,lv_size,lv_attr,data_percent,metadata_percent",
+		"-o", "lv_path,lv_name,vg_name,lv_size,vg_size,vg_free,lv_attr,data_percent,metadata_percent",
 	).CombinedOutput()
 	if err != nil {
 		return nil
@@ -968,13 +970,17 @@ func inspectLVM(ctx context.Context) []updaterhelper.LVMStat {
 	for _, report := range decoded.Report {
 		for _, item := range report.LV {
 			size, _ := strconv.ParseFloat(strings.TrimSpace(item.Size), 64)
+			vgSize, _ := strconv.ParseFloat(strings.TrimSpace(item.VGSize), 64)
+			vgFree, _ := strconv.ParseFloat(strings.TrimSpace(item.VGFree), 64)
 			stat := updaterhelper.LVMStat{
 				Device:    strings.TrimSpace(item.Path),
 				Name:      lvmMapperName(strings.TrimSpace(item.VGName), strings.TrimSpace(item.LVName)),
 				VGName:    strings.TrimSpace(item.VGName),
 				LVName:    strings.TrimSpace(item.LVName),
-				SizeBytes: uint64(size),
-				Active:    len(item.Attr) > 4 && item.Attr[4] == 'a',
+				SizeBytes:   uint64(size),
+				VGSizeBytes: uint64(vgSize),
+				VGFreeBytes: uint64(vgFree),
+				Active:      len(item.Attr) > 4 && item.Attr[4] == 'a',
 			}
 			if value, err := strconv.ParseFloat(strings.TrimSpace(item.DataPercent), 64); err == nil {
 				stat.DataPercent = &value
