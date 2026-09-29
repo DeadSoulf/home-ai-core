@@ -21,6 +21,7 @@ export type AuthResponse = {
 
 export type BlockNode = {
   name: string;
+  display_name?: string;
   path?: string;
   type: string;
   filesystem?: string;
@@ -61,6 +62,7 @@ export type SystemResponse = {
     block_tree: BlockNode[];
     block_devices: Array<{
       name: string;
+      display_name?: string;
       path: string;
       major_minor?: string;
       vendor?: string;
