@@ -21,16 +21,23 @@ type UserRecord struct {
 	LastLoginAt  *time.Time
 }
 
+type ResourcePermissionRecord struct {
+	Permission   string
+	ResourceType string
+	ResourceID   string
+}
+
 type SessionRecord struct {
-	ID          string
-	User        UserRecord
-	TokenHash   string
-	CSRFHash    string
-	CreatedAt   time.Time
-	ExpiresAt   time.Time
-	LastSeenAt  time.Time
-	Roles       []string
-	Permissions []string
+	ID                  string
+	User                UserRecord
+	TokenHash           string
+	CSRFHash            string
+	CreatedAt           time.Time
+	ExpiresAt           time.Time
+	LastSeenAt          time.Time
+	Roles               []string
+	Permissions         []string
+	ResourcePermissions []ResourcePermissionRecord
 }
 
 type AuditRecord struct {
@@ -180,33 +187,33 @@ func (s *Store) SessionByTokenHash(ctx context.Context, tokenHash string, now ti
 		record.User.LastLoginAt = &parsed
 	}
 
-	record.Roles, record.Permissions, err = s.userAccess(ctx, record.User.ID)
+	record.Roles, record.Permissions, record.ResourcePermissions, err = s.userAccess(ctx, record.User.ID)
 	if err != nil {
 		return SessionRecord{}, err
 	}
 	return record, nil
 }
 
-func (s *Store) userAccess(ctx context.Context, userID string) ([]string, []string, error) {
+func (s *Store) userAccess(ctx context.Context, userID string) ([]string, []string, []ResourcePermissionRecord, error) {
 	roleRows, err := s.db.QueryContext(ctx, `
 		SELECT r.name FROM roles r
 		JOIN user_roles ur ON ur.role_id = r.id
 		WHERE ur.user_id = ? ORDER BY r.name
 	`, userID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("read user roles: %w", err)
+		return nil, nil, nil, fmt.Errorf("read user roles: %w", err)
 	}
 	var roles []string
 	for roleRows.Next() {
 		var name string
 		if err := roleRows.Scan(&name); err != nil {
 			_ = roleRows.Close()
-			return nil, nil, fmt.Errorf("scan user role: %w", err)
+			return nil, nil, nil, fmt.Errorf("scan user role: %w", err)
 		}
 		roles = append(roles, name)
 	}
 	if err := roleRows.Close(); err != nil {
-		return nil, nil, fmt.Errorf("close role rows: %w", err)
+		return nil, nil, nil, fmt.Errorf("close role rows: %w", err)
 	}
 
 	permissionRows, err := s.db.QueryContext(ctx, `
@@ -215,22 +222,89 @@ func (s *Store) userAccess(ctx context.Context, userID string) ([]string, []stri
 		WHERE ur.user_id = ? ORDER BY rp.permission_name
 	`, userID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("read user permissions: %w", err)
+		return nil, nil, nil, fmt.Errorf("read user permissions: %w", err)
 	}
-	defer permissionRows.Close()
 
 	var permissions []string
 	for permissionRows.Next() {
 		var name string
 		if err := permissionRows.Scan(&name); err != nil {
-			return nil, nil, fmt.Errorf("scan user permission: %w", err)
+			_ = permissionRows.Close()
+			return nil, nil, nil, fmt.Errorf("scan user permission: %w", err)
 		}
 		permissions = append(permissions, name)
 	}
-	if err := permissionRows.Err(); err != nil {
-		return nil, nil, fmt.Errorf("iterate user permissions: %w", err)
+	if err := permissionRows.Close(); err != nil {
+		return nil, nil, nil, fmt.Errorf("close permission rows: %w", err)
 	}
-	return roles, permissions, nil
+	if err := permissionRows.Err(); err != nil {
+		return nil, nil, nil, fmt.Errorf("iterate user permissions: %w", err)
+	}
+
+	scopeRows, err := s.db.QueryContext(ctx, `
+		SELECT permission_name, resource_type, resource_id
+		FROM (
+			SELECT rrp.permission_name AS permission_name,
+			       rrp.resource_type AS resource_type,
+			       rrp.resource_id AS resource_id
+			FROM role_resource_permissions rrp
+			JOIN user_roles ur ON ur.role_id = rrp.role_id
+			WHERE ur.user_id = ?
+			UNION
+			SELECT urp.permission_name AS permission_name,
+			       urp.resource_type AS resource_type,
+			       urp.resource_id AS resource_id
+			FROM user_resource_permissions urp
+			WHERE urp.user_id = ?
+		)
+		ORDER BY permission_name, resource_type, resource_id
+	`, userID, userID)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("read user resource permissions: %w", err)
+	}
+	defer scopeRows.Close()
+
+	var resourcePermissions []ResourcePermissionRecord
+	for scopeRows.Next() {
+		var item ResourcePermissionRecord
+		if err := scopeRows.Scan(&item.Permission, &item.ResourceType, &item.ResourceID); err != nil {
+			return nil, nil, nil, fmt.Errorf("scan user resource permission: %w", err)
+		}
+		resourcePermissions = append(resourcePermissions, item)
+	}
+	if err := scopeRows.Err(); err != nil {
+		return nil, nil, nil, fmt.Errorf("iterate user resource permissions: %w", err)
+	}
+
+	return roles, permissions, resourcePermissions, nil
+}
+
+func (s *Store) GrantRoleResourcePermission(
+	ctx context.Context,
+	roleID, permission, resourceType, resourceID string,
+) error {
+	_, err := s.db.ExecContext(ctx, `
+		INSERT OR IGNORE INTO role_resource_permissions(role_id, permission_name, resource_type, resource_id)
+		VALUES (?, ?, ?, ?)
+	`, roleID, permission, resourceType, resourceID)
+	if err != nil {
+		return fmt.Errorf("grant role resource permission: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) GrantUserResourcePermission(
+	ctx context.Context,
+	userID, permission, resourceType, resourceID string,
+) error {
+	_, err := s.db.ExecContext(ctx, `
+		INSERT OR IGNORE INTO user_resource_permissions(user_id, permission_name, resource_type, resource_id)
+		VALUES (?, ?, ?, ?)
+	`, userID, permission, resourceType, resourceID)
+	if err != nil {
+		return fmt.Errorf("grant user resource permission: %w", err)
+	}
+	return nil
 }
 
 func (s *Store) RevokeSession(ctx context.Context, sessionID string, at time.Time) error {

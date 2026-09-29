@@ -110,3 +110,79 @@ func TestBootstrapLoginAuthenticateLogout(t *testing.T) {
 		t.Fatalf("audit records = %d, want at least 4", len(audit))
 	}
 }
+
+func TestActorAllowsScopedPermission(t *testing.T) {
+	actor := Actor{
+		ResourcePermissions: []PermissionScope{
+			{Permission: "files.read", ResourceType: "folder", ResourceID: "folder_alice"},
+		},
+	}
+
+	if !actor.Allows("files.read", "folder", "folder_alice") {
+		t.Fatal("exact scoped permission was not allowed")
+	}
+	if actor.Allows("files.read", "folder", "folder_bob") {
+		t.Fatal("scope leaked to another resource")
+	}
+	if actor.Allows("files.write", "folder", "folder_alice") {
+		t.Fatal("scope leaked to another permission")
+	}
+
+	actor.Permissions = []string{"files.read"}
+	if !actor.Allows("files.read", "folder", "folder_bob") {
+		t.Fatal("global permission should allow every resource of that operation")
+	}
+}
+
+func TestScopedPermissionLoadedFromSession(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	store, err := state.Open(ctx, dir)
+	if err != nil {
+		t.Fatalf("state.Open() error = %v", err)
+	}
+	defer store.Close()
+
+	service, err := New(ctx, store, dir)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	tokenBytes, err := os.ReadFile(service.BootstrapTokenPath())
+	if err != nil {
+		t.Fatalf("read bootstrap token: %v", err)
+	}
+	result, err := service.Bootstrap(
+		ctx,
+		string(tokenBytes),
+		"Owner",
+		"Home Owner",
+		"correct horse battery staple",
+		RequestContext{},
+	)
+	if err != nil {
+		t.Fatalf("Bootstrap() error = %v", err)
+	}
+
+	if err := store.GrantUserResourcePermission(
+		ctx,
+		result.Actor.ID,
+		"system.read",
+		"room",
+		"room_living",
+	); err != nil {
+		t.Fatalf("GrantUserResourcePermission() error = %v", err)
+	}
+
+	actor, err := service.Authenticate(ctx, result.Token)
+	if err != nil {
+		t.Fatalf("Authenticate() error = %v", err)
+	}
+	if len(actor.ResourcePermissions) != 1 {
+		t.Fatalf("resource permissions = %#v, want one grant", actor.ResourcePermissions)
+	}
+	scope := actor.ResourcePermissions[0]
+	if scope.Permission != "system.read" || scope.ResourceType != "room" || scope.ResourceID != "room_living" {
+		t.Fatalf("unexpected resource permission: %#v", scope)
+	}
+}

@@ -26,14 +26,21 @@ type RequestContext struct {
 	RemoteAddr    string
 }
 
+type PermissionScope struct {
+	Permission   string `json:"permission"`
+	ResourceType string `json:"resource_type"`
+	ResourceID   string `json:"resource_id"`
+}
+
 type Actor struct {
-	Type        string   `json:"type"`
-	ID          string   `json:"id"`
-	Username    string   `json:"username,omitempty"`
-	DisplayName string   `json:"display_name,omitempty"`
-	SessionID   string   `json:"-"`
-	Roles       []string `json:"roles"`
-	Permissions []string `json:"permissions"`
+	Type                string            `json:"type"`
+	ID                  string            `json:"id"`
+	Username            string            `json:"username,omitempty"`
+	DisplayName         string            `json:"display_name,omitempty"`
+	SessionID           string            `json:"-"`
+	Roles               []string          `json:"roles"`
+	Permissions         []string          `json:"permissions"`
+	ResourcePermissions []PermissionScope `json:"resource_permissions,omitempty"`
 
 	csrfHash string
 }
@@ -41,6 +48,26 @@ type Actor struct {
 func (a Actor) Has(permission string) bool {
 	for _, current := range a.Permissions {
 		if current == permission {
+			return true
+		}
+	}
+	return false
+}
+
+// Allows returns true when the actor has the permission globally or has an
+// exact scoped grant for the requested resource. Resource hierarchy (for
+// example room -> device) is deliberately resolved by the owning domain.
+func (a Actor) Allows(permission, resourceType, resourceID string) bool {
+	if a.Has(permission) {
+		return true
+	}
+	if permission == "" || resourceType == "" || resourceID == "" {
+		return false
+	}
+	for _, scope := range a.ResourcePermissions {
+		if scope.Permission == permission &&
+			scope.ResourceType == resourceType &&
+			scope.ResourceID == resourceID {
 			return true
 		}
 	}
@@ -351,7 +378,23 @@ func actorFromSession(record state.SessionRecord) Actor {
 		DisplayName: record.User.DisplayName,
 		SessionID:   record.ID,
 		Roles:       record.Roles,
-		Permissions: record.Permissions,
-		csrfHash:    record.CSRFHash,
+		Permissions:         record.Permissions,
+		ResourcePermissions: permissionScopes(record.ResourcePermissions),
+		csrfHash:            record.CSRFHash,
 	}
+}
+
+func permissionScopes(records []state.ResourcePermissionRecord) []PermissionScope {
+	if len(records) == 0 {
+		return nil
+	}
+	result := make([]PermissionScope, 0, len(records))
+	for _, record := range records {
+		result = append(result, PermissionScope{
+			Permission:   record.Permission,
+			ResourceType: record.ResourceType,
+			ResourceID:   record.ResourceID,
+		})
+	}
+	return result
 }
