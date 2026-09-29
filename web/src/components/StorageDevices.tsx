@@ -734,6 +734,9 @@ export function StorageDevices({
                               />
                             </label>
                           </div>
+                          <div className="storage-capacity-summary">
+                            <strong>{t("unallocated")}:</strong> {bytes(node.unallocated_bytes || 0)}
+                          </div>
                           <div className="storage-format-warning">{t("createPartitionWarning")}</div>
                           <div className="storage-format-actions">
                             <button
