@@ -287,7 +287,6 @@ func (s *Store) ListNASFolders(ctx context.Context) ([]NASFolderRecord, error) {
 	return result, nil
 }
 
-
 func (s *Store) DeleteNASFolder(ctx context.Context, folderID string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
