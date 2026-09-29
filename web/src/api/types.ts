@@ -260,3 +260,21 @@ export type NetworkProfileStatus = {
   profiles: NetworkProfile[];
 };
 
+export type FilePool = {
+  id: string;
+  name: string;
+  root_path: string;
+};
+
+export type FileFolder = {
+  id: string;
+  pool_id: string;
+  pool_name: string;
+  name: string;
+  kind: "private" | "shared";
+  owner_user_id?: string;
+  relative_path: string;
+  can_read: boolean;
+  can_write: boolean;
+};
+
