@@ -1028,6 +1028,20 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		if output, err := exec.CommandContext(ctx, "/usr/bin/mount", "--", device, target).CombinedOutput(); err != nil {
 			return "", fmt.Errorf("mount device: %s", strings.TrimSpace(string(output)))
 		}
+		targets, err = mountedTargets(ctx, device)
+		if err != nil {
+			return "", fmt.Errorf("verify mount: %w", err)
+		}
+		mounted := false
+		for _, mountedTarget := range targets {
+			if mountedTarget == target {
+				mounted = true
+				break
+			}
+		}
+		if !mounted {
+			return "", errors.New("mount completed but verification did not find the requested mount")
+		}
 		return "device mounted", nil
 
 	case "storage.unmount":
