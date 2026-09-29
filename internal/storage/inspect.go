@@ -11,32 +11,38 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
 
+type Inspection struct {
+	Filesystems []updaterhelper.FilesystemStat
+	DiskHealth  []updaterhelper.DiskHealthStat
+	LVM         []updaterhelper.LVMStat
+}
+
 type inspectionCache struct {
 	sync.Mutex
-	stats     []updaterhelper.FilesystemStat
+	value     Inspection
 	expiresAt time.Time
 }
 
-var filesystemInspection inspectionCache
+var storageInspection inspectionCache
 
-func InspectFilesystems(ctx context.Context) ([]updaterhelper.FilesystemStat, error) {
+func Inspect(ctx context.Context) (Inspection, error) {
 	now := time.Now()
-	filesystemInspection.Lock()
-	if now.Before(filesystemInspection.expiresAt) {
-		result := append([]updaterhelper.FilesystemStat(nil), filesystemInspection.stats...)
-		filesystemInspection.Unlock()
+	storageInspection.Lock()
+	if now.Before(storageInspection.expiresAt) {
+		result := cloneInspection(storageInspection.value)
+		storageInspection.Unlock()
 		return result, nil
 	}
-	filesystemInspection.Unlock()
+	storageInspection.Unlock()
 
 	if err := ensureCompatibleHelper(ctx); err != nil {
-		return nil, err
+		return Inspection{}, err
 	}
 
 	dialer := net.Dialer{}
 	conn, err := dialer.DialContext(ctx, "unix", helperSocketPath)
 	if err != nil {
-		return nil, fmt.Errorf("connect storage helper: %w", err)
+		return Inspection{}, fmt.Errorf("connect storage helper: %w", err)
 	}
 	defer conn.Close()
 
@@ -44,31 +50,51 @@ func InspectFilesystems(ctx context.Context) ([]updaterhelper.FilesystemStat, er
 		Operation:       "storage.inspect",
 		ProtocolVersion: updaterhelper.ProtocolVersion,
 	}); err != nil {
-		return nil, fmt.Errorf("request filesystem statistics: %w", err)
+		return Inspection{}, fmt.Errorf("request storage inspection: %w", err)
 	}
 
 	var response updaterhelper.Response
 	if err := json.NewDecoder(conn).Decode(&response); err != nil {
-		return nil, fmt.Errorf("read filesystem statistics: %w", err)
+		return Inspection{}, fmt.Errorf("read storage inspection: %w", err)
 	}
 	if !response.OK {
 		if response.Error == "" {
 			response.Error = "storage helper rejected inspection"
 		}
-		return nil, fmt.Errorf("inspect filesystems: %s", response.Error)
+		return Inspection{}, fmt.Errorf("inspect storage: %s", response.Error)
 	}
 
-	result := append([]updaterhelper.FilesystemStat(nil), response.FilesystemStats...)
-	filesystemInspection.Lock()
-	filesystemInspection.stats = append([]updaterhelper.FilesystemStat(nil), result...)
-	filesystemInspection.expiresAt = time.Now().Add(30 * time.Second)
-	filesystemInspection.Unlock()
+	result := Inspection{
+		Filesystems: append([]updaterhelper.FilesystemStat(nil), response.FilesystemStats...),
+		DiskHealth:  append([]updaterhelper.DiskHealthStat(nil), response.DiskHealth...),
+		LVM:         append([]updaterhelper.LVMStat(nil), response.LVM...),
+	}
+	storageInspection.Lock()
+	storageInspection.value = cloneInspection(result)
+	storageInspection.expiresAt = time.Now().Add(30 * time.Second)
+	storageInspection.Unlock()
 	return result, nil
 }
 
+func InspectFilesystems(ctx context.Context) ([]updaterhelper.FilesystemStat, error) {
+	result, err := Inspect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return result.Filesystems, nil
+}
+
 func InvalidateInspectionCache() {
-	filesystemInspection.Lock()
-	filesystemInspection.stats = nil
-	filesystemInspection.expiresAt = time.Time{}
-	filesystemInspection.Unlock()
+	storageInspection.Lock()
+	storageInspection.value = Inspection{}
+	storageInspection.expiresAt = time.Time{}
+	storageInspection.Unlock()
+}
+
+func cloneInspection(value Inspection) Inspection {
+	return Inspection{
+		Filesystems: append([]updaterhelper.FilesystemStat(nil), value.Filesystems...),
+		DiskHealth:  append([]updaterhelper.DiskHealthStat(nil), value.DiskHealth...),
+		LVM:         append([]updaterhelper.LVMStat(nil), value.LVM...),
+	}
 }
