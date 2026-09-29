@@ -1,4 +1,4 @@
-import { useCallback, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import type { BlockNode } from "../api/types";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
@@ -27,6 +27,12 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
   const [busy, setBusy] = useState("");
   const [formError, setFormError] = useState("");
   const [notice, setNotice] = useState("");
+  const [selectedFolderID, setSelectedFolderID] = useState("");
+  const [currentPath, setCurrentPath] = useState("");
+  const [entries, setEntries] = useState<Awaited<ReturnType<typeof api.fileEntries>>>([]);
+  const [entriesLoading, setEntriesLoading] = useState(false);
+  const [browserError, setBrowserError] = useState("");
+  const [newDirectoryName, setNewDirectoryName] = useState("");
 
   async function createPool(event: FormEvent) {
     event.preventDefault();
@@ -76,6 +82,100 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
     }
   }
 
+  const selectedFolder = resource.data?.folders.find((folder) => folder.id === selectedFolderID);
+
+  const loadEntries = useCallback(async (folderID: string, path: string) => {
+    if (!folderID) {
+      setEntries([]);
+      return;
+    }
+    setEntriesLoading(true);
+    setBrowserError("");
+    try {
+      setEntries(await api.fileEntries(folderID, path));
+    } catch (reason) {
+      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setEntriesLoading(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    if (selectedFolderID) {
+      void loadEntries(selectedFolderID, currentPath);
+    }
+  }, [selectedFolderID, currentPath, loadEntries]);
+
+  function openFolder(folderID: string) {
+    setSelectedFolderID(folderID);
+    setCurrentPath("");
+    setEntries([]);
+    setBrowserError("");
+  }
+
+  function openDirectory(path: string) {
+    setCurrentPath(path);
+  }
+
+  function goUp() {
+    if (!currentPath) return;
+    const parts = currentPath.split("/").filter(Boolean);
+    parts.pop();
+    setCurrentPath(parts.join("/"));
+  }
+
+  async function createDirectory(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedFolder || !selectedFolder.can_write || !newDirectoryName.trim()) return;
+    setBusy("browser-directory");
+    setBrowserError("");
+    try {
+      const path = joinFilePath(currentPath, newDirectoryName.trim());
+      await api.createFileDirectory(selectedFolder.id, path);
+      setNewDirectoryName("");
+      await loadEntries(selectedFolder.id, currentPath);
+    } catch (reason) {
+      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function uploadSelected(file?: File) {
+    if (!file || !selectedFolder || !selectedFolder.can_write) return;
+    setBusy("browser-upload");
+    setBrowserError("");
+    try {
+      await api.uploadFile(selectedFolder.id, joinFilePath(currentPath, file.name), file);
+      await loadEntries(selectedFolder.id, currentPath);
+    } catch (reason) {
+      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function downloadEntry(path: string, name: string) {
+    if (!selectedFolder) return;
+    setBusy("browser-download");
+    setBrowserError("");
+    try {
+      const blob = await api.downloadFile(selectedFolder.id, path);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (reason) {
+      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  }
+
   if (resource.loading && !resource.data) return <LoadingState />;
   if (resource.error && !resource.data) return <ErrorState message={resource.error} />;
 
@@ -103,6 +203,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                 <th>{t("fileOwner")}</th>
                 <th>{t("fileAccess")}</th>
                 {canManage && <th>{t("fileInternalPath")}</th>}
+                <th>{t("actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -118,17 +219,137 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                   </td>
                   <td>{folder.can_write ? t("fileReadWrite") : t("fileReadOnly")}</td>
                   {canManage && <td className="mono">{folder.relative_path}</td>}
+                  <td>
+                    <button
+                      className="button compact secondary"
+                      type="button"
+                      onClick={() => openFolder(folder.id)}
+                    >
+                      {t("fileOpen")}
+                    </button>
+                  </td>
                 </tr>
               ))}
               {folders.length === 0 && (
                 <tr>
-                  <td colSpan={canManage ? 6 : 5} className="muted">{t("fileNoFolders")}</td>
+                  <td colSpan={canManage ? 7 : 6} className="muted">{t("fileNoFolders")}</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
       </Panel>
+
+      {selectedFolder && (
+        <Panel title={selectedFolder.name} className="wide">
+          <div className="file-browser-toolbar">
+            <button
+              className="button compact secondary"
+              type="button"
+              disabled={!currentPath || entriesLoading}
+              onClick={goUp}
+            >
+              {t("fileUp")}
+            </button>
+            <span className="mono">{currentPath ? `/${currentPath}` : "/"}</span>
+            <button
+              className="button compact secondary"
+              type="button"
+              disabled={entriesLoading}
+              onClick={() => void loadEntries(selectedFolder.id, currentPath)}
+            >
+              {t("refresh")}
+            </button>
+          </div>
+
+          {selectedFolder.can_write && (
+            <div className="file-browser-actions">
+              <form onSubmit={createDirectory}>
+                <input
+                  value={newDirectoryName}
+                  onChange={(event) => setNewDirectoryName(event.target.value)}
+                  placeholder={t("fileNewDirectoryName")}
+                  maxLength={255}
+                  required
+                />
+                <button className="button primary compact" type="submit" disabled={busy !== ""}>
+                  {t("fileCreateDirectory")}
+                </button>
+              </form>
+              <label className="button secondary compact file-upload-button">
+                {busy === "browser-upload" ? t("working") : t("fileUpload")}
+                <input
+                  type="file"
+                  disabled={busy !== ""}
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0];
+                    event.currentTarget.value = "";
+                    void uploadSelected(file);
+                  }}
+                />
+              </label>
+            </div>
+          )}
+
+          {browserError && <div className="form-error">{browserError}</div>}
+          {entriesLoading ? (
+            <div className="muted">{t("loading")}</div>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t("name")}</th>
+                    <th>{t("fileEntryType")}</th>
+                    <th>{t("fileSize")}</th>
+                    <th>{t("modified")}</th>
+                    <th>{t("actions")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map((entry) => (
+                    <tr key={entry.path}>
+                      <td>
+                        {entry.kind === "directory" ? (
+                          <button
+                            type="button"
+                            className="file-entry-link"
+                            onClick={() => openDirectory(entry.path)}
+                          >
+                            {entry.name}
+                          </button>
+                        ) : (
+                          <span>{entry.name}</span>
+                        )}
+                      </td>
+                      <td>{entry.kind === "directory" ? t("fileDirectory") : entry.kind === "file" ? t("fileRegularFile") : t("fileSymlink")}</td>
+                      <td>{entry.kind === "file" ? formatFileSize(entry.size_bytes || 0) : "—"}</td>
+                      <td>{new Date(entry.modified_at).toLocaleString()}</td>
+                      <td>
+                        {entry.kind === "file" && (
+                          <button
+                            className="button compact secondary"
+                            type="button"
+                            disabled={busy !== ""}
+                            onClick={() => void downloadEntry(entry.path, entry.name)}
+                          >
+                            {t("fileDownload")}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {entries.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="muted">{t("fileDirectoryEmpty")}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Panel>
+      )}
 
       {canManage && (
         <div className="two-column">
@@ -262,5 +483,21 @@ function nasMountOptions(nodes: BlockNode[]): NASMountOption[] {
   };
   for (const node of nodes) visit(node);
   return [...byPath.values()].sort((a, b) => a.path.localeCompare(b.path));
+}
+
+function joinFilePath(base: string, name: string): string {
+  return [base, name].filter(Boolean).join("/");
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KiB", "MiB", "GiB", "TiB"];
+  let value = bytes / 1024;
+  let index = 0;
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024;
+    index++;
+  }
+  return `${value.toFixed(value >= 10 ? 1 : 2)} ${units[index]}`;
 }
 

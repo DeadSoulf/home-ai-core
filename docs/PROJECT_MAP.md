@@ -209,13 +209,24 @@ Check
 7. ✅ Web выбирает pool только из подходящих mounted non-system filesystems;
 8. ✅ ADR-0017 фиксирует physical storage boundary.
 
+Третий вертикальный срез:
+
+1. ✅ безопасный browse/list API внутри разрешённой logical folder;
+2. ✅ create-directory;
+3. ✅ upload с atomic temp+rename и лимитом 512 MiB;
+4. ✅ download через стандартный HTTP content path;
+5. ✅ защита от absolute/`..`/symlink traversal;
+6. ✅ scoped `files.read/files.write` на каждый `file_folder`;
+7. ✅ базовый Web file browser;
+8. ✅ ADR-0018 и тесты.
+
 Следующий подэтап:
 
-1. добавить безопасный browse/list API внутри разрешённой logical folder;
-2. create-directory/upload/download;
-3. delete/move/rename с audit и permission checks;
-4. затем полноценный Web file manager;
-5. после этого SMB и Windows file-copy client.
+1. delete/move/rename с audit и overwrite semantics;
+2. trash/recycle bin policy;
+3. resumable/chunked upload + checksums;
+4. затем SMB;
+5. Windows file-copy client.
 
 ## 4. Следующие продуктовые этапы
 
@@ -229,8 +240,8 @@ Check
 - ✅ private folders каждого пользователя;
 - ✅ shared/common folders;
 - ✅ physical directory provisioning + filesystem validation;
-- 🚧 file CRUD API;
-- Web file manager;
+- 🚧 file CRUD API (browse/create/upload/download готовы; delete/move/rename дальше);
+- 🚧 Web file manager (базовый browser готов);
 - SMB;
 - NFS при необходимости;
 - quotas/policies;

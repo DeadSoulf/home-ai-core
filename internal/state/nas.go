@@ -13,9 +13,10 @@ import (
 )
 
 var (
-	ErrNASPoolExists   = errors.New("NAS pool already exists")
-	ErrNASPoolNotFound = errors.New("NAS pool not found")
-	ErrNASFolderExists = errors.New("NAS folder already exists")
+	ErrNASPoolExists     = errors.New("NAS pool already exists")
+	ErrNASPoolNotFound   = errors.New("NAS pool not found")
+	ErrNASFolderExists   = errors.New("NAS folder already exists")
+	ErrNASFolderNotFound = errors.New("NAS folder not found")
 )
 
 type NASPoolRecord struct {
@@ -236,6 +237,46 @@ func (s *Store) CreateNASFolder(
 		CreatedAt:    now.UTC(),
 		UpdatedAt:    now.UTC(),
 	}, nil
+}
+
+func (s *Store) NASFolder(ctx context.Context, folderID string) (NASFolderRecord, error) {
+	var record NASFolderRecord
+	var createdAt, updatedAt string
+	err := s.db.QueryRowContext(ctx, `
+		SELECT f.id, f.pool_id, p.name, p.root_path, f.name, f.kind,
+		       COALESCE(f.owner_user_id, ''), f.relative_path,
+		       COALESCE(f.created_by, ''), f.created_at, f.updated_at
+		FROM nas_folders f
+		JOIN nas_pools p ON p.id = f.pool_id
+		WHERE f.id = ?
+	`, strings.TrimSpace(folderID)).Scan(
+		&record.ID,
+		&record.PoolID,
+		&record.PoolName,
+		&record.PoolRoot,
+		&record.Name,
+		&record.Kind,
+		&record.OwnerUserID,
+		&record.RelativePath,
+		&record.CreatedBy,
+		&createdAt,
+		&updatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return NASFolderRecord{}, ErrNASFolderNotFound
+	}
+	if err != nil {
+		return NASFolderRecord{}, fmt.Errorf("read NAS folder: %w", err)
+	}
+	record.CreatedAt, err = time.Parse(time.RFC3339Nano, createdAt)
+	if err != nil {
+		return NASFolderRecord{}, fmt.Errorf("parse NAS folder created_at: %w", err)
+	}
+	record.UpdatedAt, err = time.Parse(time.RFC3339Nano, updatedAt)
+	if err != nil {
+		return NASFolderRecord{}, fmt.Errorf("parse NAS folder updated_at: %w", err)
+	}
+	return record, nil
 }
 
 func (s *Store) ListNASFolders(ctx context.Context) ([]NASFolderRecord, error) {

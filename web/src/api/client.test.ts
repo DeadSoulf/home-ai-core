@@ -247,4 +247,52 @@ describe("API client", () => {
     vi.unstubAllGlobals();
   });
 
+
+  it("browses and uploads files in a logical NAS folder", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/entries")) {
+        return new Response(JSON.stringify({
+          entries: [{
+            name: "docs",
+            path: "docs",
+            kind: "directory",
+            modified_at: "2026-09-30T10:00:00Z",
+          }],
+        }), {
+          status: 200,
+          headers: {"Content-Type": "application/json"},
+        });
+      }
+      return new Response(JSON.stringify({
+        path: "hello.txt",
+        size_bytes: 5,
+      }), {
+        status: 201,
+        headers: {"Content-Type": "application/json"},
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    });
+
+    const entries = await api.fileEntries("nsf-test");
+    expect(entries[0].kind).toBe("directory");
+
+    setCSRFToken("csrf-files");
+    const file = new File(["hello"], "hello.txt", {type: "text/plain"});
+    await api.uploadFile("nsf-test", "hello.txt", file);
+
+    const [input, init] = fetchMock.mock.calls[1];
+    expect(String(input)).toContain("/api/v1/files/folders/nsf-test/content?");
+    expect(init?.method).toBe("PUT");
+    expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-files");
+
+    vi.unstubAllGlobals();
+  });
+
 });

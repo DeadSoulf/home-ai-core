@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -89,6 +91,15 @@ func (f fakeState) CreateNASFolder(
 
 func (f fakeState) ListNASFolders(context.Context) ([]state.NASFolderRecord, error) {
 	return f.nasFolders, nil
+}
+
+func (f fakeState) NASFolder(_ context.Context, folderID string) (state.NASFolderRecord, error) {
+	for _, folder := range f.nasFolders {
+		if folder.ID == folderID {
+			return folder, nil
+		}
+	}
+	return state.NASFolderRecord{}, state.ErrNASFolderNotFound
 }
 
 func (f fakeState) DeleteNASFolder(context.Context, string) error {
@@ -775,5 +786,122 @@ func TestSharedFileFolderCreate(t *testing.T) {
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+}
+
+func TestFileContentScopedReadWrite(t *testing.T) {
+	poolRoot := t.TempDir()
+	folderRoot := filepath.Join(poolRoot, ".home-ai", "shared", "nsf-visible")
+	if err := os.MkdirAll(folderRoot, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(folderRoot, "existing.txt"), []byte("existing"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+
+	sec := defaultFakeSecurity()
+	sec.actor.Permissions = []string{"security.self.read"}
+	sec.actor.ResourcePermissions = []security.PermissionScope{
+		{Permission: "files.read", ResourceType: "file_folder", ResourceID: "nsf-visible"},
+		{Permission: "files.write", ResourceType: "file_folder", ResourceID: "nsf-visible"},
+	}
+	handler := testHandlerWithSecurity(fakeState{
+		nasFolders: []state.NASFolderRecord{
+			{
+				ID:           "nsf-visible",
+				PoolID:       "nsp-main",
+				PoolName:     "Main",
+				PoolRoot:     poolRoot,
+				Name:         "Family",
+				Kind:         "shared",
+				RelativePath: "shared/nsf-visible",
+			},
+		},
+	}, sec)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/files/folders/nsf-visible/entries", nil)
+	req.Header.Set("Authorization", "Bearer test")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(
+		http.MethodPut,
+		"/api/v1/files/folders/nsf-visible/content?path=upload.txt",
+		strings.NewReader("uploaded"),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("upload status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/files/folders/nsf-visible/content?path=upload.txt",
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("download status = %d: %s", rec.Code, rec.Body.String())
+	}
+	if rec.Body.String() != "uploaded" {
+		t.Fatalf("download body = %q", rec.Body.String())
+	}
+}
+
+func TestFileContentRejectsTraversalAndMissingWriteScope(t *testing.T) {
+	poolRoot := t.TempDir()
+	folderRoot := filepath.Join(poolRoot, ".home-ai", "shared", "nsf-visible")
+	if err := os.MkdirAll(folderRoot, 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	sec := defaultFakeSecurity()
+	sec.actor.Permissions = []string{"security.self.read"}
+	sec.actor.ResourcePermissions = []security.PermissionScope{
+		{Permission: "files.read", ResourceType: "file_folder", ResourceID: "nsf-visible"},
+	}
+	handler := testHandlerWithSecurity(fakeState{
+		nasFolders: []state.NASFolderRecord{
+			{
+				ID:           "nsf-visible",
+				PoolID:       "nsp-main",
+				PoolName:     "Main",
+				PoolRoot:     poolRoot,
+				Name:         "Family",
+				Kind:         "shared",
+				RelativePath: "shared/nsf-visible",
+			},
+		},
+	}, sec)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/files/folders/nsf-visible/entries?path=../outside",
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("traversal status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+
+	req = httptest.NewRequest(
+		http.MethodPut,
+		"/api/v1/files/folders/nsf-visible/content?path=nope.txt",
+		strings.NewReader("nope"),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("write without scope status = %d, want %d", rec.Code, http.StatusForbidden)
 	}
 }
