@@ -332,7 +332,7 @@ export function SystemPage({
 
         <NetworkManagement
           interfaces={value.system.network_interfaces}
-          canReadWireGuard={canReadNetwork}
+          canReadNetwork={canReadNetwork}
           canManage={canManageNetwork}
           onChanged={() => setMetricsTick((current) => current + 1)}
         />
