@@ -831,6 +831,15 @@ type smartctlJSON struct {
 		PercentageUsed int `json:"percentage_used"`
 		Temperature    int `json:"temperature"`
 	} `json:"nvme_smart_health_information_log"`
+	ATAAttributes *struct {
+		Table []struct {
+			Name  string `json:"name"`
+			Value int    `json:"value"`
+			Raw   struct {
+				Value int64 `json:"value"`
+			} `json:"raw"`
+		} `json:"table"`
+	} `json:"ata_smart_attributes"`
 }
 
 type healthLsblkOutput struct {
@@ -897,7 +906,8 @@ func inspectDiskHealth(ctx context.Context) []updaterhelper.DiskHealthStat {
 			decoded.SmartStatus != nil ||
 			decoded.Temperature != nil ||
 			decoded.PowerOnTime != nil ||
-			decoded.NVMe != nil
+			decoded.NVMe != nil ||
+			decoded.ATAAttributes != nil
 		if decoded.SmartStatus != nil {
 			if decoded.SmartStatus.Passed {
 				stat.Health = "ok"
@@ -926,6 +936,25 @@ func inspectDiskHealth(ctx context.Context) []updaterhelper.DiskHealthStat {
 				remaining = 100
 			}
 			stat.LifeRemainingPct = &remaining
+		}
+		if stat.LifeRemainingPct == nil && decoded.ATAAttributes != nil {
+			for _, attribute := range decoded.ATAAttributes.Table {
+				name := strings.ToLower(strings.ReplaceAll(attribute.Name, "-", "_"))
+				switch name {
+				case "ssd_life_left", "percent_lifetime_remain", "media_wearout_indicator":
+					remaining := attribute.Value
+					if remaining < 0 {
+						remaining = 0
+					}
+					if remaining > 100 {
+						remaining = 100
+					}
+					stat.LifeRemainingPct = &remaining
+				}
+				if stat.LifeRemainingPct != nil {
+					break
+				}
+			}
 		}
 		if stat.Health == "ok" {
 			hot := stat.TemperatureC != nil && *stat.TemperatureC >= 60
