@@ -13,9 +13,9 @@ import (
 )
 
 var (
-	ErrNASPoolExists   = errors.New("NAS pool already exists")
-	ErrNASPoolNotFound = errors.New("NAS pool not found")
-	ErrNASFolderExists = errors.New("NAS folder already exists")
+	ErrNASPoolExists     = errors.New("NAS pool already exists")
+	ErrNASPoolNotFound   = errors.New("NAS pool not found")
+	ErrNASFolderExists   = errors.New("NAS folder already exists")
 	ErrNASFolderNotFound = errors.New("NAS folder not found")
 )
 
