@@ -3,6 +3,28 @@ import { api } from "../api/client";
 import { useResource } from "../hooks/useResource";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
 import { useI18n } from "../i18n";
+import type { BlockNode } from "../api/types";
+
+function diskFreeBytes(root: BlockNode): number | undefined {
+  const seen = new Set<string>();
+  let total = 0;
+  let found = false;
+
+  const visit = (node: BlockNode) => {
+    const key = node.path || node.uuid || node.name;
+    if (!seen.has(key)) {
+      seen.add(key);
+      if ((node.free_bytes || 0) > 0) {
+        total += node.free_bytes || 0;
+        found = true;
+      }
+    }
+    for (const child of node.children || []) visit(child);
+  };
+
+  visit(root);
+  return found ? total : undefined;
+}
 
 function formatBytes(value = 0): string {
   const units = ["B", "KiB", "MiB", "GiB", "TiB"];
@@ -50,16 +72,23 @@ export function Dashboard({revision}: {revision: number}) {
       <div className="two-column">
         <Panel title={t("storageOverview")}>
           <div className="list">
-            {data.system.system.block_devices.length === 0 && <span className="muted">{t("noBlockDevices")}</span>}
-            {data.system.system.block_devices.slice(0, 6).map((disk) => (
-              <div className="list-row" key={disk.name}>
-                <div>
-                  <strong>{disk.model || disk.name}</strong>
-                  <span>{disk.path}</span>
-                </div>
-                <span>{formatBytes(disk.size_bytes)}</span>
-              </div>
-            ))}
+            {data.system.system.block_tree.filter((disk) => disk.type === "disk").length === 0 && (
+              <span className="muted">{t("noBlockDevices")}</span>
+            )}
+            {data.system.system.block_tree
+              .filter((disk) => disk.type === "disk")
+              .slice(0, 6)
+              .map((disk) => {
+                const free = diskFreeBytes(disk);
+                return (
+                  <div className="list-row" key={disk.name}>
+                    <div>
+                      <strong>{disk.model || disk.name}</strong>
+                    </div>
+                    <span>{t("freeSpace")}: {free === undefined ? "—" : formatBytes(free)}</span>
+                  </div>
+                );
+              })}
           </div>
         </Panel>
 
