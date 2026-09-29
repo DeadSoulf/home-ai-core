@@ -1,98 +1,84 @@
-# ADR-0013: Web-driven Core self-update boundary
+# ADR-0013: Web-driven Core update boundary
 
-- Status: Accepted
-- Date: 2026-09-28
+- Status: Accepted, revised for Update System v2
+- Original date: 2026-09-28
+- Revised: 2026-09-29
 
 ## Context
 
-Home-AI-Core must be maintainable from its Web UI. Requiring SSH, GitHub CLI and manual `apt install` for every Core update is not an acceptable normal operating path.
+Home-AI-Core must be maintainable from its Web UI without SSH for routine updates.
 
-The public Core process is deliberately unprivileged, while Debian package installation requires root.
+The network-facing Core is unprivileged, while replacing installed binaries and accessing protected host resources requires root. Normal updates must therefore preserve privilege separation without depending on a newly built Debian package.
 
 ## Decision
 
-### User flow
+### Update artifact
 
-The Web UI exposes an Updates page with:
+GitHub publishes one update bundle per supported architecture:
 
-- installed Core version
-- latest compatible development release
-- release notes
-- explicit check action
-- explicit install action
-- persistent update job identity
-- automatic page reconnection after the Core restarts
+```text
+home-ai-core-update_<version>_<arch>.tar.gz
+home-ai-core-update_<version>_<arch>.tar.gz.sha256
+```
 
-### Release feed
+The bundle contains:
 
-Development builds are published from successful `main` CI runs as GitHub pre-releases.
+- `manifest.json`
+- `bin/home-ai-core`
+- `helper/home-ai-core-updater`
+- `web/...`
 
-Each release contains:
+The manifest records product, version, architecture, helper protocol/version and SHA-256/size for every file.
 
-- amd64 Debian package
-- arm64 Debian package
-- `home-ai-core-update.json`
-- exact package byte size
-- SHA-256
-- Debian package version
+### Discovery
 
-Core never accepts a package URL supplied by a Web client. It discovers the candidate from the fixed official release feed.
+Core normally discovers releases from the official GitHub release feed.
 
-For the development channel, GitHub HTTPS plus release metadata is the current distribution trust anchor and SHA-256 provides package integrity between discovery, staging and privileged installation.
+Successful checks are cached and persisted. If the GitHub API is unavailable or rate-limited, discovery can fall back to the published `VERSION` file plus verification that the expected release asset exists.
 
-Detached Ed25519 signing of the Core update manifest remains required before the production update channel is considered complete.
+The browser cannot supply an arbitrary update URL.
 
-### Job boundary
+### Download and verification
 
-Installing an update creates a persistent `core.update.install` job.
+The unprivileged Core downloads the exact selected archive into its update state directory and verifies:
 
-The unprivileged Core:
+- archive checksum
+- size limits
+- manifest product/version/architecture
+- safe relative paths
+- per-file size and SHA-256
+- required Core/Web/helper files
 
-1. discovers the newest version;
-2. downloads the package into `/var/lib/home-ai-core/updates`;
-3. enforces a maximum package size;
-4. verifies exact size and SHA-256;
-5. asks the privileged helper to install the already staged package.
+### Privileged installation
 
-### Privileged helper
+The root helper:
 
-`home-ai-core-update-helper` runs as a separate root systemd service and listens only on a Unix socket writable by the `home-ai-core` group.
+1. verifies the prepared bundle again;
+2. backs up the installed Core, Web UI and helper;
+3. stops Core;
+4. atomically switches Core/Web files;
+5. starts Core and verifies service health;
+6. replaces the helper and restarts its systemd service when needed.
 
-The helper:
+The helper protocol is versioned so newer Core code can detect an incompatible installed helper before attempting an operation.
 
-- verifies the peer UID is the Home-AI-Core service account;
-- accepts only the typed `install-core-update` operation;
-- accepts packages only from the fixed update staging directory;
-- rejects symlinks and group/world-writable package files;
-- recomputes SHA-256;
-- verifies Debian package name is exactly `home-ai-core`;
-- verifies architecture and expected Debian version;
-- refuses downgrades;
-- invokes `apt-get` with fixed arguments and keeps existing conffiles.
+### Rollback
 
-No shell command, executable path or arbitrary apt package name is accepted from the Web/API request.
+The previous application backup is exposed through the update API/Web UI. Rollback restores Core, Web and the helper and restarts services.
 
-### Self-restart recovery
+### Debian package boundary
 
-The package post-install script restarts Home-AI-Core.
+The `.deb` is not the normal update transport. It remains the initial/bootstrap and emergency recovery mechanism, and is used when a package-level transition cannot safely be achieved by the running bundle updater.
 
-If the update job was running when the old process exits, the existing job recovery mechanism requeues it. The new Core process sees that the target version is already installed and completes the job idempotently.
+## Security properties
 
-The helper handles one privileged request per process and exits. systemd restarts it, ensuring an upgraded helper binary is loaded after a Core self-update.
+- Core remains unprivileged.
+- Helper access is restricted to the `home-ai-core` service account over AF_UNIX.
+- No arbitrary command or executable path is accepted from Web input.
+- Bundle contents are bounded and verified before privileged installation.
+- Only one install/rollback operation can run at a time.
+- Update mutations require authenticated permission and CSRF protection.
 
-## Consequences
+## Remaining production work
 
-### Positive
-
-- normal Core updates no longer require SSH after the bootstrap updater release;
-- the network-facing Core remains unprivileged;
-- privileged behavior is narrowly typed and auditable;
-- interrupted self-restarts are recoverable;
-- current network/listener configuration remains a Debian conffile and is preserved during update.
-
-### Remaining work
-
-- detached Ed25519 signing for production Core release manifests;
-- automatic rollback to the previous package on failed post-update health checks;
-- release-channel selection and production/stable policy;
-- physical-node acceptance of the full Web update cycle.
+Detached signing and stable-channel release policy remain separate production-hardening tasks beyond the current development-channel SHA-256/GitHub trust model.
