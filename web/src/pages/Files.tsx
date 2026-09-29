@@ -36,6 +36,13 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
   const [trashVisible, setTrashVisible] = useState(false);
   const [trashEntries, setTrashEntries] = useState<Awaited<ReturnType<typeof api.fileTrash>>>([]);
   const [trashLoading, setTrashLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [pendingUpload, setPendingUpload] = useState<{
+    folderId: string;
+    file: File;
+    path: string;
+    uploadId: string;
+  } | null>(null);
 
   async function createPool(event: FormEvent) {
     event.preventDefault();
@@ -150,9 +157,67 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
     if (!file || !selectedFolder || !selectedFolder.can_write) return;
     setBusy("browser-upload");
     setBrowserError("");
+    setUploadProgress(0);
     try {
-      await api.uploadFile(selectedFolder.id, joinFilePath(currentPath, file.name), file);
-      await loadEntries(selectedFolder.id, currentPath);
+      const path = joinFilePath(currentPath, file.name);
+      const session = await api.startResumableUpload(selectedFolder.id, {
+        path,
+        sizeBytes: file.size,
+      });
+      const pending = {
+        folderId: selectedFolder.id,
+        file,
+        path,
+        uploadId: session.id,
+      };
+      setPendingUpload(pending);
+      await continueUpload(pending);
+    } catch (reason) {
+      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+      setBusy("");
+    }
+  }
+
+  async function continueUpload(upload = pendingUpload) {
+    if (!upload) return;
+    setBusy("browser-upload");
+    setBrowserError("");
+    try {
+      let status = await api.resumableUploadStatus(upload.folderId, upload.uploadId);
+      let offset = status.received_bytes;
+      setUploadProgress(status.size_bytes === 0 ? 100 : Math.round((offset / status.size_bytes) * 100));
+
+      const chunkSize = 8 * 1024 * 1024;
+      while (offset < upload.file.size) {
+        const end = Math.min(offset + chunkSize, upload.file.size);
+        const chunk = upload.file.slice(offset, end);
+        const result = await api.uploadResumableChunk(upload.folderId, upload.uploadId, offset, chunk);
+        status = result.upload;
+        offset = status.received_bytes;
+        setUploadProgress(status.size_bytes === 0 ? 100 : Math.round((offset / status.size_bytes) * 100));
+      }
+
+      await api.completeResumableUpload(upload.folderId, upload.uploadId);
+      setPendingUpload(null);
+      setUploadProgress(null);
+      if (selectedFolder?.id === upload.folderId) {
+        await loadEntries(upload.folderId, currentPath);
+      }
+    } catch (reason) {
+      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function cancelPendingUpload() {
+    if (!pendingUpload) return;
+    setBusy("browser-upload-cancel");
+    setBrowserError("");
+    try {
+      await api.cancelResumableUpload(pendingUpload.folderId, pendingUpload.uploadId);
+      setPendingUpload(null);
+      setUploadProgress(null);
     } catch (reason) {
       setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
     } finally {
@@ -380,7 +445,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                 {busy === "browser-upload" ? t("working") : t("fileUpload")}
                 <input
                   type="file"
-                  disabled={busy !== ""}
+                  disabled={busy !== "" || pendingUpload !== null}
                   onChange={(event) => {
                     const file = event.currentTarget.files?.[0];
                     event.currentTarget.value = "";
@@ -388,6 +453,29 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                   }}
                 />
               </label>
+              {pendingUpload && pendingUpload.folderId === selectedFolder.id && (
+                <div className="file-upload-resume">
+                  <span className="muted">
+                    {pendingUpload.file.name} · {uploadProgress ?? 0}%
+                  </span>
+                  <button
+                    className="button compact secondary"
+                    type="button"
+                    disabled={busy !== ""}
+                    onClick={() => void continueUpload()}
+                  >
+                    {t("fileUploadResume")}
+                  </button>
+                  <button
+                    className="button compact danger"
+                    type="button"
+                    disabled={busy !== ""}
+                    onClick={() => void cancelPendingUpload()}
+                  >
+                    {t("cancel")}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
