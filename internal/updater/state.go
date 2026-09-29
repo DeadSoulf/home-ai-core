@@ -37,6 +37,3 @@ func NewState(currentVersion string) State {
 	}
 }
 
-func (s State) Terminal() bool {
-	return s.Phase == PhaseSucceeded || s.Phase == PhaseFailed
-}
