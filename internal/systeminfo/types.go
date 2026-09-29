@@ -44,6 +44,18 @@ type BlockNode struct {
 	Model       string      `json:"model,omitempty"`
 	Vendor      string      `json:"vendor,omitempty"`
 	Serial      string      `json:"serial,omitempty"`
+	Transport   string      `json:"transport,omitempty"`
+	Health      string      `json:"health,omitempty"`
+	TemperatureC     *int    `json:"temperature_c,omitempty"`
+	PowerOnHours     *uint64 `json:"power_on_hours,omitempty"`
+	LifeRemainingPct *int    `json:"life_remaining_percent,omitempty"`
+	SmartAvailable   bool    `json:"smart_available"`
+	SmartError       string  `json:"smart_error,omitempty"`
+	LVMVGName        string   `json:"lvm_vg_name,omitempty"`
+	LVMLVName        string   `json:"lvm_lv_name,omitempty"`
+	LVMActive        *bool    `json:"lvm_active,omitempty"`
+	LVMDataPercent   *float64 `json:"lvm_data_percent,omitempty"`
+	LVMMetadataPercent *float64 `json:"lvm_metadata_percent,omitempty"`
 	Rotational  bool        `json:"rotational"`
 	Removable   bool        `json:"removable"`
 	System      bool        `json:"system"`
