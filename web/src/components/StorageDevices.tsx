@@ -44,8 +44,24 @@ export function StorageDevices({
   const [partitionSizeGiB, setPartitionSizeGiB] = useState("");
   const [filesystem, setFilesystem] = useState<Filesystem>("ext4");
   const [label, setLabel] = useState("");
-  const [collapsed, setCollapsed] = useState<string[]>([]);
+  const [collapsed, setCollapsed] = useState<string[]>(() =>
+    devices
+      .filter((node) => node.type === "disk")
+      .map((node) => node.path || node.name),
+  );
   const [partitionProgress, setPartitionProgress] = useState<{device: string; text: string} | null>(null);
+
+  function collapseAll() {
+    setCollapsed(
+      devices
+        .filter((node) => node.type === "disk")
+        .map((node) => node.path || node.name),
+    );
+  }
+
+  function expandAll() {
+    setCollapsed([]);
+  }
 
   function toggleDisk(node: BlockNode) {
     const key = node.path || node.name;
@@ -289,6 +305,23 @@ export function StorageDevices({
           </div>
         </div>
       )}
+
+      <div className="storage-tree-toolbar">
+        <button
+          type="button"
+          className="button secondary compact"
+          onClick={collapseAll}
+        >
+          {t("collapseAllDisks")}
+        </button>
+        <button
+          type="button"
+          className="button secondary compact"
+          onClick={expandAll}
+        >
+          {t("expandAllDisks")}
+        </button>
+      </div>
 
       <div className="table-wrap">
         <table className="storage-tree-table">
