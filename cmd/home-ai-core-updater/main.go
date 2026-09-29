@@ -421,7 +421,7 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		if request.SizeMiB > 0 && request.SizeMiB < 16 {
 			return "", errors.New("partition size must be at least 16 MiB")
 		}
-		if request.SizeMiB > 0 && request.SizeMiB > 16*1024*1024 {
+		if request.SizeMiB > 0 && request.SizeMiB > 1024*1024*1024 {
 			return "", errors.New("partition size is too large")
 		}
 		if err := createPartition(ctx, device, request.SizeMiB); err != nil {
@@ -436,12 +436,12 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		if err := requirePartitionType(ctx, device); err != nil {
 			return "", err
 		}
-		targets, err := mountedTargets(ctx, device)
+		mounted, err := diskHasMountedDescendants(ctx, device)
 		if err != nil {
 			return "", err
 		}
-		if len(targets) != 0 {
-			return "", errors.New("partition must be unmounted before deletion")
+		if mounted {
+			return "", errors.New("partition and all descendant volumes must be unmounted before deletion")
 		}
 		protected, err := samePhysicalDiskAsRoot(ctx, device)
 		if err != nil {
