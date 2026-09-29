@@ -443,7 +443,7 @@ export function StorageDevices({
                     <td>{node.type === "disk" ? ((node.partition_table || "—").toUpperCase().replace("DOS", "MBR")) : "—"}</td>
                     <td className="mono">{bytes(node.size_bytes)}</td>
                     <td className="mono">
-                      {node.free_bytes ? bytes(node.free_bytes) : "—"}
+                      {node.free_known ? bytes(node.free_bytes || 0) : "—"}
                       {node.type === "disk" && (node.unallocated_bytes || 0) > 0 && (
                         <div className="storage-free-detail">
                           {t("unallocated")}: {bytes(node.unallocated_bytes)}
