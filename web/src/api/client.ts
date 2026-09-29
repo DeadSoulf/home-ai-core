@@ -143,12 +143,13 @@ export const api = {
   system: () => request<SystemResponse>("/api/v1/system"),
 
   storageOperation: async (input: {
-    operation: "mount" | "unmount" | "format";
+    operation: "mount" | "unmount" | "format" | "partition.create" | "partition.delete";
     device: string;
     mountpoint?: string;
     filesystem?: "ext4" | "xfs" | "vfat";
     label?: string;
     confirm?: string;
+    size_mib?: number;
   }) => postJSON<{message: string}>("/api/v1/storage/operation", input, true),
 
   updateStatus: async () => {
