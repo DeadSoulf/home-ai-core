@@ -134,4 +134,61 @@ describe("API client", () => {
     vi.unstubAllGlobals();
   });
 
+
+  it("loads and saves persistent network profiles", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/v1/network/profiles") {
+        return new Response(JSON.stringify({
+          network_profiles: {
+            backend: "systemd-networkd",
+            profiles: [{
+              interface: "eth0",
+              backend: "systemd-networkd",
+              supported: true,
+              managed: true,
+              method: "dhcp",
+              dns: ["1.1.1.1"],
+            }],
+          },
+        }), {
+          status: 200,
+          headers: {"Content-Type": "application/json"},
+        });
+      }
+      expect(init?.method).toBe("POST");
+      return new Response(JSON.stringify({message: "persistent profile applied"}), {
+        status: 200,
+        headers: {"Content-Type": "application/json"},
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    });
+
+    const profiles = await api.networkProfiles();
+    expect(profiles.backend).toBe("systemd-networkd");
+    expect(profiles.profiles[0].interface).toBe("eth0");
+
+    setCSRFToken("csrf-profile");
+    await api.networkOperation({
+      operation: "profile.save",
+      interface: "eth0",
+      network_method: "static",
+      address: "192.168.50.10/24",
+      gateway: "192.168.50.1",
+      dns: ["1.1.1.1"],
+    });
+
+    const [input, init] = fetchMock.mock.calls[1];
+    expect(String(input)).toBe("/api/v1/network/operation");
+    expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-profile");
+    expect(String(init?.body)).toContain('"network_method":"static"');
+
+    vi.unstubAllGlobals();
+  });
+
 });
