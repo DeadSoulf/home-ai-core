@@ -35,7 +35,13 @@ const strings = {
     formatDiskWarning: "Format {device}? All data on this partition will be permanently deleted.",
     formatTypeConfirmation: "Formatting {device} permanently deletes its data. Type {confirmation} to continue.",
     formatConfirmationMismatch: "Formatting cancelled: confirmation text did not match.",
-    systemDiskProtection: "Destructive operations are disabled for the disk that contains the running system."
+    systemDiskProtection: "Destructive operations are disabled for the disk that contains the running system.",
+    createPartition: "Create partition", deletePartition: "Delete partition", partitionSizeGiB: "Partition size, GiB",
+    allRemainingSpace: "All remaining space", createPartitionWarning: "Leave the size empty to use all remaining free space on the disk.",
+    createPartitionConfirmation: "Create a partition on {device}. Type {confirmation} to continue.",
+    deletePartitionConfirmation: "Delete {device}? Its filesystem and all data will become inaccessible. Type {confirmation} to continue.",
+    partitionConfirmationMismatch: "Partition operation cancelled: confirmation text did not match.",
+    invalidPartitionSize: "Enter a valid partition size greater than zero."
   },
   ru: {
     starting: "Запуск Home-AI-Core…", controlPlane: "Панель управления", dashboard: "Обзор", system: "Система",
@@ -69,7 +75,13 @@ const strings = {
     formatDiskWarning: "Форматировать {device}? Все данные на этом разделе будут безвозвратно удалены.",
     formatTypeConfirmation: "Форматирование {device} безвозвратно удалит данные. Для продолжения введите {confirmation}.",
     formatConfirmationMismatch: "Форматирование отменено: текст подтверждения не совпал.",
-    systemDiskProtection: "Разрушительные операции отключены для диска, на котором находится работающая система."
+    systemDiskProtection: "Разрушительные операции отключены для диска, на котором находится работающая система.",
+    createPartition: "Создать раздел", deletePartition: "Удалить раздел", partitionSizeGiB: "Размер раздела, GiB",
+    allRemainingSpace: "Всё оставшееся место", createPartitionWarning: "Оставьте размер пустым, чтобы использовать всё оставшееся свободное место на диске.",
+    createPartitionConfirmation: "Создать раздел на {device}. Для продолжения введите {confirmation}.",
+    deletePartitionConfirmation: "Удалить {device}? Файловая система и все данные раздела станут недоступны. Для продолжения введите {confirmation}.",
+    partitionConfirmationMismatch: "Операция с разделом отменена: текст подтверждения не совпал.",
+    invalidPartitionSize: "Введите корректный размер раздела больше нуля."
   }
 } as const;
 
