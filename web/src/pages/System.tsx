@@ -47,6 +47,10 @@ export function SystemPage({revision}: {revision: number}) {
     try {
       const result = await api.updateStatus();
       setUpdateInfo(result);
+      window.dispatchEvent(new CustomEvent<string | undefined>(
+        "home-ai-core:update-status",
+        {detail: result.available ? result.available_version : undefined},
+      ));
       setUpdaterState(await api.updaterState());
       setLastChecked(new Date().toISOString());
     } catch (reason) {
