@@ -46,6 +46,10 @@ type ReleaseStatus struct {
 	BundleSizeBytes  int64      `json:"bundle_size_bytes,omitempty"`
 	PublishedAt      *time.Time `json:"published_at,omitempty"`
 	Notes            string     `json:"notes,omitempty"`
+	HelperVersion    string     `json:"helper_version,omitempty"`
+	HelperProtocol   int        `json:"helper_protocol,omitempty"`
+	HelperCompatible bool       `json:"helper_compatible"`
+	HelperError      string     `json:"helper_error,omitempty"`
 }
 
 type candidate struct {
@@ -91,6 +95,7 @@ func (s *Service) snapshotState() State {
 }
 
 func (s *Service) Check(ctx context.Context) (ReleaseStatus, error) {
+	helper := s.helperInfo(ctx)
 	s.setState(State{
 		Phase:          PhaseChecking,
 		CurrentVersion: s.currentVersion,
@@ -100,9 +105,13 @@ func (s *Service) Check(ctx context.Context) (ReleaseStatus, error) {
 	item, err := s.findCandidate(ctx, "")
 	if errors.Is(err, ErrNoUpdate) {
 		status := ReleaseStatus{
-			CurrentVersion: s.currentVersion,
-			Architecture:   s.architecture,
-			Available:      false,
+			CurrentVersion:   s.currentVersion,
+			Architecture:     s.architecture,
+			Available:        false,
+			HelperVersion:    helper.Version,
+			HelperProtocol:   helper.ProtocolVersion,
+			HelperCompatible: helper.Compatible,
+			HelperError:      helper.Error,
 		}
 		s.setState(State{
 			Phase:          PhaseIdle,
@@ -135,7 +144,19 @@ func (s *Service) Check(ctx context.Context) (ReleaseStatus, error) {
 			BundleSizeBytes:  item.BundleSizeBytes,
 		})
 	}
+	item.HelperVersion = helper.Version
+	item.HelperProtocol = helper.ProtocolVersion
+	item.HelperCompatible = helper.Compatible
+	item.HelperError = helper.Error
 	return item.ReleaseStatus, nil
+}
+
+func (s *Service) helperInfo(ctx context.Context) HelperInfo {
+	info, err := queryUpdaterHelperInfo(ctx)
+	if err != nil && info.Error == "" {
+		info.Error = err.Error()
+	}
+	return info
 }
 
 func (s *Service) Download(ctx context.Context, version string) (State, error) {
