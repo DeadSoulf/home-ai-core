@@ -186,3 +186,83 @@ func TestScopedPermissionLoadedFromSession(t *testing.T) {
 		t.Fatalf("unexpected resource permission: %#v", scope)
 	}
 }
+
+func TestCreateAndListMemberUser(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	store, err := state.Open(ctx, dir)
+	if err != nil {
+		t.Fatalf("state.Open() error = %v", err)
+	}
+	defer store.Close()
+
+	service, err := New(ctx, store, dir)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	tokenBytes, err := os.ReadFile(service.BootstrapTokenPath())
+	if err != nil {
+		t.Fatalf("read bootstrap token: %v", err)
+	}
+	owner, err := service.Bootstrap(
+		ctx,
+		string(tokenBytes),
+		"Owner",
+		"Home Owner",
+		"correct horse battery staple",
+		RequestContext{},
+	)
+	if err != nil {
+		t.Fatalf("Bootstrap() error = %v", err)
+	}
+
+	created, err := service.CreateUser(
+		ctx,
+		owner.Actor,
+		"Alice",
+		"Alice",
+		"another correct horse battery",
+		RequestContext{RequestID: "req-create-user"},
+	)
+	if err != nil {
+		t.Fatalf("CreateUser() error = %v", err)
+	}
+	if created.Username != "alice" || len(created.Roles) != 1 || created.Roles[0] != "member" {
+		t.Fatalf("unexpected created user: %#v", created)
+	}
+
+	users, err := service.ListUsers(ctx)
+	if err != nil {
+		t.Fatalf("ListUsers() error = %v", err)
+	}
+	if len(users) != 2 {
+		t.Fatalf("users = %d, want 2", len(users))
+	}
+
+	login, err := service.Login(ctx, "alice", "another correct horse battery", RequestContext{})
+	if err != nil {
+		t.Fatalf("member Login() error = %v", err)
+	}
+	if !login.Actor.Has("security.self.read") {
+		t.Fatal("member is missing security.self.read")
+	}
+	if !login.Actor.Has("security.sessions.manage") {
+		t.Fatal("member is missing security.sessions.manage")
+	}
+	if login.Actor.Has("system.read") || login.Actor.Has("storage.manage") || login.Actor.Has("security.users.manage") {
+		t.Fatalf("member received privileged permissions: %#v", login.Actor.Permissions)
+	}
+
+	if _, err := service.CreateUser(
+		ctx,
+		owner.Actor,
+		"ALICE",
+		"Duplicate",
+		"another correct horse battery",
+		RequestContext{},
+	); err != ErrUserExists {
+		t.Fatalf("duplicate CreateUser() error = %v, want ErrUserExists", err)
+	}
+}
+
