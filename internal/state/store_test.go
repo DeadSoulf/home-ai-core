@@ -20,8 +20,8 @@ func TestOpenAppliesMigrationsAndPersistsNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SchemaVersion() error = %v", err)
 	}
-	if version != 11 {
-		t.Fatalf("schema version = %d, want 11", version)
+	if version != 12 {
+		t.Fatalf("schema version = %d, want 12", version)
 	}
 
 	const nodeID = "00000000-0000-4000-8000-000000000001"
@@ -95,8 +95,8 @@ func TestMigrationsAreIdempotent(t *testing.T) {
 	if err := store.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM schema_migrations").Scan(&count); err != nil {
 		t.Fatalf("count migrations: %v", err)
 	}
-	if count != 11 {
-		t.Fatalf("migration rows = %d, want 11", count)
+	if count != 12 {
+		t.Fatalf("migration rows = %d, want 12", count)
 	}
 }
 
