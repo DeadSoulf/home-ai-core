@@ -1060,6 +1060,13 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		if output, err := exec.CommandContext(ctx, "/usr/bin/umount", "--", device).CombinedOutput(); err != nil {
 			return "", fmt.Errorf("unmount device: %s", strings.TrimSpace(string(output)))
 		}
+		remaining, err := mountedTargets(ctx, device)
+		if err != nil {
+			return "", fmt.Errorf("verify unmount: %w", err)
+		}
+		if len(remaining) != 0 {
+			return "", fmt.Errorf("unmount completed but device is still mounted at: %s", strings.Join(remaining, ", "))
+		}
 		return "device unmounted", nil
 
 	case "storage.partition.create":
