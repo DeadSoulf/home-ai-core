@@ -62,6 +62,9 @@ func TestNASFolderGrants(t *testing.T) {
 	if privateFolder.OwnerUserID != member.ID {
 		t.Fatalf("private owner = %q", privateFolder.OwnerUserID)
 	}
+	if privateFolder.PoolRoot != "/srv/home-ai/main" {
+		t.Fatalf("private pool root = %q", privateFolder.PoolRoot)
+	}
 
 	_, _, privateScopes, err := store.userAccess(ctx, member.ID)
 	if err != nil {
@@ -99,6 +102,19 @@ func TestNASFolderGrants(t *testing.T) {
 	}
 	if len(folders) != 2 {
 		t.Fatalf("folder count = %d, want 2", len(folders))
+	}
+
+	if err := store.DeleteNASFolder(ctx, privateFolder.ID); err != nil {
+		t.Fatalf("DeleteNASFolder() error = %v", err)
+	}
+	_, _, scopesAfterDelete, err := store.userAccess(ctx, member.ID)
+	if err != nil {
+		t.Fatalf("userAccess(member) after delete error = %v", err)
+	}
+	for _, scope := range scopesAfterDelete {
+		if scope.ResourceType == "file_folder" && scope.ResourceID == privateFolder.ID {
+			t.Fatalf("stale private folder grant after delete: %#v", scope)
+		}
 	}
 }
 
