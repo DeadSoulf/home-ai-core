@@ -10,6 +10,7 @@ import type {
   UpdateStatus,
   UpdaterState,
   UserAccount,
+  WireGuardStatus,
 } from "./types";
 
 type APIErrorBody = {
@@ -169,6 +170,41 @@ export const api = {
     confirm?: string;
     size_mib?: number;
   }) => postJSON<{message: string}>("/api/v1/storage/operation", input, true),
+
+  wireGuardStatus: async () => {
+    const result = await request<{wireguard: WireGuardStatus}>("/api/v1/network/wireguard");
+    return result.wireguard;
+  },
+
+  networkOperation: async (input: {
+    operation:
+      | "link.up"
+      | "link.down"
+      | "mtu"
+      | "address.add"
+      | "address.delete"
+      | "gateway.set"
+      | "gateway.delete"
+      | "wireguard.install"
+      | "wireguard.create"
+      | "wireguard.up"
+      | "wireguard.down"
+      | "wireguard.delete"
+      | "wireguard.peer.add"
+      | "wireguard.peer.delete";
+    interface?: string;
+    address?: string;
+    gateway?: string;
+    mtu?: number;
+    tunnel?: string;
+    listen_port?: number;
+    private_key?: string;
+    peer_public_key?: string;
+    preshared_key?: string;
+    allowed_ips?: string[];
+    endpoint?: string;
+    keepalive?: number;
+  }) => postJSON<{message: string}>("/api/v1/network/operation", input, true),
 
   updateStatus: async (fresh = false) => {
     const result = await request<{update: UpdateStatus}>(fresh ? "/api/v1/update?fresh=1" : "/api/v1/update");
