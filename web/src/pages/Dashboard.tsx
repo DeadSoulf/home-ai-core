@@ -107,12 +107,24 @@ export function Dashboard({revision}: {revision: number}) {
               .slice(0, 6)
               .map((disk) => {
                 const free = diskFreeBytes(disk);
+                const health =
+                  disk.health === "ok"
+                    ? t("diskHealthOk")
+                    : disk.health === "failed"
+                      ? t("diskHealthFailed")
+                      : "";
+                const details = [
+                  disk.display_name ? disk.name : "",
+                  t("freeSpace") + ": " + (free === undefined ? "—" : formatBytes(free)),
+                  disk.temperature_c !== undefined ? disk.temperature_c + "°C" : "",
+                  health,
+                ].filter(Boolean).join(" · ");
                 return (
                   <div className="list-row" key={disk.name}>
                     <div>
                       <strong>{disk.display_name || disk.model || disk.name}</strong>
                     </div>
-                    <span>{disk.display_name ? disk.name + " · " : ""}{t("freeSpace")}: {free === undefined ? "—" : formatBytes(free)}</span>
+                    <span>{details}</span>
                   </div>
                 );
               })}
