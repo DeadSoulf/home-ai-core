@@ -190,7 +190,7 @@ export function StorageDevices({
 
   async function deleteAllPartitions(node: BlockNode) {
     if (!node.path) return;
-    const confirmation = `DELETE ALL ${node.path}`;
+    const confirmation = node.name;
     const typed = window.prompt(
       t("deleteAllPartitionsConfirmation")
         .replace("{device}", node.path)
@@ -222,7 +222,7 @@ export function StorageDevices({
 
   async function deletePartition(node: BlockNode) {
     if (!node.path) return;
-    const confirmation = `DELETE ${node.path}`;
+    const confirmation = node.name;
     const typed = window.prompt(
       t("deletePartitionConfirmation")
         .replace("{device}", node.path)
