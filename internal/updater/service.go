@@ -33,8 +33,9 @@ const (
 )
 
 var (
-	ErrNoUpdate = errors.New("no update available")
-	ErrBusy     = errors.New("update operation already in progress")
+	ErrNoUpdate   = errors.New("no update available")
+	ErrNoRollback = errors.New("no rollback backup available")
+	ErrBusy       = errors.New("update operation already in progress")
 )
 
 type ReleaseStatus struct {
@@ -51,6 +52,8 @@ type ReleaseStatus struct {
 	HelperAvailable  bool       `json:"helper_available"`
 	HelperCompatible bool       `json:"helper_compatible"`
 	HelperError      string     `json:"helper_error,omitempty"`
+	RollbackAvailable bool      `json:"rollback_available"`
+	RollbackVersion   string    `json:"rollback_version,omitempty"`
 }
 
 type candidate struct {
@@ -111,9 +114,11 @@ func (s *Service) Check(ctx context.Context) (ReleaseStatus, error) {
 			Available:        false,
 			HelperVersion:    helper.Version,
 			HelperProtocol:   helper.ProtocolVersion,
-			HelperAvailable:  helper.Available,
-			HelperCompatible: helper.Compatible,
-			HelperError:      helper.Error,
+			HelperAvailable:   helper.Available,
+			HelperCompatible:  helper.Compatible,
+			HelperError:       helper.Error,
+			RollbackAvailable: helper.RollbackAvailable,
+			RollbackVersion:   helper.RollbackVersion,
 		}
 		s.setState(State{
 			Phase:          PhaseIdle,
@@ -151,6 +156,8 @@ func (s *Service) Check(ctx context.Context) (ReleaseStatus, error) {
 	item.HelperAvailable = helper.Available
 	item.HelperCompatible = helper.Compatible
 	item.HelperError = helper.Error
+	item.RollbackAvailable = helper.RollbackAvailable
+	item.RollbackVersion = helper.RollbackVersion
 	return item.ReleaseStatus, nil
 }
 
@@ -260,7 +267,7 @@ func (s *Service) Install(ctx context.Context, version string) (State, error) {
 	state.UpdatedAt = time.Now().UTC()
 	s.setState(state)
 
-	if err := callUpdaterHelper(ctx, version); err != nil {
+	if err := callUpdaterHelper(ctx, s.currentVersion, version); err != nil {
 		s.failState(err)
 		return s.snapshotState(), err
 	}
@@ -268,6 +275,47 @@ func (s *Service) Install(ctx context.Context, version string) (State, error) {
 	state = s.snapshotState()
 	state.Phase = PhaseRestarting
 	state.Message = "Update accepted; Home-AI-Core is restarting"
+	state.UpdatedAt = time.Now().UTC()
+	s.setState(state)
+	return state, nil
+}
+
+func (s *Service) Rollback(ctx context.Context) (State, error) {
+	if !s.opMu.TryLock() {
+		return s.State(), ErrBusy
+	}
+	defer s.opMu.Unlock()
+
+	info := s.helperInfo(ctx)
+	if !info.Available {
+		return s.snapshotState(), errors.New("system updater helper is unavailable")
+	}
+	if !info.Compatible {
+		return s.snapshotState(), ErrHelperUpgradeRequired
+	}
+	if !info.RollbackAvailable || strings.TrimSpace(info.RollbackVersion) == "" {
+		return s.snapshotState(), ErrNoRollback
+	}
+
+	state := s.snapshotState()
+	state.Phase = PhaseRollingBack
+	state.CurrentVersion = s.currentVersion
+	state.AvailableVersion = info.RollbackVersion
+	state.ProgressPercent = 100
+	state.Message = "Starting rollback to previous version"
+	state.Error = ""
+	state.UpdatedAt = time.Now().UTC()
+	s.setState(state)
+
+	version, err := callUpdaterRollback(ctx)
+	if err != nil {
+		s.failState(err)
+		return s.snapshotState(), err
+	}
+	state = s.snapshotState()
+	state.Phase = PhaseRestarting
+	state.AvailableVersion = version
+	state.Message = "Rollback accepted; Home-AI-Core is restarting"
 	state.UpdatedAt = time.Now().UTC()
 	s.setState(state)
 	return state, nil
