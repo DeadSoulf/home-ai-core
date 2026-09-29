@@ -162,6 +162,10 @@ tbody tr:last-child td { border-bottom: 0; }
 .update-callout span { color: #a8b1bf; font-size: 12px; line-height: 1.45; }
 .update-callout.available { border: 1px solid #31549a; background: #1b2d50; }
 .update-callout.current { border: 1px solid #28513f; background: #18342a; }
+.update-action-stack { display: grid; gap: 12px; margin-top: 12px; margin-bottom: 16px; align-items: start; }
+.update-action-stack > .button { width: fit-content; }
+.update-action-stack > .update-callout,
+.update-action-stack > .notice { margin: 0; }
 .release-notes { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 13px; line-height: 1.6; color: #b9c3d1; max-height: 420px; overflow: auto; }
 
 
@@ -171,6 +175,12 @@ tbody tr:last-child td { border-bottom: 0; }
 .storage-tree-table th:nth-child(5) { min-width: 180px; }
 .storage-tree-name { display: flex; align-items: center; gap: 7px; min-height: 26px; }
 .storage-tree-branch { color: #64748b; width: 14px; flex: 0 0 14px; }
+.storage-tree-spacer { width: 22px; flex: 0 0 22px; }
+.storage-collapse-button {
+  width: 22px; height: 22px; flex: 0 0 22px; border: 0; border-radius: 6px;
+  display: grid; place-items: center; padding: 0; background: transparent; color: #8d9aad; font-size: 10px;
+}
+.storage-collapse-button:hover { background: #242d39; color: #fff; }
 .storage-tree-model { margin: 2px 0 0; color: #7f8b9d; font-size: 11px; padding-left: 1px; }
 .storage-inline-label { color: #8d9aad; font-size: 11px; }
 .storage-system-row { background: #2b261833; }
