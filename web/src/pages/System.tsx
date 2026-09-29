@@ -205,17 +205,19 @@ export function SystemPage({revision}: {revision: number}) {
             </div>
           )}
           {updateInfo?.available && updaterState?.phase !== "ready" && (
-            <button
-              type="button"
-              className="button primary"
-              disabled={downloadingUpdate || checkingUpdate}
-              onClick={downloadUpdate}
-            >
-              {downloadingUpdate ? t("downloadingUpdate") : t("downloadUpdate")}
-            </button>
+            <div className="update-action-stack">
+              <button
+                type="button"
+                className="button primary"
+                disabled={downloadingUpdate || checkingUpdate}
+                onClick={downloadUpdate}
+              >
+                {downloadingUpdate ? t("downloadingUpdate") : t("downloadUpdate")}
+              </button>
+            </div>
           )}
           {updaterState?.phase === "ready" && (
-            <>
+            <div className="update-action-stack">
               <div className="update-callout current"><strong>{t("updateReady")}</strong></div>
               <button
                 type="button"
@@ -226,7 +228,7 @@ export function SystemPage({revision}: {revision: number}) {
                 {installingUpdate ? t("installing") : t("installUpdate")}
               </button>
               <div className="notice">{t("updateRestartNotice")}</div>
-            </>
+            </div>
           )}
           {updateError && <div className="form-error">{updateError}</div>}
           {lastChecked && <div className="notice">{t("lastChecked")}: {date(lastChecked)}</div>}
