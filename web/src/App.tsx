@@ -24,6 +24,7 @@ export default function App() {
   const [path, setPath] = useState(currentPath);
   const [realtime, setRealtime] = useState<RealtimeStatus>("disconnected");
   const [revision, setRevision] = useState(0);
+  const [availableUpdate, setAvailableUpdate] = useState<string>();
 
   useEffect(() => {
     api.setupStatus()
@@ -66,6 +67,35 @@ export default function App() {
       },
       setRealtime,
     );
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "app") {
+      setAvailableUpdate(undefined);
+      return;
+    }
+    let stopped = false;
+    let checking = false;
+    const check = async () => {
+      if (checking) return;
+      checking = true;
+      try {
+        const result = await api.updateStatus();
+        if (!stopped) {
+          setAvailableUpdate(result.available ? result.available_version : undefined);
+        }
+      } catch {
+        // Update notifications are best-effort and must not interrupt the UI.
+      } finally {
+        checking = false;
+      }
+    };
+    void check();
+    const timer = window.setInterval(check, 10 * 60 * 1000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
   }, [phase]);
 
   const authenticated = (nextActor: Actor) => {
@@ -119,7 +149,7 @@ export default function App() {
   }
 
   return (
-    <Shell actor={actor} path={path} realtime={realtime} onNavigate={navigate} onLogout={logout}>
+    <Shell actor={actor} path={path} realtime={realtime} availableUpdate={availableUpdate} onNavigate={navigate} onLogout={logout}>
       {page}
     </Shell>
   );
