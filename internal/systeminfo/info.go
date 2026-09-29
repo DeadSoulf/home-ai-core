@@ -19,7 +19,6 @@ func Collect(nodeID string) Info {
 		CPU:               cpuInfo(),
 		Memory:            memoryInfo(),
 		UptimeSeconds:     uptime(),
-		BlockDevices:      blockDevices("/sys/block"),
 		BlockTree:         lsblkTree(),
 		NetworkInterfaces: networkInterfaces("/sys/class/net"),
 		GPUs: gpus("/sys/bus/pci/devices", []string{
