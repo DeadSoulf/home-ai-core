@@ -9,6 +9,7 @@ type Request struct {
 	Operation       string `json:"operation"`
 	ProtocolVersion int    `json:"protocol_version,omitempty"`
 	Version         string `json:"version,omitempty"`
+	CurrentVersion  string `json:"current_version,omitempty"`
 	Device          string `json:"device,omitempty"`
 	Mountpoint      string `json:"mountpoint,omitempty"`
 	Filesystem      string `json:"filesystem,omitempty"`
@@ -29,8 +30,10 @@ type Response struct {
 	Message         string           `json:"message,omitempty"`
 	Error           string           `json:"error,omitempty"`
 	HelperVersion   string           `json:"helper_version,omitempty"`
-	ProtocolVersion int              `json:"protocol_version,omitempty"`
-	FilesystemStats []FilesystemStat `json:"filesystem_stats,omitempty"`
+	ProtocolVersion  int              `json:"protocol_version,omitempty"`
+	RollbackAvailable bool             `json:"rollback_available,omitempty"`
+	RollbackVersion   string           `json:"rollback_version,omitempty"`
+	FilesystemStats  []FilesystemStat `json:"filesystem_stats,omitempty"`
 }
 
 type Result struct {
