@@ -23,16 +23,16 @@ import (
 )
 
 const (
-	releasesURL       = "https://api.github.com/repos/DeadSoulf/home-ai-core/releases?per_page=20"
-	versionURL        = "https://raw.githubusercontent.com/DeadSoulf/home-ai-core/main/VERSION"
-	releaseDownloadURL = "https://github.com/DeadSoulf/home-ai-core/releases/download"
-	maxReleaseBytes   = 1 << 20
-	maxChecksumBytes  = 4096
-	maxBundleBytes    = 512 << 20
-	maxExtractedBytes = 768 << 20
-	maxBundleFiles    = 20000
-	defaultUserAgent     = "Home-AI-Core"
-	updateCheckCacheTTL  = 10 * time.Minute
+	releasesURL         = "https://api.github.com/repos/DeadSoulf/home-ai-core/releases?per_page=20"
+	versionURL          = "https://raw.githubusercontent.com/DeadSoulf/home-ai-core/main/VERSION"
+	releaseDownloadURL  = "https://github.com/DeadSoulf/home-ai-core/releases/download"
+	maxReleaseBytes     = 1 << 20
+	maxChecksumBytes    = 4096
+	maxBundleBytes      = 512 << 20
+	maxExtractedBytes   = 768 << 20
+	maxBundleFiles      = 20000
+	defaultUserAgent    = "Home-AI-Core"
+	updateCheckCacheTTL = 10 * time.Minute
 )
 
 var (
