@@ -25,6 +25,7 @@ export type BlockNode = {
   type: string;
   filesystem?: string;
   size_bytes?: number;
+  free_bytes?: number;
   mountpoints: string[];
   parent_name?: string;
   label?: string;
