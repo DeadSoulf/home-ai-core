@@ -329,4 +329,57 @@ describe("API client", () => {
     vi.unstubAllGlobals();
   });
 
+
+  it("lists restores and permanently deletes recycle-bin entries", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/trash") && !init?.method) {
+        return new Response(JSON.stringify({
+          trash: [{
+            id: "0123456789abcdef0123456789abcdef",
+            original_path: "docs/old.txt",
+            name: "old.txt",
+            kind: "file",
+            size_bytes: 3,
+            deleted_at: "2026-09-30T12:00:00Z",
+          }],
+        }), {
+          status: 200,
+          headers: {"Content-Type": "application/json"},
+        });
+      }
+      if (init?.method === "DELETE") {
+        return new Response(null, {status: 204});
+      }
+      return new Response(JSON.stringify({path: "docs/old.txt"}), {
+        status: 200,
+        headers: {"Content-Type": "application/json"},
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    });
+
+    const trash = await api.fileTrash("nsf-test");
+    expect(trash[0].original_path).toBe("docs/old.txt");
+
+    setCSRFToken("csrf-trash");
+    await api.restoreFileTrash("nsf-test", trash[0].id);
+    await api.purgeFileTrash("nsf-test", trash[0].id);
+
+    const [, restoreInit] = fetchMock.mock.calls[1];
+    expect(restoreInit?.method).toBe("POST");
+    expect(new Headers(restoreInit?.headers).get("X-CSRF-Token")).toBe("csrf-trash");
+
+    const [, purgeInit] = fetchMock.mock.calls[2];
+    expect(purgeInit?.method).toBe("DELETE");
+    expect(new Headers(purgeInit?.headers).get("X-CSRF-Token")).toBe("csrf-trash");
+
+    vi.unstubAllGlobals();
+  });
+
 });
