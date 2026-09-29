@@ -22,6 +22,7 @@ type lsblkNode struct {
 	Type        string      `json:"type"`
 	Filesystem  string      `json:"fstype"`
 	SizeBytes   uint64      `json:"size"`
+	FreeBytes   uint64      `json:"fsavail"`
 	Mountpoints []*string   `json:"mountpoints"`
 	ParentName  string      `json:"pkname"`
 	Label       string      `json:"label"`
@@ -40,7 +41,7 @@ func lsblkTree() []BlockNode {
 		"--json",
 		"--bytes",
 		"--output",
-		"NAME,PATH,TYPE,FSTYPE,SIZE,MOUNTPOINTS,PKNAME,LABEL,UUID,MODEL,VENDOR,SERIAL,ROTA,RM",
+		"NAME,PATH,TYPE,FSTYPE,SIZE,FSAVAIL,MOUNTPOINTS,PKNAME,LABEL,UUID,MODEL,VENDOR,SERIAL,ROTA,RM",
 	)
 	output, err := command.Output()
 	if err != nil {
@@ -88,11 +89,13 @@ func convertLsblkNode(item lsblkNode) BlockNode {
 	}
 
 	children := make([]BlockNode, 0, len(item.Children))
+	freeBytes := item.FreeBytes
 	for _, child := range item.Children {
 		node := convertLsblkNode(child)
 		if node.System {
 			system = true
 		}
+		freeBytes += node.FreeBytes
 		children = append(children, node)
 	}
 
@@ -102,6 +105,7 @@ func convertLsblkNode(item lsblkNode) BlockNode {
 		Type:        item.Type,
 		Filesystem:  item.Filesystem,
 		SizeBytes:   item.SizeBytes,
+		FreeBytes:   freeBytes,
 		Mountpoints: mountpoints,
 		ParentName:  item.ParentName,
 		Label:       item.Label,
