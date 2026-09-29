@@ -139,6 +139,25 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		})
 		return
 	}
+	if request.Operation == "storage.inspect" {
+		_ = conn.SetDeadline(time.Now().Add(45 * time.Second))
+		ctx, cancel := context.WithTimeout(parent, 40*time.Second)
+		defer cancel()
+		stats, err := inspectFilesystemStats(ctx)
+		if err != nil {
+			logger.Error("storage inspection failed", "error", err)
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})
+			return
+		}
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+			OK:              true,
+			Message:         "storage inspected",
+			HelperVersion:   updaterhelper.HelperVersion,
+			ProtocolVersion: updaterhelper.ProtocolVersion,
+			FilesystemStats: stats,
+		})
+		return
+	}
 	if strings.HasPrefix(request.Operation, "storage.") {
 		_ = conn.SetDeadline(time.Now().Add(2 * time.Minute))
 		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
@@ -408,6 +427,166 @@ func writeResult(uid, gid int, result updaterhelper.Result) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+type inspectLsblkOutput struct {
+	BlockDevices []inspectLsblkNode `json:"blockdevices"`
+}
+
+type inspectLsblkNode struct {
+	Path        string             `json:"path"`
+	Type        string             `json:"type"`
+	Filesystem  string             `json:"fstype"`
+	FreeBytes   *uint64            `json:"fsavail"`
+	Mountpoints []*string          `json:"mountpoints"`
+	Children    []inspectLsblkNode `json:"children"`
+}
+
+func inspectFilesystemStats(ctx context.Context) ([]updaterhelper.FilesystemStat, error) {
+	output, err := exec.CommandContext(
+		ctx,
+		"/usr/bin/lsblk",
+		"--json",
+		"--bytes",
+		"--output", "PATH,TYPE,FSTYPE,FSAVAIL,MOUNTPOINTS",
+	).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("inspect filesystems: %s", strings.TrimSpace(string(output)))
+	}
+	var decoded inspectLsblkOutput
+	if err := json.Unmarshal(output, &decoded); err != nil {
+		return nil, fmt.Errorf("decode filesystem inventory: %w", err)
+	}
+
+	stats := make([]updaterhelper.FilesystemStat, 0)
+	var visit func(inspectLsblkNode)
+	visit = func(node inspectLsblkNode) {
+		filesystem := strings.ToLower(strings.TrimSpace(node.Filesystem))
+		if node.Path != "" && filesystem != "" && filesystem != "swap" && filesystem != "lvm2_member" {
+			stat := updaterhelper.FilesystemStat{
+				Device:     node.Path,
+				Filesystem: filesystem,
+			}
+			if node.FreeBytes != nil {
+				stat.FreeBytes = *node.FreeBytes
+				stat.FreeKnown = true
+			} else if free, ok := offlineFilesystemFreeBytesPrivileged(ctx, node.Path, filesystem); ok {
+				stat.FreeBytes = free
+				stat.FreeKnown = true
+			}
+			stats = append(stats, stat)
+		}
+		for _, child := range node.Children {
+			visit(child)
+		}
+	}
+	for _, node := range decoded.BlockDevices {
+		visit(node)
+	}
+	return stats, nil
+}
+
+func offlineFilesystemFreeBytesPrivileged(ctx context.Context, device, filesystem string) (uint64, bool) {
+	switch filesystem {
+	case "ext2", "ext3", "ext4":
+		output, err := exec.CommandContext(ctx, "/usr/sbin/dumpe2fs", "-h", device).CombinedOutput()
+		if err != nil {
+			return 0, false
+		}
+		var freeBlocks, blockSize uint64
+		for _, line := range strings.Split(string(output), "\n") {
+			key, value, ok := strings.Cut(line, ":")
+			if !ok {
+				continue
+			}
+			number, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64)
+			if err != nil {
+				continue
+			}
+			switch strings.TrimSpace(key) {
+			case "Free blocks":
+				freeBlocks = number
+			case "Block size":
+				blockSize = number
+			}
+		}
+		if blockSize == 0 {
+			return 0, false
+		}
+		return freeBlocks * blockSize, true
+	case "xfs":
+		output, err := exec.CommandContext(
+			ctx,
+			"/usr/sbin/xfs_db",
+			"-r",
+			"-c", "sb 0",
+			"-c", "p blocksize fdblocks",
+			device,
+		).CombinedOutput()
+		if err != nil {
+			return 0, false
+		}
+		var freeBlocks, blockSize uint64
+		for _, line := range strings.Split(string(output), "\n") {
+			key, value, ok := strings.Cut(line, "=")
+			if !ok {
+				continue
+			}
+			number, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64)
+			if err != nil {
+				continue
+			}
+			switch strings.TrimSpace(key) {
+			case "fdblocks":
+				freeBlocks = number
+			case "blocksize":
+				blockSize = number
+			}
+		}
+		if blockSize == 0 {
+			return 0, false
+		}
+		return freeBlocks * blockSize, true
+	case "vfat", "fat", "fat32":
+		output, err := exec.CommandContext(ctx, "/usr/sbin/fsck.fat", "-n", "-v", device).CombinedOutput()
+		if err != nil {
+			return 0, false
+		}
+		var clusterSize, usedClusters, totalClusters uint64
+		for _, line := range strings.Split(string(output), "\n") {
+			trimmed := strings.TrimSpace(line)
+			if strings.Contains(trimmed, "bytes per cluster") {
+				fields := strings.Fields(trimmed)
+				if len(fields) > 0 {
+					clusterSize, _ = strconv.ParseUint(fields[0], 10, 64)
+				}
+			}
+			if !strings.Contains(trimmed, "clusters") || !strings.Contains(trimmed, "/") {
+				continue
+			}
+			for _, field := range strings.Fields(trimmed) {
+				if !strings.Contains(field, "/") {
+					continue
+				}
+				parts := strings.SplitN(strings.Trim(field, ",;()"), "/", 2)
+				if len(parts) != 2 {
+					continue
+				}
+				used, errUsed := strconv.ParseUint(parts[0], 10, 64)
+				total, errTotal := strconv.ParseUint(parts[1], 10, 64)
+				if errUsed == nil && errTotal == nil && total >= used {
+					usedClusters = used
+					totalClusters = total
+				}
+			}
+		}
+		if clusterSize == 0 || totalClusters == 0 || totalClusters < usedClusters {
+			return 0, false
+		}
+		return (totalClusters - usedClusters) * clusterSize, true
+	default:
+		return 0, false
+	}
 }
 
 func performStorageOperation(ctx context.Context, request updaterhelper.Request) (string, error) {
