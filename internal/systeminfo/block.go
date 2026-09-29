@@ -164,6 +164,8 @@ func offlineFilesystemFreeBytes(device, filesystem string) uint64 {
 		value = extFilesystemFreeBytes(device)
 	case "xfs":
 		value = xfsFilesystemFreeBytes(device)
+	case "vfat", "fat", "fat32":
+		value = fatFilesystemFreeBytes(device)
 	}
 
 	filesystemFreeCache.Lock()
@@ -201,6 +203,46 @@ func extFilesystemFreeBytes(device string) uint64 {
 		return 0
 	}
 	return freeBlocks * blockSize
+}
+
+func fatFilesystemFreeBytes(device string) uint64 {
+	output, err := exec.Command("/usr/sbin/fsck.fat", "-n", "-v", device).CombinedOutput()
+	if err != nil {
+		return 0
+	}
+	var clusterSize uint64
+	var usedClusters, totalClusters uint64
+	for _, line := range strings.Split(string(output), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.Contains(trimmed, "bytes per cluster") {
+			fields := strings.Fields(trimmed)
+			if len(fields) > 0 {
+				clusterSize, _ = strconv.ParseUint(fields[0], 10, 64)
+			}
+		}
+		if !strings.Contains(trimmed, "clusters") || !strings.Contains(trimmed, "/") {
+			continue
+		}
+		for _, field := range strings.Fields(trimmed) {
+			if !strings.Contains(field, "/") {
+				continue
+			}
+			parts := strings.SplitN(strings.Trim(field, ",;()"), "/", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			used, errUsed := strconv.ParseUint(parts[0], 10, 64)
+			total, errTotal := strconv.ParseUint(parts[1], 10, 64)
+			if errUsed == nil && errTotal == nil && total >= used {
+				usedClusters = used
+				totalClusters = total
+			}
+		}
+	}
+	if clusterSize == 0 || totalClusters == 0 || totalClusters < usedClusters {
+		return 0
+	}
+	return (totalClusters - usedClusters) * clusterSize
 }
 
 func xfsFilesystemFreeBytes(device string) uint64 {
