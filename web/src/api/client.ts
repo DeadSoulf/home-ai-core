@@ -143,7 +143,7 @@ export const api = {
   system: () => request<SystemResponse>("/api/v1/system"),
 
   storageOperation: async (input: {
-    operation: "mount" | "unmount" | "format" | "partition.create" | "partition.delete" | "label.rename";
+    operation: "mount" | "unmount" | "format" | "partition.create" | "partition.delete" | "partition.delete_all" | "label.rename";
     device: string;
     mountpoint?: string;
     filesystem?: "ext4" | "xfs" | "vfat";
