@@ -117,15 +117,24 @@ func (s *Service) Check(ctx context.Context) (ReleaseStatus, error) {
 		return ReleaseStatus{}, err
 	}
 
-	s.setState(State{
-		Phase:            PhaseAvailable,
-		CurrentVersion:   s.currentVersion,
-		AvailableVersion: item.AvailableVersion,
-		Message:          "Update available",
-		UpdatedAt:        time.Now().UTC(),
-		PublishedAt:      item.PublishedAt,
-		BundleSizeBytes:  item.BundleSizeBytes,
-	})
+	current := s.snapshotState()
+	if current.Phase == PhaseReady && current.AvailableVersion == item.AvailableVersion {
+		current.CurrentVersion = s.currentVersion
+		current.PublishedAt = item.PublishedAt
+		current.BundleSizeBytes = item.BundleSizeBytes
+		current.UpdatedAt = time.Now().UTC()
+		s.setState(current)
+	} else {
+		s.setState(State{
+			Phase:            PhaseAvailable,
+			CurrentVersion:   s.currentVersion,
+			AvailableVersion: item.AvailableVersion,
+			Message:          "Update available",
+			UpdatedAt:        time.Now().UTC(),
+			PublishedAt:      item.PublishedAt,
+			BundleSizeBytes:  item.BundleSizeBytes,
+		})
+	}
 	return item.ReleaseStatus, nil
 }
 
