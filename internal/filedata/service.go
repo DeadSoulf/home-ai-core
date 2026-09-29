@@ -60,7 +60,7 @@ func List(root, relative string) ([]Entry, error) {
 	}
 	result := make([]Entry, 0, len(items))
 	for _, item := range items {
-		if strings.HasPrefix(item.Name(), ".home-ai-upload-") {
+		if strings.HasPrefix(item.Name(), ".home-ai-upload-") || item.Name() == trashDirName {
 			continue
 		}
 		itemPath := filepath.Join(dir, item.Name())
@@ -295,8 +295,8 @@ func resolveExisting(root, relative string) (string, error) {
 	if relative == "" {
 		return root, nil
 	}
-	if filepath.IsAbs(relative) || pathEscapes(relative) {
-		return "", errors.New("path escapes logical folder")
+	if filepath.IsAbs(relative) || pathEscapes(relative) || reservedRelative(relative) {
+		return "", errors.New("path is outside the user-visible logical folder")
 	}
 
 	current := root
@@ -321,7 +321,7 @@ func resolveExisting(root, relative string) (string, error) {
 
 func splitTarget(relative string) (string, string, error) {
 	relative = cleanRelative(relative)
-	if relative == "" || filepath.IsAbs(relative) || pathEscapes(relative) {
+	if relative == "" || filepath.IsAbs(relative) || pathEscapes(relative) || reservedRelative(relative) {
 		return "", "", errors.New("invalid target path")
 	}
 	name := filepath.Base(relative)
@@ -345,6 +345,15 @@ func cleanRelative(value string) string {
 
 func pathEscapes(relative string) bool {
 	return relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator))
+}
+
+func reservedRelative(relative string) bool {
+	relative = cleanRelative(relative)
+	if relative == "" {
+		return false
+	}
+	first := strings.Split(relative, string(filepath.Separator))[0]
+	return first == trashDirName || strings.HasPrefix(first, ".home-ai-upload-")
 }
 
 func fileSize(info os.FileInfo, kind string) int64 {
