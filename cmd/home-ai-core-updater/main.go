@@ -1143,6 +1143,11 @@ func createPartition(ctx context.Context, disk string, sizeMiB uint64) error {
 }
 
 func prepareDestructiveChange(ctx context.Context, device string) error {
+	activeSwaps, err := activeSwapDevices()
+	if err != nil {
+		return err
+	}
+
 	output, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-nrpo", "NAME,FSTYPE", device).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("inspect device usage: %s", strings.TrimSpace(string(output)))
@@ -1159,8 +1164,15 @@ func prepareDestructiveChange(ctx context.Context, device string) error {
 			fstype = fields[1]
 		}
 		if fstype == "swap" {
-			if out, err := exec.CommandContext(ctx, "/usr/sbin/swapoff", name).CombinedOutput(); err != nil {
-				return fmt.Errorf("disable swap %s: %s", name, strings.TrimSpace(string(out)))
+			if !devicePathInSet(name, activeSwaps) {
+				continue
+			}
+			if out, err := exec.CommandContext(ctx, "/usr/sbin/swapoff", "--", name).CombinedOutput(); err != nil {
+				message := strings.TrimSpace(string(out))
+				if message == "" {
+					message = err.Error()
+				}
+				return fmt.Errorf("disable active swap %s: %s", name, message)
 			}
 			continue
 		}
@@ -1178,6 +1190,41 @@ func prepareDestructiveChange(ctx context.Context, device string) error {
 		return err
 	}
 	return nil
+}
+
+func activeSwapDevices() (map[string]bool, error) {
+	data, err := os.ReadFile("/proc/swaps")
+	if err != nil {
+		return nil, fmt.Errorf("inspect active swap devices: %w", err)
+	}
+	result := map[string]bool{}
+	lines := strings.Split(string(data), "\n")
+	for index, line := range lines {
+		if index == 0 {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		path := fields[0]
+		result[path] = true
+		if resolved, err := filepath.EvalSymlinks(path); err == nil {
+			result[resolved] = true
+		}
+	}
+	return result, nil
+}
+
+func devicePathInSet(device string, paths map[string]bool) bool {
+	if paths[device] {
+		return true
+	}
+	resolved, err := filepath.EvalSymlinks(device)
+	if err != nil {
+		return false
+	}
+	return paths[resolved]
 }
 
 func deactivateLVMOnDisk(ctx context.Context, device string) error {
