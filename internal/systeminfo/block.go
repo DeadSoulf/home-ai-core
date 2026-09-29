@@ -23,7 +23,7 @@ type lsblkNode struct {
 	Filesystem    string      `json:"fstype"`
 	PartitionTable string      `json:"pttype"`
 	SizeBytes     uint64      `json:"size"`
-	FreeBytes   uint64      `json:"fsavail"`
+	FreeBytes   *uint64     `json:"fsavail"`
 	Mountpoints []*string   `json:"mountpoints"`
 	ParentName  string      `json:"pkname"`
 	Label       string      `json:"label"`
@@ -98,7 +98,12 @@ func convertLsblkNode(item lsblkNode) BlockNode {
 		children = append(children, node)
 	}
 
-	freeBytes := item.FreeBytes
+	var freeBytes uint64
+	freeKnown := false
+	if item.FreeBytes != nil {
+		freeBytes = *item.FreeBytes
+		freeKnown = true
+	}
 	var unallocatedBytes uint64
 	if item.Type == "disk" {
 		var partitionBytes uint64
@@ -111,6 +116,7 @@ func convertLsblkNode(item lsblkNode) BlockNode {
 			unallocatedBytes = item.SizeBytes - partitionBytes
 			freeBytes += unallocatedBytes
 		}
+		freeKnown = true
 	}
 
 	return BlockNode{
@@ -120,6 +126,7 @@ func convertLsblkNode(item lsblkNode) BlockNode {
 		Filesystem:  item.Filesystem,
 		SizeBytes:   item.SizeBytes,
 		FreeBytes:        freeBytes,
+		FreeKnown:        freeKnown,
 		UnallocatedBytes: unallocatedBytes,
 		PartitionTable:   strings.TrimSpace(item.PartitionTable),
 		Mountpoints:      mountpoints,
