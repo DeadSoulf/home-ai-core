@@ -109,6 +109,20 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: "invalid updater request"})
 		return
 	}
+	if strings.HasPrefix(request.Operation, "storage.") {
+		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
+		defer cancel()
+		message, err := performStorageOperation(ctx, request)
+		if err != nil {
+			logger.Error("storage operation failed", "operation", request.Operation, "device", request.Device, "error", err)
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})
+			return
+		}
+		logger.Info("storage operation completed", "operation", request.Operation, "device", request.Device)
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{OK: true, Message: message})
+		return
+	}
+
 	if request.Operation != "install" || !validVersion(request.Version) {
 		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: "invalid updater operation or version"})
 		return
@@ -331,6 +345,193 @@ func writeResult(uid, gid int, result updaterhelper.Result) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+func performStorageOperation(ctx context.Context, request updaterhelper.Request) (string, error) {
+	device, err := validateBlockDevice(request.Device)
+	if err != nil {
+		return "", err
+	}
+
+	switch request.Operation {
+	case "storage.mount":
+		target := strings.TrimSpace(request.Mountpoint)
+		if target == "" {
+			target = filepath.Join("/mnt/home-ai-core", filepath.Base(device))
+		}
+		target = filepath.Clean(target)
+		if target != "/mnt/home-ai-core" && !strings.HasPrefix(target, "/mnt/home-ai-core/") {
+			return "", errors.New("mount point must be under /mnt/home-ai-core")
+		}
+		if err := os.MkdirAll(target, 0o755); err != nil {
+			return "", fmt.Errorf("create mount point: %w", err)
+		}
+		if err := os.Chmod(target, 0o755); err != nil {
+			return "", fmt.Errorf("set mount point permissions: %w", err)
+		}
+		if output, err := exec.CommandContext(ctx, "/usr/bin/mount", "--", device, target).CombinedOutput(); err != nil {
+			return "", fmt.Errorf("mount device: %s", strings.TrimSpace(string(output)))
+		}
+		return "device mounted", nil
+
+	case "storage.unmount":
+		targets, err := mountedTargets(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		for _, target := range targets {
+			if target == "/" {
+				return "", errors.New("refusing to unmount the root filesystem")
+			}
+		}
+		if len(targets) == 0 {
+			return "", errors.New("device is not mounted")
+		}
+		if output, err := exec.CommandContext(ctx, "/usr/bin/umount", "--", device).CombinedOutput(); err != nil {
+			return "", fmt.Errorf("unmount device: %s", strings.TrimSpace(string(output)))
+		}
+		return "device unmounted", nil
+
+	case "storage.format":
+		if request.Confirm != "FORMAT "+device {
+			return "", errors.New("format confirmation does not match device")
+		}
+		targets, err := mountedTargets(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		if len(targets) != 0 {
+			return "", errors.New("device must be unmounted before formatting")
+		}
+		protected, err := samePhysicalDiskAsRoot(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		if protected {
+			return "", errors.New("refusing to format a device on the system disk")
+		}
+		label := strings.TrimSpace(request.Label)
+		if !validFilesystemLabel(label) {
+			return "", errors.New("invalid filesystem label")
+		}
+
+		var command string
+		var args []string
+		switch strings.ToLower(strings.TrimSpace(request.Filesystem)) {
+		case "ext4":
+			command = "/usr/sbin/mkfs.ext4"
+			args = []string{"-F"}
+			if label != "" {
+				args = append(args, "-L", label)
+			}
+		case "xfs":
+			command = "/usr/sbin/mkfs.xfs"
+			args = []string{"-f"}
+			if label != "" {
+				args = append(args, "-L", label)
+			}
+		case "vfat":
+			command = "/usr/sbin/mkfs.vfat"
+			if label != "" {
+				args = append(args, "-n", label)
+			}
+		default:
+			return "", errors.New("unsupported filesystem; use ext4, xfs or vfat")
+		}
+		if _, err := os.Stat(command); err != nil {
+			return "", fmt.Errorf("filesystem tool is unavailable: %s", command)
+		}
+		args = append(args, device)
+		if output, err := exec.CommandContext(ctx, command, args...).CombinedOutput(); err != nil {
+			return "", fmt.Errorf("format device: %s", strings.TrimSpace(string(output)))
+		}
+		return "device formatted", nil
+	default:
+		return "", errors.New("unsupported storage operation")
+	}
+}
+
+func validateBlockDevice(value string) (string, error) {
+	device := filepath.Clean(strings.TrimSpace(value))
+	if device == "." || !strings.HasPrefix(device, "/dev/") {
+		return "", errors.New("invalid block device path")
+	}
+	info, err := os.Stat(device)
+	if err != nil {
+		return "", fmt.Errorf("stat block device: %w", err)
+	}
+	if info.Mode()&os.ModeDevice == 0 {
+		return "", errors.New("requested path is not a device")
+	}
+	return device, nil
+}
+
+func mountedTargets(ctx context.Context, device string) ([]string, error) {
+	output, err := exec.CommandContext(ctx, "/usr/bin/findmnt", "-rn", "-S", device, "-o", "TARGET").CombinedOutput()
+	if err != nil {
+		// findmnt exits non-zero when the source has no mounts.
+		if len(strings.TrimSpace(string(output))) == 0 {
+			return []string{}, nil
+		}
+		return nil, fmt.Errorf("inspect mounts: %s", strings.TrimSpace(string(output)))
+	}
+	var targets []string
+	for _, line := range strings.Split(string(output), "\n") {
+		if target := strings.TrimSpace(line); target != "" {
+			targets = append(targets, target)
+		}
+	}
+	return targets, nil
+}
+
+func samePhysicalDiskAsRoot(ctx context.Context, device string) (bool, error) {
+	rootOutput, err := exec.CommandContext(ctx, "/usr/bin/findmnt", "-rn", "-o", "SOURCE", "/").CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("resolve root filesystem: %s", strings.TrimSpace(string(rootOutput)))
+	}
+	rootSource := strings.TrimSpace(string(rootOutput))
+	if !strings.HasPrefix(rootSource, "/dev/") {
+		return false, errors.New("cannot safely resolve the system disk")
+	}
+	rootDisk, err := topPhysicalDisk(ctx, rootSource)
+	if err != nil {
+		return false, err
+	}
+	targetDisk, err := topPhysicalDisk(ctx, device)
+	if err != nil {
+		return false, err
+	}
+	return rootDisk == targetDisk, nil
+}
+
+func topPhysicalDisk(ctx context.Context, device string) (string, error) {
+	current := device
+	for i := 0; i < 16; i++ {
+		output, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-ndo", "PKNAME", current).CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("resolve parent disk: %s", strings.TrimSpace(string(output)))
+		}
+		parent := strings.TrimSpace(string(output))
+		if parent == "" {
+			return filepath.Base(current), nil
+		}
+		current = filepath.Join("/dev", parent)
+	}
+	return "", errors.New("block device parent chain is too deep")
+}
+
+func validFilesystemLabel(value string) bool {
+	if len(value) > 32 {
+		return false
+	}
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') ||
+			r == ' ' || r == '-' || r == '_' || r == '.' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func validVersion(value string) bool {
