@@ -240,3 +240,22 @@ export type WireGuardStatus = {
   error?: string;
   tunnels: WireGuardTunnel[];
 };
+
+export type NetworkProfile = {
+  interface: string;
+  backend: string;
+  supported: boolean;
+  managed: boolean;
+  method?: string;
+  address?: string;
+  gateway?: string;
+  dns?: string[];
+  source?: string;
+  error?: string;
+};
+
+export type NetworkProfileStatus = {
+  backend: string;
+  profiles: NetworkProfile[];
+};
+
