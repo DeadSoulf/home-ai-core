@@ -153,7 +153,15 @@ export default function App() {
   let page;
   switch (path) {
     case "/system":
-      page = has("system.read") ? <SystemPage revision={revision} /> : accountPage;
+      page = has("system.read")
+        ? (
+          <SystemPage
+            revision={revision}
+            canReadNetwork={has("network.read")}
+            canManageNetwork={has("network.manage")}
+          />
+        )
+        : accountPage;
       break;
     case "/modules":
       page = has("modules.read") ? <ModulesPage revision={revision} /> : accountPage;
