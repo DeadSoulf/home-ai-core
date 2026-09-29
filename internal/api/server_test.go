@@ -759,4 +759,3 @@ func TestSharedFileFolderCreate(t *testing.T) {
 		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusCreated, rec.Body.String())
 	}
 }
-
