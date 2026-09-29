@@ -7,6 +7,12 @@ import (
 
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
+	"github.com/DeadSoulf/home-ai-core/internal/storage"
+)
+
+var (
+	prepareFilePool   = storage.PrepareNASPool
+	prepareFileFolder = storage.PrepareNASFolder
 )
 
 type filePoolResponse struct {
@@ -60,6 +66,10 @@ func (s *server) filePools(
 		}
 		if err := decodeJSON(w, r, &input); err != nil {
 			writeAPIError(w, r, http.StatusBadRequest, "invalid_file_pool", err.Error(), nil)
+			return
+		}
+		if err := prepareFilePool(r.Context(), input.RootPath); err != nil {
+			writeAPIError(w, r, http.StatusBadGateway, "file_pool_prepare_failed", err.Error(), nil)
 			return
 		}
 		record, err := s.state.CreateNASPool(
@@ -154,6 +164,15 @@ func (s *server) fileFolders(
 			actor.ID,
 			time.Now().UTC(),
 		)
+		if err == nil {
+			if prepareErr := prepareFileFolder(r.Context(), record.PoolRoot, record.RelativePath); prepareErr != nil {
+				if cleanupErr := s.state.DeleteNASFolder(r.Context(), record.ID); cleanupErr != nil {
+					s.logger.Error("failed to clean NAS folder metadata after provisioning failure", "folder_id", record.ID, "error", cleanupErr)
+				}
+				writeAPIError(w, r, http.StatusBadGateway, "file_folder_prepare_failed", prepareErr.Error(), nil)
+				return
+			}
+		}
 		switch {
 		case errors.Is(err, state.ErrNASPoolNotFound):
 			writeAPIError(w, r, http.StatusNotFound, "file_pool_not_found", "file pool not found", nil)
