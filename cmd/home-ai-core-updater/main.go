@@ -741,11 +741,17 @@ func deletePartition(ctx context.Context, partition string) error {
 func rereadPartitionTable(ctx context.Context, disk string) error {
 	output, err := exec.CommandContext(ctx, "/usr/sbin/blockdev", "--rereadpt", disk).CombinedOutput()
 	if err != nil {
+		// partx can remove stale kernel partition mappings after the on-disk table
+		// has changed. It still refuses entries that are genuinely busy.
+		_, _ = exec.CommandContext(ctx, "/usr/bin/partx", "--delete", disk).CombinedOutput()
+		output, err = exec.CommandContext(ctx, "/usr/sbin/blockdev", "--rereadpt", disk).CombinedOutput()
+	}
+	if err != nil {
 		message := strings.TrimSpace(string(output))
 		if message == "" {
 			message = err.Error()
 		}
-		return fmt.Errorf("partition table changed on disk but kernel could not reload it; device may still be in use: %s", message)
+		return fmt.Errorf("partition table changed on disk but kernel could not reload it; close/deactivate volumes that still use this disk: %s", message)
 	}
 	_ = exec.CommandContext(ctx, "/usr/bin/udevadm", "settle").Run()
 	return nil
