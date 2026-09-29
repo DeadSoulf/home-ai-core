@@ -885,7 +885,7 @@ func inspectDiskHealth(ctx context.Context) []updaterhelper.DiskHealthStat {
 		smartOutput, commandErr := exec.CommandContext(
 			ctx,
 			"/usr/sbin/smartctl",
-			"-j", "-H", "-A",
+			"-j", "-n", "standby", "-H", "-A",
 			item.Path,
 		).CombinedOutput()
 		var decoded smartctlJSON
