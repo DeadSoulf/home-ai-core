@@ -190,10 +190,12 @@ export type UpdateStatus = {
   helper_available: boolean;
   helper_compatible: boolean;
   helper_error?: string;
+  rollback_available: boolean;
+  rollback_version?: string;
 };
 
 export type UpdaterState = {
-  phase: "idle" | "checking" | "available" | "downloading" | "ready" | "installing" | "restarting" | "succeeded" | "failed";
+  phase: "idle" | "checking" | "available" | "downloading" | "ready" | "installing" | "rolling_back" | "restarting" | "succeeded" | "failed";
   current_version?: string;
   available_version?: string;
   progress_percent?: number;
