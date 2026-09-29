@@ -26,4 +26,4 @@ The production bundle is written to `web/dist`.
 
 On Debian the bundle is installed under `/usr/share/home-ai-core/web` and is served by the Go Core. Node.js is not required on the production server.
 
-First-owner bootstrap remains localhost-only until Phase 8.5 introduces the approved secure LAN/TLS onboarding flow.
+First-owner bootstrap is intentionally localhost-only. Remote onboarding belongs to the later secure-networking work rather than the current Web UI foundation.
