@@ -614,6 +614,10 @@ func (s *Service) reconcileInstallResult() {
 	if err := json.Unmarshal(data, &result); err != nil {
 		return
 	}
+	// Install results are one-shot handoff records from the privileged helper.
+	// Consume the record once so an old successful/failed result cannot keep
+	// overwriting the state of later update operations.
+	defer os.Remove(path)
 
 	state := s.snapshotState()
 	switch {
