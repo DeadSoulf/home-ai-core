@@ -9,7 +9,6 @@ type Info struct {
 	CPU               CPUInfo            `json:"cpu"`
 	Memory            MemoryInfo         `json:"memory"`
 	UptimeSeconds     uint64             `json:"uptime_seconds,omitempty"`
-	BlockDevices      []BlockDevice      `json:"block_devices"`
 	BlockTree         []BlockNode        `json:"block_tree"`
 	NetworkInterfaces []NetworkInterface `json:"network_interfaces"`
 	GPUs              []GPU              `json:"gpus"`
@@ -62,31 +61,6 @@ type BlockNode struct {
 	Removable          bool        `json:"removable"`
 	System             bool        `json:"system"`
 	Children           []BlockNode `json:"children"`
-}
-
-type BlockDevice struct {
-	Name        string      `json:"name"`
-	DisplayName string      `json:"display_name,omitempty"`
-	Path        string      `json:"path"`
-	MajorMinor  string      `json:"major_minor,omitempty"`
-	Vendor      string      `json:"vendor,omitempty"`
-	Model       string      `json:"model,omitempty"`
-	Serial      string      `json:"serial,omitempty"`
-	SizeBytes   uint64      `json:"size_bytes,omitempty"`
-	Rotational  bool        `json:"rotational"`
-	Removable   bool        `json:"removable"`
-	System      bool        `json:"system"`
-	Partitions  []Partition `json:"partitions"`
-}
-
-type Partition struct {
-	Name        string   `json:"name"`
-	Path        string   `json:"path"`
-	SizeBytes   uint64   `json:"size_bytes,omitempty"`
-	Filesystem  string   `json:"filesystem,omitempty"`
-	UUID        string   `json:"uuid,omitempty"`
-	Label       string   `json:"label,omitempty"`
-	Mountpoints []string `json:"mountpoints"`
 }
 
 type NetworkInterface struct {
