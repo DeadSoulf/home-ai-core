@@ -2,6 +2,7 @@ package filedata
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -91,3 +92,64 @@ func TestFolderRoot(t *testing.T) {
 		t.Fatalf("FolderRoot() = %q, want %q", got, want)
 	}
 }
+
+func TestDeleteAndMove(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "folder")
+	if err := os.MkdirAll(filepath.Join(root, "docs", "sub"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "docs", "a.txt"), []byte("a"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Move(root, "docs/a.txt", "docs/b.txt"); err != nil {
+		t.Fatalf("Move(file) error = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "docs", "b.txt")); err != nil {
+		t.Fatalf("moved file missing: %v", err)
+	}
+
+	if err := Move(root, "docs/sub", "renamed"); err != nil {
+		t.Fatalf("Move(directory) error = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "renamed")); err != nil {
+		t.Fatalf("moved directory missing: %v", err)
+	}
+
+	if err := Delete(root, "docs/b.txt"); err != nil {
+		t.Fatalf("Delete(file) error = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "docs", "b.txt")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("deleted file still exists: %v", err)
+	}
+	if err := Delete(root, "renamed"); err != nil {
+		t.Fatalf("Delete(empty directory) error = %v", err)
+	}
+}
+
+func TestDeleteAndMoveSafety(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "folder")
+	if err := os.MkdirAll(filepath.Join(root, "docs", "child"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "exists.txt"), []byte("x"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Delete(root, ""); err == nil {
+		t.Fatal("logical root deletion succeeded")
+	}
+	if err := Delete(root, "docs"); err == nil {
+		t.Fatal("non-empty directory deletion succeeded")
+	}
+	if err := Move(root, "docs", "docs/child/moved"); err == nil {
+		t.Fatal("directory moved inside itself")
+	}
+	if err := Move(root, "docs", "exists.txt"); err == nil {
+		t.Fatal("move overwrote existing target")
+	}
+	if err := Move(root, "../outside", "x"); err == nil {
+		t.Fatal("move traversal succeeded")
+	}
+}
+
