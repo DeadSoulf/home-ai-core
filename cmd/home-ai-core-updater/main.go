@@ -430,7 +430,7 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		return "partition created", nil
 
 	case "storage.partition.delete":
-		if request.Confirm != "DELETE "+device {
+		if request.Confirm != filepath.Base(device) {
 			return "", errors.New("partition deletion confirmation does not match device")
 		}
 		if err := requirePartitionType(ctx, device); err != nil {
@@ -452,7 +452,7 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		return "partition deleted", nil
 
 	case "storage.partition.delete_all":
-		if request.Confirm != "DELETE ALL "+device {
+		if request.Confirm != filepath.Base(device) {
 			return "", errors.New("delete-all confirmation does not match disk")
 		}
 		if err := requireDiskType(ctx, device); err != nil {
