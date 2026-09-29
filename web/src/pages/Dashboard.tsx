@@ -110,9 +110,11 @@ export function Dashboard({revision}: {revision: number}) {
                 const health =
                   disk.health === "ok"
                     ? t("diskHealthOk")
-                    : disk.health === "failed"
-                      ? t("diskHealthFailed")
-                      : "";
+                    : disk.health === "warning"
+                      ? t("diskHealthWarning")
+                      : disk.health === "failed"
+                        ? t("diskHealthFailed")
+                        : "";
                 const details = [
                   disk.display_name ? disk.name : "",
                   t("freeSpace") + ": " + (free === undefined ? "—" : formatBytes(free)),
