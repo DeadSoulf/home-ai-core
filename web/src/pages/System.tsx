@@ -27,6 +27,7 @@ export function SystemPage({revision}: {revision: number}) {
   const [updaterState, setUpdaterState] = useState<UpdaterState>();
   const [downloadingUpdate, setDownloadingUpdate] = useState(false);
   const [installingUpdate, setInstallingUpdate] = useState(false);
+  const [rollingBackUpdate, setRollingBackUpdate] = useState(false);
   const [updateError, setUpdateError] = useState("");
   const [lastChecked, setLastChecked] = useState<string>();
   const {data, loading, error} = useResource(load, revision + metricsTick);
@@ -119,7 +120,28 @@ export function SystemPage({revision}: {revision: number}) {
     waitForUpdatedVersion(version);
   }
 
-  function waitForUpdatedVersion(version: string) {
+  async function rollbackUpdate() {
+    const version = updateInfo?.rollback_version;
+    if (!version) return;
+    if (!window.confirm(t("rollbackConfirmation").replace("{version}", version))) return;
+
+    setRollingBackUpdate(true);
+    setUpdateError("");
+    try {
+      const state = await api.rollbackUpdate();
+      setUpdaterState(state);
+    } catch (reason) {
+      if (reason instanceof APIError) {
+        setUpdateError(reason.code === "helper_upgrade_required" ? t("helperUpgradeRequired") : reason.message);
+        setRollingBackUpdate(false);
+        return;
+      }
+      // Core may stop immediately after the privileged helper accepts rollback.
+    }
+    waitForUpdatedVersion(version, () => setRollingBackUpdate(false));
+  }
+
+  function waitForUpdatedVersion(version: string, onTimeout?: () => void) {
     const deadline = Date.now() + 3 * 60 * 1000;
     const poll = async () => {
       try {
@@ -135,6 +157,8 @@ export function SystemPage({revision}: {revision: number}) {
         window.setTimeout(poll, 1500);
       } else {
         setInstallingUpdate(false);
+        setRollingBackUpdate(false);
+        onTimeout?.();
         setUpdateError(t("requestFailed"));
       }
     };
@@ -192,6 +216,7 @@ export function SystemPage({revision}: {revision: number}) {
             <dt>{t("systemHelper")}</dt><dd className="mono">{updateInfo?.helper_version || "—"}</dd>
             <dt>{t("helperProtocol")}</dt><dd className="mono">{updateInfo?.helper_protocol || "—"}</dd>
             <dt>{t("size")}</dt><dd>{updateInfo?.bundle_size_bytes ? fileBytes(updateInfo.bundle_size_bytes) : "—"}</dd>
+            <dt>{t("rollbackVersion")}</dt><dd className="mono">{updateInfo?.rollback_available ? (updateInfo.rollback_version || "—") : t("notAvailable")}</dd>
             {updateInfo?.published_at && <><dt>{t("published")}</dt><dd>{date(updateInfo.published_at)}</dd></>}
           </dl>
           {updateInfo && (
@@ -233,12 +258,25 @@ export function SystemPage({revision}: {revision: number}) {
               <button
                 type="button"
                 className="button primary"
-                disabled={installingUpdate || updateInfo?.helper_available === false || updateInfo?.helper_compatible === false}
+                disabled={installingUpdate || rollingBackUpdate || updateInfo?.helper_available === false || updateInfo?.helper_compatible === false}
                 onClick={installUpdate}
               >
                 {installingUpdate ? t("installing") : t("installUpdate")}
               </button>
               <div className="notice">{t("updateRestartNotice")}</div>
+            </div>
+          )}
+          {updateInfo?.rollback_available && updateInfo.rollback_version && (
+            <div className="update-action-stack">
+              <button
+                type="button"
+                className="button danger"
+                disabled={installingUpdate || rollingBackUpdate || updateInfo.helper_available === false || updateInfo.helper_compatible === false}
+                onClick={rollbackUpdate}
+              >
+                {rollingBackUpdate ? t("rollingBack") : t("rollbackUpdate").replace("{version}", updateInfo.rollback_version)}
+              </button>
+              <div className="notice">{t("rollbackNotice")}</div>
             </div>
           )}
           {updateError && <div className="form-error">{updateError}</div>}
