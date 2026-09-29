@@ -217,3 +217,39 @@ tbody tr:last-child td { border-bottom: 0; }
 .storage-protection { margin: 0 16px 16px; border: 1px solid #59491e; background: #302915; color: #e8ce86; border-radius: 9px; padding: 10px 12px; font-size: 12px; }
 .storage-success { border: 1px solid #28513f; background: #18342a; color: #9de0bc; border-radius: 9px; padding: 10px 12px; }
 .storage-empty-partitions { padding: 14px 16px; color: #8d9aad; }
+
+.storage-operation-progress {
+  border: 1px solid #32445b;
+  background: #18212c;
+  border-radius: 9px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 9px;
+}
+.storage-operation-progress-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  color: #d8e3f0;
+  font-size: 12px;
+}
+.storage-operation-progress-head .mono { color: #8d9aad; }
+.storage-operation-progress-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #0f151d;
+}
+.storage-operation-progress-bar {
+  width: 38%;
+  height: 100%;
+  border-radius: inherit;
+  background: currentColor;
+  color: #7fa8d8;
+  animation: storage-operation-progress 1.1s ease-in-out infinite;
+}
+@keyframes storage-operation-progress {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(300%); }
+}
