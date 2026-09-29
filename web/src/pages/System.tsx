@@ -256,7 +256,7 @@ export function SystemPage({revision}: {revision: number}) {
 
         <Panel title={t("blockDevices")} className="wide">
           <StorageDevices
-            devices={value.system.block_devices}
+            devices={value.system.block_tree}
             onChanged={() => setMetricsTick((current) => current + 1)}
           />
         </Panel>
