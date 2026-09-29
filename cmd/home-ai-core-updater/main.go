@@ -1313,6 +1313,38 @@ func diskHasMountedDescendants(ctx context.Context, device string) (bool, error)
 	return false, nil
 }
 
+func remainingDiskBytes(ctx context.Context, disk string) (uint64, error) {
+	output, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-bnro", "TYPE,SIZE", disk).CombinedOutput()
+	if err != nil {
+		return 0, fmt.Errorf("inspect disk capacity: %s", strings.TrimSpace(string(output)))
+	}
+	var total uint64
+	var allocated uint64
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 2 {
+			continue
+		}
+		value, err := strconv.ParseUint(fields[1], 10, 64)
+		if err != nil {
+			continue
+		}
+		if fields[0] == "disk" && total == 0 {
+			total = value
+		}
+		if fields[0] == "part" {
+			allocated += value
+		}
+	}
+	if total == 0 {
+		return 0, errors.New("cannot determine disk capacity")
+	}
+	if allocated >= total {
+		return 0, nil
+	}
+	return total - allocated, nil
+}
+
 func createPartition(ctx context.Context, disk string, sizeMiB uint64) error {
 	before, err := partitionNames(ctx, disk)
 	if err != nil {
