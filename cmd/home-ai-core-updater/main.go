@@ -673,12 +673,30 @@ func prepareDestructiveChange(ctx context.Context, device string) error {
 }
 
 func deleteAllPartitions(ctx context.Context, disk string) error {
+	before, err := partitionNames(ctx, disk)
+	if err != nil {
+		return err
+	}
+
 	output, err := exec.CommandContext(ctx, "/usr/sbin/sfdisk", "--delete", disk).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("delete all partitions: %s", strings.TrimSpace(string(output)))
 	}
-	_ = exec.CommandContext(ctx, "/usr/sbin/blockdev", "--rereadpt", disk).Run()
-	_ = exec.CommandContext(ctx, "/usr/bin/udevadm", "settle").Run()
+
+	if err := rereadPartitionTable(ctx, disk); err != nil {
+		return err
+	}
+
+	after, err := partitionNames(ctx, disk)
+	if err != nil {
+		return err
+	}
+	if len(after) != 0 {
+		return fmt.Errorf("kernel still reports partitions after deletion: %s", strings.Join(after, ", "))
+	}
+	if len(before) == 0 {
+		return errors.New("disk has no partitions to delete")
+	}
 	return nil
 }
 
@@ -709,9 +727,43 @@ func deletePartition(ctx context.Context, partition string) error {
 	if err != nil {
 		return fmt.Errorf("delete partition: %s", strings.TrimSpace(string(output)))
 	}
-	_ = exec.CommandContext(ctx, "/usr/sbin/blockdev", "--rereadpt", parentDevice).Run()
+	if err := rereadPartitionTable(ctx, parentDevice); err != nil {
+		return err
+	}
+	if _, err := os.Stat(partition); err == nil {
+		return fmt.Errorf("kernel still reports partition %s after deletion", partition)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("verify deleted partition: %w", err)
+	}
+	return nil
+}
+
+func rereadPartitionTable(ctx context.Context, disk string) error {
+	output, err := exec.CommandContext(ctx, "/usr/sbin/blockdev", "--rereadpt", disk).CombinedOutput()
+	if err != nil {
+		message := strings.TrimSpace(string(output))
+		if message == "" {
+			message = err.Error()
+		}
+		return fmt.Errorf("partition table changed on disk but kernel could not reload it; device may still be in use: %s", message)
+	}
 	_ = exec.CommandContext(ctx, "/usr/bin/udevadm", "settle").Run()
 	return nil
+}
+
+func partitionNames(ctx context.Context, disk string) ([]string, error) {
+	output, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-nrpo", "NAME,TYPE", disk).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("inspect disk partitions: %s", strings.TrimSpace(string(output)))
+	}
+	var names []string
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && fields[1] == "part" {
+			names = append(names, fields[0])
+		}
+	}
+	return names, nil
 }
 
 func validateBlockDevice(value string) (string, error) {
