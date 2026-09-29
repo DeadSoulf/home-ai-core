@@ -362,7 +362,9 @@ export function StorageDevices({
               <th>{t("name")}</th>
               <th>{t("type")}</th>
               <th>{t("filesystem")}</th>
+              <th>{t("partitionTable")}</th>
               <th>{t("size")}</th>
+              <th>{t("freeSpace")}</th>
               <th>{t("mountPoints")}</th>
               <th>{t("parentDisk")}</th>
               <th>{t("actions")}</th>
@@ -438,7 +440,16 @@ export function StorageDevices({
                     </td>
                     <td>{node.type === "disk" ? t("diskTypeDisk") : node.type === "part" ? t("diskTypePartition") : node.type === "lvm" ? "LVM" : node.type === "rom" ? t("diskTypeOptical") : (node.type || "—")}</td>
                     <td>{node.filesystem || "—"}</td>
+                    <td>{node.type === "disk" ? ((node.partition_table || "—").toUpperCase().replace("DOS", "MBR")) : "—"}</td>
                     <td className="mono">{bytes(node.size_bytes)}</td>
+                    <td className="mono">
+                      {node.free_bytes ? bytes(node.free_bytes) : "—"}
+                      {node.type === "disk" && (node.unallocated_bytes || 0) > 0 && (
+                        <div className="storage-free-detail">
+                          {t("unallocated")}: {bytes(node.unallocated_bytes)}
+                        </div>
+                      )}
+                    </td>
                     <td className="mono">{node.mountpoints.join(", ") || "—"}</td>
                     <td className="mono">{node.parent_name || "—"}</td>
                     <td>
@@ -538,7 +549,7 @@ export function StorageDevices({
 
                   {creating && (
                     <tr className="storage-format-row">
-                      <td colSpan={7}>
+                      <td colSpan={9}>
                         <div className="storage-format">
                           <div>
                             <label>
@@ -590,7 +601,7 @@ export function StorageDevices({
 
                   {formatting && (
                     <tr className="storage-format-row">
-                      <td colSpan={7}>
+                      <td colSpan={9}>
                         <div className="storage-format">
                           <div>
                             <label>
