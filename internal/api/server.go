@@ -79,10 +79,10 @@ func New(
 	s.mux.HandleFunc("/api/v1/modules", s.requireAuth("modules.read", s.modulesCollection))
 	s.mux.HandleFunc("/api/v1/modules/capabilities", s.requireAuth("modules.read", s.moduleCapabilities))
 	s.mux.HandleFunc("/api/v1/modules/", s.requireAuth("modules.read", s.moduleResource))
-	s.mux.HandleFunc("/api/v1/update", s.requireAuth("system.read", func(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
+	s.mux.HandleFunc("/api/v1/update", s.requireAuth("updates.read", func(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
 		s.updateStatus(w, r)
 	}))
-	s.mux.HandleFunc("/api/v1/update/state", s.requireAuth("system.read", func(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
+	s.mux.HandleFunc("/api/v1/update/state", s.requireAuth("updates.read", func(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
 		s.updateState(w, r)
 	}))
 	s.mux.HandleFunc("/api/v1/update/download", s.requireAuth("updates.manage", s.updateDownload))
