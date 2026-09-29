@@ -8,6 +8,24 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 )
 
+func (s *server) networkProfiles(
+	w http.ResponseWriter,
+	r *http.Request,
+	_ security.Actor,
+	_ authSource,
+) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w, r, http.MethodGet)
+		return
+	}
+	status, err := homenetwork.InspectNetworkProfiles(r.Context())
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadGateway, "network_profile_inspection_failed", err.Error(), nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"network_profiles": status})
+}
+
 func (s *server) wireGuardStatus(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -55,6 +73,8 @@ func (s *server) networkOperation(
 		AllowedIPs    []string `json:"allowed_ips,omitempty"`
 		Endpoint      string   `json:"endpoint,omitempty"`
 		Keepalive     int      `json:"keepalive,omitempty"`
+		NetworkMethod string   `json:"network_method,omitempty"`
+		DNS           []string `json:"dns,omitempty"`
 	}
 	if err := decodeJSON(w, r, &input); err != nil {
 		writeAPIError(w, r, http.StatusBadRequest, "invalid_network_request", err.Error(), nil)
@@ -80,6 +100,8 @@ func (s *server) networkOperation(
 		AllowedIPs:    input.AllowedIPs,
 		Endpoint:      input.Endpoint,
 		Keepalive:     input.Keepalive,
+		NetworkMethod: input.NetworkMethod,
+		DNS:           input.DNS,
 	})
 	if err != nil {
 		writeAPIError(w, r, http.StatusBadGateway, "network_operation_failed", err.Error(), nil)
@@ -103,7 +125,9 @@ func (s *server) networkOperation(
 		map[string]any{
 			"address": input.Address,
 			"gateway": input.Gateway,
-			"mtu":     input.MTU,
+			"mtu":            input.MTU,
+			"network_method": input.NetworkMethod,
+			"dns":            input.DNS,
 		},
 	)
 	s.realtime.Publish(
