@@ -25,6 +25,8 @@ type SecurityService interface {
 	Login(context.Context, string, string, security.RequestContext) (security.AuthResult, error)
 	Authenticate(context.Context, string) (security.Actor, error)
 	Logout(context.Context, security.Actor, security.RequestContext) error
+	CreateUser(context.Context, security.Actor, string, string, string, security.RequestContext) (security.User, error)
+	ListUsers(context.Context) ([]security.User, error)
 	ListAudit(context.Context, int) ([]security.AuditEntry, error)
 	RecordAudit(context.Context, security.RequestContext, security.Actor, string, string, string, string, map[string]any)
 }
@@ -161,6 +163,62 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request, actor security.A
 	clearSessionCookie(w, r)
 	w.WriteHeader(http.StatusNoContent)
 	s.realtime.Publish("security.session.revoked", map[string]any{"user_id": actor.ID}, requestIDFromContext(r.Context()))
+}
+
+func (s *server) usersCollection(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	switch r.Method {
+	case http.MethodGet:
+		users, err := s.security.ListUsers(r.Context())
+		if err != nil {
+			writeAPIError(w, r, http.StatusInternalServerError, "users_unavailable", "user list is unavailable", nil)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"users": users})
+	case http.MethodPost:
+		if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+			writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+			return
+		}
+
+		var request struct {
+			Username    string `json:"username"`
+			DisplayName string `json:"display_name"`
+			Password    string `json:"password"`
+		}
+		if err := decodeJSON(w, r, &request); err != nil {
+			writeAPIError(w, r, http.StatusBadRequest, "invalid_request", err.Error(), nil)
+			return
+		}
+		user, err := s.security.CreateUser(
+			r.Context(),
+			actor,
+			request.Username,
+			request.DisplayName,
+			request.Password,
+			s.securityRequestContext(r),
+		)
+		switch {
+		case errors.Is(err, security.ErrUserExists):
+			writeAPIError(w, r, http.StatusConflict, "user_exists", "username already exists", nil)
+		case err != nil:
+			writeAPIError(w, r, http.StatusBadRequest, "user_create_failed", err.Error(), nil)
+		default:
+			s.realtime.Publish(
+				"security.user.created",
+				map[string]any{"user_id": user.ID},
+				requestIDFromContext(r.Context()),
+			)
+			writeJSON(w, http.StatusCreated, map[string]any{"user": user})
+		}
+	default:
+		w.Header().Set("Allow", http.MethodGet+", "+http.MethodPost)
+		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+	}
 }
 
 func (s *server) audit(w http.ResponseWriter, r *http.Request, _ security.Actor) {

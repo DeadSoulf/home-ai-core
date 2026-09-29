@@ -91,3 +91,39 @@ Requires `audit.read`.
 ## Transport warning
 
 Authentication does not make plaintext remote HTTP safe. The Core remains loopback-only by default until the secure networking/TLS gateway phase provides an approved remote-access path.
+
+
+## User management
+
+List users:
+
+```text
+GET /api/v1/security/users
+```
+
+Requires `security.users.read`.
+
+Create a household member:
+
+```text
+POST /api/v1/security/users
+```
+
+Requires `security.users.manage`. Cookie-authenticated requests also require a valid `X-CSRF-Token`.
+
+Request:
+
+```json
+{
+  "username": "alice",
+  "display_name": "Alice",
+  "password": "a long passphrase"
+}
+```
+
+New users receive the built-in `member` role. The role grants only:
+
+- `security.self.read`;
+- `security.sessions.manage`.
+
+System, storage, update, module, audit and future Home-AI domain access are assigned explicitly rather than inherited automatically.
