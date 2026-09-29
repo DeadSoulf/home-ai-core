@@ -41,7 +41,8 @@ func (s *server) jobsCollection(
 		return
 	}
 	if r.Method != http.MethodGet {
-		methodNotAllowed(w, r, http.MethodGet, http.MethodDelete)
+		w.Header().Set("Allow", http.MethodGet+", "+http.MethodDelete)
+		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 		return
 	}
 
