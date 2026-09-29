@@ -152,4 +152,3 @@ func TestDeleteAndMoveSafety(t *testing.T) {
 		t.Fatal("move traversal succeeded")
 	}
 }
-
