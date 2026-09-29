@@ -113,7 +113,7 @@ function AuthLayout(props: {title: string; subtitle: string; children: ReactNode
       <section className="auth-card">
         <div className="auth-toolbar"><LanguageSwitch /></div>
         <div className="brand auth-brand">
-          <div className="brand-mark">H</div>
+          <img className="auth-logo" src="/brand/app-icon.webp" alt="Home AI Core" />
           <div>
             <strong>Home-AI-Core</strong>
             <span>{t("privateInfrastructure")}</span>
