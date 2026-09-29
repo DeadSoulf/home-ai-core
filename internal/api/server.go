@@ -8,6 +8,7 @@ import (
 
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
+	"github.com/DeadSoulf/home-ai-core/internal/storage"
 	"github.com/DeadSoulf/home-ai-core/internal/systeminfo"
 	"github.com/DeadSoulf/home-ai-core/internal/version"
 )
@@ -142,6 +143,13 @@ func (s *server) system(w http.ResponseWriter, r *http.Request) {
 	}
 
 	info := systeminfo.Collect(s.nodeID)
+	inspectCtx, inspectCancel := contextWithTimeout(r.Context(), 8*time.Second)
+	if stats, err := storage.InspectFilesystems(inspectCtx); err == nil {
+		systeminfo.ApplyFilesystemStats(&info, stats)
+	} else {
+		s.logger.Debug("filesystem statistics unavailable", "error", err)
+	}
+	inspectCancel()
 	if names, err := s.state.DiskNames(r.Context()); err != nil {
 		s.logger.Error("failed to read disk names", "error", err)
 	} else {
