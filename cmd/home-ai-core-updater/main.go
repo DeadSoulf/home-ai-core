@@ -923,6 +923,13 @@ func inspectDiskHealth(ctx context.Context) []updaterhelper.DiskHealthStat {
 			}
 			stat.LifeRemainingPct = &remaining
 		}
+		if stat.Health == "ok" {
+			hot := stat.TemperatureC != nil && *stat.TemperatureC >= 60
+			worn := stat.LifeRemainingPct != nil && *stat.LifeRemainingPct <= 10
+			if hot || worn {
+				stat.Health = "warning"
+			}
+		}
 		if commandErr != nil && stat.Health == "unknown" {
 			stat.SmartError = "smartctl reported a device warning"
 		}
