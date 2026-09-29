@@ -636,6 +636,19 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		if output, err := exec.CommandContext(ctx, command, args...).CombinedOutput(); err != nil {
 			return "", fmt.Errorf("format device: %s", strings.TrimSpace(string(output)))
 		}
+		_ = exec.CommandContext(ctx, "/usr/bin/udevadm", "settle").Run()
+		actualOutput, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-ndo", "FSTYPE", device).CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("verify filesystem: %s", strings.TrimSpace(string(actualOutput)))
+		}
+		actual := strings.ToLower(strings.TrimSpace(string(actualOutput)))
+		expected := strings.ToLower(strings.TrimSpace(request.Filesystem))
+		if expected == "vfat" && (actual == "fat" || actual == "fat32") {
+			actual = "vfat"
+		}
+		if actual != expected {
+			return "", fmt.Errorf("filesystem verification failed: expected %s, got %s", expected, actual)
+		}
 		return "device formatted", nil
 	default:
 		return "", errors.New("unsupported storage operation")
@@ -678,6 +691,11 @@ func diskHasMountedDescendants(ctx context.Context, device string) (bool, error)
 }
 
 func createPartition(ctx context.Context, disk string, sizeMiB uint64) error {
+	before, err := partitionNames(ctx, disk)
+	if err != nil {
+		return err
+	}
+
 	pttypeOutput, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-ndo", "PTTYPE", disk).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("inspect partition table: %s", strings.TrimSpace(string(pttypeOutput)))
@@ -701,30 +719,53 @@ func createPartition(ctx context.Context, disk string, sizeMiB uint64) error {
 	if err != nil {
 		return fmt.Errorf("create partition: %s", strings.TrimSpace(string(output)))
 	}
-	_ = exec.CommandContext(ctx, "/usr/sbin/blockdev", "--rereadpt", disk).Run()
+
+	reloadOutput, err := exec.CommandContext(ctx, "/usr/sbin/blockdev", "--rereadpt", disk).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf(
+			"partition was written but kernel could not reload the table: %s",
+			strings.TrimSpace(string(reloadOutput)),
+		)
+	}
 	_ = exec.CommandContext(ctx, "/usr/bin/udevadm", "settle").Run()
+
+	after, err := partitionNames(ctx, disk)
+	if err != nil {
+		return err
+	}
+	if len(after) <= len(before) {
+		return errors.New("partition table was changed but the new partition is not visible to the kernel")
+	}
 	return nil
 }
 
 func prepareDestructiveChange(ctx context.Context, device string) error {
-	output, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-nrpo", "NAME,TYPE,FSTYPE,MOUNTPOINTS", device).CombinedOutput()
+	output, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-nrpo", "NAME,FSTYPE", device).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("inspect device usage: %s", strings.TrimSpace(string(output)))
 	}
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 	for i := len(lines) - 1; i >= 0; i-- {
 		fields := strings.Fields(lines[i])
-		if len(fields) < 3 {
+		if len(fields) == 0 {
 			continue
 		}
 		name := fields[0]
-		fstype := fields[2]
+		fstype := ""
+		if len(fields) > 1 {
+			fstype = fields[1]
+		}
 		if fstype == "swap" {
 			if out, err := exec.CommandContext(ctx, "/usr/sbin/swapoff", name).CombinedOutput(); err != nil {
 				return fmt.Errorf("disable swap %s: %s", name, strings.TrimSpace(string(out)))
 			}
+			continue
 		}
-		if len(fields) > 3 {
+		targets, err := mountedTargets(ctx, name)
+		if err != nil {
+			return err
+		}
+		if len(targets) != 0 {
 			if out, err := exec.CommandContext(ctx, "/usr/bin/umount", "--", name).CombinedOutput(); err != nil {
 				return fmt.Errorf("unmount %s: %s", name, strings.TrimSpace(string(out)))
 			}
