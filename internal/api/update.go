@@ -124,6 +124,8 @@ func (s *server) updateInstall(
 	switch {
 	case errors.Is(err, updater.ErrBusy):
 		writeAPIError(w, r, http.StatusConflict, "update_busy", err.Error(), nil)
+	case errors.Is(err, updater.ErrHelperUpgradeRequired):
+		writeAPIError(w, r, http.StatusConflict, "helper_upgrade_required", err.Error(), nil)
 	case err != nil:
 		s.logger.Error("update install failed", "error", err)
 		writeAPIError(w, r, http.StatusBadGateway, "update_install_failed", err.Error(), nil)
