@@ -318,6 +318,11 @@ export function StorageDevices({
         return;
       }
       sizeMiB = Math.round(sizeGiB * 1024);
+      const availableBytes = Math.max(0, (node.unallocated_bytes || 0) - 4 * 1024 * 1024);
+      if (node.unallocated_bytes && sizeMiB * 1024 * 1024 > availableBytes) {
+        setError(t("partitionSizeExceedsAvailable").replace("{available}", bytes(availableBytes)));
+        return;
+      }
     }
 
     const confirmation = `CREATE ${node.path}`;
