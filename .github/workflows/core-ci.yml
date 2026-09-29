@@ -211,10 +211,10 @@ jobs:
 
           PACKAGE_CONTENTS="$(dpkg-deb --contents "$AMD64_PACKAGE")"
           grep -q './usr/bin/home-ai-core' <<<"$PACKAGE_CONTENTS"
-          grep -q './usr/libexec/home-ai-core/home-ai-core-update-helper' <<<"$PACKAGE_CONTENTS"
+          grep -q './usr/libexec/home-ai-core/home-ai-core-updater' <<<"$PACKAGE_CONTENTS"
           grep -q './usr/share/home-ai-core/web/index.html' <<<"$PACKAGE_CONTENTS"
           grep -q './lib/systemd/system/home-ai-core.service' <<<"$PACKAGE_CONTENTS"
-          grep -q './lib/systemd/system/home-ai-core-update-helper.service' <<<"$PACKAGE_CONTENTS"
+          grep -q './lib/systemd/system/home-ai-core-updater.service' <<<"$PACKAGE_CONTENTS"
           grep -q './usr/lib/sysusers.d/home-ai-core.conf' <<<"$PACKAGE_CONTENTS"
           grep -q './etc/home-ai-core/home-ai-core.env' <<<"$PACKAGE_CONTENTS"
 
