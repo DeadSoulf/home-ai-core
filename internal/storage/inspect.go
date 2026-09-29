@@ -76,14 +76,6 @@ func Inspect(ctx context.Context) (Inspection, error) {
 	return result, nil
 }
 
-func InspectFilesystems(ctx context.Context) ([]updaterhelper.FilesystemStat, error) {
-	result, err := Inspect(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return result.Filesystems, nil
-}
-
 func InvalidateInspectionCache() {
 	storageInspection.Lock()
 	storageInspection.value = Inspection{}
