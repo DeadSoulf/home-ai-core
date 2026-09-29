@@ -28,16 +28,16 @@ type NASPoolRecord struct {
 }
 
 type NASFolderRecord struct {
-	ID          string
-	PoolID      string
-	PoolName    string
-	Name        string
-	Kind        string
-	OwnerUserID string
+	ID           string
+	PoolID       string
+	PoolName     string
+	Name         string
+	Kind         string
+	OwnerUserID  string
 	RelativePath string
-	CreatedBy   string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	CreatedBy    string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 func (s *Store) CreateNASPool(
