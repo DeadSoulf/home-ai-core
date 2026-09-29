@@ -17,24 +17,24 @@ type lsblkOutput struct {
 }
 
 type lsblkNode struct {
-	Name        string      `json:"name"`
-	Path        string      `json:"path"`
-	Type        string      `json:"type"`
-	Filesystem    string      `json:"fstype"`
+	Name           string      `json:"name"`
+	Path           string      `json:"path"`
+	Type           string      `json:"type"`
+	Filesystem     string      `json:"fstype"`
 	PartitionTable string      `json:"pttype"`
-	SizeBytes     uint64      `json:"size"`
-	FreeBytes   *uint64     `json:"fsavail"`
-	Mountpoints []*string   `json:"mountpoints"`
-	ParentName  string      `json:"pkname"`
-	Label       string      `json:"label"`
-	UUID        string      `json:"uuid"`
-	Model       string      `json:"model"`
-	Vendor      string      `json:"vendor"`
-	Serial      string      `json:"serial"`
-	Transport   string      `json:"tran"`
-	Rotational  bool        `json:"rota"`
-	Removable   bool        `json:"rm"`
-	Children    []lsblkNode `json:"children"`
+	SizeBytes      uint64      `json:"size"`
+	FreeBytes      *uint64     `json:"fsavail"`
+	Mountpoints    []*string   `json:"mountpoints"`
+	ParentName     string      `json:"pkname"`
+	Label          string      `json:"label"`
+	UUID           string      `json:"uuid"`
+	Model          string      `json:"model"`
+	Vendor         string      `json:"vendor"`
+	Serial         string      `json:"serial"`
+	Transport      string      `json:"tran"`
+	Rotational     bool        `json:"rota"`
+	Removable      bool        `json:"rm"`
+	Children       []lsblkNode `json:"children"`
 }
 
 func lsblkTree() []BlockNode {
@@ -127,27 +127,27 @@ func convertLsblkNode(item lsblkNode) BlockNode {
 	}
 
 	return BlockNode{
-		Name:        item.Name,
-		Path:        item.Path,
-		Type:        item.Type,
-		Filesystem:  item.Filesystem,
-		SizeBytes:   item.SizeBytes,
+		Name:             item.Name,
+		Path:             item.Path,
+		Type:             item.Type,
+		Filesystem:       item.Filesystem,
+		SizeBytes:        item.SizeBytes,
 		FreeBytes:        freeBytes,
 		FreeKnown:        freeKnown,
 		UnallocatedBytes: unallocatedBytes,
 		PartitionTable:   strings.TrimSpace(item.PartitionTable),
 		Mountpoints:      mountpoints,
-		ParentName:  item.ParentName,
-		Label:       item.Label,
-		UUID:        item.UUID,
-		Model:       strings.TrimSpace(item.Model),
-		Vendor:      strings.TrimSpace(item.Vendor),
-		Serial:      strings.TrimSpace(item.Serial),
-		Transport:   strings.ToLower(strings.TrimSpace(item.Transport)),
-		Rotational:  item.Rotational,
-		Removable:   item.Removable,
-		System:      system,
-		Children:    children,
+		ParentName:       item.ParentName,
+		Label:            item.Label,
+		UUID:             item.UUID,
+		Model:            strings.TrimSpace(item.Model),
+		Vendor:           strings.TrimSpace(item.Vendor),
+		Serial:           strings.TrimSpace(item.Serial),
+		Transport:        strings.ToLower(strings.TrimSpace(item.Transport)),
+		Rotational:       item.Rotational,
+		Removable:        item.Removable,
+		System:           system,
+		Children:         children,
 	}
 }
 
@@ -218,7 +218,6 @@ func ignoredBlockDevice(name string) bool {
 	}
 	return false
 }
-
 
 type mountInfo struct {
 	Filesystem string
