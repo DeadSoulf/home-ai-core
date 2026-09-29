@@ -14,7 +14,7 @@ function diskFreeBytes(root: BlockNode): number | undefined {
     const key = node.path || node.uuid || node.name;
     if (!seen.has(key)) {
       seen.add(key);
-      if ((node.free_bytes || 0) > 0) {
+      if (node.free_known) {
         total += node.free_bytes || 0;
         found = true;
       }
