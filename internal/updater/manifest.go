@@ -8,11 +8,13 @@ import (
 )
 
 type Manifest struct {
-	SchemaVersion int            `json:"schema_version"`
-	Product       string         `json:"product"`
-	Version       string         `json:"version"`
-	Architecture  string         `json:"architecture"`
-	Files         []ManifestFile `json:"files"`
+	SchemaVersion  int            `json:"schema_version"`
+	Product        string         `json:"product"`
+	Version        string         `json:"version"`
+	Architecture   string         `json:"architecture"`
+	HelperProtocol int            `json:"helper_protocol,omitempty"`
+	HelperVersion  string         `json:"helper_version,omitempty"`
+	Files          []ManifestFile `json:"files"`
 }
 
 type ManifestFile struct {
@@ -37,6 +39,7 @@ func (m Manifest) Validate() error {
 
 	haveCore := false
 	haveWeb := false
+	haveHelper := false
 	seen := make(map[string]struct{}, len(m.Files))
 	for _, file := range m.Files {
 		clean := filepath.ToSlash(filepath.Clean(file.Path))
@@ -59,9 +62,17 @@ func (m Manifest) Validate() error {
 		if strings.HasPrefix(clean, "web/") {
 			haveWeb = true
 		}
+		if clean == "helper/home-ai-core-updater" {
+			haveHelper = true
+		}
 	}
 	if !haveCore || !haveWeb {
 		return errors.New("update manifest is missing core binary or web files")
+	}
+	if m.HelperProtocol != 0 {
+		if m.HelperProtocol < 1 || strings.TrimSpace(m.HelperVersion) == "" || !haveHelper {
+			return errors.New("update manifest has invalid updater helper metadata")
+		}
 	}
 	return nil
 }
