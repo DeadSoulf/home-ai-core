@@ -26,7 +26,7 @@ export function Shell(props: {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">H</div>
+          <img className="brand-logo" src="/brand/logo-mark.webp" alt="" />
           <div>
             <strong>Home-AI-Core</strong>
             <span>{t("controlPlane")}</span>
