@@ -295,4 +295,38 @@ describe("API client", () => {
     vi.unstubAllGlobals();
   });
 
+
+  it("moves and deletes NAS entries with CSRF protection", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "DELETE") {
+        return new Response(null, {status: 204});
+      }
+      return new Response(JSON.stringify({path: "docs/new.txt"}), {
+        status: 200,
+        headers: {"Content-Type": "application/json"},
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    });
+
+    setCSRFToken("csrf-file-mutate");
+    await api.moveFileEntry("nsf-test", "docs/old.txt", "docs/new.txt");
+    await api.deleteFileEntry("nsf-test", "docs/new.txt");
+
+    const [, moveInit] = fetchMock.mock.calls[0];
+    expect(moveInit?.method).toBe("POST");
+    expect(new Headers(moveInit?.headers).get("X-CSRF-Token")).toBe("csrf-file-mutate");
+
+    const [, deleteInit] = fetchMock.mock.calls[1];
+    expect(deleteInit?.method).toBe("DELETE");
+    expect(new Headers(deleteInit?.headers).get("X-CSRF-Token")).toBe("csrf-file-mutate");
+
+    vi.unstubAllGlobals();
+  });
+
 });

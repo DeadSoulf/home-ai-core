@@ -220,13 +220,22 @@ Check
 7. ✅ базовый Web file browser;
 8. ✅ ADR-0018 и тесты.
 
+Четвёртый вертикальный срез:
+
+1. ✅ delete file / empty directory;
+2. ✅ move/rename внутри одной logical folder;
+3. ✅ overwrite при move запрещён;
+4. ✅ move каталога внутрь самого себя запрещён;
+5. ✅ scoped `files.write`, CSRF и Audit;
+6. ✅ Web controls для delete и move/rename;
+7. ✅ API/Web tests.
+
 Следующий подэтап:
 
-1. delete/move/rename с audit и overwrite semantics;
-2. trash/recycle bin policy;
-3. resumable/chunked upload + checksums;
-4. затем SMB;
-5. Windows file-copy client.
+1. trash/recycle bin policy;
+2. resumable/chunked upload + checksums;
+3. затем SMB;
+4. Windows file-copy client.
 
 ## 4. Следующие продуктовые этапы
 
@@ -240,8 +249,8 @@ Check
 - ✅ private folders каждого пользователя;
 - ✅ shared/common folders;
 - ✅ physical directory provisioning + filesystem validation;
-- 🚧 file CRUD API (browse/create/upload/download готовы; delete/move/rename дальше);
-- 🚧 Web file manager (базовый browser готов);
+- ✅ file CRUD API foundation (browse/create/upload/download/delete/move/rename);
+- 🚧 Web file manager (basic browser + mutations готовы; trash/resumable дальше);
 - SMB;
 - NFS при необходимости;
 - quotas/policies;

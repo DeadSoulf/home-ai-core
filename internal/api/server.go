@@ -100,6 +100,8 @@ func New(
 	s.mux.HandleFunc("POST /api/v1/files/folders/{folderID}/directories", s.requireAuth("security.self.read", s.fileFolderDirectory))
 	s.mux.HandleFunc("GET /api/v1/files/folders/{folderID}/content", s.requireAuth("security.self.read", s.fileFolderContent))
 	s.mux.HandleFunc("PUT /api/v1/files/folders/{folderID}/content", s.requireAuth("security.self.read", s.fileFolderContent))
+	s.mux.HandleFunc("DELETE /api/v1/files/folders/{folderID}/entry", s.requireAuth("security.self.read", s.fileFolderEntry))
+	s.mux.HandleFunc("POST /api/v1/files/folders/{folderID}/move", s.requireAuth("security.self.read", s.fileFolderMove))
 	s.mux.HandleFunc("GET /api/v1/network/profiles", s.requireAuth("network.read", s.networkProfiles))
 	s.mux.HandleFunc("GET /api/v1/network/wireguard", s.requireAuth("network.read", s.wireGuardStatus))
 	s.mux.HandleFunc("POST /api/v1/network/operation", s.requireAuth("network.manage", s.networkOperation))

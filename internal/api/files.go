@@ -352,6 +352,100 @@ func (s *server) fileFolderContent(
 	}
 }
 
+func (s *server) fileFolderEntry(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	folder, root, ok := s.authorizedFileFolder(w, r, actor, true)
+	if !ok {
+		return
+	}
+	relative := strings.TrimSpace(r.URL.Query().Get("path"))
+	if relative == "" {
+		writeAPIError(w, r, http.StatusBadRequest, "file_path_required", "file path is required", nil)
+		return
+	}
+	if err := filedata.Delete(root, relative); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "file_delete_failed", err.Error(), nil)
+		return
+	}
+	s.security.RecordAudit(
+		r.Context(),
+		s.securityRequestContext(r),
+		actor,
+		"files.entry.delete",
+		"file_folder",
+		folder.ID,
+		"success",
+		map[string]any{"path": relative},
+	)
+	s.realtime.Publish(
+		"files.entry.deleted",
+		map[string]any{"folder_id": folder.ID, "path": relative},
+		requestIDFromContext(r.Context()),
+	)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *server) fileFolderMove(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	folder, root, ok := s.authorizedFileFolder(w, r, actor, true)
+	if !ok {
+		return
+	}
+	var input struct {
+		FromPath string `json:"from_path"`
+		ToPath   string `json:"to_path"`
+	}
+	if err := decodeJSON(w, r, &input); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_file_move", err.Error(), nil)
+		return
+	}
+	input.FromPath = strings.TrimSpace(input.FromPath)
+	input.ToPath = strings.TrimSpace(input.ToPath)
+	if err := filedata.Move(root, input.FromPath, input.ToPath); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "file_move_failed", err.Error(), nil)
+		return
+	}
+	s.security.RecordAudit(
+		r.Context(),
+		s.securityRequestContext(r),
+		actor,
+		"files.entry.move",
+		"file_folder",
+		folder.ID,
+		"success",
+		map[string]any{
+			"from_path": input.FromPath,
+			"to_path":   input.ToPath,
+		},
+	)
+	s.realtime.Publish(
+		"files.entry.moved",
+		map[string]any{
+			"folder_id": folder.ID,
+			"from_path": input.FromPath,
+			"to_path":   input.ToPath,
+		},
+		requestIDFromContext(r.Context()),
+	)
+	writeJSON(w, http.StatusOK, map[string]any{"path": input.ToPath})
+}
+
 func (s *server) authorizedFileFolder(
 	w http.ResponseWriter,
 	r *http.Request,

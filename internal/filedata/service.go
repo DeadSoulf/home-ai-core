@@ -184,6 +184,84 @@ func Upload(root, relative string, source io.Reader) (int64, error) {
 	return written, nil
 }
 
+func Delete(root, relative string) error {
+	relative = cleanRelative(relative)
+	if relative == "" {
+		return errors.New("logical folder root cannot be deleted")
+	}
+	path, err := resolveExisting(root, relative)
+	if err != nil {
+		return err
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return errors.New("symlink deletion is not supported")
+	}
+	if err := os.Remove(path); err != nil {
+		return fmt.Errorf("delete entry: %w", err)
+	}
+	return nil
+}
+
+func Move(root, from, to string) error {
+	from = cleanRelative(from)
+	to = cleanRelative(to)
+	if from == "" || to == "" {
+		return errors.New("source and target paths are required")
+	}
+	if from == to {
+		return errors.New("source and target paths are the same")
+	}
+
+	source, err := resolveExisting(root, from)
+	if err != nil {
+		return err
+	}
+	sourceInfo, err := os.Lstat(source)
+	if err != nil {
+		return err
+	}
+	if sourceInfo.Mode()&os.ModeSymlink != 0 {
+		return errors.New("symlink move is not supported")
+	}
+
+	targetParentRelative, targetName, err := splitTarget(to)
+	if err != nil {
+		return err
+	}
+	targetParent, err := resolveExisting(root, targetParentRelative)
+	if err != nil {
+		return err
+	}
+	targetParentInfo, err := os.Lstat(targetParent)
+	if err != nil {
+		return err
+	}
+	if !targetParentInfo.IsDir() {
+		return errors.New("target parent is not a directory")
+	}
+
+	if sourceInfo.IsDir() &&
+		(targetParent == source || strings.HasPrefix(targetParent, source+string(filepath.Separator))) {
+		return errors.New("directory cannot be moved inside itself")
+	}
+
+	target := filepath.Join(targetParent, targetName)
+	if _, err := os.Lstat(target); err == nil {
+		return errors.New("target already exists")
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	if err := os.Rename(source, target); err != nil {
+		return fmt.Errorf("move entry: %w", err)
+	}
+	return nil
+}
+
 func OpenFile(root, relative string) (*os.File, os.FileInfo, error) {
 	path, err := resolveExisting(root, relative)
 	if err != nil {
