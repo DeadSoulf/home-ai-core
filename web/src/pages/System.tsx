@@ -6,6 +6,7 @@ import { ErrorState, LoadingState, Panel } from "../components/Panel";
 import { useI18n } from "../i18n";
 import { PageHeading } from "./Dashboard";
 import { StorageDevices } from "../components/StorageDevices";
+import { NetworkManagement } from "../components/NetworkManagement";
 
 function bytes(value = 0) {
   return new Intl.NumberFormat(undefined, {maximumFractionDigits: 1}).format(value / 1024 ** 3) + " GiB";
@@ -18,8 +19,16 @@ function fileBytes(value = 0) {
   return value + " B";
 }
 
-export function SystemPage({revision}: {revision: number}) {
-  const {t, status, date} = useI18n();
+export function SystemPage({
+  revision,
+  canReadNetwork,
+  canManageNetwork,
+}: {
+  revision: number;
+  canReadNetwork: boolean;
+  canManageNetwork: boolean;
+}) {
+  const {t, date} = useI18n();
   const load = useCallback(() => api.system(), []);
   const [metricsTick, setMetricsTick] = useState(0);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -321,24 +330,12 @@ export function SystemPage({revision}: {revision: number}) {
           />
         </Panel>
 
-        <Panel title={t("networkInterfaces")} className="wide">
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>{t("name")}</th><th>{t("state")}</th><th>MAC</th><th>{t("addresses")}</th><th>{t("speed")}</th></tr></thead>
-              <tbody>
-                {value.system.network_interfaces.map((iface) => (
-                  <tr key={iface.name}>
-                    <td>{iface.name}</td>
-                    <td>{status(iface.oper_state || (iface.up ? "up" : "down"))}</td>
-                    <td className="mono">{iface.mac || "—"}</td>
-                    <td className="mono">{iface.addresses.join(", ") || "—"}</td>
-                    <td>{iface.speed_bps ? `${iface.speed_bps / 1_000_000} Mbps` : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
+        <NetworkManagement
+          interfaces={value.system.network_interfaces}
+          canReadWireGuard={canReadNetwork}
+          canManage={canManageNetwork}
+          onChanged={() => setMetricsTick((current) => current + 1)}
+        />
       </div>
 
     </div>
