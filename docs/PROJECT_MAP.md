@@ -230,12 +230,22 @@ Check
 6. ✅ Web controls для delete и move/rename;
 7. ✅ API/Web tests.
 
+Пятый вертикальный срез:
+
+1. ✅ обычный Delete перемещает объект в per-folder recycle bin;
+2. ✅ корзина скрыта от обычного file browser;
+3. ✅ можно удалить в корзину целое дерево каталога;
+4. ✅ список корзины показывает original path/type/size/deleted time;
+5. ✅ Restore не перезаписывает существующий target;
+6. ✅ отдельное явное Delete permanently;
+7. ✅ scoped `files.read/files.write`, CSRF и Audit;
+8. ✅ Web recycle-bin UI + API/Web tests.
+
 Следующий подэтап:
 
-1. trash/recycle bin policy;
-2. resumable/chunked upload + checksums;
-3. затем SMB;
-4. Windows file-copy client.
+1. resumable/chunked upload + checksums;
+2. затем SMB;
+3. Windows file-copy client.
 
 ## 4. Следующие продуктовые этапы
 
@@ -250,7 +260,7 @@ Check
 - ✅ shared/common folders;
 - ✅ physical directory provisioning + filesystem validation;
 - ✅ file CRUD API foundation (browse/create/upload/download/delete/move/rename);
-- 🚧 Web file manager (basic browser + mutations готовы; trash/resumable дальше);
+- 🚧 Web file manager (browser + mutations + recycle bin готовы; resumable дальше);
 - SMB;
 - NFS при необходимости;
 - quotas/policies;
