@@ -11,6 +11,8 @@ import type {
   UpdaterState,
   UserAccount,
   NetworkProfileStatus,
+  FileFolder,
+  FilePool,
   WireGuardStatus,
 } from "./types";
 
@@ -155,6 +157,39 @@ export const api = {
       password: input.password,
     }, true);
     return result.user;
+  },
+
+  filePools: async () => {
+    const result = await request<{pools: FilePool[]}>("/api/v1/files/pools");
+    return result.pools;
+  },
+
+  createFilePool: async (input: {name: string; rootPath: string}) => {
+    const result = await postJSON<{pool: FilePool}>("/api/v1/files/pools", {
+      name: input.name,
+      root_path: input.rootPath,
+    }, true);
+    return result.pool;
+  },
+
+  fileFolders: async () => {
+    const result = await request<{folders: FileFolder[]}>("/api/v1/files/folders");
+    return result.folders;
+  },
+
+  createFileFolder: async (input: {
+    poolId: string;
+    name: string;
+    kind: "private" | "shared";
+    ownerUserId?: string;
+  }) => {
+    const result = await postJSON<{folder: FileFolder}>("/api/v1/files/folders", {
+      pool_id: input.poolId,
+      name: input.name,
+      kind: input.kind,
+      owner_user_id: input.ownerUserId,
+    }, true);
+    return result.folder;
   },
 
   system: () => request<SystemResponse>("/api/v1/system"),

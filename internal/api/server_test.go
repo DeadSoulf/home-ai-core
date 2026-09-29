@@ -18,12 +18,15 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/modules"
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
+	"github.com/DeadSoulf/home-ai-core/internal/state"
 )
 
 type fakeState struct {
 	pingErr       error
 	schemaVersion int
 	schemaErr     error
+	nasPools      []state.NASPoolRecord
+	nasFolders    []state.NASFolderRecord
 }
 
 func (f fakeState) Ping(context.Context) error {
@@ -44,6 +47,48 @@ func (f fakeState) DiskNames(context.Context) (map[string]string, error) {
 
 func (f fakeState) SetDiskName(context.Context, string, string) error {
 	return nil
+}
+
+func (f fakeState) CreateNASPool(
+	_ context.Context,
+	name, rootPath, createdBy string,
+	now time.Time,
+) (state.NASPoolRecord, error) {
+	return state.NASPoolRecord{
+		ID:        "nsp-test",
+		Name:      name,
+		RootPath:  rootPath,
+		CreatedBy: createdBy,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}, nil
+}
+
+func (f fakeState) ListNASPools(context.Context) ([]state.NASPoolRecord, error) {
+	return f.nasPools, nil
+}
+
+func (f fakeState) CreateNASFolder(
+	_ context.Context,
+	poolID, name, kind, ownerUserID, createdBy string,
+	now time.Time,
+) (state.NASFolderRecord, error) {
+	return state.NASFolderRecord{
+		ID:           "nsf-test",
+		PoolID:       poolID,
+		PoolName:     "Main",
+		Name:         name,
+		Kind:         kind,
+		OwnerUserID:  ownerUserID,
+		RelativePath: "shared/nsf-test",
+		CreatedBy:    createdBy,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}, nil
+}
+
+func (f fakeState) ListNASFolders(context.Context) ([]state.NASFolderRecord, error) {
+	return f.nasFolders, nil
 }
 
 type fakeSecurity struct {
@@ -72,6 +117,9 @@ func defaultFakeSecurity() fakeSecurity {
 				"modules.read",
 				"updates.read",
 				"updates.manage",
+				"files.read",
+				"files.write",
+				"files.manage",
 			},
 		},
 	}
@@ -593,6 +641,114 @@ func TestCreateUserWithBearerSession(t *testing.T) {
 		http.MethodPost,
 		"/api/v1/security/users",
 		strings.NewReader(`{"username":"member","display_name":"Member","password":"correct horse battery staple"}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+}
+
+func TestFileFoldersFilterScopedAccess(t *testing.T) {
+	sec := defaultFakeSecurity()
+	sec.actor.Permissions = []string{"security.self.read"}
+	sec.actor.ResourcePermissions = []security.PermissionScope{
+		{Permission: "files.read", ResourceType: "file_folder", ResourceID: "nsf-visible"},
+		{Permission: "files.write", ResourceType: "file_folder", ResourceID: "nsf-visible"},
+	}
+	handler := testHandlerWithSecurity(fakeState{
+		nasFolders: []state.NASFolderRecord{
+			{
+				ID:           "nsf-visible",
+				PoolID:       "nsp-main",
+				PoolName:     "Main",
+				Name:         "My files",
+				Kind:         "private",
+				OwnerUserID:  "usr-test",
+				RelativePath: "users/usr-test/nsf-visible",
+			},
+			{
+				ID:           "nsf-hidden",
+				PoolID:       "nsp-main",
+				PoolName:     "Main",
+				Name:         "Other",
+				Kind:         "private",
+				OwnerUserID:  "usr-other",
+				RelativePath: "users/usr-other/nsf-hidden",
+			},
+		},
+	}, sec)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/files/folders", nil)
+	req.Header.Set("Authorization", "Bearer test")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var body struct {
+		Folders []fileFolderResponse `json:"folders"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Folders) != 1 || body.Folders[0].ID != "nsf-visible" {
+		t.Fatalf("unexpected visible folders: %#v", body.Folders)
+	}
+	if !body.Folders[0].CanWrite {
+		t.Fatal("scoped files.write was not reflected in response")
+	}
+}
+
+func TestFilePoolCreateRequiresManage(t *testing.T) {
+	sec := defaultFakeSecurity()
+	sec.actor.Permissions = []string{"security.self.read"}
+	handler := testHandlerWithSecurity(fakeState{}, sec)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/files/pools",
+		strings.NewReader(`{"name":"Main","root_path":"/srv/home-ai/main"}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
+func TestFilePoolCreate(t *testing.T) {
+	handler := testHandler(fakeState{})
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/files/pools",
+		strings.NewReader(`{"name":"Main","root_path":"/srv/home-ai/main"}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+}
+
+func TestSharedFileFolderCreate(t *testing.T) {
+	handler := testHandler(fakeState{})
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/files/folders",
+		strings.NewReader(`{"pool_id":"nsp-main","name":"Family","kind":"shared"}`),
 	)
 	req.Header.Set("Authorization", "Bearer test")
 	req.Header.Set("Content-Type", "application/json")

@@ -7,6 +7,7 @@ import { FirstRunPage, LoginPage } from "./pages/Auth";
 import { AccountPage } from "./pages/Account";
 import { AuditPage } from "./pages/Audit";
 import { Dashboard } from "./pages/Dashboard";
+import { FilesPage } from "./pages/Files";
 import { JobsPage } from "./pages/Jobs";
 import { ModulesPage } from "./pages/Modules";
 import { SystemPage } from "./pages/System";
@@ -16,7 +17,7 @@ type Phase = "loading" | "setup" | "login" | "app";
 
 function currentPath(): string {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
-  return ["/", "/system", "/modules", "/jobs", "/audit", "/users"].includes(path) ? path : "/";
+  return ["/", "/files", "/system", "/modules", "/jobs", "/audit", "/users"].includes(path) ? path : "/";
 }
 
 export default function App() {
@@ -152,6 +153,11 @@ export default function App() {
 
   let page;
   switch (path) {
+    case "/files":
+      page = has("security.self.read")
+        ? <FilesPage revision={revision} canManage={has("files.manage")} />
+        : accountPage;
+      break;
     case "/system":
       page = has("system.read")
         ? (
