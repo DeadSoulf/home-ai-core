@@ -25,7 +25,7 @@ type Request struct {
 func Execute(ctx context.Context, input Request) (string, error) {
 	operation := strings.TrimSpace(input.Operation)
 	switch operation {
-	case "mount", "unmount", "format", "partition.create", "partition.delete":
+	case "mount", "unmount", "format", "partition.create", "partition.delete", "label.rename":
 	default:
 		return "", errors.New("unsupported storage operation")
 	}
