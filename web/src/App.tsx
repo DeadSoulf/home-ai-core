@@ -90,11 +90,25 @@ export default function App() {
         checking = false;
       }
     };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void check();
+    };
+    const updateStatusEvent = (event: Event) => {
+      const detail = (event as CustomEvent<string | undefined>).detail;
+      setAvailableUpdate(detail || undefined);
+    };
+
     void check();
-    const timer = window.setInterval(check, 10 * 60 * 1000);
+    const timer = window.setInterval(check, 60 * 1000);
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("home-ai-core:update-status", updateStatusEvent);
     return () => {
       stopped = true;
       window.clearInterval(timer);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("home-ai-core:update-status", updateStatusEvent);
     };
   }, [phase]);
 
