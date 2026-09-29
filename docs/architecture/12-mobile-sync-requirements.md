@@ -1,47 +1,67 @@
-# Mobile Sync Requirements
+# Client File Transfer Requirements
 
-The future Home-AI mobile client is treated as a first-class platform client rather than a special filesystem hack.
+> Historical filename retained for link stability. The clarified priority is Windows file upload first; Android follows later.
 
-## Required capabilities
+## Product requirement
 
-- authenticated device registration
-- background photo/video upload
-- document upload
-- resumable/chunked transfers
-- retry after connectivity loss
-- integrity verification
-- duplicate detection
-- selective synchronization
-- remote and local-network operation
-- notification support
-- per-user and per-device permissions
+Home-AI needs first-party clients that transfer user-owned files into the user's authorized Home-AI storage.
 
-## Server-side boundary
+This is not a full operating-system image-backup system.
 
-Mobile clients communicate with a documented sync/media API.
+## Windows client — first priority
 
-They must not require SMB/NFS exposure to the public Internet.
+Required direction:
 
-## Data model considerations
+- authenticated device enrollment;
+- select files/folders to copy;
+- select an allowed destination;
+- private and shared Home-AI folders;
+- resumable/chunked transfers;
+- retry after connectivity loss;
+- integrity verification;
+- duplicate/conflict handling;
+- optional scheduled/automatic copy;
+- local-network operation;
+- remote operation through the approved secure access path;
+- per-device revocation.
 
-Uploaded objects should support:
+The Windows client must not bypass Home-AI user/folder permissions.
 
-- stable ID
-- owner
-- original filename
-- content hash
-- size
-- MIME type
-- creation/capture timestamp
-- device/source identity
-- storage location
-- metadata
-- optional album/folder references
+## Android — later
 
-## Security
+The future Android client may add:
 
-- TLS is mandatory for remote traffic.
-- Device tokens can be revoked independently.
-- Credentials are stored using mobile platform secure storage.
-- Remote access should prefer a secure tunnel or authenticated gateway.
-- Server-side encryption and client-side encryption may be added as separate capabilities, but encryption design must not prevent backup and recovery.
+- file upload;
+- photo/video upload;
+- notifications;
+- Home-AI status/control;
+- voice-related functions;
+- selective offline access.
+
+Android implementation should wait until the server APIs used by Windows/file storage are stable.
+
+## Transport and security
+
+- remote transfer uses the normal authenticated Home-AI API through the secure remote-access path;
+- SMB/NFS must not be exposed directly to the public Internet;
+- device credentials can be revoked independently;
+- transfer integrity is verified;
+- server-side authorization decides the destination scope.
+
+## Server-side data model
+
+Transferred objects should support enough metadata for future search/sync:
+
+- stable ID;
+- owner;
+- folder/share;
+- original filename;
+- content hash;
+- size;
+- MIME type;
+- timestamps;
+- device/source identity;
+- storage location;
+- optional metadata.
+
+The storage implementation must remain compatible with backup/recovery and future AI-authorized search.

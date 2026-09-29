@@ -1,79 +1,108 @@
-# Product Scope
+# Home-AI Product Scope
 
 ## Mission
 
-Home-AI-Core is a self-hosted home infrastructure platform that turns one or more Debian servers into a unified private system for personal data, home automation, video surveillance, applications and local AI.
+Home-AI is an autonomous local home platform built around one trusted control plane.
 
-The system is designed for private ownership of data and local operation first.
+It combines:
 
-## Primary workloads
+- Smart Home;
+- Cameras / NVR;
+- personal File Storage / NAS;
+- local AI Agent;
+- Voice;
+- secure remote access;
+- client file upload;
+- future multi-node resource sharing.
 
-### Personal Cloud
+The system is local-first and does not require mandatory cloud subscriptions for its essential home functions.
 
-- personal documents and files
-- family photos and videos
-- automatic upload from future mobile clients
-- shared family storage
-- backup and restore
-- media indexing and search
+## Smart Home
 
-### Video Surveillance
+Home-AI implements its own:
 
-- IP camera integration
-- live viewing
-- recording
-- retention policies
-- event detection
-- optional AI analysis of video streams
+- device/entity/state model;
+- rooms/zones;
+- automations;
+- scenes/schedules;
+- permission-aware actions.
 
-### Smart Home
+Protocol support is modular: Zigbee, Matter/Thread, MQTT, Wi-Fi/LAN, Bluetooth, Modbus and future local integrations.
 
-- Home Assistant or equivalent integrations
-- sensors, switches, climate, lighting and security devices
-- automation workflows
-- event exchange with the Home-AI-Core event bus
+Home Assistant is not a required dependency.
 
-### AI Core
+## Cameras / NVR
 
-- local LLM and multimodal runtimes
-- GPU/accelerator discovery and scheduling
-- model management
-- access to approved Home-AI-Core capabilities
-- system diagnostics and assisted configuration
-- smart-home assistance and automation
-- search and reasoning over user-owned data where explicitly enabled
+- IP/RTSP cameras;
+- live view;
+- local recording;
+- configurable archive allocation;
+- retention and oldest-first overwrite;
+- event timeline;
+- motion/object detection;
+- optional hardware-backed face recognition;
+- AI-assisted search/analysis.
 
-AI is not granted unrestricted root access. All actions pass through the same permission, policy and audit boundaries as other actors.
+## File Storage
 
-### Multi-server Operation
+- private per-user folders;
+- shared folders;
+- Web file manager;
+- SMB/NFS where appropriate;
+- storage pools/volumes;
+- health/capacity;
+- snapshots/backup policies where supported.
 
-A household may contain multiple Home-AI-Core nodes.
+## AI Agent
 
-Nodes can contribute:
+The AI Agent is a first-class system actor.
 
-- CPU
-- RAM
-- GPU/accelerators
-- storage
-- application capacity
-- video-processing capacity
+It uses approved tools and the effective permissions of the requesting user.
 
-The platform should present those nodes as one managed home infrastructure environment while preserving node-level failure isolation.
+AI may learn preferences, propose automations/configuration and coordinate Home-AI capabilities.
 
-### Mobile Clients
+Changes requiring approval remain pending until approved by the appropriate authorized user.
 
-Future mobile applications should support:
+AI cannot silently escalate its own permissions or bypass audit/security boundaries.
 
-- automatic photo/video upload
-- document upload
-- background synchronization
-- resumable transfers
-- remote access through secure identity and networking
-- selective download/offline access
-- notifications and system status
+External AI is optional.
 
-## Non-goals for the initial Core
+## Multi-node
 
-The Core itself does not implement NAS protocols, camera processing, smart-home logic, model inference or mobile synchronization.
+Additional Home-AI servers may contribute CPU, RAM, GPU, storage and workload capacity.
 
-It provides the contracts and control plane that allow those capabilities to exist as modules and applications.
+The product should eventually distribute movable workloads and keep operating in a degraded mode when another node is unavailable.
+
+## Voice and clients
+
+Voice becomes a primary interaction mode later.
+
+A Windows client is planned first for copying selected user files to Home-AI. Android follows later.
+
+Remote access should use an owner-controlled secure tunnel such as WireGuard.
+
+## Core non-goals
+
+Core itself is not the place for all product business logic.
+
+Core provides the shared contracts:
+
+- identity/security/policy;
+- state;
+- jobs;
+- events;
+- audit;
+- modules;
+- updates;
+- node/resource inventory.
+
+NAS, Smart Home, NVR, AI, Voice and Cluster functionality should remain modular.
+
+## Scope explicitly deprioritized
+
+- Home Assistant as the smart-home engine;
+- generic virtualization as a primary product;
+- generic Docker-management UI as a primary product;
+- generic third-party app marketplace as a primary product;
+- full Windows system-image backup;
+- mandatory external AI/cloud dependency.

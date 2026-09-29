@@ -1,202 +1,186 @@
-# Development Roadmap
+# Home-AI Development Roadmap
 
-## Phase 0 — Repository reset
-- Preserve previous implementation in an archive branch.
-- Replace the active working tree with a clean project skeleton.
-- Recreate `develop` from the new baseline.
+This roadmap follows the canonical product direction in `../PRODUCT_VISION.md`.
 
-## Phase 1 — Product and architecture specification
-- Product mission and supported home workloads.
-- Core vs Module vs App vs Integration boundaries.
-- Single-node and future multi-node resource identity.
-- AI trust and permission model.
-- Mobile sync requirements.
-- Third-party code policy.
+Earlier foundation phases produced useful Core capabilities. Generic container/virtualization management is no longer on the critical path.
 
-## Phase 2 — Technology and repository foundation
-- Select Core implementation language/runtime.
-- Select Web UI stack.
-- Define IPC/privilege boundary.
-- Core, web, SDK, schemas, packaging and tests layout.
-- ADR process.
-- Git workflow.
-- Versioning and release rules.
+## F0 — Core Foundation — mostly complete
 
-## Phase 3 — Core v0.1
-- Daemon/bootstrap.
-- Configuration.
-- Structured logging.
-- Health endpoint.
-- Node identity.
-- Read-only host and capability discovery.
+Implemented foundation:
 
-## Phase 4 — Core API and realtime transport
-- Versioned REST API.
-- WebSocket event channel.
-- Stable resource IDs.
-- Error model.
-- Request correlation IDs.
-- API documentation.
+- Core daemon/API;
+- node identity;
+- SQLite state + migrations;
+- authentication/sessions;
+- RBAC/CSRF/audit;
+- jobs;
+- durable events;
+- WebSocket realtime;
+- Module SDK/registry/dependency planning;
+- signed module repository foundation;
+- Web UI shell;
+- hardware/system discovery;
+- low-level storage;
+- privileged helper;
+- Web update system + rollback capability;
+- CI/release pipelines.
 
-## Phase 5 — Identity and security
-- Users and sessions.
-- Device identities.
-- RBAC and capability permissions.
-- Module permission grants.
-- Secrets handling.
-- Audit log.
-- AI actor identity and policy boundary.
+### Remaining F0 hardening
 
-## Phase 6 — Jobs and Events
-- Persistent job model.
-- Progress and cancellation.
-- Typed event bus.
-- WebSocket delivery.
-- Node-aware event metadata.
+- split oversized privileged updater/storage helper implementation;
+- live rollback acceptance test;
+- extend permission model toward resource scopes;
+- stable signed release-channel design;
+- failure testing.
 
-## Phase 7 — Module SDK
-- Manifest schema.
-- Dependency and conflict model.
-- Permissions.
-- Lifecycle: install, upgrade, remove, backup, restore.
-- UI registration.
-- Capability discovery.
+## F1 — File Storage / NAS
 
-## Phase 8 — Web UI Core
-- First-run setup.
-- Dashboard.
-- System.
-- Users/devices.
-- Modules.
-- Jobs.
-- Audit.
-- Settings.
+Build the first major user-facing product domain on the existing storage foundation.
 
-## Phase 9 — Module Store and Updates
-- Repository metadata.
-- Signed packages.
-- Install/update/remove.
-- Compatibility validation.
-- Core/module update orchestration.
-- Rollback.
-- Hardware driver reconciliation using trusted signed profiles.
-- Automatic driver jobs for newly detected PCI/USB hardware through the privileged helper.
+- pools/volumes;
+- private per-user folders;
+- shared folders;
+- Web file manager;
+- SMB;
+- NFS where required;
+- quotas/policies;
+- snapshots/backup capabilities where supported;
+- storage health/capacity UX.
 
-## Phase 10 — Containers
-- Docker Engine integration.
-- Compose/stacks.
-- Images, networks, volumes and registries.
-- Application runtime abstraction.
+## F2 — Native Smart Home
 
-## Phase 11 — Storage and Personal Cloud foundation
+Home-AI owns its smart-home data model and automation engine.
 
-Low-level Storage v1 groundwork landed ahead of this phase: block-device inventory, SMART, filesystems, mounts, guarded partition operations and LVM inspection/deactivation are already available through the Core/helper boundary.
+- device/entity/state model;
+- rooms/zones;
+- discovery and pairing;
+- Zigbee module;
+- Matter/Thread module;
+- MQTT module;
+- Wi-Fi/LAN integrations;
+- Bluetooth integrations;
+- Modbus;
+- scenes;
+- schedules;
+- automation/rule engine;
+- notification/event integration;
+- resource-scoped permissions and audit.
 
-Remaining Phase 11 work is the higher-level storage product layer:
+A future compatibility bridge to other systems is optional; Home Assistant is not the platform foundation.
 
-- ZFS/Btrfs/LVM providers where appropriate.
-- Storage pools and datasets/volumes.
-- User/family file spaces.
-- File/media metadata API.
-- SMB/NFS as optional NAS capabilities.
-- Integrity and quota model.
+## F3 — Cameras / NVR
 
-## Phase 12 — Backup and Recovery
-- Core configuration backup.
-- Module and App state.
-- User files and media.
-- Off-host backup targets.
-- Restore testing.
-- Disaster recovery procedures.
+- camera entities;
+- RTSP ingest;
+- ONVIF where useful;
+- live view;
+- recording;
+- timeline/archive;
+- configurable recording storage allocation;
+- oldest-first overwrite/retention;
+- protected recordings;
+- motion/object events;
+- AI vision integration points;
+- known-person database and face recognition when hardware permits.
 
-## Phase 13 — Secure Networking and Remote Access
-- Host networking.
-- Bridges and VLANs.
-- Service exposure policy.
-- TLS and certificates.
-- VPN/tunnel integrations.
-- Secure remote access without exposing SMB/NFS directly.
+## F4 — Local AI Runtime and Agent
 
-## Phase 14 — Smart Home
-- Home Assistant and/or equivalent integration.
-- Device/state bridge into the Home-AI event bus.
-- Permission-scoped actions.
-- Automation triggers and notifications.
+### Runtime
 
-## Phase 15 — Video Surveillance
-- Camera discovery/integration.
-- RTSP/ONVIF-oriented ingest adapters.
-- Live view.
-- Recording and retention.
-- Storage policies.
-- Event model for motion/detections.
-- Optional accelerator-backed video analytics.
+- local LLM adapters;
+- multimodal/vision adapters;
+- GPU/accelerator placement hints;
+- model lifecycle/storage;
+- resource limits.
 
-## Phase 16 — AI Runtime
-- GPU/accelerator discovery.
-- Model/runtime management.
-- Local LLM and multimodal inference endpoints.
-- Resource limits and scheduling hints.
-- Model storage and lifecycle.
+### Agent
 
-## Phase 17 — AI Orchestration
-- AI access to approved Core/Module tools.
-- Permission and approval policies.
-- System diagnostics.
-- Assisted configuration.
-- Smart-home orchestration.
-- Search/reasoning over explicitly authorized private data.
-- Full auditability of AI actions.
+- tool registry;
+- permission-derived tool access;
+- approval workflow;
+- user/home context;
+- memory;
+- file search;
+- NVR search;
+- Smart Home control;
+- server diagnostics;
+- automation proposals;
+- self-improvement proposals;
+- versioned/audited/reversible AI-driven changes;
+- optional external AI providers.
 
-## Phase 18 — Multi-node Foundation
-- Secure node enrollment.
-- Node identity and trust.
-- Capability/resource advertisement.
-- Cluster health.
-- Node-aware jobs/events.
-- Storage and workload locality metadata.
+## F5 — Voice
 
-## Phase 19 — Distributed Scheduling
-- Placement of movable workloads.
-- CPU/RAM/GPU resource accounting.
-- Affinity and node-bound resources.
-- Failure/degraded-mode behaviour.
-- Optional distributed AI workload coordination.
-- Multiple-server management from one UI.
+- microphone terminal identity;
+- wake word;
+- STT;
+- user/context resolution;
+- AI Agent request;
+- permission/approval;
+- TTS.
 
-## Phase 20 — Virtualization
-- libvirt/KVM/QEMU.
-- VM lifecycle.
-- ISO/images.
-- Virtual networks and storage.
-- PCI/USB/GPU passthrough.
-- Node-aware placement where supported.
+## F6 — Remote Access and Client File Transfer
 
-## Phase 21 — Mobile Sync Server API
-- Device registration.
-- Resumable/chunked uploads.
-- Automatic photo/video ingest API.
-- Document synchronization.
-- Content hashes and duplicate detection.
-- Selective sync.
-- Notification hooks.
-- Per-device revocation and permissions.
+### WireGuard
 
-## Phase 22 — Native Mobile Applications
-- Android client.
+- owner-controlled secure tunnel;
+- device enrollment and revocation;
+- service exposure policy.
+
+### Windows client
+
+- copy selected files to allowed Home-AI folders;
+- resumable upload;
+- integrity verification;
+- LAN/remote operation;
+- scheduling/automatic copy when enabled.
+
+Android follows after the server API is stable.
+
+## F7 — Multi-node Foundation
+
+- secure node enrollment;
+- authenticated/encrypted trust;
+- heartbeats;
+- node/resource inventory;
+- CPU/RAM/GPU/storage capability advertisement;
+- workload requirement model;
+- storage/locality metadata;
+- degraded operation.
+
+## F8 — Distributed Scheduling and Failover
+
+- scheduler;
+- placement of movable workloads;
+- AI/video processing distribution;
+- capacity accounting;
+- affinity/locality;
+- node-bound resource handling;
+- reassignment after failure where possible;
+- cluster-wide Web view.
+
+Cluster leader/control-state architecture is intentionally deferred until requirements are validated; current APIs must not force a permanent single-master model.
+
+## F9 — Production / Commercial Hardening
+
+- stable/dev channels;
+- signed release manifests/artifacts;
+- permission/security review;
+- backup/recovery validation;
+- multi-node failure tests;
+- NVR/storage long-duration tests;
+- AI approval/audit tests;
+- licensing/provenance audit;
+- documentation;
+- installer/recovery UX.
+
+## Parked optional capabilities
+
+These may be implemented later if there is a real Home-AI use case:
+
+- generic container management;
+- generic third-party app marketplace;
+- KVM/VM management;
 - iOS client.
-- Background camera roll backup.
-- Documents and offline access.
-- Secure credential storage.
-- Local-network and remote operation.
 
-Mobile applications should live in dedicated repositories once their API contract is stable.
-
-## Phase 23 — Production 1.0
-- CI and full test matrix.
-- Security review.
-- Upgrade/rollback validation.
-- Backup/restore validation.
-- Multi-node failure tests.
-- Documentation.
-- Supported Debian 13 installation and recovery tooling.
+They must not block NAS, Smart Home, NVR, AI, Voice or Cluster development.

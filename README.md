@@ -1,56 +1,77 @@
 # Home-AI-Core
 
-Home-AI-Core is a modular private home-server control plane for Debian 13.
+Home-AI-Core is the trusted control-plane foundation of **Home-AI** — an autonomous local platform for smart-home automation, cameras/NVR, personal file storage, local AI, voice interaction and future multi-node resource sharing.
 
-The platform is designed to manage personal infrastructure from one Web UI while keeping the network-facing Core unprivileged. Privileged host operations are isolated in a narrowly scoped root helper.
+The long-term product is designed to keep essential home functions local and operational without mandatory cloud services or subscriptions.
+
+The current project is intentionally building the foundation first: identity, security, jobs, events, modules, system/storage control, updates and the Web UI that future Home-AI domains will use.
+
+## Product direction
+
+Home-AI is planned around these primary domains:
+
+- native Smart Home runtime and automation engine;
+- local Cameras / NVR with recording, retention and AI vision;
+- File Storage / NAS with private and shared user spaces;
+- local AI Agent with permission- and approval-controlled tools;
+- voice terminals;
+- secure remote access through an owner-controlled tunnel;
+- Windows file-upload client and later Android client;
+- multi-node Home-AI cluster with resource-aware workload placement.
+
+Home Assistant is not a required dependency of the target smart-home architecture.
+
+Generic container/virtualization management may exist later as optional infrastructure, but it is not the primary product mission.
+
+See:
+
+- `docs/PRODUCT_VISION.md` — canonical product goal and requirements;
+- `docs/PROJECT_MAP.md` — current roadmap/status;
+- `docs/CURRENT_STATE_AUDIT.md` — what existing work is kept, repurposed or deprioritized.
 
 ## Current platform
 
 The repository currently includes:
 
-- Go control-plane daemon and React/TypeScript Web UI
-- first-run owner bootstrap and authenticated sessions
-- SQLite state with embedded forward migrations
-- RBAC, CSRF protection and audit logging
-- persistent jobs and durable events
-- realtime WebSocket transport
-- Module SDK v1, module registry and signed module-repository foundation
-- CPU, RAM, network, GPU/PCI and block-device inventory
+- Go control-plane daemon and React/TypeScript Web UI;
+- first-run owner bootstrap and authenticated sessions;
+- SQLite state with embedded forward migrations;
+- RBAC, CSRF protection and audit logging;
+- persistent jobs and durable events;
+- realtime WebSocket transport;
+- Module SDK v1, module registry and signed module-repository foundation;
+- CPU, RAM, network, GPU/PCI and block-device inventory;
 - Storage v1 management for non-system disks:
-  - GPT/MBR inventory and unallocated capacity
-  - partition create/delete/delete-all
-  - ext4, XFS and FAT formatting
-  - mount/unmount
-  - filesystem labels and persistent display names
-  - LVM inspection/deactivation for destructive operations
-  - active-swap handling
-  - SMART health, temperature, power-on time and SSD/NVMe lifetime where supported
+  - GPT/MBR inventory and unallocated capacity;
+  - partition create/delete/delete-all;
+  - ext4, XFS and FAT formatting;
+  - mount/unmount;
+  - filesystem labels and persistent display names;
+  - LVM inspection/deactivation for destructive operations;
+  - active-swap handling;
+  - SMART health, temperature, power-on time and SSD/NVMe lifetime where supported;
 - Web-driven Core update system:
-  - architecture-specific update bundles
-  - Core + Web UI + privileged helper in one verified bundle
-  - SHA-256 and manifest verification
-  - backup, restart and rollback
-  - helper protocol/version compatibility
-  - cached GitHub release discovery with fallback when the GitHub API is unavailable
-- Debian 13 initial installer for amd64 and arm64
+  - architecture-specific update bundles;
+  - Core + Web UI + privileged helper in one verified bundle;
+  - SHA-256 and manifest verification;
+  - backup, restart and rollback;
+  - helper protocol/version compatibility;
+  - cached GitHub release discovery with fallback;
+- Debian 13 initial installer for amd64 and arm64.
 
 ## Installation and updates
 
 The Debian package is the bootstrap and emergency-recovery installation format.
 
-After the initial installation, normal Home-AI-Core updates are installed from **System → Updates** in the Web UI. Normal updates do not require rebuilding or installing a new Debian package.
+After initial installation, normal Home-AI-Core updates are installed from **System → Updates** in the Web UI. Normal updates do not require rebuilding or installing a new Debian package.
 
-The initial installer can be built manually with the GitHub Actions workflow:
-
-`Build initial installer`
-
-or locally with:
+The initial installer can be built with GitHub Actions or locally:
 
 ```sh
 sh ./scripts/build-deb.sh amd64
 ```
 
-The Web update bundles are produced by:
+Update bundles:
 
 ```sh
 sh ./scripts/build-update-bundle.sh amd64
@@ -77,8 +98,15 @@ and communicates with Core through an authenticated Unix socket.
 
 ## Architecture principle
 
-Core owns platform contracts, security, state, inventory, update orchestration and the minimal host operations required by the current platform.
+Core owns shared platform contracts:
 
-Higher-level capabilities such as NAS/SMB/NFS, storage pools, snapshots, backup, containers, virtualization, NVR, smart-home services, AI runtimes and VPN functionality should remain modular rather than growing into one monolithic Core.
+- identity/security;
+- permissions/policy;
+- state;
+- jobs/events;
+- audit;
+- module registry;
+- update orchestration;
+- node/system capability discovery.
 
-See `docs/architecture/`, `docs/decisions/` and `docs/update-system-v2.md` for the current contracts.
+Product domains such as NAS, Smart Home, NVR, AI, Voice, WireGuard and Cluster should be modular and reuse these shared contracts rather than bypassing them.
