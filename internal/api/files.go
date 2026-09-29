@@ -16,15 +16,15 @@ type filePoolResponse struct {
 }
 
 type fileFolderResponse struct {
-	ID          string `json:"id"`
-	PoolID      string `json:"pool_id"`
-	PoolName    string `json:"pool_name"`
-	Name        string `json:"name"`
-	Kind        string `json:"kind"`
-	OwnerUserID string `json:"owner_user_id,omitempty"`
+	ID           string `json:"id"`
+	PoolID       string `json:"pool_id"`
+	PoolName     string `json:"pool_name"`
+	Name         string `json:"name"`
+	Kind         string `json:"kind"`
+	OwnerUserID  string `json:"owner_user_id,omitempty"`
 	RelativePath string `json:"relative_path"`
-	CanRead     bool   `json:"can_read"`
-	CanWrite    bool   `json:"can_write"`
+	CanRead      bool   `json:"can_read"`
+	CanWrite     bool   `json:"can_write"`
 }
 
 func (s *server) filePools(
@@ -43,8 +43,8 @@ func (s *server) filePools(
 		pools := make([]filePoolResponse, 0, len(records))
 		for _, record := range records {
 			pools = append(pools, filePoolResponse{
-				ID: record.ID,
-				Name: record.Name,
+				ID:       record.ID,
+				Name:     record.Name,
 				RootPath: record.RootPath,
 			})
 		}
@@ -87,8 +87,8 @@ func (s *server) filePools(
 			)
 			s.realtime.Publish("files.pool.created", map[string]any{"pool_id": record.ID}, requestIDFromContext(r.Context()))
 			writeJSON(w, http.StatusCreated, map[string]any{"pool": filePoolResponse{
-				ID: record.ID,
-				Name: record.Name,
+				ID:       record.ID,
+				Name:     record.Name,
 				RootPath: record.RootPath,
 			}})
 		}
@@ -171,8 +171,8 @@ func (s *server) fileFolders(
 				record.ID,
 				"success",
 				map[string]any{
-					"pool_id": record.PoolID,
-					"kind": record.Kind,
+					"pool_id":       record.PoolID,
+					"kind":          record.Kind,
 					"owner_user_id": record.OwnerUserID,
 				},
 			)
