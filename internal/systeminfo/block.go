@@ -22,7 +22,7 @@ type lsblkNode struct {
 	Type        string      `json:"type"`
 	Filesystem  string      `json:"fstype"`
 	SizeBytes   uint64      `json:"size"`
-	Mountpoints []string    `json:"mountpoints"`
+	Mountpoints []*string   `json:"mountpoints"`
 	ParentName  string      `json:"pkname"`
 	Label       string      `json:"label"`
 	UUID        string      `json:"uuid"`
@@ -64,7 +64,7 @@ func lsblkTree() []BlockNode {
 }
 
 func ignoredLsblkType(item lsblkNode) bool {
-	if item.Type == "loop" || item.Type == "rom" {
+	if item.Type == "loop" {
 		return true
 	}
 	return ignoredBlockDevice(item.Name)
@@ -73,8 +73,11 @@ func ignoredLsblkType(item lsblkNode) bool {
 func convertLsblkNode(item lsblkNode) BlockNode {
 	mountpoints := make([]string, 0, len(item.Mountpoints))
 	system := false
-	for _, mountpoint := range item.Mountpoints {
-		mountpoint = strings.TrimSpace(mountpoint)
+	for _, rawMountpoint := range item.Mountpoints {
+		if rawMountpoint == nil {
+			continue
+		}
+		mountpoint := strings.TrimSpace(*rawMountpoint)
 		if mountpoint == "" {
 			continue
 		}
