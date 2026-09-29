@@ -83,9 +83,9 @@ export function Dashboard({revision}: {revision: number}) {
                 return (
                   <div className="list-row" key={disk.name}>
                     <div>
-                      <strong>{disk.model || disk.name}</strong>
+                      <strong>{disk.display_name || disk.model || disk.name}</strong>
                     </div>
-                    <span>{t("freeSpace")}: {free === undefined ? "—" : formatBytes(free)}</span>
+                    <span>{disk.display_name ? disk.name + " · " : ""}{t("freeSpace")}: {free === undefined ? "—" : formatBytes(free)}</span>
                   </div>
                 );
               })}
