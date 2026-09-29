@@ -20,6 +20,7 @@ func Collect(nodeID string) Info {
 		Memory:            memoryInfo(),
 		UptimeSeconds:     uptime(),
 		BlockDevices:      blockDevices("/sys/block"),
+		BlockTree:         lsblkTree(),
 		NetworkInterfaces: networkInterfaces("/sys/class/net"),
 		GPUs: gpus("/sys/bus/pci/devices", []string{
 			"/usr/share/misc/pci.ids",
