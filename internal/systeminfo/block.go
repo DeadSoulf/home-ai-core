@@ -89,13 +89,11 @@ func convertLsblkNode(item lsblkNode) BlockNode {
 	}
 
 	children := make([]BlockNode, 0, len(item.Children))
-	freeBytes := item.FreeBytes
 	for _, child := range item.Children {
 		node := convertLsblkNode(child)
 		if node.System {
 			system = true
 		}
-		freeBytes += node.FreeBytes
 		children = append(children, node)
 	}
 
@@ -105,7 +103,7 @@ func convertLsblkNode(item lsblkNode) BlockNode {
 		Type:        item.Type,
 		Filesystem:  item.Filesystem,
 		SizeBytes:   item.SizeBytes,
-		FreeBytes:   freeBytes,
+		FreeBytes:   item.FreeBytes,
 		Mountpoints: mountpoints,
 		ParentName:  item.ParentName,
 		Label:       item.Label,
