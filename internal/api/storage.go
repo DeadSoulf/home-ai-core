@@ -62,7 +62,7 @@ func (s *server) storageOperation(
 
 	s.security.RecordAudit(
 		r.Context(),
-		requestSecurityContext(r),
+		s.securityRequestContext(r),
 		actor,
 		"storage."+input.Operation,
 		"block_device",
