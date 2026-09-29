@@ -112,6 +112,7 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		return
 	}
 	if strings.HasPrefix(request.Operation, "storage.") {
+		_ = conn.SetDeadline(time.Now().Add(2 * time.Minute))
 		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
 		defer cancel()
 		message, err := performStorageOperation(ctx, request)
@@ -646,28 +647,105 @@ func createPartition(ctx context.Context, disk string, sizeMiB uint64) error {
 }
 
 func prepareDestructiveChange(ctx context.Context, device string) error {
-	output, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-nrpo", "NAME,TYPE,MOUNTPOINTS", device).CombinedOutput()
+	output, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-nrpo", "NAME,TYPE,FSTYPE,MOUNTPOINTS", device).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("inspect device usage: %s", strings.TrimSpace(string(output)))
 	}
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 	for i := len(lines) - 1; i >= 0; i-- {
 		fields := strings.Fields(lines[i])
-		if len(fields) < 2 {
+		if len(fields) < 3 {
 			continue
 		}
 		name := fields[0]
-		typeName := fields[1]
-		if typeName == "swap" {
+		fstype := fields[2]
+		if fstype == "swap" {
 			if out, err := exec.CommandContext(ctx, "/usr/sbin/swapoff", name).CombinedOutput(); err != nil {
 				return fmt.Errorf("disable swap %s: %s", name, strings.TrimSpace(string(out)))
 			}
 		}
-		if len(fields) > 2 {
+		if len(fields) > 3 {
 			if out, err := exec.CommandContext(ctx, "/usr/bin/umount", "--", name).CombinedOutput(); err != nil {
 				return fmt.Errorf("unmount %s: %s", name, strings.TrimSpace(string(out)))
 			}
 		}
+	}
+	if err := deactivateLVMOnDisk(ctx, device); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deactivateLVMOnDisk(ctx context.Context, device string) error {
+	if _, err := os.Stat("/usr/sbin/pvs"); err != nil {
+		return nil
+	}
+	if _, err := os.Stat("/usr/sbin/vgchange"); err != nil {
+		return nil
+	}
+
+	targetDisk, err := topPhysicalDisk(ctx, device)
+	if err != nil {
+		return err
+	}
+
+	output, err := exec.CommandContext(
+		ctx,
+		"/usr/sbin/pvs",
+		"--noheadings",
+		"--separator", "|",
+		"-o", "pv_name,vg_name",
+	).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("inspect LVM physical volumes: %s", strings.TrimSpace(string(output)))
+	}
+
+	type pvVG struct {
+		pv string
+		vg string
+	}
+	var mappings []pvVG
+	targetVGs := map[string]bool{}
+	for _, line := range strings.Split(string(output), "\n") {
+		parts := strings.Split(line, "|")
+		if len(parts) < 2 {
+			continue
+		}
+		pv := strings.TrimSpace(parts[0])
+		vg := strings.TrimSpace(parts[1])
+		if pv == "" || vg == "" || !strings.HasPrefix(pv, "/dev/") {
+			continue
+		}
+		mappings = append(mappings, pvVG{pv: pv, vg: vg})
+		disk, err := topPhysicalDisk(ctx, pv)
+		if err != nil {
+			continue
+		}
+		if disk == targetDisk {
+			targetVGs[vg] = true
+		}
+	}
+
+	for vg := range targetVGs {
+		for _, mapping := range mappings {
+			if mapping.vg != vg {
+				continue
+			}
+			disk, err := topPhysicalDisk(ctx, mapping.pv)
+			if err != nil {
+				return fmt.Errorf("resolve LVM physical volume %s: %w", mapping.pv, err)
+			}
+			if disk != targetDisk {
+				return fmt.Errorf("refusing to deactivate LVM volume group %s because it also uses another physical disk", vg)
+			}
+		}
+		out, err := exec.CommandContext(ctx, "/usr/sbin/vgchange", "-an", "--", vg).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("deactivate LVM volume group %s: %s", vg, strings.TrimSpace(string(out)))
+		}
+	}
+	if len(targetVGs) != 0 {
+		_ = exec.CommandContext(ctx, "/usr/bin/udevadm", "settle").Run()
 	}
 	return nil
 }
