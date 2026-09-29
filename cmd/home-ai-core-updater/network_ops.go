@@ -99,6 +99,8 @@ func performNetworkOperation(ctx context.Context, request updaterhelper.Request)
 		}
 		return fmt.Sprintf("default gateway updated for %s", iface), nil
 
+	case "network.profile.save":
+		return saveNetworkProfile(ctx, request)
 	case "wireguard.install":
 		return installWireGuardTools(ctx)
 	case "wireguard.create":
