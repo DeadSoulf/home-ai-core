@@ -68,7 +68,7 @@ Home-AI должен стать полностью автономной лока
 | System Info | ✅ | CPU/RAM/GPU/network/storage inventory | локальная диагностика + cluster resources |
 | Hardware discovery | ✅ | PCI/GPU/storage данные | ускорители, камеры, adapters |
 | Low-level Storage | ✅ | partitions, format, mount, labels, SMART/LVM | фундамент NAS и NVR storage |
-| Privileged helper | ✅ / ⚠️ | безопасная root-граница работает | host/storage/network privileged actions |
+| Privileged helper | ✅ | root-граница работает; routing/update/storage физически разделены | host/storage/network privileged actions |
 | Update System v2 | ✅ | Web check/download/install/restart | обновление продукта без обычного .deb |
 | Rollback | 🧪 | реализован | нужен живой acceptance test |
 | Web UI | ✅ foundation | System/Modules/Jobs/Audit и auth shell | основной интерфейс сейчас |
@@ -103,15 +103,21 @@ Check
 
 ### 🚧 Этап F1 — закончить фундамент
 
-1. Разделить большой `cmd/home-ai-core-updater/main.go`:
-   - socket/router;
-   - update/install/rollback;
-   - storage operations.
-2. Не менять внешний protocol/socket при первом extraction refactor.
-3. Добавить targeted tests для privileged routing/validation.
-4. Прогнать полный CI.
-5. Реально проверить rollback и повторное обновление.
-6. Расширить permission model в сторону будущих resource scopes.
+Готово:
+
+1. ✅ Разделён большой `cmd/home-ai-core-updater/main.go`:
+   - `main.go` — socket/router;
+   - `update_ops.go` — update/install/rollback;
+   - `storage_ops.go` — storage operations;
+   - `unix_helpers.go` — Unix/socket helpers.
+2. ✅ Внешний protocol/socket не изменён.
+3. ✅ Полный `core-ci` после extraction refactor прошёл успешно.
+
+Осталось:
+
+4. 🧪 Реально проверить rollback и повторное обновление.
+5. 🚧 Расширить permission model в сторону будущих resource scopes.
+6. ⏭ Добавить targeted tests для privileged routing/validation по мере следующего package-level refactor.
 
 После этого фундамент считаем достаточно устойчивым для продуктовых модулей.
 
@@ -323,7 +329,7 @@ AI не может расширять собственные права.
 
 | Риск | Действие |
 |---|---|
-| updater helper слишком большой | extraction refactor |
+| updater helper раньше был монолитным | ✅ первый extraction refactor выполнен; package-level split можно сделать позже |
 | rollback не проверен живым циклом | acceptance test |
 | RBAC пока недостаточно resource-aware | добавить scopes до Smart Home/NAS |
 | durable events не подходят для media/high-rate telemetry | оставить media отдельным data plane |
