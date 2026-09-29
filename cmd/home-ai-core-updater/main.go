@@ -1094,6 +1094,17 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		if request.SizeMiB > 0 && request.SizeMiB > 1024*1024*1024 {
 			return "", errors.New("partition size is too large")
 		}
+		if request.SizeMiB > 0 {
+			remaining, err := remainingDiskBytes(ctx, device)
+			if err != nil {
+				return "", err
+			}
+			const alignmentReserve = uint64(4 * 1024 * 1024)
+			requested := request.SizeMiB * 1024 * 1024
+			if remaining <= alignmentReserve || requested > remaining-alignmentReserve {
+				return "", errors.New("requested partition size exceeds available unallocated space")
+			}
+		}
 		if err := createPartition(ctx, device, request.SizeMiB); err != nil {
 			return "", err
 		}
