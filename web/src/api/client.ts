@@ -14,6 +14,8 @@ import type {
   FileEntry,
   FileFolder,
   FileTrashEntry,
+  FileUploadComplete,
+  FileUploadSession,
   FilePool,
   WireGuardStatus,
 } from "./types";
@@ -282,6 +284,65 @@ export const api = {
     if (token) headers.set("X-CSRF-Token", token);
     return request<void>(
       `/api/v1/files/folders/${encodeURIComponent(folderId)}/trash/${encodeURIComponent(trashId)}`,
+      {method: "DELETE", headers},
+    );
+  },
+
+  startResumableUpload: async (
+    folderId: string,
+    input: {path: string; sizeBytes: number; sha256?: string},
+  ) => {
+    const result = await postJSON<{upload: FileUploadSession}>(
+      `/api/v1/files/folders/${encodeURIComponent(folderId)}/uploads`,
+      {
+        path: input.path,
+        size_bytes: input.sizeBytes,
+        sha256: input.sha256,
+      },
+      true,
+    );
+    return result.upload;
+  },
+
+  resumableUploadStatus: async (folderId: string, uploadId: string) => {
+    const result = await request<{upload: FileUploadSession}>(
+      `/api/v1/files/folders/${encodeURIComponent(folderId)}/uploads/${encodeURIComponent(uploadId)}`,
+    );
+    return result.upload;
+  },
+
+  uploadResumableChunk: async (
+    folderId: string,
+    uploadId: string,
+    offset: number,
+    chunk: Blob,
+  ) => {
+    const token = getCSRFToken();
+    const headers = new Headers({"Content-Type": "application/octet-stream"});
+    if (token) headers.set("X-CSRF-Token", token);
+    const query = new URLSearchParams({offset: String(offset)});
+    const result = await request<{upload: FileUploadSession; written_bytes: number}>(
+      `/api/v1/files/folders/${encodeURIComponent(folderId)}/uploads/${encodeURIComponent(uploadId)}/chunk?${query.toString()}`,
+      {method: "PUT", headers, body: chunk},
+    );
+    return result;
+  },
+
+  completeResumableUpload: async (folderId: string, uploadId: string) => {
+    const result = await postJSON<{result: FileUploadComplete}>(
+      `/api/v1/files/folders/${encodeURIComponent(folderId)}/uploads/${encodeURIComponent(uploadId)}/complete`,
+      undefined,
+      true,
+    );
+    return result.result;
+  },
+
+  cancelResumableUpload: async (folderId: string, uploadId: string) => {
+    const token = getCSRFToken();
+    const headers = new Headers();
+    if (token) headers.set("X-CSRF-Token", token);
+    return request<void>(
+      `/api/v1/files/folders/${encodeURIComponent(folderId)}/uploads/${encodeURIComponent(uploadId)}`,
       {method: "DELETE", headers},
     );
   },
