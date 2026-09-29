@@ -7,7 +7,9 @@ import type { BlockNode } from "../api/types";
 
 function diskFreeBytes(root: BlockNode): number | undefined {
   const seen = new Set<string>();
+  const seenVolumeGroups = new Set<string>();
   let filesystemFree = 0;
+  let lvmFree = 0;
   let foundFilesystem = false;
   let unknownFilesystem = false;
 
@@ -15,6 +17,16 @@ function diskFreeBytes(root: BlockNode): number | undefined {
     const key = node.path || node.uuid || node.name;
     if (seen.has(key)) return;
     seen.add(key);
+
+    if (
+      node.type === "lvm" &&
+      node.lvm_vg_name &&
+      node.lvm_vg_free_bytes !== undefined &&
+      !seenVolumeGroups.has(node.lvm_vg_name)
+    ) {
+      seenVolumeGroups.add(node.lvm_vg_name);
+      lvmFree += node.lvm_vg_free_bytes;
+    }
 
     const filesystem = (node.filesystem || "").toLowerCase();
     const dataFilesystem =
@@ -50,7 +62,7 @@ function diskFreeBytes(root: BlockNode): number | undefined {
 
   const unallocated = root.unallocated_bytes || 0;
   if (!foundFilesystem && unallocated === 0) return undefined;
-  return filesystemFree + unallocated;
+  return filesystemFree + lvmFree + unallocated;
 }
 
 function formatBytes(value = 0): string {
