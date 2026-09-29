@@ -2,13 +2,116 @@ package systeminfo
 
 import (
 	"bufio"
+	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 )
 
 const sectorSize = uint64(512)
+
+type lsblkOutput struct {
+	BlockDevices []lsblkNode `json:"blockdevices"`
+}
+
+type lsblkNode struct {
+	Name        string      `json:"name"`
+	Path        string      `json:"path"`
+	Type        string      `json:"type"`
+	Filesystem  string      `json:"fstype"`
+	SizeBytes   uint64      `json:"size"`
+	Mountpoints []string    `json:"mountpoints"`
+	ParentName  string      `json:"pkname"`
+	Label       string      `json:"label"`
+	UUID        string      `json:"uuid"`
+	Model       string      `json:"model"`
+	Vendor      string      `json:"vendor"`
+	Serial      string      `json:"serial"`
+	Rotational  bool        `json:"rota"`
+	Removable   bool        `json:"rm"`
+	Children    []lsblkNode `json:"children"`
+}
+
+func lsblkTree() []BlockNode {
+	command := exec.Command(
+		"/usr/bin/lsblk",
+		"--json",
+		"--bytes",
+		"--output",
+		"NAME,PATH,TYPE,FSTYPE,SIZE,MOUNTPOINTS,PKNAME,LABEL,UUID,MODEL,VENDOR,SERIAL,ROTA,RM",
+	)
+	output, err := command.Output()
+	if err != nil {
+		return []BlockNode{}
+	}
+
+	var decoded lsblkOutput
+	if err := json.Unmarshal(output, &decoded); err != nil {
+		return []BlockNode{}
+	}
+
+	result := make([]BlockNode, 0, len(decoded.BlockDevices))
+	for _, item := range decoded.BlockDevices {
+		if ignoredLsblkType(item) {
+			continue
+		}
+		result = append(result, convertLsblkNode(item))
+	}
+	sort.SliceStable(result, func(i, j int) bool { return result[i].Name < result[j].Name })
+	return result
+}
+
+func ignoredLsblkType(item lsblkNode) bool {
+	if item.Type == "loop" || item.Type == "rom" {
+		return true
+	}
+	return ignoredBlockDevice(item.Name)
+}
+
+func convertLsblkNode(item lsblkNode) BlockNode {
+	mountpoints := make([]string, 0, len(item.Mountpoints))
+	system := false
+	for _, mountpoint := range item.Mountpoints {
+		mountpoint = strings.TrimSpace(mountpoint)
+		if mountpoint == "" {
+			continue
+		}
+		mountpoints = append(mountpoints, mountpoint)
+		if mountpoint == "/" {
+			system = true
+		}
+	}
+
+	children := make([]BlockNode, 0, len(item.Children))
+	for _, child := range item.Children {
+		node := convertLsblkNode(child)
+		if node.System {
+			system = true
+		}
+		children = append(children, node)
+	}
+
+	return BlockNode{
+		Name:        item.Name,
+		Path:        item.Path,
+		Type:        item.Type,
+		Filesystem:  item.Filesystem,
+		SizeBytes:   item.SizeBytes,
+		Mountpoints: mountpoints,
+		ParentName:  item.ParentName,
+		Label:       item.Label,
+		UUID:        item.UUID,
+		Model:       strings.TrimSpace(item.Model),
+		Vendor:      strings.TrimSpace(item.Vendor),
+		Serial:      strings.TrimSpace(item.Serial),
+		Rotational:  item.Rotational,
+		Removable:   item.Removable,
+		System:      system,
+		Children:    children,
+	}
+}
 
 func blockDevices(sysBlockRoot string) []BlockDevice {
 	entries, err := os.ReadDir(sysBlockRoot)
