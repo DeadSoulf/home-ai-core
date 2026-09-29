@@ -253,3 +253,10 @@ tbody tr:last-child td { border-bottom: 0; }
   0% { transform: translateX(-110%); }
   100% { transform: translateX(300%); }
 }
+
+.storage-tree-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 10px;
+}
