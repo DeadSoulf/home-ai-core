@@ -90,6 +90,7 @@ func New(currentVersion, stateDir string) *Service {
 		state:          NewState(currentVersion),
 	}
 	service.loadPersistedState()
+	service.loadReleaseStatusCache()
 	service.reconcileInstallResult()
 	return service
 }
@@ -241,11 +242,57 @@ func (s *Service) cachedReleaseStatusAnyAge() (ReleaseStatus, bool) {
 }
 
 func (s *Service) storeReleaseStatus(status ReleaseStatus) {
+	checkedAt := time.Now().UTC()
 	s.checkCacheMu.Lock()
 	s.checkCache = status
-	s.checkCacheAt = time.Now()
+	s.checkCacheAt = checkedAt
 	s.checkCacheLoaded = true
 	s.checkCacheMu.Unlock()
+	s.persistReleaseStatusCache(status, checkedAt)
+}
+
+type releaseStatusCacheFile struct {
+	CheckedAt time.Time     `json:"checked_at"`
+	Status    ReleaseStatus `json:"status"`
+}
+
+func (s *Service) loadReleaseStatusCache() {
+	path := filepath.Join(s.stateDir, "update", "release-status.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	var cached releaseStatusCacheFile
+	if err := json.Unmarshal(data, &cached); err != nil {
+		return
+	}
+	if cached.CheckedAt.IsZero() || cached.Status.CurrentVersion != s.currentVersion {
+		return
+	}
+	s.checkCache = cached.Status
+	s.checkCacheAt = cached.CheckedAt
+	s.checkCacheLoaded = true
+}
+
+func (s *Service) persistReleaseStatusCache(status ReleaseStatus, checkedAt time.Time) {
+	dir := filepath.Join(s.stateDir, "update")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return
+	}
+	data, err := json.MarshalIndent(releaseStatusCacheFile{
+		CheckedAt: checkedAt,
+		Status:    status,
+	}, "", "  ")
+	if err != nil {
+		return
+	}
+	data = append(data, '\n')
+	tmp := filepath.Join(dir, "release-status.json.tmp")
+	target := filepath.Join(dir, "release-status.json")
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+		return
+	}
+	_ = os.Rename(tmp, target)
 }
 
 func (s *Service) helperInfo(ctx context.Context) HelperInfo {
