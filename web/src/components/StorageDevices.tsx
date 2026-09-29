@@ -44,6 +44,7 @@ export function StorageDevices({
   const [partitionSizeGiB, setPartitionSizeGiB] = useState("");
   const [filesystem, setFilesystem] = useState<Filesystem>("ext4");
   const [label, setLabel] = useState("");
+  const [diskName, setDiskName] = useState("");
   const [collapsed, setCollapsed] = useState<string[]>(() =>
     devices
       .filter((node) => node.type === "disk")
@@ -80,6 +81,33 @@ export function StorageDevices({
     try {
       const result = await api.storageOperation({operation, device: node.path});
       setMessage(result.message);
+      onChanged();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function renamePhysicalDisk(node: BlockNode) {
+    if (!node.path || node.type !== "disk") return;
+    const value = window.prompt(
+      t("diskDisplayNamePrompt").replace("{device}", node.path),
+      node.display_name || "",
+    );
+    if (value === null) return;
+    const nextName = value.trim();
+    if (!nextName) {
+      setError(t("diskNameRequired"));
+      return;
+    }
+
+    setBusy(node.path);
+    setError("");
+    setMessage("");
+    try {
+      await api.setDiskName(node.path, nextName);
+      setMessage(t("diskNameSaved"));
       onChanged();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t("requestFailed"));
@@ -195,10 +223,14 @@ export function StorageDevices({
         size_mib: sizeMiB || undefined,
         confirm: confirmation,
       });
+      if (diskName.trim()) {
+        await api.setDiskName(node.path, diskName.trim());
+      }
       setPartitionProgress({device: node.path, text: t("partitionRefreshing")});
       setMessage(result.message);
       setCreateDisk("");
       setPartitionSizeGiB("");
+      setDiskName("");
       onChanged();
       setPartitionProgress({device: node.path, text: t("partitionCreated")});
       window.setTimeout(() => setPartitionProgress(null), 1200);
@@ -327,12 +359,12 @@ export function StorageDevices({
         <table className="storage-tree-table">
           <thead>
             <tr>
-              <th>NAME</th>
-              <th>TYPE</th>
-              <th>FSTYPE</th>
-              <th>SIZE</th>
-              <th>MOUNTPOINTS</th>
-              <th>PKNAME</th>
+              <th>{t("name")}</th>
+              <th>{t("type")}</th>
+              <th>{t("filesystem")}</th>
+              <th>{t("size")}</th>
+              <th>{t("mountPoints")}</th>
+              <th>{t("parentDisk")}</th>
               <th>{t("actions")}</th>
             </tr>
           </thead>
@@ -393,7 +425,8 @@ export function StorageDevices({
                         ) : (
                           <span className="storage-tree-spacer" />
                         )}
-                        <strong className="mono">{node.name}</strong>
+                        <strong className={node.display_name ? "storage-display-name" : "mono"}>{node.display_name || node.name}</strong>
+                        {node.display_name && <span className="storage-device-path mono">{node.name}</span>}
                         {node.system && <span className="status-badge storage-system">{t("systemDisk")}</span>}
                         {node.label && <span className="storage-inline-label">{node.label}</span>}
                       </div>
@@ -403,7 +436,7 @@ export function StorageDevices({
                         </div>
                       )}
                     </td>
-                    <td>{node.type || "—"}</td>
+                    <td>{node.type === "disk" ? t("diskTypeDisk") : node.type === "part" ? t("diskTypePartition") : node.type === "lvm" ? "LVM" : node.type === "rom" ? t("diskTypeOptical") : (node.type || "—")}</td>
                     <td>{node.filesystem || "—"}</td>
                     <td className="mono">{bytes(node.size_bytes)}</td>
                     <td className="mono">{node.mountpoints.join(", ") || "—"}</td>
@@ -444,10 +477,20 @@ export function StorageDevices({
                           <>
                             <button
                               type="button"
-                              className="button secondary compact"
+                              className="button secondary compact storage-action-button"
+                              disabled={operationBusy}
+                              onClick={() => renamePhysicalDisk(node)}
+                            >
+                              {t("renamePhysicalDisk")}
+                            </button>
+                            <button
+                              type="button"
+                              className="button primary compact storage-action-button"
                               disabled={operationBusy || !canCreatePartition}
                               onClick={() => {
-                                setCreateDisk(creating ? "" : (node.path || ""));
+                                const opening = !creating;
+                                setCreateDisk(opening ? (node.path || "") : "");
+                                setDiskName(opening ? (node.display_name || "") : "");
                                 setFormatDevice("");
                                 setError("");
                               }}
@@ -456,7 +499,7 @@ export function StorageDevices({
                             </button>
                             <button
                               type="button"
-                              className="button danger compact"
+                              className="button danger compact storage-action-button"
                               disabled={operationBusy || node.system || (node.children?.length || 0) === 0}
                               onClick={() => deleteAllPartitions(node)}
                             >
@@ -499,6 +542,15 @@ export function StorageDevices({
                         <div className="storage-format">
                           <div>
                             <label>
+                              {t("diskDisplayName")}
+                              <input
+                                value={diskName}
+                                maxLength={64}
+                                onChange={(event) => setDiskName(event.target.value)}
+                                placeholder={t("diskDisplayNamePlaceholder")}
+                              />
+                            </label>
+                            <label>
                               {t("partitionSizeGiB")}
                               <input
                                 inputMode="decimal"
@@ -517,6 +569,7 @@ export function StorageDevices({
                               onClick={() => {
                                 setCreateDisk("");
                                 setPartitionSizeGiB("");
+                                setDiskName("");
                               }}
                             >
                               {t("cancel")}
