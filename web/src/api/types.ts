@@ -214,3 +214,29 @@ export type UpdaterState = {
   published_at?: string;
   bundle_size_bytes?: number;
 };
+
+
+export type WireGuardPeer = {
+  public_key: string;
+  endpoint?: string;
+  allowed_ips?: string[];
+  latest_handshake?: number;
+  transfer_rx?: number;
+  transfer_tx?: number;
+  keepalive?: number;
+};
+
+export type WireGuardTunnel = {
+  name: string;
+  active: boolean;
+  address?: string;
+  public_key?: string;
+  listen_port?: number;
+  peers?: WireGuardPeer[];
+};
+
+export type WireGuardStatus = {
+  available: boolean;
+  error?: string;
+  tunnels: WireGuardTunnel[];
+};
