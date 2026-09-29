@@ -1,59 +1,96 @@
 # Core API v1
 
-Core API v1 is the first stable contract surface for the restarted Home-AI-Core platform.
+Core API v1 is the authenticated control-plane surface for the local Home-AI-Core node.
 
 ## Transport rules
 
 - REST base path: `/api/v1/`
-- JSON responses use UTF-8
-- API responses are marked `Cache-Control: no-store`
+- JSON uses UTF-8
+- authenticated browser requests use same-origin cookie sessions
+- state-changing cookie requests require CSRF validation
 - every request receives `X-Request-ID`
-- clients may provide a safe `X-Correlation-ID`, which Core echoes
-- default listener remains loopback-only until authentication is implemented
+- safe client `X-Correlation-ID` values are echoed
+- API errors use stable machine-readable codes
 
-## GET /health
+## Public operational endpoint
 
-Purpose:
+### GET /health
 
-- local process health checks
-- systemd/reverse-proxy probes
-- installation verification
-- Core state database readiness
+Returns Core/database readiness and the running Core version.
 
-Response:
+The health endpoint is intentionally outside the normal authenticated API envelope so systemd/reverse-proxy/local recovery tooling can probe it.
 
-```json
-{
-  "status": "ok",
-  "version": "0.1.0-dev"
-}
-```
+## Authentication and setup
 
-If the Core state database is unavailable, the endpoint returns `503 Service Unavailable` with `status: degraded`.
+Current security routes include:
 
-The health endpoint is operational infrastructure and does not use the normal API error envelope.
+- `GET /api/v1/security/setup-status`
+- `POST /api/v1/security/bootstrap`
+- `POST /api/v1/auth/login`
+- `GET /api/v1/auth/me`
+- `POST /api/v1/auth/logout`
 
-## GET /api/v1/system
+The first-owner bootstrap remains local-only.
 
-Returns read-only information about the local node.
+## System inventory
 
-Initial information includes:
+### GET /api/v1/system
 
-- stable node ID
-- hostname
-- operating system and kernel
-- CPU model and logical CPU count
-- total and currently available memory
+Requires `system.read`.
+
+Returns the local node identity and current inventory including:
+
+- hostname, OS, kernel and architecture
+- CPU utilization/model/count
+- memory
 - uptime
-- whole block devices visible in `/sys/block`
-- network interfaces and addresses
-- basic DRM/PCI GPU discovery
-- Core version
-- Core database schema version
+- recursive block-device tree
+- filesystem/unallocated-space information
+- persistent disk display names
+- SMART/LVM metadata when the privileged helper can provide it
+- network interfaces
+- GPU/PCI inventory
+- Core/schema versions
 
-Block-device data deliberately does not create permanent identities from `/dev/*` paths.
+The unprivileged Core collects safe inventory and merges privileged storage inspection returned by the helper.
 
-## API errors
+## Storage
+
+Storage mutations require `storage.manage` and CSRF for cookie sessions.
+
+- `POST /api/v1/storage/operation`
+- `POST /api/v1/storage/name`
+
+Supported low-level operations currently include mount/unmount, format, partition create/delete/delete-all and filesystem-label changes. The privileged helper enforces system-disk protection and validates each operation again.
+
+## Updates
+
+Reading updater information requires `updates.read`.
+
+- `GET /api/v1/update`
+- `GET /api/v1/update/state`
+
+Mutations require `updates.manage`:
+
+- `POST /api/v1/update/download`
+- `POST /api/v1/update/install`
+- `POST /api/v1/update/rollback`
+
+A manual fresh release check uses `GET /api/v1/update?fresh=1`; normal callers can use the cached status.
+
+## Jobs, events, modules and audit
+
+The current API also exposes:
+
+- persistent Jobs
+- durable Event history
+- realtime WebSocket events
+- module registry/capabilities
+- audit events
+
+See the dedicated API documents for their detailed contracts.
+
+## Error envelope
 
 Example:
 
@@ -63,72 +100,9 @@ Example:
     "code": "not_found",
     "message": "resource not found",
     "request_id": "95df...",
-    "correlation_id": "mobile-upload-42"
+    "correlation_id": "client-operation-42"
   }
 }
 ```
 
-Error codes are stable machine-readable identifiers. Messages are safe for users/logging. Internal errors are not returned.
-
-## GET /api/v1/events
-
-Upgrades to WebSocket and provides Event Envelope v1.
-
-The server first emits `core.connected`.
-
-A client may then subscribe:
-
-```json
-{
-  "op": "subscribe",
-  "topics": ["system.*", "job.*"]
-}
-```
-
-or unsubscribe:
-
-```json
-{
-  "op": "unsubscribe",
-  "topics": ["system.*"]
-}
-```
-
-Core protocol events are always delivered.
-
-### Event envelope
-
-```json
-{
-  "version": 1,
-  "id": "evt_...",
-  "stream_id": "stream_...",
-  "sequence": 10,
-  "type": "core.heartbeat",
-  "time": "2026-09-28T08:00:00Z",
-  "source": {
-    "node_id": "...",
-    "component": "core"
-  },
-  "request_id": "...",
-  "data": {}
-}
-```
-
-### Heartbeat
-
-`core.heartbeat` is emitted every 30 seconds.
-
-### Reconnect
-
-Realtime v1 does not persist or replay events.
-
-After reconnect, clients must:
-
-1. fetch current authoritative state using REST,
-2. reconnect to `/api/v1/events`,
-3. restore their subscriptions.
-
-A changed `stream_id` indicates that the Core event stream restarted.
-
-Persistent event history/replay belongs to the later Event/Job Engine.
+Error codes are machine-readable. Internal implementation details are logged server-side rather than exposed indiscriminately.
