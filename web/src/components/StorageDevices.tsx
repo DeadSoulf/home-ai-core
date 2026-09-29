@@ -104,6 +104,20 @@ export function StorageDevices({
   const [partitionProgress, setPartitionProgress] = useState<{device: string; text: string} | null>(null);
   const [columnWidths, setColumnWidths] = useState<Record<StorageColumn, number>>(initialColumnWidths);
 
+  function setStorageError(reason: unknown) {
+    const detail = reason instanceof Error ? reason.message : t("requestFailed");
+    const normalized = detail.toLowerCase();
+    let friendly = "";
+    if (normalized.includes("system disk")) friendly = t("storageErrorSystemDisk");
+    else if (normalized.includes("deactivate lvm") || normalized.includes("volume group")) friendly = t("storageErrorLvmBusy");
+    else if (normalized.includes("swap")) friendly = t("storageErrorSwap");
+    else if (normalized.includes("kernel could not reload") || normalized.includes("still reports partition")) friendly = t("storageErrorKernelReload");
+    else if (normalized.includes("still mounted") || normalized.includes("unmount")) friendly = t("storageErrorUnmount");
+    else if (normalized.includes("exceeds available") || normalized.includes("no space")) friendly = t("storageErrorNoSpace");
+    else if (normalized.includes("filesystem verification") || normalized.includes("format device")) friendly = t("storageErrorFormat");
+    setError(friendly ? friendly + "\n" + t("technicalDetails") + ": " + detail : detail);
+  }
+
   function resizeColumn(column: StorageColumn, event: ReactPointerEvent<HTMLSpanElement>) {
     event.preventDefault();
     const startX = event.clientX;
@@ -189,7 +203,7 @@ export function StorageDevices({
       setMessage(result.message);
       onChanged();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t("requestFailed"));
+      setStorageError(reason);
     } finally {
       setBusy("");
     }
@@ -216,7 +230,7 @@ export function StorageDevices({
       setMessage(t("diskNameSaved"));
       onChanged();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t("requestFailed"));
+      setStorageError(reason);
     } finally {
       setBusy("");
     }
@@ -244,7 +258,7 @@ export function StorageDevices({
       setMessage(result.message);
       onChanged();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t("requestFailed"));
+      setStorageError(reason);
     } finally {
       setBusy("");
     }
@@ -286,7 +300,7 @@ export function StorageDevices({
       setLabel("");
       onChanged();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t("requestFailed"));
+      setStorageError(reason);
     } finally {
       setBusy("");
     }
@@ -342,7 +356,7 @@ export function StorageDevices({
       window.setTimeout(() => setPartitionProgress(null), 1200);
     } catch (reason) {
       setPartitionProgress(null);
-      setError(reason instanceof Error ? reason.message : t("requestFailed"));
+      setStorageError(reason);
     } finally {
       setBusy("");
     }
@@ -379,7 +393,7 @@ export function StorageDevices({
       window.setTimeout(() => setPartitionProgress(null), 1200);
     } catch (reason) {
       setPartitionProgress(null);
-      setError(reason instanceof Error ? reason.message : t("requestFailed"));
+      setStorageError(reason);
     } finally {
       setBusy("");
     }
@@ -416,7 +430,7 @@ export function StorageDevices({
       window.setTimeout(() => setPartitionProgress(null), 1200);
     } catch (reason) {
       setPartitionProgress(null);
-      setError(reason instanceof Error ? reason.message : t("requestFailed"));
+      setStorageError(reason);
     } finally {
       setBusy("");
     }
