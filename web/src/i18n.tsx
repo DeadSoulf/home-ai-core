@@ -52,7 +52,9 @@ const strings = {
     partitionDeleted: "Partition deleted.",
     partitionsDeletingAll: "Deleting all partitions…",
     partitionsDeletedAll: "All partitions deleted.",
-    partitionRefreshing: "Refreshing disk information…"
+    partitionRefreshing: "Refreshing disk information…",
+    collapseAllDisks: "Collapse all",
+    expandAllDisks: "Expand all"
   },
   ru: {
     starting: "Запуск Home-AI-Core…", controlPlane: "Панель управления", dashboard: "Обзор", system: "Система",
@@ -103,7 +105,9 @@ const strings = {
     partitionDeleted: "Раздел удалён.",
     partitionsDeletingAll: "Удаление всех разделов…",
     partitionsDeletedAll: "Все разделы удалены.",
-    partitionRefreshing: "Обновление информации о дисках…"
+    partitionRefreshing: "Обновление информации о дисках…",
+    collapseAllDisks: "Свернуть всё",
+    expandAllDisks: "Развернуть всё"
   }
 } as const;
 
