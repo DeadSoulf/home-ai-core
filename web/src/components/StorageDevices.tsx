@@ -13,11 +13,19 @@ function bytes(value = 0) {
   return value + " B";
 }
 
-function flatten(nodes: BlockNode[], depth = 0): Array<{node: BlockNode; depth: number}> {
-  return nodes.flatMap((node) => [
-    {node, depth},
-    ...flatten(node.children || [], depth + 1),
-  ]);
+function flatten(
+  nodes: BlockNode[],
+  collapsed: string[],
+  depth = 0,
+): Array<{node: BlockNode; depth: number}> {
+  return nodes.flatMap((node) => {
+    const key = node.path || node.name;
+    const hideChildren = node.type === "disk" && collapsed.includes(key);
+    return [
+      {node, depth},
+      ...(hideChildren ? [] : flatten(node.children || [], collapsed, depth + 1)),
+    ];
+  });
 }
 
 export function StorageDevices({
@@ -36,6 +44,16 @@ export function StorageDevices({
   const [partitionSizeGiB, setPartitionSizeGiB] = useState("");
   const [filesystem, setFilesystem] = useState<Filesystem>("ext4");
   const [label, setLabel] = useState("");
+  const [collapsed, setCollapsed] = useState<string[]>([]);
+
+  function toggleDisk(node: BlockNode) {
+    const key = node.path || node.name;
+    setCollapsed((current) =>
+      current.includes(key)
+        ? current.filter((item) => item !== key)
+        : [...current, key],
+    );
+  }
 
   async function perform(operation: "mount" | "unmount", node: BlockNode) {
     if (!node.path) return;
@@ -43,9 +61,34 @@ export function StorageDevices({
     setError("");
     setMessage("");
     try {
+      const result = await api.storageOperation({operation, device: node.path});
+      setMessage(result.message);
+      onChanged();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function renameFilesystem(node: BlockNode) {
+    if (!node.path) return;
+    const value = window.prompt(t("renameDiskPrompt").replace("{device}", node.path), node.label || "");
+    if (value === null) return;
+    const nextLabel = value.trim();
+    if (!nextLabel) {
+      setError(t("diskNameRequired"));
+      return;
+    }
+
+    setBusy(node.path);
+    setError("");
+    setMessage("");
+    try {
       const result = await api.storageOperation({
-        operation,
+        operation: "label.rename",
         device: node.path,
+        label: nextLabel,
       });
       setMessage(result.message);
       onChanged();
@@ -175,7 +218,7 @@ export function StorageDevices({
     return <div className="empty-state">{t("noBlockDevices")}</div>;
   }
 
-  const rows = flatten(devices);
+  const rows = flatten(devices, collapsed);
 
   return (
     <div className="storage-tree-wrap">
@@ -202,6 +245,8 @@ export function StorageDevices({
               const operationBusy = !!node.path && busy === node.path;
               const formatting = !!node.path && formatDevice === node.path;
               const creating = !!node.path && createDisk === node.path;
+              const collapseKey = node.path || node.name;
+              const isCollapsed = collapsed.includes(collapseKey);
               const mountable =
                 !!node.path &&
                 !!node.filesystem &&
@@ -223,6 +268,11 @@ export function StorageDevices({
                 !!node.path &&
                 node.type === "disk" &&
                 !node.system;
+              const renameable =
+                !!node.path &&
+                !mounted &&
+                !node.system &&
+                ["ext4", "xfs", "vfat", "fat", "fat32"].includes((node.filesystem || "").toLowerCase());
 
               return (
                 <Fragment key={`${node.path || node.name}-${index}`}>
@@ -233,7 +283,20 @@ export function StorageDevices({
                         style={{paddingLeft: `${depth * 22}px`}}
                         title={[node.vendor, node.model, node.serial].filter(Boolean).join(" · ")}
                       >
-                        {depth > 0 && <span className="storage-tree-branch">↳</span>}
+                        {node.type === "disk" && (node.children?.length || 0) > 0 ? (
+                          <button
+                            type="button"
+                            className="storage-collapse-button"
+                            onClick={() => toggleDisk(node)}
+                            title={isCollapsed ? t("expandPartitions") : t("collapsePartitions")}
+                          >
+                            {isCollapsed ? "▶" : "▼"}
+                          </button>
+                        ) : depth > 0 ? (
+                          <span className="storage-tree-branch">↳</span>
+                        ) : (
+                          <span className="storage-tree-spacer" />
+                        )}
                         <strong className="mono">{node.name}</strong>
                         {node.system && <span className="status-badge storage-system">{t("systemDisk")}</span>}
                         {node.label && <span className="storage-inline-label">{node.label}</span>}
@@ -269,6 +332,16 @@ export function StorageDevices({
                             onClick={() => perform("mount", node)}
                           >
                             {operationBusy ? t("working") : t("mount")}
+                          </button>
+                        )}
+                        {renameable && (
+                          <button
+                            type="button"
+                            className="button secondary compact"
+                            disabled={operationBusy}
+                            onClick={() => renameFilesystem(node)}
+                          >
+                            {t("renameDisk")}
                           </button>
                         )}
                         {node.type === "disk" && (
@@ -309,7 +382,7 @@ export function StorageDevices({
                             </button>
                           </>
                         )}
-                        {!mountable && node.type !== "part" && node.type !== "disk" && <span className="muted">—</span>}
+                        {!mountable && !renameable && node.type !== "part" && node.type !== "disk" && <span className="muted">—</span>}
                       </div>
                     </td>
                   </tr>
