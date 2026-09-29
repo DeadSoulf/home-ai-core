@@ -32,6 +32,8 @@ export function StorageDevices({
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [formatDevice, setFormatDevice] = useState("");
+  const [createDisk, setCreateDisk] = useState("");
+  const [partitionSizeGiB, setPartitionSizeGiB] = useState("");
   const [filesystem, setFilesystem] = useState<Filesystem>("ext4");
   const [label, setLabel] = useState("");
 
@@ -90,6 +92,85 @@ export function StorageDevices({
     }
   }
 
+  async function createPartition(node: BlockNode) {
+    if (!node.path) return;
+
+    let sizeMiB = 0;
+    const sizeText = partitionSizeGiB.trim();
+    if (sizeText !== "") {
+      const sizeGiB = Number(sizeText.replace(",", "."));
+      if (!Number.isFinite(sizeGiB) || sizeGiB <= 0) {
+        setError(t("invalidPartitionSize"));
+        return;
+      }
+      sizeMiB = Math.round(sizeGiB * 1024);
+    }
+
+    const confirmation = `CREATE ${node.path}`;
+    const typed = window.prompt(
+      t("createPartitionConfirmation")
+        .replace("{device}", node.path)
+        .replace("{confirmation}", confirmation),
+      "",
+    );
+    if (typed !== confirmation) {
+      if (typed !== null) setError(t("partitionConfirmationMismatch"));
+      return;
+    }
+
+    setBusy(node.path);
+    setError("");
+    setMessage("");
+    try {
+      const result = await api.storageOperation({
+        operation: "partition.create",
+        device: node.path,
+        size_mib: sizeMiB || undefined,
+        confirm: confirmation,
+      });
+      setMessage(result.message);
+      setCreateDisk("");
+      setPartitionSizeGiB("");
+      onChanged();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function deletePartition(node: BlockNode) {
+    if (!node.path) return;
+    const confirmation = `DELETE ${node.path}`;
+    const typed = window.prompt(
+      t("deletePartitionConfirmation")
+        .replace("{device}", node.path)
+        .replace("{confirmation}", confirmation),
+      "",
+    );
+    if (typed !== confirmation) {
+      if (typed !== null) setError(t("partitionConfirmationMismatch"));
+      return;
+    }
+
+    setBusy(node.path);
+    setError("");
+    setMessage("");
+    try {
+      const result = await api.storageOperation({
+        operation: "partition.delete",
+        device: node.path,
+        confirm: confirmation,
+      });
+      setMessage(result.message);
+      onChanged();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  }
+
   if (devices.length === 0) {
     return <div className="empty-state">{t("noBlockDevices")}</div>;
   }
@@ -120,6 +201,7 @@ export function StorageDevices({
               const root = node.mountpoints.includes("/");
               const operationBusy = !!node.path && busy === node.path;
               const formatting = !!node.path && formatDevice === node.path;
+              const creating = !!node.path && createDisk === node.path;
               const mountable =
                 !!node.path &&
                 !!node.filesystem &&
@@ -131,6 +213,15 @@ export function StorageDevices({
                 !!node.path &&
                 node.type === "part" &&
                 !mounted &&
+                !node.system;
+              const deletable =
+                !!node.path &&
+                node.type === "part" &&
+                !mounted &&
+                !node.system;
+              const canCreatePartition =
+                !!node.path &&
+                node.type === "disk" &&
                 !node.system;
 
               return (
@@ -180,23 +271,90 @@ export function StorageDevices({
                             {operationBusy ? t("working") : t("mount")}
                           </button>
                         )}
-                        {node.type === "part" && (
+                        {node.type === "disk" && (
                           <button
                             type="button"
-                            className="button danger compact"
-                            disabled={operationBusy || !formattable}
+                            className="button secondary compact"
+                            disabled={operationBusy || !canCreatePartition}
                             onClick={() => {
-                              setFormatDevice(formatting ? "" : (node.path || ""));
+                              setCreateDisk(creating ? "" : (node.path || ""));
+                              setFormatDevice("");
                               setError("");
                             }}
                           >
-                            {t("format")}
+                            {t("createPartition")}
                           </button>
                         )}
-                        {!mountable && node.type !== "part" && <span className="muted">—</span>}
+                        {node.type === "part" && (
+                          <>
+                            <button
+                              type="button"
+                              className="button danger compact"
+                              disabled={operationBusy || !formattable}
+                              onClick={() => {
+                                setFormatDevice(formatting ? "" : (node.path || ""));
+                                setCreateDisk("");
+                                setError("");
+                              }}
+                            >
+                              {t("format")}
+                            </button>
+                            <button
+                              type="button"
+                              className="button danger compact"
+                              disabled={operationBusy || !deletable}
+                              onClick={() => deletePartition(node)}
+                            >
+                              {t("deletePartition")}
+                            </button>
+                          </>
+                        )}
+                        {!mountable && node.type !== "part" && node.type !== "disk" && <span className="muted">—</span>}
                       </div>
                     </td>
                   </tr>
+
+                  {creating && (
+                    <tr className="storage-format-row">
+                      <td colSpan={7}>
+                        <div className="storage-format">
+                          <div>
+                            <label>
+                              {t("partitionSizeGiB")}
+                              <input
+                                inputMode="decimal"
+                                value={partitionSizeGiB}
+                                onChange={(event) => setPartitionSizeGiB(event.target.value)}
+                                placeholder={t("allRemainingSpace")}
+                              />
+                            </label>
+                          </div>
+                          <div className="storage-format-warning">{t("createPartitionWarning")}</div>
+                          <div className="storage-format-actions">
+                            <button
+                              type="button"
+                              className="button secondary"
+                              disabled={operationBusy}
+                              onClick={() => {
+                                setCreateDisk("");
+                                setPartitionSizeGiB("");
+                              }}
+                            >
+                              {t("cancel")}
+                            </button>
+                            <button
+                              type="button"
+                              className="button primary"
+                              disabled={operationBusy}
+                              onClick={() => createPartition(node)}
+                            >
+                              {operationBusy ? t("working") : t("createPartition")}
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
 
                   {formatting && (
                     <tr className="storage-format-row">
