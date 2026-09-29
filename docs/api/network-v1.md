@@ -114,6 +114,8 @@ The same network operation endpoint supports:
 
 `wireguard.install` explicitly runs the Debian package-manager installation for `wireguard-tools`.
 
+The privileged helper itself stays inside its restricted systemd sandbox. Package-manager work is delegated through `systemd-run` to a short-lived transient root service, because APT must be able to drop privileges to `_apt` and open Internet sockets. The transient service is started only for the explicit install action and is collected after completion.
+
 It is never run automatically during a normal Home-AI-Core update.
 
 New initial installer packages depend on `wireguard-tools` and `iproute2`.
