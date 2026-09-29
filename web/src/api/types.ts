@@ -19,6 +19,25 @@ export type AuthResponse = {
   token?: string;
 };
 
+export type BlockNode = {
+  name: string;
+  path?: string;
+  type: string;
+  filesystem?: string;
+  size_bytes?: number;
+  mountpoints: string[];
+  parent_name?: string;
+  label?: string;
+  uuid?: string;
+  model?: string;
+  vendor?: string;
+  serial?: string;
+  rotational: boolean;
+  removable: boolean;
+  system: boolean;
+  children: BlockNode[];
+};
+
 export type SystemResponse = {
   version: string;
   schema_version: number;
@@ -38,41 +57,7 @@ export type SystemResponse = {
       available_bytes?: number;
     };
     uptime_seconds?: number;
-    block_tree: Array<{
-      name: string;
-      path?: string;
-      type: string;
-      filesystem?: string;
-      size_bytes?: number;
-      mountpoints: string[];
-      parent_name?: string;
-      label?: string;
-      uuid?: string;
-      model?: string;
-      vendor?: string;
-      serial?: string;
-      rotational: boolean;
-      removable: boolean;
-      system: boolean;
-      children: Array<{
-        name: string;
-        path?: string;
-        type: string;
-        filesystem?: string;
-        size_bytes?: number;
-        mountpoints: string[];
-        parent_name?: string;
-        label?: string;
-        uuid?: string;
-        model?: string;
-        vendor?: string;
-        serial?: string;
-        rotational: boolean;
-        removable: boolean;
-        system: boolean;
-        children: any[];
-      }>;
-    }>;
+    block_tree: BlockNode[];
     block_devices: Array<{
       name: string;
       path: string;
