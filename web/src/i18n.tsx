@@ -122,7 +122,18 @@ const strings = {
     wireGuardInvalidKeepalive: "Persistent keepalive must be between 0 and 65535.",
     wireGuardInvalidPort: "Listen port must be between 1 and 65535.",
     wireGuardPeerDeleteConfirm: "Remove this WireGuard peer?", wireGuardNoPeers: "No peers configured.",
-    wireGuardNoTunnels: "No WireGuard tunnels configured.", delete: "Delete"
+    wireGuardNoTunnels: "No WireGuard tunnels configured.", delete: "Delete",
+    networkPersistentProfiles: "Persistent network profiles",
+    networkBackend: "Network backend", networkInterface: "Interface",
+    networkProfileSource: "Profile source", networkProfileManaged: "Persistent profile",
+    networkProfileMethod: "IPv4 method", networkProfileAddress: "Static address",
+    networkProfileGateway: "Gateway", networkProfileSaveApply: "Save and apply",
+    networkProfileApplyWarning: "Applying a persistent network profile can change the server IP and disconnect this Web session.",
+    networkProfileApplyConfirm: "Save and apply the persistent network profile for {interface}? The current Web connection may be interrupted.",
+    networkProfileAddressRequired: "A static address with CIDR prefix is required.",
+    networkProfileUnsupported: "Persistent management is not supported for this interface/backend yet.",
+    networkProfileUnconfigured: "not configured", networkStatic: "Static",
+    yes: "Yes", no: "No"
   },
   ru: {
     starting: "Запуск Home-AI-Core…", controlPlane: "Панель управления", dashboard: "Обзор", system: "Система",
@@ -243,7 +254,18 @@ const strings = {
     wireGuardInvalidKeepalive: "Persistent keepalive должен быть от 0 до 65535.",
     wireGuardInvalidPort: "Порт должен быть от 1 до 65535.",
     wireGuardPeerDeleteConfirm: "Удалить этот WireGuard peer?", wireGuardNoPeers: "Peers пока нет.",
-    wireGuardNoTunnels: "WireGuard-туннели пока не настроены.", delete: "Удалить"
+    wireGuardNoTunnels: "WireGuard-туннели пока не настроены.", delete: "Удалить",
+    networkPersistentProfiles: "Постоянные сетевые профили",
+    networkBackend: "Сетевой backend", networkInterface: "Интерфейс",
+    networkProfileSource: "Источник профиля", networkProfileManaged: "Постоянный профиль",
+    networkProfileMethod: "Метод IPv4", networkProfileAddress: "Статический адрес",
+    networkProfileGateway: "Шлюз", networkProfileSaveApply: "Сохранить и применить",
+    networkProfileApplyWarning: "Применение постоянного сетевого профиля может изменить IP сервера и оборвать текущую Web-сессию.",
+    networkProfileApplyConfirm: "Сохранить и применить постоянный профиль для {interface}? Текущее Web-соединение может прерваться.",
+    networkProfileAddressRequired: "Для статической настройки нужен адрес с CIDR-префиксом.",
+    networkProfileUnsupported: "Постоянное управление этим интерфейсом/backend пока не поддерживается.",
+    networkProfileUnconfigured: "не настроен", networkStatic: "Статический",
+    yes: "Да", no: "Нет"
   }
 } as const;
 
