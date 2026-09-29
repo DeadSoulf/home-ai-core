@@ -137,7 +137,6 @@ func TestModuleRegistrationPreservesStatus(t *testing.T) {
 	}
 }
 
-
 func TestDiskNamesPersist(t *testing.T) {
 	ctx := context.Background()
 	store, err := Open(ctx, t.TempDir())
