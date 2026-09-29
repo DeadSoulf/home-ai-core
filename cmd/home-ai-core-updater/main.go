@@ -455,6 +455,57 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		}
 		return "partition deleted", nil
 
+	case "storage.label.rename":
+		targets, err := mountedTargets(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		if len(targets) != 0 {
+			return "", errors.New("device must be unmounted before renaming")
+		}
+		protected, err := samePhysicalDiskAsRoot(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		if protected {
+			return "", errors.New("refusing to rename a filesystem on the system disk")
+		}
+		label := strings.TrimSpace(request.Label)
+		if label == "" {
+			return "", errors.New("filesystem label cannot be empty")
+		}
+		fstypeOutput, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-ndo", "FSTYPE", device).CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("inspect filesystem type: %s", strings.TrimSpace(string(fstypeOutput)))
+		}
+		fstype := strings.ToLower(strings.TrimSpace(string(fstypeOutput)))
+		if !validFilesystemLabelForType(label, fstype) {
+			return "", errors.New("invalid filesystem label for filesystem type")
+		}
+		var command string
+		var args []string
+		switch fstype {
+		case "ext4":
+			command = "/usr/sbin/e2label"
+			args = []string{device, label}
+		case "xfs":
+			command = "/usr/sbin/xfs_admin"
+			args = []string{"-L", label, device}
+		case "vfat", "fat", "fat32":
+			command = "/usr/sbin/fatlabel"
+			args = []string{device, label}
+		default:
+			return "", errors.New("renaming is supported for ext4, xfs and vfat filesystems")
+		}
+		if _, err := os.Stat(command); err != nil {
+			return "", fmt.Errorf("filesystem label tool is unavailable: %s", command)
+		}
+		if output, err := exec.CommandContext(ctx, command, args...).CombinedOutput(); err != nil {
+			return "", fmt.Errorf("rename filesystem: %s", strings.TrimSpace(string(output)))
+		}
+		_ = exec.CommandContext(ctx, "/usr/bin/udevadm", "settle").Run()
+		return "filesystem renamed", nil
+
 	case "storage.format":
 		if request.Confirm != "FORMAT "+device {
 			return "", errors.New("format confirmation does not match device")
@@ -680,6 +731,22 @@ func topPhysicalDisk(ctx context.Context, device string) (string, error) {
 		current = filepath.Join("/dev", parent)
 	}
 	return "", errors.New("block device parent chain is too deep")
+}
+
+func validFilesystemLabelForType(value, filesystem string) bool {
+	limit := 32
+	switch filesystem {
+	case "ext4":
+		limit = 16
+	case "xfs":
+		limit = 12
+	case "vfat", "fat", "fat32":
+		limit = 11
+	}
+	if len(value) == 0 || len(value) > limit {
+		return false
+	}
+	return validFilesystemLabel(value)
 }
 
 func validFilesystemLabel(value string) bool {
