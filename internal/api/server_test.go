@@ -38,6 +38,14 @@ func (f fakeState) ClearTerminalJobs(context.Context) (int64, error) {
 	return 0, nil
 }
 
+func (f fakeState) DiskNames(context.Context) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
+func (f fakeState) SetDiskName(context.Context, string, string) error {
+	return nil
+}
+
 type fakeSecurity struct {
 	initialized bool
 	actor       security.Actor
