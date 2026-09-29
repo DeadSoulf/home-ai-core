@@ -110,19 +110,34 @@ function AuthLayout(props: {title: string; subtitle: string; children: ReactNode
   const {t} = useI18n();
   return (
     <main className="auth-screen">
-      <section className="auth-card">
-        <div className="auth-toolbar"><LanguageSwitch /></div>
-        <div className="brand auth-brand">
-          <img className="auth-logo" src="/brand/app-icon.webp" alt="Home AI Core" />
-          <div>
-            <strong>Home-AI-Core</strong>
-            <span>{t("privateInfrastructure")}</span>
+      <div className="auth-shell">
+        <section className="auth-showcase" aria-hidden="true">
+          <div className="auth-showcase-orbit auth-showcase-orbit-one" />
+          <div className="auth-showcase-orbit auth-showcase-orbit-two" />
+          <div className="auth-showcase-content">
+            <img className="auth-showcase-logo" src="/brand/variants/logo-stacked.webp" alt="" />
+            <div className="auth-showcase-copy">
+              <span className="auth-kicker">HOME AI CORE</span>
+              <strong>Home-AI-Core</strong>
+              <span>{t("privateInfrastructure")}</span>
+            </div>
           </div>
-        </div>
-        <h1>{props.title}</h1>
-        <p className="muted">{props.subtitle}</p>
-        {props.children}
-      </section>
+        </section>
+
+        <section className="auth-card">
+          <div className="auth-toolbar"><LanguageSwitch /></div>
+          <div className="auth-card-brand">
+            <img className="auth-logo" src="/brand/app-icon.webp" alt="Home AI Core" />
+            <div>
+              <strong>Home-AI-Core</strong>
+              <span>{t("privateInfrastructure")}</span>
+            </div>
+          </div>
+          <h1>{props.title}</h1>
+          <p className="muted">{props.subtitle}</p>
+          {props.children}
+        </section>
+      </div>
     </main>
   );
 }
