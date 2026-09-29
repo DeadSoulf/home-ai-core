@@ -592,7 +592,7 @@ func (s *Service) findCandidateFromPublishedVersion(ctx context.Context, request
 }
 
 func (s *Service) releaseAssetExists(ctx context.Context, assetURL string) (bool, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, assetURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, assetURL, nil)
 	if err != nil {
 		return false, err
 	}
@@ -604,6 +604,7 @@ func (s *Service) releaseAssetExists(ctx context.Context, assetURL string) (bool
 	defer resp.Body.Close()
 	switch resp.StatusCode {
 	case http.StatusOK:
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxChecksumBytes+1))
 		return true, nil
 	case http.StatusNotFound:
 		return false, nil
