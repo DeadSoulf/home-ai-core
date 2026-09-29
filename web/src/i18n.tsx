@@ -39,13 +39,13 @@ const strings = {
     createPartition: "Create partition", deletePartition: "Delete partition", partitionSizeGiB: "Partition size, GiB",
     allRemainingSpace: "All remaining space", createPartitionWarning: "Leave the size empty to use all remaining free space on the disk.",
     createPartitionConfirmation: "Create a partition on {device}. Type {confirmation} to continue.",
-    deletePartitionConfirmation: "Delete {device}? Its filesystem and all data will become inaccessible. Type {confirmation} to continue.",
+    deletePartitionConfirmation: "Delete {device}? Its filesystem and all data will become inaccessible. Type only the device name: {confirmation}.",
     partitionConfirmationMismatch: "Partition operation cancelled: confirmation text did not match.",
     invalidPartitionSize: "Enter a valid partition size greater than zero.",
     collapsePartitions: "Collapse partitions", expandPartitions: "Expand partitions", renameDisk: "Rename",
     renameDiskPrompt: "Enter a new filesystem label for {device}.", diskNameRequired: "The new name cannot be empty.",
     deleteAllPartitions: "Delete all partitions",
-    deleteAllPartitionsConfirmation: "Delete ALL partitions on {device}? All data on this disk will become inaccessible. Type {confirmation} to continue."
+    deleteAllPartitionsConfirmation: "Delete ALL partitions on {device}? All data on this disk will become inaccessible. Type only the disk name: {confirmation}."
   },
   ru: {
     starting: "Запуск Home-AI-Core…", controlPlane: "Панель управления", dashboard: "Обзор", system: "Система",
@@ -83,13 +83,13 @@ const strings = {
     createPartition: "Создать раздел", deletePartition: "Удалить раздел", partitionSizeGiB: "Размер раздела, GiB",
     allRemainingSpace: "Всё оставшееся место", createPartitionWarning: "Оставьте размер пустым, чтобы использовать всё оставшееся свободное место на диске.",
     createPartitionConfirmation: "Создать раздел на {device}. Для продолжения введите {confirmation}.",
-    deletePartitionConfirmation: "Удалить {device}? Файловая система и все данные раздела станут недоступны. Для продолжения введите {confirmation}.",
+    deletePartitionConfirmation: "Удалить {device}? Файловая система и все данные раздела станут недоступны. Введите только имя раздела: {confirmation}.",
     partitionConfirmationMismatch: "Операция с разделом отменена: текст подтверждения не совпал.",
     invalidPartitionSize: "Введите корректный размер раздела больше нуля.",
     collapsePartitions: "Свернуть разделы", expandPartitions: "Развернуть разделы", renameDisk: "Переименовать",
     renameDiskPrompt: "Введите новое имя (метку файловой системы) для {device}.", diskNameRequired: "Новое имя не может быть пустым.",
     deleteAllPartitions: "Удалить все разделы",
-    deleteAllPartitionsConfirmation: "Удалить ВСЕ разделы на {device}? Все данные на диске станут недоступны. Для продолжения введите {confirmation}."
+    deleteAllPartitionsConfirmation: "Удалить ВСЕ разделы на {device}? Все данные на диске станут недоступны. Введите только имя диска: {confirmation}."
   }
 } as const;
 
