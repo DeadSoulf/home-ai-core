@@ -1,12 +1,10 @@
-# Hardware Discovery
+# Hardware and Storage Discovery
 
-Core v0.1 includes a read-only local hardware inventory.
+Home-AI-Core keeps descriptive hardware discovery in the unprivileged Core and routes privileged storage inspection/mutation through the root helper.
 
-## Sources
+## Unprivileged Core sources
 
-The initial implementation deliberately avoids shelling out to tools such as `lshw`, `lsblk`, `ip` or vendor GPU utilities.
-
-It reads from:
+Core reads safe host information from Linux and standard APIs, including:
 
 - `/proc/cpuinfo`
 - `/proc/meminfo`
@@ -14,36 +12,40 @@ It reads from:
 - `/sys/block`
 - `/sys/class/net`
 - `/sys/class/drm`
-- Go's standard network-interface API
+- `lsblk` for the recursive block-device tree
+- the PCI ID database when available
 
-This keeps the base Core independent from optional command-line packages and reduces command parsing/security surface.
+The resulting inventory includes CPU, memory, network, GPU/PCI and block-device metadata.
 
-## Scope
+## Privileged storage inspection
 
-Core discovery is descriptive, not authoritative configuration management.
+The unprivileged Core does not open arbitrary block devices itself. It asks `home-ai-core-updater` over the authenticated Unix socket for bounded storage inspection.
 
-It reports enough information to:
+The helper currently provides:
 
-- display a useful node dashboard
-- advertise basic node capabilities later
-- detect the presence of storage/network/GPU resources
-- support diagnostics
+- filesystem free-space information, including supported unmounted filesystems
+- SMART health and temperature
+- power-on hours where SMART exposes them
+- SSD/NVMe lifetime where available
+- LVM volume-group/logical-volume metadata
 
-## Ownership boundaries
+SMART checks use standby-safe probing so routine UI refreshes do not intentionally wake sleeping drives.
 
-Core does **not**:
+## Storage mutation
 
-- partition or format disks
-- mount filesystems
-- configure interfaces
-- install GPU drivers
-- assign stable storage IDs
-- allocate devices to workloads
+Storage v1 supports guarded operations on non-system disks:
 
-Those operations belong to future modules and the privileged-operation boundary.
+- partition create/delete/delete-all
+- filesystem creation: ext4, XFS and FAT
+- filesystem-label changes
+- mount/unmount under the Home-AI-Core mount root
+- active swap shutdown before destructive operations
+- LVM volume-group deactivation when the group is fully contained on the target physical disk
 
-## Stable identity
+The helper rejects destructive operations on the physical disk that contains the running root filesystem.
 
-Kernel names such as `sda`, `nvme0n1` and interface names are properties, not global resource identities.
+## Identity
 
-Future Storage/Network modules will establish stable resource identifiers from appropriate provider data and persist those mappings in Core/module state.
+Kernel names such as `sda` and `nvme0n1` remain technical paths, not durable user identity.
+
+Home-AI-Core can persist a user-facing physical-disk name using the disk serial when available, with the device path only as a fallback stable key.
