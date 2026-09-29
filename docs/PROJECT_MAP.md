@@ -67,7 +67,7 @@ Home-AI должен стать полностью автономной лока
 | Module SDK / Registry | ✅ | manifest, dependencies, capabilities | модульная архитектура продукта |
 | Signed Module Repository | ✅ foundation | подписи и проверка metadata/package | будущая доставка Home-AI модулей |
 | System Info | ✅ | CPU/RAM/GPU/network/storage inventory | локальная диагностика + cluster resources |
-| Network Management | ✅ v2 | runtime controls + persistent DHCP/static/DNS profiles for NetworkManager/systemd-networkd | локальное и постоянное администрирование сети |
+| Network Management | ✅ v3 | runtime controls + persistent DHCP/static/DNS for NetworkManager, systemd-networkd and safe ifupdown-owned profiles | локальное и постоянное администрирование сети |
 | WireGuard | ✅ foundation | install, tunnel lifecycle, peers, persistent configs | база собственного удалённого доступа |
 | Hardware discovery | ✅ | PCI/GPU/storage данные | ускорители, камеры, adapters |
 | Low-level Storage | ✅ | partitions, format, mount, labels, SMART/LVM | фундамент NAS и NVR storage |
@@ -102,7 +102,7 @@ Check
 
 Используется единое каноническое дерево block devices. Низкоуровневые безопасные storage операции уже дают основу для будущего NAS.
 
-### ✅ Network Management v2
+### ✅ Network Management v3
 
 Реализовано:
 
@@ -115,7 +115,11 @@ Check
 - persistent gateway и DNS;
 - NetworkManager backend;
 - systemd-networkd backend;
-- ifupdown определяется, но пока не переписывается автоматически;
+- ifupdown: чтение существующих stanza, показ source/method/address/gateway/DNS;
+- внешние ifupdown-профили отображаются read-only и не перезаписываются;
+- Home-AI-owned ifupdown-профили хранятся отдельно в `/etc/network/interfaces.d/50-home-ai-<iface>`;
+- при отсутствии include создаётся backup `/etc/network/interfaces` и добавляется только маркированный include-block;
+- конфликт нескольких IPv4 stanza блокирует запись до ручного исправления;
 - сетевые `ip`/`wg` команды выполняются через transient systemd units и не ослабляют постоянный root-helper;
 - отдельные permissions `network.read` / `network.manage`;
 - Audit для сетевых действий;
@@ -126,7 +130,7 @@ Check
 - сохранение конфигурации в `/etc/wireguard`;
 - отображение endpoint, allowed IPs, handshake и RX/TX.
 
-Следующий сетевой долг: безопасное persistent-редактирование ifupdown и затем VLAN/bridges/bonds.
+Следующий сетевой долг: explicit import/takeover внешнего ifupdown-профиля (отдельным подтверждаемым действием), затем VLAN/bridges/bonds.
 
 ### ✅ Multi-user foundation
 
@@ -407,7 +411,7 @@ AI не может расширять собственные права.
 | durable events не подходят для media/high-rate telemetry | оставить media отдельным data plane |
 | SQLite single-node | не превращать локальную схему в неявный cluster contract |
 | cluster leadership не определён | сохранить abstraction, решить позже |
-| ifupdown persistent profiles пока read-only | добавить безопасный parser/ownership model для /etc/network/interfaces |
+| внешние ifupdown profiles нельзя takeover из UI | позже добавить явный import/takeover с backup/diff/confirmation |
 | stable signing/channel | сделать до stable/commercial release |
 | AI self-development может менять систему | только versioned/audited/rollback + approval policy |
 

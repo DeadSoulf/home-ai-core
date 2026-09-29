@@ -326,7 +326,15 @@ export function NetworkManagement(props: {
                   <select value={selectedInterface} onChange={(event) => setSelectedInterface(event.target.value)}>
                     {profiles.profiles.map((profile) => (
                       <option key={profile.interface} value={profile.interface}>
-                        {profile.interface} · {profile.supported ? (profile.method || t("networkProfileUnconfigured")) : t("networkProfileUnsupported")}
+                        {profile.interface} · {
+                          profile.ownership === "external"
+                            ? t("networkProfileExternal")
+                            : profile.ownership === "conflict"
+                              ? t("networkProfileConflict")
+                              : profile.supported
+                                ? (profile.method || t("networkProfileUnconfigured"))
+                                : t("networkProfileUnsupported")
+                        }
                       </option>
                     ))}
                   </select>
@@ -338,11 +346,25 @@ export function NetworkManagement(props: {
                       <dt>{t("networkBackend")}</dt><dd>{selectedProfile.backend}</dd>
                       <dt>{t("networkProfileSource")}</dt><dd className="mono">{selectedProfile.source || "—"}</dd>
                       <dt>{t("networkProfileManaged")}</dt><dd>{selectedProfile.managed ? t("yes") : t("no")}</dd>
+                      <dt>{t("networkProfileOwnership")}</dt>
+                      <dd>
+                        {selectedProfile.ownership === "home-ai"
+                          ? t("networkProfileOwnedHomeAI")
+                          : selectedProfile.ownership === "external"
+                            ? t("networkProfileExternal")
+                            : selectedProfile.ownership === "conflict"
+                              ? t("networkProfileConflict")
+                              : t("networkProfileOwnershipNone")}
+                      </dd>
                     </dl>
 
                     {!selectedProfile.supported && (
                       <div className="form-error">
-                        {selectedProfile.error || t("networkProfileUnsupported")}
+                        {selectedProfile.ownership === "external"
+                          ? t("networkProfileExternalNotice")
+                          : selectedProfile.ownership === "conflict"
+                            ? t("networkProfileConflictNotice")
+                            : (selectedProfile.error || t("networkProfileUnsupported"))}
                       </div>
                     )}
 

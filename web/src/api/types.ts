@@ -246,6 +246,7 @@ export type NetworkProfile = {
   backend: string;
   supported: boolean;
   managed: boolean;
+  ownership?: "none" | "home-ai" | "external" | "conflict";
   method?: string;
   address?: string;
   gateway?: string;
