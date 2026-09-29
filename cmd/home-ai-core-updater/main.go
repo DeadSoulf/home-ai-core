@@ -436,13 +436,6 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		if err := requirePartitionType(ctx, device); err != nil {
 			return "", err
 		}
-		mounted, err := diskHasMountedDescendants(ctx, device)
-		if err != nil {
-			return "", err
-		}
-		if mounted {
-			return "", errors.New("partition and all descendant volumes must be unmounted before deletion")
-		}
 		protected, err := samePhysicalDiskAsRoot(ctx, device)
 		if err != nil {
 			return "", err
@@ -450,10 +443,35 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		if protected {
 			return "", errors.New("refusing to delete a partition on the system disk")
 		}
+		if err := prepareDestructiveChange(ctx, device); err != nil {
+			return "", err
+		}
 		if err := deletePartition(ctx, device); err != nil {
 			return "", err
 		}
 		return "partition deleted", nil
+
+	case "storage.partition.delete_all":
+		if request.Confirm != "DELETE ALL "+device {
+			return "", errors.New("delete-all confirmation does not match disk")
+		}
+		if err := requireDiskType(ctx, device); err != nil {
+			return "", err
+		}
+		protected, err := samePhysicalDiskAsRoot(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		if protected {
+			return "", errors.New("refusing to delete partitions on the system disk")
+		}
+		if err := prepareDestructiveChange(ctx, device); err != nil {
+			return "", err
+		}
+		if err := deleteAllPartitions(ctx, device); err != nil {
+			return "", err
+		}
+		return "all partitions deleted", nil
 
 	case "storage.label.rename":
 		targets, err := mountedTargets(ctx, device)
@@ -510,19 +528,15 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		if request.Confirm != "FORMAT "+device {
 			return "", errors.New("format confirmation does not match device")
 		}
-		targets, err := mountedTargets(ctx, device)
-		if err != nil {
-			return "", err
-		}
-		if len(targets) != 0 {
-			return "", errors.New("device must be unmounted before formatting")
-		}
 		protected, err := samePhysicalDiskAsRoot(ctx, device)
 		if err != nil {
 			return "", err
 		}
 		if protected {
 			return "", errors.New("refusing to format a device on the system disk")
+		}
+		if err := prepareDestructiveChange(ctx, device); err != nil {
+			return "", err
 		}
 		label := strings.TrimSpace(request.Label)
 		if !validFilesystemLabel(label) {
@@ -623,6 +637,43 @@ func createPartition(ctx context.Context, disk string, sizeMiB uint64) error {
 	output, err := command.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("create partition: %s", strings.TrimSpace(string(output)))
+	}
+	_ = exec.CommandContext(ctx, "/usr/sbin/blockdev", "--rereadpt", disk).Run()
+	_ = exec.CommandContext(ctx, "/usr/bin/udevadm", "settle").Run()
+	return nil
+}
+
+func prepareDestructiveChange(ctx context.Context, device string) error {
+	output, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-nrpo", "NAME,TYPE,MOUNTPOINTS", device).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("inspect device usage: %s", strings.TrimSpace(string(output)))
+	}
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		fields := strings.Fields(lines[i])
+		if len(fields) < 2 {
+			continue
+		}
+		name := fields[0]
+		typeName := fields[1]
+		if typeName == "swap" {
+			if out, err := exec.CommandContext(ctx, "/usr/sbin/swapoff", name).CombinedOutput(); err != nil {
+				return fmt.Errorf("disable swap %s: %s", name, strings.TrimSpace(string(out)))
+			}
+		}
+		if len(fields) > 2 {
+			if out, err := exec.CommandContext(ctx, "/usr/bin/umount", "--", name).CombinedOutput(); err != nil {
+				return fmt.Errorf("unmount %s: %s", name, strings.TrimSpace(string(out)))
+			}
+		}
+	}
+	return nil
+}
+
+func deleteAllPartitions(ctx context.Context, disk string) error {
+	output, err := exec.CommandContext(ctx, "/usr/sbin/sfdisk", "--delete", disk).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("delete all partitions: %s", strings.TrimSpace(string(output)))
 	}
 	_ = exec.CommandContext(ctx, "/usr/sbin/blockdev", "--rereadpt", disk).Run()
 	_ = exec.CommandContext(ctx, "/usr/bin/udevadm", "settle").Run()
