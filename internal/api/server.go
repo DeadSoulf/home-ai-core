@@ -92,6 +92,7 @@ func New(
 	s.mux.HandleFunc("/api/v1/update/rollback", s.requireAuth("updates.manage", s.updateRollback))
 	s.mux.HandleFunc("/api/v1/storage/operation", s.requireAuth("storage.manage", s.storageOperation))
 	s.mux.HandleFunc("/api/v1/storage/name", s.requireAuth("storage.manage", s.storageName))
+	s.mux.HandleFunc("GET /api/v1/network/profiles", s.requireAuth("network.read", s.networkProfiles))
 	s.mux.HandleFunc("GET /api/v1/network/wireguard", s.requireAuth("network.read", s.wireGuardStatus))
 	s.mux.HandleFunc("POST /api/v1/network/operation", s.requireAuth("network.manage", s.networkOperation))
 	s.mux.HandleFunc("/api/v1/audit", s.requireAuth(
