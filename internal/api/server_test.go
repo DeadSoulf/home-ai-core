@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -89,6 +90,15 @@ func (f fakeState) CreateNASFolder(
 
 func (f fakeState) ListNASFolders(context.Context) ([]state.NASFolderRecord, error) {
 	return f.nasFolders, nil
+}
+
+func (f fakeState) NASFolder(_ context.Context, folderID string) (state.NASFolderRecord, error) {
+	for _, folder := range f.nasFolders {
+		if folder.ID == folderID {
+			return folder, nil
+		}
+	}
+	return state.NASFolderRecord{}, sql.ErrNoRows
 }
 
 func (f fakeState) DeleteNASFolder(context.Context, string) error {
