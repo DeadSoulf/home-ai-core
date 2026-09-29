@@ -976,8 +976,11 @@ func TestFileMoveAndDelete(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer test")
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("non-empty directory delete status = %d, want %d", rec.Code, http.StatusBadRequest)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("non-empty directory trash status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+	if _, err := os.Stat(filepath.Join(folderRoot, "docs")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("trashed directory still exists: %v", err)
 	}
 }
 
