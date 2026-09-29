@@ -188,6 +188,38 @@ export function StorageDevices({
     }
   }
 
+  async function deleteAllPartitions(node: BlockNode) {
+    if (!node.path) return;
+    const confirmation = `DELETE ALL ${node.path}`;
+    const typed = window.prompt(
+      t("deleteAllPartitionsConfirmation")
+        .replace("{device}", node.path)
+        .replace("{confirmation}", confirmation),
+      "",
+    );
+    if (typed !== confirmation) {
+      if (typed !== null) setError(t("partitionConfirmationMismatch"));
+      return;
+    }
+
+    setBusy(node.path);
+    setError("");
+    setMessage("");
+    try {
+      const result = await api.storageOperation({
+        operation: "partition.delete_all",
+        device: node.path,
+        confirm: confirmation,
+      });
+      setMessage(result.message);
+      onChanged();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function deletePartition(node: BlockNode) {
     if (!node.path) return;
     const confirmation = `DELETE ${node.path}`;
@@ -267,7 +299,6 @@ export function StorageDevices({
               const deletable =
                 !!node.path &&
                 node.type === "part" &&
-                !mounted &&
                 !node.system;
               const canCreatePartition =
                 !!node.path &&
@@ -350,18 +381,28 @@ export function StorageDevices({
                           </button>
                         )}
                         {node.type === "disk" && (
-                          <button
-                            type="button"
-                            className="button secondary compact"
-                            disabled={operationBusy || !canCreatePartition}
-                            onClick={() => {
-                              setCreateDisk(creating ? "" : (node.path || ""));
-                              setFormatDevice("");
-                              setError("");
-                            }}
-                          >
-                            {t("createPartition")}
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              className="button secondary compact"
+                              disabled={operationBusy || !canCreatePartition}
+                              onClick={() => {
+                                setCreateDisk(creating ? "" : (node.path || ""));
+                                setFormatDevice("");
+                                setError("");
+                              }}
+                            >
+                              {t("createPartition")}
+                            </button>
+                            <button
+                              type="button"
+                              className="button danger compact"
+                              disabled={operationBusy || node.system || (node.children?.length || 0) === 0}
+                              onClick={() => deleteAllPartitions(node)}
+                            >
+                              {t("deleteAllPartitions")}
+                            </button>
+                          </>
                         )}
                         {node.type === "part" && (
                           <>
