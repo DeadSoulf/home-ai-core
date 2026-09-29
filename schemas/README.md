@@ -2,12 +2,9 @@
 
 Versioned machine-readable contracts live here.
 
-Planned schemas include:
+Implemented schemas:
 
-- Module manifest
-- Signed module repository
-- App manifest
-- Integration manifest
-- Permission declarations
-- Events
-- Jobs
+- Module manifest v1
+- Signed module repository v1
+
+Additional schemas are added only when their corresponding platform contracts are implemented and versioned.
