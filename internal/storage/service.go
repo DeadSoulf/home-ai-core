@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 
@@ -22,12 +23,36 @@ type Request struct {
 	SizeMiB    uint64
 }
 
+func ensureCompatibleHelper(ctx context.Context) error {
+	dialer := net.Dialer{}
+	conn, err := dialer.DialContext(ctx, "unix", helperSocketPath)
+	if err != nil {
+		return fmt.Errorf("connect storage helper: %w", err)
+	}
+	defer conn.Close()
+
+	if err := json.NewEncoder(conn).Encode(updaterhelper.Request{Operation: "info"}); err != nil {
+		return fmt.Errorf("query storage helper: %w", err)
+	}
+	var response updaterhelper.Response
+	if err := json.NewDecoder(conn).Decode(&response); err != nil {
+		return fmt.Errorf("query storage helper: %w", err)
+	}
+	if !response.OK || response.ProtocolVersion < updaterhelper.ProtocolVersion {
+		return errors.New("system storage helper is outdated; install the latest initial installer once")
+	}
+	return nil
+}
+
 func Execute(ctx context.Context, input Request) (string, error) {
 	operation := strings.TrimSpace(input.Operation)
 	switch operation {
 	case "mount", "unmount", "format", "partition.create", "partition.delete", "partition.delete_all", "label.rename":
 	default:
 		return "", errors.New("unsupported storage operation")
+	}
+	if err := ensureCompatibleHelper(ctx); err != nil {
+		return "", err
 	}
 
 	dialer := net.Dialer{}
@@ -38,7 +63,8 @@ func Execute(ctx context.Context, input Request) (string, error) {
 	defer conn.Close()
 
 	request := updaterhelper.Request{
-		Operation:  "storage." + operation,
+		Operation:       "storage." + operation,
+		ProtocolVersion: updaterhelper.ProtocolVersion,
 		Device:     strings.TrimSpace(input.Device),
 		Mountpoint: strings.TrimSpace(input.Mountpoint),
 		Filesystem: strings.TrimSpace(input.Filesystem),
