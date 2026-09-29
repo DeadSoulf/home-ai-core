@@ -33,4 +33,3 @@ func readUEvent(path string) map[string]string {
 	}
 	return values
 }
-
