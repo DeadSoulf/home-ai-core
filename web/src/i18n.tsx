@@ -45,7 +45,14 @@ const strings = {
     collapsePartitions: "Collapse partitions", expandPartitions: "Expand partitions", renameDisk: "Rename",
     renameDiskPrompt: "Enter a new filesystem label for {device}.", diskNameRequired: "The new name cannot be empty.",
     deleteAllPartitions: "Delete all partitions",
-    deleteAllPartitionsConfirmation: "Delete ALL partitions on {device}? All data on this disk will become inaccessible. Type only the disk name: {confirmation}."
+    deleteAllPartitionsConfirmation: "Delete ALL partitions on {device}? All data on this disk will become inaccessible. Type only the disk name: {confirmation}.",
+    partitionCreating: "Creating partition…",
+    partitionCreated: "Partition created.",
+    partitionDeleting: "Deleting partition…",
+    partitionDeleted: "Partition deleted.",
+    partitionsDeletingAll: "Deleting all partitions…",
+    partitionsDeletedAll: "All partitions deleted.",
+    partitionRefreshing: "Refreshing disk information…"
   },
   ru: {
     starting: "Запуск Home-AI-Core…", controlPlane: "Панель управления", dashboard: "Обзор", system: "Система",
@@ -89,7 +96,14 @@ const strings = {
     collapsePartitions: "Свернуть разделы", expandPartitions: "Развернуть разделы", renameDisk: "Переименовать",
     renameDiskPrompt: "Введите новое имя (метку файловой системы) для {device}.", diskNameRequired: "Новое имя не может быть пустым.",
     deleteAllPartitions: "Удалить все разделы",
-    deleteAllPartitionsConfirmation: "Удалить ВСЕ разделы на {device}? Все данные на диске станут недоступны. Введите только имя диска: {confirmation}."
+    deleteAllPartitionsConfirmation: "Удалить ВСЕ разделы на {device}? Все данные на диске станут недоступны. Введите только имя диска: {confirmation}.",
+    partitionCreating: "Создание раздела…",
+    partitionCreated: "Раздел создан.",
+    partitionDeleting: "Удаление раздела…",
+    partitionDeleted: "Раздел удалён.",
+    partitionsDeletingAll: "Удаление всех разделов…",
+    partitionsDeletedAll: "Все разделы удалены.",
+    partitionRefreshing: "Обновление информации о дисках…"
   }
 } as const;
 
