@@ -48,6 +48,8 @@ func applyStorageDetailsNode(
 				node.LVMVGName = stat.VGName
 				node.LVMLVName = stat.LVName
 				node.LVMActive = &active
+				node.LVMVGSizeBytes = stat.VGSizeBytes
+				node.LVMVGFreeBytes = stat.VGFreeBytes
 				node.LVMDataPercent = stat.DataPercent
 				node.LVMMetadataPercent = stat.MetadataPercent
 				if stat.SizeBytes > 0 {
