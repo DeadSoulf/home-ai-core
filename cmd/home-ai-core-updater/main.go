@@ -399,6 +399,62 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		}
 		return "device unmounted", nil
 
+	case "storage.partition.create":
+		if request.Confirm != "CREATE "+device {
+			return "", errors.New("partition creation confirmation does not match disk")
+		}
+		if err := requireDiskType(ctx, device); err != nil {
+			return "", err
+		}
+		protected, err := samePhysicalDiskAsRoot(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		if protected {
+			return "", errors.New("refusing to change the partition table on the system disk")
+		}
+		if mounted, err := diskHasMountedDescendants(ctx, device); err != nil {
+			return "", err
+		} else if mounted {
+			return "", errors.New("all filesystems on the disk must be unmounted before changing partitions")
+		}
+		if request.SizeMiB > 0 && request.SizeMiB < 16 {
+			return "", errors.New("partition size must be at least 16 MiB")
+		}
+		if request.SizeMiB > 0 && request.SizeMiB > 16*1024*1024 {
+			return "", errors.New("partition size is too large")
+		}
+		if err := createPartition(ctx, device, request.SizeMiB); err != nil {
+			return "", err
+		}
+		return "partition created", nil
+
+	case "storage.partition.delete":
+		if request.Confirm != "DELETE "+device {
+			return "", errors.New("partition deletion confirmation does not match device")
+		}
+		if err := requirePartitionType(ctx, device); err != nil {
+			return "", err
+		}
+		targets, err := mountedTargets(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		if len(targets) != 0 {
+			return "", errors.New("partition must be unmounted before deletion")
+		}
+		protected, err := samePhysicalDiskAsRoot(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		if protected {
+			return "", errors.New("refusing to delete a partition on the system disk")
+		}
+		if err := deletePartition(ctx, device); err != nil {
+			return "", err
+		}
+		return "partition deleted", nil
+
 	case "storage.format":
 		if request.Confirm != "FORMAT "+device {
 			return "", errors.New("format confirmation does not match device")
@@ -456,6 +512,102 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 	default:
 		return "", errors.New("unsupported storage operation")
 	}
+}
+
+func requireDiskType(ctx context.Context, device string) error {
+	output, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-ndo", "TYPE", device).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("inspect disk type: %s", strings.TrimSpace(string(output)))
+	}
+	if strings.TrimSpace(string(output)) != "disk" {
+		return errors.New("partition creation is allowed only on physical disks")
+	}
+	return nil
+}
+
+func requirePartitionType(ctx context.Context, device string) error {
+	output, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-ndo", "TYPE", device).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("inspect partition type: %s", strings.TrimSpace(string(output)))
+	}
+	if strings.TrimSpace(string(output)) != "part" {
+		return errors.New("partition deletion is allowed only for partitions")
+	}
+	return nil
+}
+
+func diskHasMountedDescendants(ctx context.Context, device string) (bool, error) {
+	output, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-nrpo", "MOUNTPOINTS", device).CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("inspect disk mounts: %s", strings.TrimSpace(string(output)))
+	}
+	for _, line := range strings.Split(string(output), "\n") {
+		if strings.TrimSpace(line) != "" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func createPartition(ctx context.Context, disk string, sizeMiB uint64) error {
+	pttypeOutput, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-ndo", "PTTYPE", disk).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("inspect partition table: %s", strings.TrimSpace(string(pttypeOutput)))
+	}
+	pttype := strings.TrimSpace(string(pttypeOutput))
+
+	var args []string
+	if pttype == "" {
+		args = []string{"--label", "gpt", disk}
+	} else {
+		args = []string{"--append", disk}
+	}
+
+	line := ",\n"
+	if sizeMiB > 0 {
+		line = fmt.Sprintf(",%dMiB\n", sizeMiB)
+	}
+	command := exec.CommandContext(ctx, "/usr/sbin/sfdisk", args...)
+	command.Stdin = strings.NewReader(line)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("create partition: %s", strings.TrimSpace(string(output)))
+	}
+	_ = exec.CommandContext(ctx, "/usr/sbin/blockdev", "--rereadpt", disk).Run()
+	_ = exec.CommandContext(ctx, "/usr/bin/udevadm", "settle").Run()
+	return nil
+}
+
+func deletePartition(ctx context.Context, partition string) error {
+	parentOutput, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-ndo", "PKNAME", partition).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("resolve parent disk: %s", strings.TrimSpace(string(parentOutput)))
+	}
+	parent := strings.TrimSpace(string(parentOutput))
+	if parent == "" {
+		return errors.New("cannot resolve parent disk")
+	}
+	parentDevice := filepath.Join("/dev", parent)
+	if err := requireDiskType(ctx, parentDevice); err != nil {
+		return err
+	}
+
+	partNumberData, err := os.ReadFile(filepath.Join("/sys/class/block", filepath.Base(partition), "partition"))
+	if err != nil {
+		return fmt.Errorf("resolve partition number: %w", err)
+	}
+	partNumber := strings.TrimSpace(string(partNumberData))
+	if partNumber == "" {
+		return errors.New("cannot resolve partition number")
+	}
+
+	output, err := exec.CommandContext(ctx, "/usr/sbin/sfdisk", "--delete", parentDevice, partNumber).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("delete partition: %s", strings.TrimSpace(string(output)))
+	}
+	_ = exec.CommandContext(ctx, "/usr/sbin/blockdev", "--rereadpt", parentDevice).Run()
+	_ = exec.CommandContext(ctx, "/usr/bin/udevadm", "settle").Run()
+	return nil
 }
 
 func validateBlockDevice(value string) (string, error) {
