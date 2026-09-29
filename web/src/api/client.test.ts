@@ -102,4 +102,36 @@ describe("API client", () => {
 
     vi.unstubAllGlobals();
   });
+
+  it("sends network changes with CSRF protection", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({message: "updated"}), {
+        status: 200,
+        headers: {"Content-Type": "application/json"},
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    });
+
+    setCSRFToken("csrf-network");
+    const result = await api.networkOperation({
+      operation: "mtu",
+      interface: "eth0",
+      mtu: 1400,
+    });
+    expect(result.message).toBe("updated");
+    const [input, init] = fetchMock.mock.calls[0];
+    expect(String(input)).toBe("/api/v1/network/operation");
+    expect(init?.method).toBe("POST");
+    expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-network");
+    expect(String(init?.body)).toContain('"interface":"eth0"');
+
+    vi.unstubAllGlobals();
+  });
+
 });
