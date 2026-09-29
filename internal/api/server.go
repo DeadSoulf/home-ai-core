@@ -87,6 +87,7 @@ func New(
 	s.mux.HandleFunc("/api/v1/update/download", s.requireAuth("updates.manage", s.updateDownload))
 	s.mux.HandleFunc("/api/v1/update/install", s.requireAuth("updates.manage", s.updateInstall))
 	s.mux.HandleFunc("/api/v1/storage/operation", s.requireAuth("storage.manage", s.storageOperation))
+	s.mux.HandleFunc("/api/v1/storage/name", s.requireAuth("storage.manage", s.storageName))
 	s.mux.HandleFunc("/api/v1/audit", s.requireAuth(
 		"audit.read",
 		func(w http.ResponseWriter, r *http.Request, actor security.Actor, _ authSource) {
@@ -140,10 +141,17 @@ func (s *server) system(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	info := systeminfo.Collect(s.nodeID)
+	if names, err := s.state.DiskNames(r.Context()); err != nil {
+		s.logger.Error("failed to read disk names", "error", err)
+	} else {
+		systeminfo.ApplyDiskNames(&info, names)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"version":        version.Version,
 		"schema_version": schemaVersion,
-		"system":         systeminfo.Collect(s.nodeID),
+		"system":         info,
 	})
 }
 
