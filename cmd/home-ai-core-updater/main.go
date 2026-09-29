@@ -158,12 +158,16 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})
 			return
 		}
+		health := inspectDiskHealth(ctx)
+		lvm := inspectLVM(ctx)
 		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
 			OK:              true,
 			Message:         "storage inspected",
 			HelperVersion:   updaterhelper.HelperVersion,
 			ProtocolVersion: updaterhelper.ProtocolVersion,
 			FilesystemStats: stats,
+			DiskHealth:      health,
+			LVM:             lvm,
 		})
 		return
 	}
@@ -811,6 +815,185 @@ func offlineFilesystemFreeBytesPrivileged(ctx context.Context, device, filesyste
 	default:
 		return 0, false
 	}
+}
+
+type smartctlJSON struct {
+	SmartStatus *struct {
+		Passed bool `json:"passed"`
+	} `json:"smart_status"`
+	Temperature *struct {
+		Current int `json:"current"`
+	} `json:"temperature"`
+	PowerOnTime *struct {
+		Hours uint64 `json:"hours"`
+	} `json:"power_on_time"`
+	NVMe *struct {
+		PercentageUsed int `json:"percentage_used"`
+		Temperature    int `json:"temperature"`
+	} `json:"nvme_smart_health_information_log"`
+}
+
+type healthLsblkOutput struct {
+	BlockDevices []struct {
+		Path      string `json:"path"`
+		Type      string `json:"type"`
+		Transport string `json:"tran"`
+	} `json:"blockdevices"`
+}
+
+func inspectDiskHealth(ctx context.Context) []updaterhelper.DiskHealthStat {
+	output, err := exec.CommandContext(
+		ctx,
+		"/usr/bin/lsblk",
+		"--json",
+		"--output", "PATH,TYPE,TRAN",
+	).CombinedOutput()
+	if err != nil {
+		return nil
+	}
+	var devices healthLsblkOutput
+	if json.Unmarshal(output, &devices) != nil {
+		return nil
+	}
+
+	_, smartErr := os.Stat("/usr/sbin/smartctl")
+	result := make([]updaterhelper.DiskHealthStat, 0, len(devices.BlockDevices))
+	for _, item := range devices.BlockDevices {
+		if item.Type != "disk" || item.Path == "" {
+			continue
+		}
+		stat := updaterhelper.DiskHealthStat{
+			Device:    item.Path,
+			Transport: strings.ToLower(strings.TrimSpace(item.Transport)),
+			Health:    "unknown",
+		}
+		if smartErr != nil {
+			stat.SmartError = "smartctl is not installed"
+			result = append(result, stat)
+			continue
+		}
+
+		smartOutput, commandErr := exec.CommandContext(
+			ctx,
+			"/usr/sbin/smartctl",
+			"-j", "-H", "-A",
+			item.Path,
+		).CombinedOutput()
+		var decoded smartctlJSON
+		if err := json.Unmarshal(smartOutput, &decoded); err != nil {
+			message := strings.TrimSpace(string(smartOutput))
+			if message == "" && commandErr != nil {
+				message = commandErr.Error()
+			}
+			if len(message) > 240 {
+				message = message[:240]
+			}
+			stat.SmartError = message
+			result = append(result, stat)
+			continue
+		}
+
+		stat.SmartAvailable = true
+		if decoded.SmartStatus != nil {
+			if decoded.SmartStatus.Passed {
+				stat.Health = "ok"
+			} else {
+				stat.Health = "failed"
+			}
+		}
+		if decoded.Temperature != nil && decoded.Temperature.Current > -100 && decoded.Temperature.Current < 200 {
+			value := decoded.Temperature.Current
+			stat.TemperatureC = &value
+		}
+		if decoded.PowerOnTime != nil {
+			value := decoded.PowerOnTime.Hours
+			stat.PowerOnHours = &value
+		}
+		if decoded.NVMe != nil {
+			if stat.TemperatureC == nil && decoded.NVMe.Temperature > -100 && decoded.NVMe.Temperature < 200 {
+				value := decoded.NVMe.Temperature
+				stat.TemperatureC = &value
+			}
+			remaining := 100 - decoded.NVMe.PercentageUsed
+			if remaining < 0 {
+				remaining = 0
+			}
+			if remaining > 100 {
+				remaining = 100
+			}
+			stat.LifeRemainingPct = &remaining
+		}
+		if commandErr != nil && stat.Health == "unknown" {
+			stat.SmartError = "smartctl reported a device warning"
+		}
+		result = append(result, stat)
+	}
+	return result
+}
+
+type lvsJSON struct {
+	Report []struct {
+		LV []struct {
+			Path            string `json:"lv_path"`
+			LVName          string `json:"lv_name"`
+			VGName          string `json:"vg_name"`
+			Size            string `json:"lv_size"`
+			Attr            string `json:"lv_attr"`
+			DataPercent     string `json:"data_percent"`
+			MetadataPercent string `json:"metadata_percent"`
+		} `json:"lv"`
+	} `json:"report"`
+}
+
+func inspectLVM(ctx context.Context) []updaterhelper.LVMStat {
+	if _, err := os.Stat("/usr/sbin/lvs"); err != nil {
+		return nil
+	}
+	output, err := exec.CommandContext(
+		ctx,
+		"/usr/sbin/lvs",
+		"--reportformat", "json",
+		"--units", "b",
+		"--nosuffix",
+		"-o", "lv_path,lv_name,vg_name,lv_size,lv_attr,data_percent,metadata_percent",
+	).CombinedOutput()
+	if err != nil {
+		return nil
+	}
+	var decoded lvsJSON
+	if json.Unmarshal(output, &decoded) != nil {
+		return nil
+	}
+	var result []updaterhelper.LVMStat
+	for _, report := range decoded.Report {
+		for _, item := range report.LV {
+			size, _ := strconv.ParseFloat(strings.TrimSpace(item.Size), 64)
+			stat := updaterhelper.LVMStat{
+				Device:    strings.TrimSpace(item.Path),
+				Name:      lvmMapperName(strings.TrimSpace(item.VGName), strings.TrimSpace(item.LVName)),
+				VGName:    strings.TrimSpace(item.VGName),
+				LVName:    strings.TrimSpace(item.LVName),
+				SizeBytes: uint64(size),
+				Active:    len(item.Attr) > 4 && item.Attr[4] == 'a',
+			}
+			if value, err := strconv.ParseFloat(strings.TrimSpace(item.DataPercent), 64); err == nil {
+				stat.DataPercent = &value
+			}
+			if value, err := strconv.ParseFloat(strings.TrimSpace(item.MetadataPercent), 64); err == nil {
+				stat.MetadataPercent = &value
+			}
+			result = append(result, stat)
+		}
+	}
+	return result
+}
+
+func lvmMapperName(vg, lv string) string {
+	escape := func(value string) string { return strings.ReplaceAll(value, "-", "--") }
+	if vg == "" || lv == "" {
+		return ""
+	}
+	return escape(vg) + "-" + escape(lv)
 }
 
 func performStorageOperation(ctx context.Context, request updaterhelper.Request) (string, error) {
