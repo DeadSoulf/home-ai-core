@@ -60,7 +60,9 @@ func List(root, relative string) ([]Entry, error) {
 	}
 	result := make([]Entry, 0, len(items))
 	for _, item := range items {
-		if strings.HasPrefix(item.Name(), ".home-ai-upload-") || item.Name() == trashDirName {
+		if strings.HasPrefix(item.Name(), ".home-ai-upload-") ||
+			item.Name() == trashDirName ||
+			item.Name() == resumableUploadDirName {
 			continue
 		}
 		itemPath := filepath.Join(dir, item.Name())
@@ -353,7 +355,9 @@ func reservedRelative(relative string) bool {
 		return false
 	}
 	first := strings.Split(relative, string(filepath.Separator))[0]
-	return first == trashDirName || strings.HasPrefix(first, ".home-ai-upload-")
+	return first == trashDirName ||
+		first == resumableUploadDirName ||
+		strings.HasPrefix(first, ".home-ai-upload-")
 }
 
 func fileSize(info os.FileInfo, kind string) int64 {
