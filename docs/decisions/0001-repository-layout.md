@@ -1,43 +1,48 @@
 # ADR-0001: Repository Layout
 
-- Status: Accepted
-- Date: 2026-09-28
+- Status: Amended
+- Original date: 2026-09-28
+- Amended: 2026-09-29
 
 ## Context
 
-Home-AI-Core is being restarted to avoid coupling the platform core to individual server features.
+The original repository skeleton reserved empty top-level directories for future Core, SDK, Apps and test implementations. The real implementation subsequently converged on standard Go and Web layouts, leaving several placeholder directories with no executable purpose.
 
-The repository needs visible boundaries between trusted Core code, Web UI, SDK/contracts, optional Modules, Apps and distribution tooling.
+Keeping empty architectural placeholders made the repository harder to read and implied that the active implementation lived somewhere other than it actually does.
 
 ## Decision
 
-Use the following top-level ownership model:
+Use the implemented ownership model:
 
 ```text
 home-ai-core/
-├── core/
-├── web/
-├── sdk/
-├── schemas/
-├── modules/
-├── apps/
-├── packaging/
-├── scripts/
-├── tests/
-└── docs/
+├── cmd/                  executable entry points
+├── internal/             trusted Core implementation
+├── web/                  React/TypeScript Web UI
+├── schemas/              external JSON contracts
+├── modules/              future installable module workspace
+├── packaging/            Debian/systemd assets
+├── scripts/              build and validation scripts
+├── docs/                 architecture, API and ADRs
+└── .github/workflows/    CI, initial installer and update publishing
 ```
 
-`core/` contains only platform responsibilities.
+Go tests remain next to the packages they exercise. Web tests remain next to Web source. Module SDK contracts live under `internal/modules`, `schemas/` and `docs/sdk/`.
 
-`modules/` contains optional host capabilities.
+Empty `core/`, `sdk/`, `apps/` and `tests/` placeholder directories are not retained.
 
-`apps/` contains user-facing services built on module capabilities.
+## Boundaries
 
-`sdk/` and `schemas/` define stable extension contracts.
+- `cmd/home-ai-core` is the unprivileged network-facing control plane.
+- `cmd/home-ai-core-updater` is the privileged helper.
+- `internal/` owns platform implementation only.
+- `web/` never executes privileged host commands directly.
+- `modules/` is reserved for future independently installable capability implementations.
+- High-level product features should use module contracts rather than bypassing Core boundaries.
 
 ## Consequences
 
-- Feature ownership is visible in the filesystem.
-- The Core can be tested independently from optional capabilities.
-- Modules can evolve independently behind versioned contracts.
-- Cross-directory shortcuts that bypass public contracts are considered architectural violations.
+- the filesystem now matches the actual implementation;
+- dead scaffold is removed;
+- tests follow normal Go/Web conventions;
+- architecture boundaries remain explicit without placeholder directories.
