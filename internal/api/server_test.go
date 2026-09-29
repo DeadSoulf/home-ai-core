@@ -905,3 +905,78 @@ func TestFileContentRejectsTraversalAndMissingWriteScope(t *testing.T) {
 		t.Fatalf("write without scope status = %d, want %d", rec.Code, http.StatusForbidden)
 	}
 }
+
+func TestFileMoveAndDelete(t *testing.T) {
+	poolRoot := t.TempDir()
+	folderRoot := filepath.Join(poolRoot, ".home-ai", "shared", "nsf-visible")
+	if err := os.MkdirAll(filepath.Join(folderRoot, "docs"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(folderRoot, "docs", "old.txt"), []byte("data"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+
+	sec := defaultFakeSecurity()
+	sec.actor.Permissions = []string{"security.self.read"}
+	sec.actor.ResourcePermissions = []security.PermissionScope{
+		{Permission: "files.read", ResourceType: "file_folder", ResourceID: "nsf-visible"},
+		{Permission: "files.write", ResourceType: "file_folder", ResourceID: "nsf-visible"},
+	}
+	handler := testHandlerWithSecurity(fakeState{
+		nasFolders: []state.NASFolderRecord{
+			{
+				ID:           "nsf-visible",
+				PoolID:       "nsp-main",
+				PoolName:     "Main",
+				PoolRoot:     poolRoot,
+				Name:         "Family",
+				Kind:         "shared",
+				RelativePath: "shared/nsf-visible",
+			},
+		},
+	}, sec)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/files/folders/nsf-visible/move",
+		strings.NewReader(`{"from_path":"docs/old.txt","to_path":"docs/new.txt"}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("move status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(
+		http.MethodDelete,
+		"/api/v1/files/folders/nsf-visible/entry?path=docs%2Fnew.txt",
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete status = %d: %s", rec.Code, rec.Body.String())
+	}
+	if _, err := os.Stat(filepath.Join(folderRoot, "docs", "new.txt")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("deleted file still exists: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(folderRoot, "docs", "child.txt"), []byte("x"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	req = httptest.NewRequest(
+		http.MethodDelete,
+		"/api/v1/files/folders/nsf-visible/entry?path=docs",
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("non-empty directory delete status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
