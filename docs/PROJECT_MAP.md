@@ -5,8 +5,8 @@
 > Аудит уже сделанного: [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
-**Опубликован для проверки:** `0.1.63-dev`  
-**Состояние:** Network Management v2 реализован; `0.1.63-dev` содержит persistent DHCP/static/DNS profiles и sandbox-safe network/WireGuard commands  
+**Опубликован для проверки:** `0.1.64-dev`  
+**Состояние:** Network Management v3 реализован; `0.1.64-dev` добавляет безопасное persistent-управление ifupdown с ownership/read-only защитой внешних профилей  
 **Обновлено:** 2026-09-29
 
 ## Конечный продукт
@@ -425,7 +425,8 @@ AI не может расширять собственные права.
 | `0.1.60-dev` | hotfix | APT для WireGuard вынесен в transient systemd service |
 | `0.1.61-dev` | UI | branding + обновлённый экран авторизации |
 | `0.1.62-dev` | UI | упрощён интерфейс статуса обновлений |
-| `0.1.63-dev` | 🧪 опубликована | Network Management v2: persistent profiles + safe ip/wg execution; ожидает живую проверку |
+| `0.1.63-dev` | ✅ установлена для проверки | Network Management v2; на сервере определён backend ifupdown |
+| `0.1.64-dev` | 🧪 опубликована | Network Management v3: safe ifupdown profiles/ownership; ожидает живую проверку |
 
 ## 10. Правило ведения карты
 
