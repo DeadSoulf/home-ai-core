@@ -95,34 +95,6 @@ func List(record state.NASFolderRecord, requested string) ([]Entry, error) {
 	return result, nil
 }
 
-func OpenDownload(record state.NASFolderRecord, requested string) (*os.File, fs.FileInfo, error) {
-	relative, err := cleanRelativePath(requested, false)
-	if err != nil {
-		return nil, nil, err
-	}
-	root, err := os.OpenRoot(FolderPath(record))
-	if err != nil {
-		return nil, nil, fmt.Errorf("open managed folder: %w", err)
-	}
-	file, err := root.Open(relative)
-	if err != nil {
-		root.Close()
-		return nil, nil, err
-	}
-	info, err := file.Stat()
-	if err != nil {
-		file.Close()
-		root.Close()
-		return nil, nil, err
-	}
-	if !info.Mode().IsRegular() {
-		file.Close()
-		root.Close()
-		return nil, nil, ErrNotRegular
-	}
-	return &rootBoundFile{File: file, root: root}.File, info, nil
-}
-
 // OpenDownloadWithClose returns a regular file plus a close function that also
 // closes the root descriptor. It is the preferred download API.
 func OpenDownloadWithClose(record state.NASFolderRecord, requested string) (*os.File, fs.FileInfo, func(), error) {
@@ -267,9 +239,4 @@ func regularFileSize(info fs.FileInfo) int64 {
 		return info.Size()
 	}
 	return 0
-}
-
-type rootBoundFile struct {
-	*os.File
-	root *os.Root
 }
