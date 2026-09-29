@@ -37,6 +37,18 @@ export type BlockNode = {
   model?: string;
   vendor?: string;
   serial?: string;
+  transport?: string;
+  health?: string;
+  temperature_c?: number;
+  power_on_hours?: number;
+  life_remaining_percent?: number;
+  smart_available: boolean;
+  smart_error?: string;
+  lvm_vg_name?: string;
+  lvm_lv_name?: string;
+  lvm_active?: boolean;
+  lvm_data_percent?: number;
+  lvm_metadata_percent?: number;
   rotational: boolean;
   removable: boolean;
   system: boolean;
