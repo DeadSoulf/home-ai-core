@@ -36,4 +36,3 @@ func NewState(currentVersion string) State {
 		UpdatedAt:      time.Now().UTC(),
 	}
 }
-
