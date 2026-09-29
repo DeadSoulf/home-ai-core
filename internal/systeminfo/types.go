@@ -54,6 +54,8 @@ type BlockNode struct {
 	LVMVGName        string   `json:"lvm_vg_name,omitempty"`
 	LVMLVName        string   `json:"lvm_lv_name,omitempty"`
 	LVMActive        *bool    `json:"lvm_active,omitempty"`
+	LVMVGSizeBytes   uint64   `json:"lvm_vg_size_bytes,omitempty"`
+	LVMVGFreeBytes   uint64   `json:"lvm_vg_free_bytes,omitempty"`
 	LVMDataPercent   *float64 `json:"lvm_data_percent,omitempty"`
 	LVMMetadataPercent *float64 `json:"lvm_metadata_percent,omitempty"`
 	Rotational  bool        `json:"rotational"`
