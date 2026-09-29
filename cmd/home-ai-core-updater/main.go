@@ -168,6 +168,20 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		})
 		return
 	}
+	if strings.HasPrefix(request.Operation, "storage.nas.") {
+		_ = conn.SetDeadline(time.Now().Add(45 * time.Second))
+		ctx, cancel := context.WithTimeout(parent, 40*time.Second)
+		defer cancel()
+		message, err := performNASOperation(ctx, request, uid, gid)
+		if err != nil {
+			logger.Error("NAS operation failed", "operation", request.Operation, "root_path", request.RootPath, "relative_path", request.RelativePath, "error", err)
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})
+			return
+		}
+		logger.Info("NAS operation completed", "operation", request.Operation, "root_path", request.RootPath, "relative_path", request.RelativePath)
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{OK: true, Message: message})
+		return
+	}
 	if strings.HasPrefix(request.Operation, "storage.") {
 		_ = conn.SetDeadline(time.Now().Add(2*time.Minute + 15*time.Second))
 		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
