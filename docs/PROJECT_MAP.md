@@ -180,17 +180,31 @@ Check
 Отдельно проверить в эксплуатации:
 
 - 🧪 rollback и повторное обновление на установленном сервере;
+- 🧪 DHCP/static/WireGuard reboot acceptance из [CORE_ACCEPTANCE.md](CORE_ACCEPTANCE.md);
 - ⏭ targeted tests для privileged routing/validation при следующем package-level refactor.
 
 ### 🚧 Этап F2 — File Storage / NAS
 
-Текущий следующий подэтап:
+Первый вертикальный срез готов:
 
-1. определить модель storage spaces/pools;
-2. определить private home каждого пользователя;
-3. определить shared/common folders;
-4. связать доступ с user IDs и resource-scoped permissions;
-5. затем добавить файловое API/Web file manager и сетевые протоколы.
+1. ✅ модель logical storage pools;
+2. ✅ private/shared folder resources;
+3. ✅ stable folder IDs и внутренние relative paths;
+4. ✅ `files.read/files.write/files.manage`;
+5. ✅ scoped grants на конкретную папку;
+6. ✅ private folder → выбранный пользователь;
+7. ✅ shared folder → роль `member`;
+8. ✅ API list/create pools и folders;
+9. ✅ Web-раздел **Файлы** с фильтрацией по effective permissions;
+10. ✅ ADR-0016 и тесты.
+
+Следующий подэтап:
+
+1. связать pool root с реально смонтированной data filesystem;
+2. безопасно создавать физические каталоги;
+3. добавить browse/list/upload/download/create-dir/delete/move API;
+4. затем Web file manager;
+5. после этого SMB и Windows file-copy client.
 
 ## 4. Следующие продуктовые этапы
 
@@ -200,9 +214,10 @@ Check
 
 Нужно:
 
-- storage pools/volumes;
-- private folders каждого пользователя;
-- shared/common folders;
+- ✅ logical storage pools/volumes metadata;
+- ✅ private folders каждого пользователя;
+- ✅ shared/common folders;
+- 🚧 physical directory provisioning + filesystem validation;
 - Web file manager;
 - SMB;
 - NFS при необходимости;
@@ -426,7 +441,9 @@ AI не может расширять собственные права.
 | `0.1.61-dev` | UI | branding + обновлённый экран авторизации |
 | `0.1.62-dev` | UI | упрощён интерфейс статуса обновлений |
 | `0.1.63-dev` | ✅ установлена для проверки | Network Management v2; на сервере определён backend ifupdown |
-| `0.1.64-dev` | 🧪 опубликована | Network Management v3: safe ifupdown profiles/ownership; ожидает живую проверку |
+| `0.1.64-dev` | Network Management v3 | safe ifupdown profiles/ownership |
+| `0.1.65-dev` | Network UI | показывает фактический DHCP IPv4 |
+| `0.1.66-dev` | Network hotfix | network inventory без AF_NETLINK; исправлена пустая таблица интерфейсов |
 
 ## 10. Правило ведения карты
 
