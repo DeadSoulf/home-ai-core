@@ -70,7 +70,7 @@ func (s *server) storageOperation(
 		"block_device",
 		input.Device,
 		"success",
-		map[string]any{"mountpoint": input.Mountpoint, "filesystem": input.Filesystem, "size_mib": input.SizeMiB},
+		map[string]any{"mountpoint": input.Mountpoint, "filesystem": input.Filesystem, "label": input.Label, "size_mib": input.SizeMiB},
 	)
 	writeJSON(w, http.StatusOK, map[string]any{"message": message})
 }
