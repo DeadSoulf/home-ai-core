@@ -45,7 +45,7 @@ export function SystemPage({revision}: {revision: number}) {
     setCheckingUpdate(true);
     setUpdateError("");
     try {
-      const result = await api.updateStatus();
+      const result = await api.updateStatus(true);
       setUpdateInfo(result);
       window.dispatchEvent(new CustomEvent<string | undefined>(
         "home-ai-core:update-status",
@@ -54,7 +54,11 @@ export function SystemPage({revision}: {revision: number}) {
       setUpdaterState(await api.updaterState());
       setLastChecked(new Date().toISOString());
     } catch (reason) {
-      setUpdateError(reason instanceof Error ? reason.message : t("requestFailed"));
+      if (reason instanceof APIError && reason.code === "update_check_failed") {
+        setUpdateError(t("updateCheckUnavailable"));
+      } else {
+        setUpdateError(reason instanceof Error ? reason.message : t("requestFailed"));
+      }
     } finally {
       setCheckingUpdate(false);
     }
@@ -237,7 +241,8 @@ export function SystemPage({revision}: {revision: number}) {
           {updateInfo?.helper_compatible && (
             <div className="notice">{t("helperReady")}: {updateInfo.helper_version || "—"} · protocol {updateInfo.helper_protocol || "—"}</div>
           )}
-          {updaterState && updaterState.phase !== "idle" && updaterState.phase !== "succeeded" && (
+          {updaterState &&
+            !["idle", "succeeded", "available", "checking"].includes(updaterState.phase) && (
             <div className="notice">
               <div><strong>{updaterState.message || updaterState.phase}</strong></div>
               <div className="progress"><span style={{width: `${Math.min(100, updaterState.progress_percent || 0)}%`}} /></div>
