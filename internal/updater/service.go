@@ -454,8 +454,16 @@ func extractAndVerifyBundle(archivePath, targetDir, version, architecture string
 			return fmt.Errorf("read update archive: %w", err)
 		}
 
+		rawName := filepath.ToSlash(header.Name)
 		name := filepath.ToSlash(filepath.Clean(header.Name))
-		if name == "." || strings.HasPrefix(name, "../") || strings.HasPrefix(name, "/") || name != header.Name {
+		if name == "." || strings.HasPrefix(name, "../") || strings.HasPrefix(rawName, "/") {
+			return errors.New("update archive contains unsafe path")
+		}
+		if header.Typeflag == tar.TypeDir {
+			if rawName != name && rawName != name+"/" {
+				return errors.New("update archive contains unsafe path")
+			}
+		} else if rawName != name {
 			return errors.New("update archive contains unsafe path")
 		}
 		target := filepath.Join(targetDir, filepath.FromSlash(name))
