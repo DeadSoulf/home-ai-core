@@ -183,6 +183,22 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		return
 	}
 
+	if request.Operation == "network.profile.inspect" {
+		_ = conn.SetDeadline(time.Now().Add(45 * time.Second))
+		ctx, cancel := context.WithTimeout(parent, 40*time.Second)
+		defer cancel()
+		backend, profiles := inspectNetworkProfiles(ctx)
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+			OK:              true,
+			Message:         "network profiles inspected",
+			HelperVersion:   updaterhelper.HelperVersion,
+			ProtocolVersion: updaterhelper.ProtocolVersion,
+			NetworkBackend:  backend,
+			NetworkProfiles: profiles,
+		})
+		return
+	}
+
 	if request.Operation == "wireguard.inspect" {
 		_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
 		ctx, cancel := context.WithTimeout(parent, 25*time.Second)
