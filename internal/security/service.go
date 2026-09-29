@@ -16,6 +16,7 @@ var (
 	ErrInvalidBootstrapToken = errors.New("invalid bootstrap token")
 	ErrAlreadyInitialized    = errors.New("security already initialized")
 	ErrUnauthorized          = errors.New("authentication required")
+	ErrUserExists            = errors.New("user already exists")
 )
 
 const sessionLifetime = 24 * time.Hour
@@ -24,6 +25,16 @@ type RequestContext struct {
 	RequestID     string
 	CorrelationID string
 	RemoteAddr    string
+}
+
+type User struct {
+	ID          string     `json:"id"`
+	Username    string     `json:"username"`
+	DisplayName string     `json:"display_name"`
+	Disabled    bool       `json:"disabled"`
+	CreatedAt   time.Time  `json:"created_at"`
+	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
+	Roles       []string   `json:"roles"`
 }
 
 type PermissionScope struct {
@@ -196,6 +207,86 @@ func (s *Service) Bootstrap(
 	s.audit(ctx, meta, Actor{Type: "user", ID: user.ID, Username: user.Username},
 		"security.bootstrap", "user", user.ID, "success", nil)
 	return result, nil
+}
+
+func (s *Service) CreateUser(
+	ctx context.Context,
+	actor Actor,
+	username, displayName, password string,
+	meta RequestContext,
+) (User, error) {
+	username, err := NormalizeUsername(username)
+	if err != nil {
+		return User{}, err
+	}
+	displayName, err = NormalizeDisplayName(displayName, username)
+	if err != nil {
+		return User{}, err
+	}
+	passwordHash, err := HashPassword(password)
+	if err != nil {
+		return User{}, err
+	}
+	userID, err := newID("usr_")
+	if err != nil {
+		return User{}, err
+	}
+
+	record, err := s.store.CreateUser(
+		ctx,
+		userID,
+		username,
+		displayName,
+		passwordHash,
+		"role_member",
+		s.now().UTC(),
+	)
+	if errors.Is(err, state.ErrUserExists) {
+		return User{}, ErrUserExists
+	}
+	if err != nil {
+		return User{}, err
+	}
+
+	user := userFromRecord(state.UserAccountRecord{
+		User:  record,
+		Roles: []string{"member"},
+	})
+	s.audit(
+		ctx,
+		meta,
+		actor,
+		"security.user.create",
+		"user",
+		user.ID,
+		"success",
+		map[string]any{"username": user.Username, "roles": user.Roles},
+	)
+	return user, nil
+}
+
+func (s *Service) ListUsers(ctx context.Context) ([]User, error) {
+	records, err := s.store.ListUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	users := make([]User, 0, len(records))
+	for _, record := range records {
+		users = append(users, userFromRecord(record))
+	}
+	return users, nil
+}
+
+func userFromRecord(record state.UserAccountRecord) User {
+	return User{
+		ID:          record.User.ID,
+		Username:    record.User.Username,
+		DisplayName: record.User.DisplayName,
+		Disabled:    record.User.Disabled,
+		CreatedAt:   record.User.CreatedAt,
+		LastLoginAt: record.User.LastLoginAt,
+		Roles:       record.Roles,
+	}
 }
 
 func (s *Service) Login(

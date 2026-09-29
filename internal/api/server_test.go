@@ -66,6 +66,8 @@ func defaultFakeSecurity() fakeSecurity {
 				"events.read",
 				"security.self.read",
 				"security.sessions.manage",
+				"security.users.read",
+				"security.users.manage",
 				"audit.read",
 				"modules.read",
 				"updates.read",
@@ -108,6 +110,33 @@ func (f fakeSecurity) Authenticate(context.Context, string) (security.Actor, err
 
 func (f fakeSecurity) Logout(context.Context, security.Actor, security.RequestContext) error {
 	return nil
+}
+
+func (f fakeSecurity) CreateUser(
+	context.Context,
+	security.Actor,
+	string,
+	string,
+	string,
+	security.RequestContext,
+) (security.User, error) {
+	return security.User{
+		ID:          "usr-member",
+		Username:    "member",
+		DisplayName: "Member",
+		Roles:       []string{"member"},
+	}, nil
+}
+
+func (f fakeSecurity) ListUsers(context.Context) ([]security.User, error) {
+	return []security.User{
+		{
+			ID:          "usr-test",
+			Username:    "owner",
+			DisplayName: "Owner",
+			Roles:       []string{"owner"},
+		},
+	}, nil
 }
 
 func (f fakeSecurity) ListAudit(context.Context, int) ([]security.AuditEntry, error) {
@@ -517,5 +546,60 @@ func TestModulesAPI(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("capabilities status = %d", rec.Code)
+	}
+}
+
+func TestUsersListRequiresPermission(t *testing.T) {
+	sec := defaultFakeSecurity()
+	sec.actor.Permissions = []string{"security.self.read"}
+	handler := testHandlerWithSecurity(fakeState{}, sec)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/security/users", nil)
+	req.Header.Set("Authorization", "Bearer test")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
+func TestUsersList(t *testing.T) {
+	handler := testHandler(fakeState{})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/security/users", nil)
+	req.Header.Set("Authorization", "Bearer test")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	var body struct {
+		Users []security.User `json:"users"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Users) != 1 || body.Users[0].Username != "owner" {
+		t.Fatalf("unexpected users: %#v", body.Users)
+	}
+}
+
+func TestCreateUserWithBearerSession(t *testing.T) {
+	handler := testHandler(fakeState{})
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/security/users",
+		strings.NewReader(`{"username":"member","display_name":"Member","password":"correct horse battery staple"}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusCreated, rec.Body.String())
 	}
 }
