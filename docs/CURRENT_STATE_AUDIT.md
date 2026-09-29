@@ -37,7 +37,7 @@ Core Foundation
 | SQLite state + migrations | KEEP | Local durable control metadata and safe upgrades |
 | Stable node identity | KEEP | Direct foundation for future cluster membership/resource ownership |
 | Authentication / sessions | KEEP | Multi-user Home-AI requires identity |
-| RBAC / permissions | KEEP + EXTEND | Needed for users, rooms, devices, files, cameras and AI tool access |
+| RBAC / permissions | KEEP + EXTEND | Global RBAC plus resource-scoped grant foundation now exists for users, rooms, devices, files, cameras and AI tool access |
 | CSRF and Web security | KEEP | Required for privileged local administration |
 | Audit log | KEEP | Essential for AI actions, security, storage and automation changes |
 | Persistent Jobs | KEEP | Needed for file operations, NVR maintenance, model downloads, backups and distributed workloads |
@@ -248,7 +248,7 @@ Still required:
 
 1. Split `cmd/home-ai-core-updater/main.go` into routing, update and storage implementation packages.
 2. Perform a real rollback acceptance test after the successful `0.1.58-dev` Web update.
-3. Extend permission concepts from generic capabilities toward resource/zone/folder/camera scopes.
+3. Resource-scoped grants are implemented; add management API/UI and domain-aware hierarchy when NAS/Smart Home resources exist.
 4. Define event-retention boundaries before Smart Home and NVR create high event volume.
 5. Keep cluster-critical state abstract enough that single-node SQLite assumptions do not leak into future APIs.
 6. Define a signed stable release channel before commercial/stable deployment.

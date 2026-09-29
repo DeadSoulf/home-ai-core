@@ -58,7 +58,7 @@ Home-AI должен стать полностью автономной лока
 | Core API | ✅ | Go REST API и health | единый API для Web, AI, voice, clients и cluster |
 | State / migrations | ✅ | SQLite + forward migrations | локальное control-plane состояние |
 | Node identity | ✅ | стабильный ID узла | основа будущего cluster enrollment |
-| Security / Auth | ✅ | owner bootstrap, sessions, RBAC, CSRF | пользователи и политика доступа |
+| Security / Auth | ✅ | owner bootstrap, sessions, RBAC, CSRF, resource-scoped grants | пользователи, комнаты, устройства, камеры, папки и AI policy |
 | Audit | ✅ | аудит действий | критично для AI и опасных операций |
 | Jobs | ✅ | persistent job engine | долгие операции, модели, storage, NVR, cluster |
 | Events | ✅ | durable events | Smart Home/NVR/cluster domain events |
@@ -113,13 +113,23 @@ Check
 2. ✅ Внешний protocol/socket не изменён.
 3. ✅ Полный `core-ci` после extraction refactor прошёл успешно.
 
+Готово дополнительно:
+
+4. ✅ Добавлен фундамент resource-scoped permissions:
+   - глобальные permissions сохранены;
+   - scoped grants для ролей;
+   - scoped grants для отдельных пользователей;
+   - `Actor.Allows(permission, resource_type, resource_id)`;
+   - миграция `009_resource_permissions.sql`;
+   - ADR-0014;
+   - тесты и полный CI.
+
 Осталось:
 
-4. 🧪 Реально проверить rollback и повторное обновление.
-5. 🚧 Расширить permission model в сторону будущих resource scopes.
+5. 🧪 Реально проверить rollback и повторное обновление на установленном сервере.
 6. ⏭ Добавить targeted tests для privileged routing/validation по мере следующего package-level refactor.
 
-После этого фундамент считаем достаточно устойчивым для продуктовых модулей.
+Пока rollback ждёт практической проверки на сервере, можно начинать проектирование F2 — File Storage / NAS.
 
 ## 4. Следующие продуктовые этапы
 
@@ -331,7 +341,7 @@ AI не может расширять собственные права.
 |---|---|
 | updater helper раньше был монолитным | ✅ первый extraction refactor выполнен; package-level split можно сделать позже |
 | rollback не проверен живым циклом | acceptance test |
-| RBAC пока недостаточно resource-aware | добавить scopes до Smart Home/NAS |
+| resource scopes заложены, но UI/API управления grants ещё нет | добавить управление ролями/scopes вместе с NAS/Smart Home |
 | durable events не подходят для media/high-rate telemetry | оставить media отдельным data plane |
 | SQLite single-node | не превращать локальную схему в неявный cluster contract |
 | cluster leadership не определён | сохранить abstraction, решить позже |
