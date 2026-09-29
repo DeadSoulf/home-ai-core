@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -537,6 +538,201 @@ func (s *server) fileFolderTrashPurge(
 		"files.trash.purged",
 		map[string]any{"folder_id": folder.ID, "trash_id": trashID},
 		requestIDFromContext(r.Context()),
+	)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+const maxResumableChunkBytes int64 = 8 << 20
+
+func (s *server) fileUploadStart(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	folder, root, ok := s.authorizedFileFolder(w, r, actor, true)
+	if !ok {
+		return
+	}
+	var input struct {
+		Path   string `json:"path"`
+		Size   int64  `json:"size_bytes"`
+		SHA256 string `json:"sha256,omitempty"`
+	}
+	if err := decodeJSON(w, r, &input); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_upload_session", err.Error(), nil)
+		return
+	}
+	session, err := filedata.StartUpload(
+		root,
+		strings.TrimSpace(input.Path),
+		input.Size,
+		strings.TrimSpace(input.SHA256),
+		time.Now().UTC(),
+	)
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "upload_session_create_failed", err.Error(), nil)
+		return
+	}
+	s.security.RecordAudit(
+		r.Context(),
+		s.securityRequestContext(r),
+		actor,
+		"files.upload.start",
+		"file_folder",
+		folder.ID,
+		"success",
+		map[string]any{
+			"upload_id":  session.ID,
+			"path":       session.TargetPath,
+			"size_bytes": session.SizeBytes,
+			"sha256":     session.ExpectedSHA256,
+		},
+	)
+	writeJSON(w, http.StatusCreated, map[string]any{"upload": session})
+}
+
+func (s *server) fileUploadStatus(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	_ authSource,
+) {
+	_, root, ok := s.authorizedFileFolder(w, r, actor, true)
+	if !ok {
+		return
+	}
+	session, err := filedata.GetUpload(root, strings.TrimSpace(r.PathValue("uploadID")))
+	if err != nil {
+		writeAPIError(w, r, http.StatusNotFound, "upload_session_not_found", err.Error(), nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"upload": session})
+}
+
+func (s *server) fileUploadChunk(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	_, root, ok := s.authorizedFileFolder(w, r, actor, true)
+	if !ok {
+		return
+	}
+	offset, err := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("offset")), 10, 64)
+	if err != nil || offset < 0 {
+		writeAPIError(w, r, http.StatusBadRequest, "upload_offset_invalid", "valid non-negative chunk offset is required", nil)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxResumableChunkBytes+1)
+	session, written, err := filedata.WriteUploadChunk(
+		root,
+		strings.TrimSpace(r.PathValue("uploadID")),
+		offset,
+		r.Body,
+		maxResumableChunkBytes,
+		time.Now().UTC(),
+	)
+	if err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeAPIError(w, r, http.StatusRequestEntityTooLarge, "upload_chunk_too_large", "upload chunk exceeds 8 MiB", nil)
+			return
+		}
+		writeAPIError(w, r, http.StatusBadRequest, "upload_chunk_failed", err.Error(), nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"upload":        session,
+		"written_bytes": written,
+	})
+}
+
+func (s *server) fileUploadComplete(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	folder, root, ok := s.authorizedFileFolder(w, r, actor, true)
+	if !ok {
+		return
+	}
+	uploadID := strings.TrimSpace(r.PathValue("uploadID"))
+	result, err := filedata.CompleteUpload(root, uploadID)
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "upload_complete_failed", err.Error(), nil)
+		return
+	}
+	s.security.RecordAudit(
+		r.Context(),
+		s.securityRequestContext(r),
+		actor,
+		"files.upload.complete",
+		"file_folder",
+		folder.ID,
+		"success",
+		map[string]any{
+			"upload_id":  uploadID,
+			"path":       result.Path,
+			"size_bytes": result.Size,
+			"sha256":     result.SHA256,
+		},
+	)
+	s.realtime.Publish(
+		"files.file.uploaded",
+		map[string]any{
+			"folder_id":  folder.ID,
+			"path":       result.Path,
+			"size_bytes": result.Size,
+			"sha256":     result.SHA256,
+		},
+		requestIDFromContext(r.Context()),
+	)
+	writeJSON(w, http.StatusOK, map[string]any{"result": result})
+}
+
+func (s *server) fileUploadCancel(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	folder, root, ok := s.authorizedFileFolder(w, r, actor, true)
+	if !ok {
+		return
+	}
+	uploadID := strings.TrimSpace(r.PathValue("uploadID"))
+	if err := filedata.CancelUpload(root, uploadID); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "upload_cancel_failed", err.Error(), nil)
+		return
+	}
+	s.security.RecordAudit(
+		r.Context(),
+		s.securityRequestContext(r),
+		actor,
+		"files.upload.cancel",
+		"file_folder",
+		folder.ID,
+		"success",
+		map[string]any{"upload_id": uploadID},
 	)
 	w.WriteHeader(http.StatusNoContent)
 }
