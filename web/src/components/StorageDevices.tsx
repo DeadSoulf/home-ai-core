@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { api } from "../api/client";
 import type { BlockNode } from "../api/types";
 import { useI18n } from "../i18n";
@@ -134,8 +134,8 @@ export function StorageDevices({
                 !node.system;
 
               return (
-                <>
-                  <tr key={`${node.path || node.name}-${index}`} className={node.system ? "storage-system-row" : ""}>
+                <Fragment key={`${node.path || node.name}-${index}`}>
+                  <tr className={node.system ? "storage-system-row" : ""}>
                     <td>
                       <div
                         className="storage-tree-name"
@@ -244,7 +244,7 @@ export function StorageDevices({
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               );
             })}
           </tbody>
