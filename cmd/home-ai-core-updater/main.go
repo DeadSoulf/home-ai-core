@@ -1192,6 +1192,13 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 			return "", fmt.Errorf("rename filesystem: %s", strings.TrimSpace(string(output)))
 		}
 		_ = exec.CommandContext(ctx, "/usr/bin/udevadm", "settle").Run()
+		labelOutput, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-ndo", "LABEL", device).CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("verify filesystem label: %s", strings.TrimSpace(string(labelOutput)))
+		}
+		if strings.TrimSpace(string(labelOutput)) != label {
+			return "", fmt.Errorf("filesystem label verification failed")
+		}
 		return "filesystem renamed", nil
 
 	case "storage.format":
