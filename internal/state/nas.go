@@ -238,6 +238,44 @@ func (s *Store) CreateNASFolder(
 	}, nil
 }
 
+
+func (s *Store) NASFolder(ctx context.Context, folderID string) (NASFolderRecord, error) {
+	var record NASFolderRecord
+	var createdAt, updatedAt string
+	err := s.db.QueryRowContext(ctx, `
+		SELECT f.id, f.pool_id, p.name, p.root_path, f.name, f.kind,
+		       COALESCE(f.owner_user_id, ''), f.relative_path,
+		       COALESCE(f.created_by, ''), f.created_at, f.updated_at
+		FROM nas_folders f
+		JOIN nas_pools p ON p.id = f.pool_id
+		WHERE f.id = ?
+	`, folderID).Scan(
+		&record.ID,
+		&record.PoolID,
+		&record.PoolName,
+		&record.PoolRoot,
+		&record.Name,
+		&record.Kind,
+		&record.OwnerUserID,
+		&record.RelativePath,
+		&record.CreatedBy,
+		&createdAt,
+		&updatedAt,
+	)
+	if err != nil {
+		return NASFolderRecord{}, err
+	}
+	record.CreatedAt, err = time.Parse(time.RFC3339Nano, createdAt)
+	if err != nil {
+		return NASFolderRecord{}, fmt.Errorf("parse NAS folder created_at: %w", err)
+	}
+	record.UpdatedAt, err = time.Parse(time.RFC3339Nano, updatedAt)
+	if err != nil {
+		return NASFolderRecord{}, fmt.Errorf("parse NAS folder updated_at: %w", err)
+	}
+	return record, nil
+}
+
 func (s *Store) ListNASFolders(ctx context.Context) ([]NASFolderRecord, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT f.id, f.pool_id, p.name, p.root_path, f.name, f.kind,
