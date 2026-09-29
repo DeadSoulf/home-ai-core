@@ -175,6 +175,11 @@ export const api = {
     return result.state;
   },
 
+  rollbackUpdate: async () => {
+    const result = await postJSON<{state: UpdaterState}>("/api/v1/update/rollback", undefined, true);
+    return result.state;
+  },
+
   modules: async () => {
     const result = await request<{modules: RegisteredModule[]}>("/api/v1/modules");
     return result.modules;
