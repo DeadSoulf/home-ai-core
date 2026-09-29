@@ -135,7 +135,6 @@ func (s *server) updateInstall(
 	}
 }
 
-
 func (s *server) updateRollback(
 	w http.ResponseWriter,
 	r *http.Request,
