@@ -136,3 +136,24 @@ func TestModuleRegistrationPreservesStatus(t *testing.T) {
 		t.Fatalf("version = %q, want 1.1.0", record.Version)
 	}
 }
+
+
+func TestDiskNamesPersist(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer store.Close()
+
+	if err := store.SetDiskName(ctx, "serial:test-disk-1", "Архив"); err != nil {
+		t.Fatalf("SetDiskName() error = %v", err)
+	}
+	names, err := store.DiskNames(ctx)
+	if err != nil {
+		t.Fatalf("DiskNames() error = %v", err)
+	}
+	if names["serial:test-disk-1"] != "Архив" {
+		t.Fatalf("disk name = %q", names["serial:test-disk-1"])
+	}
+}
