@@ -22,4 +22,5 @@ type State interface {
 		now time.Time,
 	) (state.NASFolderRecord, error)
 	ListNASFolders(ctx context.Context) ([]state.NASFolderRecord, error)
+	DeleteNASFolder(ctx context.Context, folderID string) error
 }
