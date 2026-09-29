@@ -30,6 +30,8 @@ type Request struct {
 	Keepalive       int      `json:"keepalive,omitempty"`
 	NetworkMethod   string   `json:"network_method,omitempty"`
 	DNS             []string `json:"dns,omitempty"`
+	RootPath        string   `json:"root_path,omitempty"`
+	RelativePath    string   `json:"relative_path,omitempty"`
 }
 
 type FilesystemStat struct {

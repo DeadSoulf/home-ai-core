@@ -91,6 +91,10 @@ func (f fakeState) ListNASFolders(context.Context) ([]state.NASFolderRecord, err
 	return f.nasFolders, nil
 }
 
+func (f fakeState) DeleteNASFolder(context.Context, string) error {
+	return nil
+}
+
 type fakeSecurity struct {
 	initialized bool
 	actor       security.Actor
@@ -724,7 +728,20 @@ func TestFilePoolCreateRequiresManage(t *testing.T) {
 	}
 }
 
+func stubNASProvisioning(t *testing.T) {
+	t.Helper()
+	originalPool := prepareFilePool
+	originalFolder := prepareFileFolder
+	prepareFilePool = func(context.Context, string) error { return nil }
+	prepareFileFolder = func(context.Context, string, string) error { return nil }
+	t.Cleanup(func() {
+		prepareFilePool = originalPool
+		prepareFileFolder = originalFolder
+	})
+}
+
 func TestFilePoolCreate(t *testing.T) {
+	stubNASProvisioning(t)
 	handler := testHandler(fakeState{})
 
 	req := httptest.NewRequest(
@@ -743,6 +760,7 @@ func TestFilePoolCreate(t *testing.T) {
 }
 
 func TestSharedFileFolderCreate(t *testing.T) {
+	stubNASProvisioning(t)
 	handler := testHandler(fakeState{})
 
 	req := httptest.NewRequest(
