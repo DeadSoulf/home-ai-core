@@ -371,23 +371,24 @@ func (s *server) fileFolderEntry(
 		writeAPIError(w, r, http.StatusBadRequest, "file_path_required", "file path is required", nil)
 		return
 	}
-	if err := filedata.Delete(root, relative); err != nil {
-		writeAPIError(w, r, http.StatusBadRequest, "file_delete_failed", err.Error(), nil)
+	entry, err := filedata.Trash(root, relative, time.Now().UTC())
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "file_trash_failed", err.Error(), nil)
 		return
 	}
 	s.security.RecordAudit(
 		r.Context(),
 		s.securityRequestContext(r),
 		actor,
-		"files.entry.delete",
+		"files.entry.trash",
 		"file_folder",
 		folder.ID,
 		"success",
-		map[string]any{"path": relative},
+		map[string]any{"path": relative, "trash_id": entry.ID},
 	)
 	s.realtime.Publish(
-		"files.entry.deleted",
-		map[string]any{"folder_id": folder.ID, "path": relative},
+		"files.entry.trashed",
+		map[string]any{"folder_id": folder.ID, "path": relative, "trash_id": entry.ID},
 		requestIDFromContext(r.Context()),
 	)
 	w.WriteHeader(http.StatusNoContent)
@@ -444,6 +445,100 @@ func (s *server) fileFolderMove(
 		requestIDFromContext(r.Context()),
 	)
 	writeJSON(w, http.StatusOK, map[string]any{"path": input.ToPath})
+}
+
+func (s *server) fileFolderTrash(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	_ authSource,
+) {
+	_, root, ok := s.authorizedFileFolder(w, r, actor, false)
+	if !ok {
+		return
+	}
+	entries, err := filedata.ListTrash(root)
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadGateway, "file_trash_unavailable", err.Error(), nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"trash": entries})
+}
+
+func (s *server) fileFolderTrashRestore(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	folder, root, ok := s.authorizedFileFolder(w, r, actor, true)
+	if !ok {
+		return
+	}
+	trashID := strings.TrimSpace(r.PathValue("trashID"))
+	entry, err := filedata.RestoreTrash(root, trashID)
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "file_restore_failed", err.Error(), nil)
+		return
+	}
+	s.security.RecordAudit(
+		r.Context(),
+		s.securityRequestContext(r),
+		actor,
+		"files.trash.restore",
+		"file_folder",
+		folder.ID,
+		"success",
+		map[string]any{"trash_id": trashID, "path": entry.OriginalPath},
+	)
+	s.realtime.Publish(
+		"files.trash.restored",
+		map[string]any{"folder_id": folder.ID, "trash_id": trashID, "path": entry.OriginalPath},
+		requestIDFromContext(r.Context()),
+	)
+	writeJSON(w, http.StatusOK, map[string]any{"path": entry.OriginalPath})
+}
+
+func (s *server) fileFolderTrashPurge(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	folder, root, ok := s.authorizedFileFolder(w, r, actor, true)
+	if !ok {
+		return
+	}
+	trashID := strings.TrimSpace(r.PathValue("trashID"))
+	entry, err := filedata.PurgeTrash(root, trashID)
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "file_trash_purge_failed", err.Error(), nil)
+		return
+	}
+	s.security.RecordAudit(
+		r.Context(),
+		s.securityRequestContext(r),
+		actor,
+		"files.trash.purge",
+		"file_folder",
+		folder.ID,
+		"success",
+		map[string]any{"trash_id": trashID, "path": entry.OriginalPath},
+	)
+	s.realtime.Publish(
+		"files.trash.purged",
+		map[string]any{"folder_id": folder.ID, "trash_id": trashID},
+		requestIDFromContext(r.Context()),
+	)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *server) authorizedFileFolder(

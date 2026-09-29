@@ -67,16 +67,29 @@ The file data API supports:
 - create directory;
 - upload/replace a regular file;
 - download a regular file;
-- delete a regular file or empty directory;
-- move/rename an entry inside the same logical folder.
+- move/rename an entry inside the same logical folder;
+- move files or whole directories into a per-folder recycle bin;
+- list recycle-bin entries;
+- restore a recycle-bin entry to its original path;
+- explicitly purge a recycle-bin entry permanently.
 
 Move/rename never overwrites an existing target.
 
-Directory deletion is deliberately non-recursive. A non-empty directory must be emptied first.
+Normal Delete is non-destructive: it moves the selected file or entire directory tree into an internal recycle bin inside the same logical-folder filesystem.
 
-Moving a directory into itself or one of its descendants is rejected.
+The recycle bin lives under `.home-ai-trash/` inside the logical folder. That path is reserved and hidden from normal browse/upload/move APIs.
 
-Delete and move operations require scoped `files.write` (or global `files.manage`) and are recorded in Audit.
+Trash metadata records the original path, type, size and deletion time. It is stored alongside the trash data on the filesystem, not in SQLite.
+
+Restore never overwrites an existing object at the original path. If the original parent directory no longer exists, restore fails until the user recreates the parent.
+
+Permanent purge is a separate explicit operation and may recursively remove a trashed directory tree.
+
+There is no automatic retention or scheduled purge yet.
+
+Moving a normal directory into itself or one of its descendants is rejected.
+
+Trash, restore, purge and move operations require scoped `files.write` (or global `files.manage`) and are recorded in Audit.
 
 ## Consequences
 
@@ -92,7 +105,7 @@ Delete and move operations require scoped `files.write` (or global `files.manage
 - overwrite-on-move;
 - cross-logical-folder move;
 - recursive operations;
-- trash/recycle bin;
+- automatic trash retention/purge policy;
 - resumable/chunked uploads;
 - quotas;
 - checksums;

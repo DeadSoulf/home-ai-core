@@ -17,6 +17,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 
+	"github.com/DeadSoulf/home-ai-core/internal/filedata"
 	"github.com/DeadSoulf/home-ai-core/internal/modules"
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
@@ -975,7 +976,159 @@ func TestFileMoveAndDelete(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer test")
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("non-empty directory delete status = %d, want %d", rec.Code, http.StatusBadRequest)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("non-empty directory trash status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+	if _, err := os.Stat(filepath.Join(folderRoot, "docs")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("trashed directory still exists: %v", err)
+	}
+}
+
+func TestFileTrashRestoreAndPurgeAPI(t *testing.T) {
+	poolRoot := t.TempDir()
+	folderRoot := filepath.Join(poolRoot, ".home-ai", "shared", "nsf-visible")
+	if err := os.MkdirAll(folderRoot, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(folderRoot, "trash-me.txt"), []byte("trash"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+
+	sec := defaultFakeSecurity()
+	sec.actor.Permissions = []string{"security.self.read"}
+	sec.actor.ResourcePermissions = []security.PermissionScope{
+		{Permission: "files.read", ResourceType: "file_folder", ResourceID: "nsf-visible"},
+		{Permission: "files.write", ResourceType: "file_folder", ResourceID: "nsf-visible"},
+	}
+	handler := testHandlerWithSecurity(fakeState{
+		nasFolders: []state.NASFolderRecord{{
+			ID:           "nsf-visible",
+			PoolID:       "nsp-main",
+			PoolName:     "Main",
+			PoolRoot:     poolRoot,
+			Name:         "Family",
+			Kind:         "shared",
+			RelativePath: "shared/nsf-visible",
+		}},
+	}, sec)
+
+	req := httptest.NewRequest(
+		http.MethodDelete,
+		"/api/v1/files/folders/nsf-visible/entry?path=trash-me.txt",
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("trash status = %d: %s", rec.Code, rec.Body.String())
+	}
+	if _, err := os.Stat(filepath.Join(folderRoot, "trash-me.txt")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("source still exists after trash: %v", err)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/files/folders/nsf-visible/trash", nil)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("trash list status = %d: %s", rec.Code, rec.Body.String())
+	}
+	var listed struct {
+		Trash []filedata.TrashEntry `json:"trash"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &listed); err != nil {
+		t.Fatalf("decode trash list: %v", err)
+	}
+	if len(listed.Trash) != 1 || listed.Trash[0].OriginalPath != "trash-me.txt" {
+		t.Fatalf("unexpected trash list: %#v", listed.Trash)
+	}
+	trashID := listed.Trash[0].ID
+
+	req = httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/files/folders/nsf-visible/trash/"+trashID+"/restore",
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("restore status = %d: %s", rec.Code, rec.Body.String())
+	}
+	if data, err := os.ReadFile(filepath.Join(folderRoot, "trash-me.txt")); err != nil || string(data) != "trash" {
+		t.Fatalf("restored data = %q err=%v", data, err)
+	}
+
+	req = httptest.NewRequest(
+		http.MethodDelete,
+		"/api/v1/files/folders/nsf-visible/entry?path=trash-me.txt",
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("second trash status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/files/folders/nsf-visible/trash", nil)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if err := json.Unmarshal(rec.Body.Bytes(), &listed); err != nil {
+		t.Fatalf("decode second trash list: %v", err)
+	}
+	if len(listed.Trash) != 1 {
+		t.Fatalf("trash count = %d, want 1", len(listed.Trash))
+	}
+
+	req = httptest.NewRequest(
+		http.MethodDelete,
+		"/api/v1/files/folders/nsf-visible/trash/"+listed.Trash[0].ID,
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("purge status = %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestFileTrashMutationsRequireWriteScope(t *testing.T) {
+	poolRoot := t.TempDir()
+	folderRoot := filepath.Join(poolRoot, ".home-ai", "shared", "nsf-visible")
+	if err := os.MkdirAll(folderRoot, 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	sec := defaultFakeSecurity()
+	sec.actor.Permissions = []string{"security.self.read"}
+	sec.actor.ResourcePermissions = []security.PermissionScope{
+		{Permission: "files.read", ResourceType: "file_folder", ResourceID: "nsf-visible"},
+	}
+	handler := testHandlerWithSecurity(fakeState{
+		nasFolders: []state.NASFolderRecord{{
+			ID:           "nsf-visible",
+			PoolID:       "nsp-main",
+			PoolName:     "Main",
+			PoolRoot:     poolRoot,
+			Name:         "Family",
+			Kind:         "shared",
+			RelativePath: "shared/nsf-visible",
+		}},
+	}, sec)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/files/folders/nsf-visible/trash/0123456789abcdef0123456789abcdef/restore",
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("restore without write scope status = %d, want %d", rec.Code, http.StatusForbidden)
 	}
 }

@@ -13,6 +13,7 @@ import type {
   NetworkProfileStatus,
   FileEntry,
   FileFolder,
+  FileTrashEntry,
   FilePool,
   WireGuardStatus,
 } from "./types";
@@ -259,6 +260,29 @@ export const api = {
       `/api/v1/files/folders/${encodeURIComponent(folderId)}/move`,
       {from_path: fromPath, to_path: toPath},
       true,
+    );
+  },
+
+  fileTrash: async (folderId: string) => {
+    const result = await request<{trash: FileTrashEntry[]}>(`/api/v1/files/folders/${encodeURIComponent(folderId)}/trash`);
+    return result.trash;
+  },
+
+  restoreFileTrash: async (folderId: string, trashId: string) => {
+    return postJSON<{path: string}>(
+      `/api/v1/files/folders/${encodeURIComponent(folderId)}/trash/${encodeURIComponent(trashId)}/restore`,
+      undefined,
+      true,
+    );
+  },
+
+  purgeFileTrash: async (folderId: string, trashId: string) => {
+    const token = getCSRFToken();
+    const headers = new Headers();
+    if (token) headers.set("X-CSRF-Token", token);
+    return request<void>(
+      `/api/v1/files/folders/${encodeURIComponent(folderId)}/trash/${encodeURIComponent(trashId)}`,
+      {method: "DELETE", headers},
     );
   },
 

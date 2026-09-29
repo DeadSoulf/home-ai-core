@@ -7,7 +7,7 @@ import { useI18n } from "../i18n";
 import { PageHeading } from "./Dashboard";
 
 export function FilesPage({revision, canManage}: {revision: number; canManage: boolean}) {
-  const {t} = useI18n();
+  const {t, date} = useI18n();
   const load = useCallback(async () => {
     const folders = await api.fileFolders();
     if (!canManage) {
@@ -33,6 +33,9 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
   const [entriesLoading, setEntriesLoading] = useState(false);
   const [browserError, setBrowserError] = useState("");
   const [newDirectoryName, setNewDirectoryName] = useState("");
+  const [trashVisible, setTrashVisible] = useState(false);
+  const [trashEntries, setTrashEntries] = useState<Awaited<ReturnType<typeof api.fileTrash>>>([]);
+  const [trashLoading, setTrashLoading] = useState(false);
 
   async function createPool(event: FormEvent) {
     event.preventDefault();
@@ -110,6 +113,8 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
     setSelectedFolderID(folderID);
     setCurrentPath("");
     setEntries([]);
+    setTrashVisible(false);
+    setTrashEntries([]);
     setBrowserError("");
   }
 
@@ -163,6 +168,9 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
     try {
       await api.deleteFileEntry(selectedFolder.id, path);
       await loadEntries(selectedFolder.id, currentPath);
+      if (trashVisible) {
+        await loadTrash(selectedFolder.id);
+      }
     } catch (reason) {
       setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
     } finally {
@@ -179,6 +187,59 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
     try {
       await api.moveFileEntry(selectedFolder.id, path, target);
       await loadEntries(selectedFolder.id, currentPath);
+    } catch (reason) {
+      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function loadTrash(folderID: string) {
+    setTrashLoading(true);
+    setBrowserError("");
+    try {
+      setTrashEntries(await api.fileTrash(folderID));
+    } catch (reason) {
+      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setTrashLoading(false);
+    }
+  }
+
+  async function toggleTrash() {
+    if (!selectedFolder) return;
+    const next = !trashVisible;
+    setTrashVisible(next);
+    if (next) {
+      await loadTrash(selectedFolder.id);
+    }
+  }
+
+  async function restoreTrashEntry(id: string) {
+    if (!selectedFolder?.can_write) return;
+    setBusy("trash-restore");
+    setBrowserError("");
+    try {
+      await api.restoreFileTrash(selectedFolder.id, id);
+      await Promise.all([
+        loadTrash(selectedFolder.id),
+        loadEntries(selectedFolder.id, currentPath),
+      ]);
+    } catch (reason) {
+      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function purgeTrashEntry(id: string, name: string) {
+    if (!selectedFolder?.can_write) return;
+    if (!window.confirm(t("fileTrashPurgeConfirm").replace("{name}", name))) return;
+    setBusy("trash-purge");
+    setBrowserError("");
+    try {
+      await api.purgeFileTrash(selectedFolder.id, id);
+      await loadTrash(selectedFolder.id);
     } catch (reason) {
       setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
     } finally {
@@ -291,6 +352,14 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
             >
               {t("refresh")}
             </button>
+            <button
+              className={`button compact ${trashVisible ? "primary" : "secondary"}`}
+              type="button"
+              disabled={trashLoading}
+              onClick={() => void toggleTrash()}
+            >
+              {t("fileTrash")}
+            </button>
           </div>
 
           {selectedFolder.can_write && (
@@ -399,6 +468,68 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                   )}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {trashVisible && (
+            <div className="file-trash-section">
+              <h3>{t("fileTrash")}</h3>
+              {trashLoading ? (
+                <div className="muted">{t("loading")}</div>
+              ) : (
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>{t("name")}</th>
+                        <th>{t("fileOriginalPath")}</th>
+                        <th>{t("fileEntryType")}</th>
+                        <th>{t("fileSize")}</th>
+                        <th>{t("fileDeletedAt")}</th>
+                        <th>{t("actions")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {trashEntries.map((entry) => (
+                        <tr key={entry.id}>
+                          <td>{entry.name}</td>
+                          <td className="mono">{entry.original_path}</td>
+                          <td>{entry.kind === "directory" ? t("fileDirectory") : t("fileRegularFile")}</td>
+                          <td>{entry.kind === "file" ? formatFileSize(entry.size_bytes || 0) : "—"}</td>
+                          <td>{date(entry.deleted_at)}</td>
+                          <td>
+                            {selectedFolder.can_write && (
+                              <div className="network-actions">
+                                <button
+                                  className="button compact secondary"
+                                  type="button"
+                                  disabled={busy !== ""}
+                                  onClick={() => void restoreTrashEntry(entry.id)}
+                                >
+                                  {t("fileRestore")}
+                                </button>
+                                <button
+                                  className="button compact danger"
+                                  type="button"
+                                  disabled={busy !== ""}
+                                  onClick={() => void purgeTrashEntry(entry.id, entry.name)}
+                                >
+                                  {t("fileDeletePermanently")}
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {trashEntries.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="muted">{t("fileTrashEmpty")}</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </Panel>

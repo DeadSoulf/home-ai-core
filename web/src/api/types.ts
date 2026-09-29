@@ -286,3 +286,12 @@ export type FileEntry = {
   modified_at: string;
 };
 
+export type FileTrashEntry = {
+  id: string;
+  original_path: string;
+  name: string;
+  kind: "file" | "directory";
+  size_bytes?: number;
+  deleted_at: string;
+};
+
