@@ -11,11 +11,14 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
 
 const wireGuardDir = "/etc/wireguard"
+
+var packageInstallMu sync.Mutex
 
 func performNetworkOperation(ctx context.Context, request updaterhelper.Request) (string, error) {
 	switch request.Operation {
@@ -167,13 +170,23 @@ func installWireGuardTools(ctx context.Context) (string, error) {
 	if wireGuardToolsAvailable() {
 		return "WireGuard tools are already installed", nil
 	}
+	if !packageInstallMu.TryLock() {
+		return "", errors.New("package installation is already in progress")
+	}
+	defer packageInstallMu.Unlock()
+
 	apt, err := exec.LookPath("apt-get")
 	if err != nil {
 		return "", errors.New("apt-get is unavailable")
 	}
+	systemdRun, err := exec.LookPath("systemd-run")
+	if err != nil {
+		return "", errors.New("systemd-run is unavailable")
+	}
+
 	for _, args := range [][]string{{"update"}, {"install", "-y", "wireguard-tools"}} {
-		cmd := exec.CommandContext(ctx, apt, args...)
-		cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
+		commandArgs := transientPackageCommand(apt, args...)
+		cmd := exec.CommandContext(ctx, systemdRun, commandArgs...)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			message := strings.TrimSpace(string(output))
@@ -187,6 +200,20 @@ func installWireGuardTools(ctx context.Context) (string, error) {
 		return "", errors.New("wireguard-tools installation completed but wg/wg-quick are unavailable")
 	}
 	return "WireGuard tools installed", nil
+}
+
+func transientPackageCommand(command string, args ...string) []string {
+	result := []string{
+		"--quiet",
+		"--wait",
+		"--pipe",
+		"--collect",
+		"--service-type=exec",
+		"--setenv=DEBIAN_FRONTEND=noninteractive",
+		"--",
+		command,
+	}
+	return append(result, args...)
 }
 
 func createWireGuardTunnel(ctx context.Context, request updaterhelper.Request) (string, error) {
