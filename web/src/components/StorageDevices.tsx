@@ -575,6 +575,9 @@ export function StorageDevices({
                         {node.type === "disk" && node.health === "ok" && (
                           <span className="status-badge status-success">{t("diskHealthOk")}</span>
                         )}
+                        {node.type === "disk" && node.health === "warning" && (
+                          <span className="status-badge status-queued">{t("diskHealthWarning")}</span>
+                        )}
                         {node.type === "disk" && node.health === "failed" && (
                           <span className="status-badge status-failed">{t("diskHealthFailed")}</span>
                         )}
