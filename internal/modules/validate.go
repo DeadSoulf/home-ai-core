@@ -1,7 +1,6 @@
 package modules
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -43,9 +42,6 @@ func DecodeManifest(reader io.Reader) (Manifest, error) {
 	return manifest, nil
 }
 
-func DecodeManifestBytes(data []byte) (Manifest, error) {
-	return DecodeManifest(bytes.NewReader(data))
-}
 
 func ValidateManifest(m Manifest) error {
 	if m.SchemaVersion != ManifestSchemaVersion {
