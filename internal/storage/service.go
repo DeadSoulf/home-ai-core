@@ -19,12 +19,13 @@ type Request struct {
 	Filesystem string
 	Label      string
 	Confirm    string
+	SizeMiB    uint64
 }
 
 func Execute(ctx context.Context, input Request) (string, error) {
 	operation := strings.TrimSpace(input.Operation)
 	switch operation {
-	case "mount", "unmount", "format":
+	case "mount", "unmount", "format", "partition.create", "partition.delete":
 	default:
 		return "", errors.New("unsupported storage operation")
 	}
@@ -43,6 +44,7 @@ func Execute(ctx context.Context, input Request) (string, error) {
 		Filesystem: strings.TrimSpace(input.Filesystem),
 		Label:      strings.TrimSpace(input.Label),
 		Confirm:    strings.TrimSpace(input.Confirm),
+		SizeMiB:    input.SizeMiB,
 	}
 	if err := json.NewEncoder(conn).Encode(request); err != nil {
 		return "", err
