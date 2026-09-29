@@ -204,16 +204,19 @@ jobs:
           test -n "$ARM64_PACKAGE"
           test "$(dpkg-deb -f "$AMD64_PACKAGE" Package)" = "home-ai-core"
           test "$(dpkg-deb -f "$AMD64_PACKAGE" Architecture)" = "amd64"
-          dpkg-deb -f "$AMD64_PACKAGE" Depends | grep -q 'pci.ids'
+          PACKAGE_DEPENDS="$(dpkg-deb -f "$AMD64_PACKAGE" Depends)"
+          grep -q 'pci.ids' <<<"$PACKAGE_DEPENDS"
+          grep -q 'smartmontools' <<<"$PACKAGE_DEPENDS"
           test "$(dpkg-deb -f "$ARM64_PACKAGE" Architecture)" = "arm64"
 
-          dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './usr/bin/home-ai-core'
-          dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './usr/libexec/home-ai-core/home-ai-core-update-helper'
-          dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './usr/share/home-ai-core/web/index.html'
-          dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './lib/systemd/system/home-ai-core.service'
-          dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './lib/systemd/system/home-ai-core-update-helper.service'
-          dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './usr/lib/sysusers.d/home-ai-core.conf'
-          dpkg-deb --contents "$AMD64_PACKAGE" | grep -q './etc/home-ai-core/home-ai-core.env'
+          PACKAGE_CONTENTS="$(dpkg-deb --contents "$AMD64_PACKAGE")"
+          grep -q './usr/bin/home-ai-core' <<<"$PACKAGE_CONTENTS"
+          grep -q './usr/libexec/home-ai-core/home-ai-core-update-helper' <<<"$PACKAGE_CONTENTS"
+          grep -q './usr/share/home-ai-core/web/index.html' <<<"$PACKAGE_CONTENTS"
+          grep -q './lib/systemd/system/home-ai-core.service' <<<"$PACKAGE_CONTENTS"
+          grep -q './lib/systemd/system/home-ai-core-update-helper.service' <<<"$PACKAGE_CONTENTS"
+          grep -q './usr/lib/sysusers.d/home-ai-core.conf' <<<"$PACKAGE_CONTENTS"
+          grep -q './etc/home-ai-core/home-ai-core.env' <<<"$PACKAGE_CONTENTS"
 
 
           PACKAGE_ROOT="$(mktemp -d)"
@@ -249,7 +252,8 @@ jobs:
             exit 1
           fi
 
-          curl --fail --silent http://127.0.0.1:18081/ | grep -q 'Home-AI-Core'
+          curl --fail --silent http://127.0.0.1:18081/ >/tmp/home-ai-package-index.html
+          grep -q 'Home-AI-Core' /tmp/home-ai-package-index.html
           package_cleanup
           trap - EXIT INT TERM
 
