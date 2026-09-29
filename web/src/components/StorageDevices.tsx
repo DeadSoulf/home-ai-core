@@ -45,6 +45,7 @@ export function StorageDevices({
   const [filesystem, setFilesystem] = useState<Filesystem>("ext4");
   const [label, setLabel] = useState("");
   const [collapsed, setCollapsed] = useState<string[]>([]);
+  const [partitionProgress, setPartitionProgress] = useState<{device: string; text: string} | null>(null);
 
   function toggleDisk(node: BlockNode) {
     const key = node.path || node.name;
@@ -170,6 +171,7 @@ export function StorageDevices({
     setBusy(node.path);
     setError("");
     setMessage("");
+    setPartitionProgress({device: node.path, text: t("partitionCreating")});
     try {
       const result = await api.storageOperation({
         operation: "partition.create",
@@ -177,10 +179,13 @@ export function StorageDevices({
         size_mib: sizeMiB || undefined,
         confirm: confirmation,
       });
+      setPartitionProgress({device: node.path, text: t("partitionRefreshing")});
       setMessage(result.message);
       setCreateDisk("");
       setPartitionSizeGiB("");
       onChanged();
+      setPartitionProgress({device: node.path, text: t("partitionCreated")});
+      window.setTimeout(() => setPartitionProgress(null), 1200);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t("requestFailed"));
     } finally {
@@ -205,15 +210,20 @@ export function StorageDevices({
     setBusy(node.path);
     setError("");
     setMessage("");
+    setPartitionProgress({device: node.path, text: t("partitionsDeletingAll")});
     try {
       const result = await api.storageOperation({
         operation: "partition.delete_all",
         device: node.path,
         confirm: confirmation,
       });
+      setPartitionProgress({device: node.path, text: t("partitionRefreshing")});
       setMessage(result.message);
       onChanged();
+      setPartitionProgress({device: node.path, text: t("partitionsDeletedAll")});
+      window.setTimeout(() => setPartitionProgress(null), 1200);
     } catch (reason) {
+      setPartitionProgress(null);
       setError(reason instanceof Error ? reason.message : t("requestFailed"));
     } finally {
       setBusy("");
@@ -237,15 +247,20 @@ export function StorageDevices({
     setBusy(node.path);
     setError("");
     setMessage("");
+    setPartitionProgress({device: node.path, text: t("partitionDeleting")});
     try {
       const result = await api.storageOperation({
         operation: "partition.delete",
         device: node.path,
         confirm: confirmation,
       });
+      setPartitionProgress({device: node.path, text: t("partitionRefreshing")});
       setMessage(result.message);
       onChanged();
+      setPartitionProgress({device: node.path, text: t("partitionDeleted")});
+      window.setTimeout(() => setPartitionProgress(null), 1200);
     } catch (reason) {
+      setPartitionProgress(null);
       setError(reason instanceof Error ? reason.message : t("requestFailed"));
     } finally {
       setBusy("");
@@ -262,6 +277,17 @@ export function StorageDevices({
     <div className="storage-tree-wrap">
       {error && <div className="form-error">{error}</div>}
       {message && <div className="storage-success">{message}</div>}
+      {partitionProgress && (
+        <div className="storage-operation-progress" role="status" aria-live="polite">
+          <div className="storage-operation-progress-head">
+            <strong>{partitionProgress.text}</strong>
+            <span className="mono">{partitionProgress.device}</span>
+          </div>
+          <div className="storage-operation-progress-track">
+            <div className="storage-operation-progress-bar" />
+          </div>
+        </div>
+      )}
 
       <div className="table-wrap">
         <table className="storage-tree-table">
