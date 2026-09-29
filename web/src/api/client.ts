@@ -243,6 +243,25 @@ export const api = {
     );
   },
 
+  deleteFileEntry: async (folderId: string, path: string) => {
+    const token = getCSRFToken();
+    const headers = new Headers();
+    if (token) headers.set("X-CSRF-Token", token);
+    const query = new URLSearchParams({path});
+    return request<void>(
+      `/api/v1/files/folders/${encodeURIComponent(folderId)}/entry?${query.toString()}`,
+      {method: "DELETE", headers},
+    );
+  },
+
+  moveFileEntry: async (folderId: string, fromPath: string, toPath: string) => {
+    return postJSON<{path: string}>(
+      `/api/v1/files/folders/${encodeURIComponent(folderId)}/move`,
+      {from_path: fromPath, to_path: toPath},
+      true,
+    );
+  },
+
   system: () => request<SystemResponse>("/api/v1/system"),
 
   setDiskName: async (device: string, name: string) =>
