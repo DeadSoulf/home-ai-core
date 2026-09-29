@@ -198,12 +198,23 @@ Check
 9. ✅ Web-раздел **Файлы** с фильтрацией по effective permissions;
 10. ✅ ADR-0016 и тесты.
 
+Второй вертикальный срез готов:
+
+1. ✅ pool root разрешён только на реально смонтированной data filesystem под `/mnt/home-ai-core/...`;
+2. ✅ privileged helper проверяет exact mountpoint, writable state и запрет symlink;
+3. ✅ Home-AI создаёт только собственную область `.home-ai/`;
+4. ✅ physical private/shared directories создаются по stable resource IDs;
+5. ✅ директории принадлежат UID/GID Core, сетевой Core остаётся unprivileged;
+6. ✅ при неудаче physical folder provisioning metadata/scoped grants откатываются;
+7. ✅ Web выбирает pool только из подходящих mounted non-system filesystems;
+8. ✅ ADR-0017 фиксирует physical storage boundary.
+
 Следующий подэтап:
 
-1. связать pool root с реально смонтированной data filesystem;
-2. безопасно создавать физические каталоги;
-3. добавить browse/list/upload/download/create-dir/delete/move API;
-4. затем Web file manager;
+1. добавить безопасный browse/list API внутри разрешённой logical folder;
+2. create-directory/upload/download;
+3. delete/move/rename с audit и permission checks;
+4. затем полноценный Web file manager;
 5. после этого SMB и Windows file-copy client.
 
 ## 4. Следующие продуктовые этапы
@@ -217,7 +228,8 @@ Check
 - ✅ logical storage pools/volumes metadata;
 - ✅ private folders каждого пользователя;
 - ✅ shared/common folders;
-- 🚧 physical directory provisioning + filesystem validation;
+- ✅ physical directory provisioning + filesystem validation;
+- 🚧 file CRUD API;
 - Web file manager;
 - SMB;
 - NFS при необходимости;
