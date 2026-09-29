@@ -39,21 +39,21 @@ var (
 )
 
 type ReleaseStatus struct {
-	CurrentVersion   string     `json:"current_version"`
-	AvailableVersion string     `json:"available_version,omitempty"`
-	Available        bool       `json:"available"`
-	Architecture     string     `json:"architecture"`
-	BundleFile       string     `json:"bundle_file,omitempty"`
-	BundleSizeBytes  int64      `json:"bundle_size_bytes,omitempty"`
-	PublishedAt      *time.Time `json:"published_at,omitempty"`
-	Notes            string     `json:"notes,omitempty"`
-	HelperVersion    string     `json:"helper_version,omitempty"`
-	HelperProtocol   int        `json:"helper_protocol,omitempty"`
-	HelperAvailable  bool       `json:"helper_available"`
-	HelperCompatible bool       `json:"helper_compatible"`
-	HelperError      string     `json:"helper_error,omitempty"`
-	RollbackAvailable bool      `json:"rollback_available"`
-	RollbackVersion   string    `json:"rollback_version,omitempty"`
+	CurrentVersion    string     `json:"current_version"`
+	AvailableVersion  string     `json:"available_version,omitempty"`
+	Available         bool       `json:"available"`
+	Architecture      string     `json:"architecture"`
+	BundleFile        string     `json:"bundle_file,omitempty"`
+	BundleSizeBytes   int64      `json:"bundle_size_bytes,omitempty"`
+	PublishedAt       *time.Time `json:"published_at,omitempty"`
+	Notes             string     `json:"notes,omitempty"`
+	HelperVersion     string     `json:"helper_version,omitempty"`
+	HelperProtocol    int        `json:"helper_protocol,omitempty"`
+	HelperAvailable   bool       `json:"helper_available"`
+	HelperCompatible  bool       `json:"helper_compatible"`
+	HelperError       string     `json:"helper_error,omitempty"`
+	RollbackAvailable bool       `json:"rollback_available"`
+	RollbackVersion   string     `json:"rollback_version,omitempty"`
 }
 
 type candidate struct {
@@ -109,11 +109,11 @@ func (s *Service) Check(ctx context.Context) (ReleaseStatus, error) {
 	item, err := s.findCandidate(ctx, "")
 	if errors.Is(err, ErrNoUpdate) {
 		status := ReleaseStatus{
-			CurrentVersion:   s.currentVersion,
-			Architecture:     s.architecture,
-			Available:        false,
-			HelperVersion:    helper.Version,
-			HelperProtocol:   helper.ProtocolVersion,
+			CurrentVersion:    s.currentVersion,
+			Architecture:      s.architecture,
+			Available:         false,
+			HelperVersion:     helper.Version,
+			HelperProtocol:    helper.ProtocolVersion,
 			HelperAvailable:   helper.Available,
 			HelperCompatible:  helper.Compatible,
 			HelperError:       helper.Error,
