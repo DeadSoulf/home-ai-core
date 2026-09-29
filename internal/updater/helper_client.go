@@ -17,6 +17,7 @@ var ErrHelperUpgradeRequired = errors.New("system updater helper is outdated; in
 type HelperInfo struct {
 	Version         string `json:"version"`
 	ProtocolVersion int    `json:"protocol_version"`
+	Available       bool   `json:"available"`
 	Compatible      bool   `json:"compatible"`
 	Error           string `json:"error,omitempty"`
 }
@@ -41,11 +42,12 @@ func queryUpdaterHelperInfo(ctx context.Context) (HelperInfo, error) {
 		if message == "" {
 			message = "installed helper does not support protocol discovery"
 		}
-		return HelperInfo{Error: message}, ErrHelperUpgradeRequired
+		return HelperInfo{Available: true, Error: message}, ErrHelperUpgradeRequired
 	}
 	info := HelperInfo{
 		Version:         response.HelperVersion,
 		ProtocolVersion: response.ProtocolVersion,
+		Available:       true,
 		Compatible:      response.ProtocolVersion >= updaterhelper.ProtocolVersion,
 	}
 	if !info.Compatible {
