@@ -191,4 +191,60 @@ describe("API client", () => {
     vi.unstubAllGlobals();
   });
 
+
+  it("loads folders and creates a NAS pool with CSRF protection", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/v1/files/folders") {
+        return new Response(JSON.stringify({
+          folders: [{
+            id: "nsf-1",
+            pool_id: "nsp-1",
+            pool_name: "Main",
+            name: "Family",
+            kind: "shared",
+            relative_path: "shared/nsf-1",
+            can_read: true,
+            can_write: true,
+          }],
+        }), {
+          status: 200,
+          headers: {"Content-Type": "application/json"},
+        });
+      }
+      return new Response(JSON.stringify({
+        pool: {
+          id: "nsp-1",
+          name: "Main",
+          root_path: "/srv/home-ai/main",
+        },
+      }), {
+        status: 201,
+        headers: {"Content-Type": "application/json"},
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    });
+
+    const folders = await api.fileFolders();
+    expect(folders).toHaveLength(1);
+    expect(folders[0].name).toBe("Family");
+
+    setCSRFToken("csrf-files");
+    const pool = await api.createFilePool({name: "Main", rootPath: "/srv/home-ai/main"});
+    expect(pool.id).toBe("nsp-1");
+
+    const [input, init] = fetchMock.mock.calls[1];
+    expect(String(input)).toBe("/api/v1/files/pools");
+    expect(init?.method).toBe("POST");
+    expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-files");
+    expect(String(init?.body)).toContain('"root_path":"/srv/home-ai/main"');
+
+    vi.unstubAllGlobals();
+  });
+
 });
