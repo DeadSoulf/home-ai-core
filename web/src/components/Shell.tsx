@@ -15,6 +15,7 @@ export function Shell(props: {
   actor: Actor;
   path: string;
   realtime: RealtimeStatus;
+  availableUpdate?: string;
   onNavigate: (path: string) => void;
   onLogout: () => void;
   children: ReactNode;
@@ -59,7 +60,20 @@ export function Shell(props: {
         </div>
       </aside>
 
-      <main className="main-content">{props.children}</main>
+      <main className="main-content">
+        {props.availableUpdate && (
+          <button
+            type="button"
+            className="update-banner"
+            onClick={() => props.onNavigate("/system")}
+          >
+            <span>{t("newUpdateAvailable")}</span>
+            <strong>{props.availableUpdate}</strong>
+            <span className="update-banner-action">{t("openUpdate")}</span>
+          </button>
+        )}
+        {props.children}
+      </main>
     </div>
   );
 }
