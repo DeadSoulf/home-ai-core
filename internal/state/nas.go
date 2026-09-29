@@ -31,6 +31,7 @@ type NASFolderRecord struct {
 	ID           string
 	PoolID       string
 	PoolName     string
+	PoolRoot     string
 	Name         string
 	Kind         string
 	OwnerUserID  string
@@ -149,8 +150,12 @@ func (s *Store) CreateNASFolder(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var poolName string
-	if err := tx.QueryRowContext(ctx, "SELECT name FROM nas_pools WHERE id = ?", poolID).Scan(&poolName); err != nil {
+	var poolName, poolRoot string
+	if err := tx.QueryRowContext(
+		ctx,
+		"SELECT name, root_path FROM nas_pools WHERE id = ?",
+		poolID,
+	).Scan(&poolName, &poolRoot); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return NASFolderRecord{}, ErrNASPoolNotFound
 		}
@@ -222,6 +227,7 @@ func (s *Store) CreateNASFolder(
 		ID:           id,
 		PoolID:       poolID,
 		PoolName:     poolName,
+		PoolRoot:     poolRoot,
 		Name:         name,
 		Kind:         kind,
 		OwnerUserID:  ownerUserID,
@@ -234,7 +240,7 @@ func (s *Store) CreateNASFolder(
 
 func (s *Store) ListNASFolders(ctx context.Context) ([]NASFolderRecord, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT f.id, f.pool_id, p.name, f.name, f.kind,
+		SELECT f.id, f.pool_id, p.name, p.root_path, f.name, f.kind,
 		       COALESCE(f.owner_user_id, ''), f.relative_path,
 		       COALESCE(f.created_by, ''), f.created_at, f.updated_at
 		FROM nas_folders f
@@ -254,6 +260,7 @@ func (s *Store) ListNASFolders(ctx context.Context) ([]NASFolderRecord, error) {
 			&record.ID,
 			&record.PoolID,
 			&record.PoolName,
+			&record.PoolRoot,
 			&record.Name,
 			&record.Kind,
 			&record.OwnerUserID,
@@ -278,6 +285,39 @@ func (s *Store) ListNASFolders(ctx context.Context) ([]NASFolderRecord, error) {
 		return nil, fmt.Errorf("iterate NAS folders: %w", err)
 	}
 	return result, nil
+}
+
+
+func (s *Store) DeleteNASFolder(ctx context.Context, folderID string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin NAS folder cleanup: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM user_resource_permissions
+		WHERE resource_type = 'file_folder' AND resource_id = ?
+	`, folderID); err != nil {
+		return fmt.Errorf("remove user NAS folder grants: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM role_resource_permissions
+		WHERE resource_type = 'file_folder' AND resource_id = ?
+	`, folderID); err != nil {
+		return fmt.Errorf("remove role NAS folder grants: %w", err)
+	}
+	result, err := tx.ExecContext(ctx, "DELETE FROM nas_folders WHERE id = ?", folderID)
+	if err != nil {
+		return fmt.Errorf("delete NAS folder: %w", err)
+	}
+	if count, _ := result.RowsAffected(); count == 0 {
+		return sql.ErrNoRows
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit NAS folder cleanup: %w", err)
+	}
+	return nil
 }
 
 func newStateID(prefix string) (string, error) {
