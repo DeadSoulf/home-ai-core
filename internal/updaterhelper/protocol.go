@@ -6,15 +6,15 @@ const ProtocolVersion = 2
 var HelperVersion = "dev"
 
 type Request struct {
-	Operation       string `json:"operation"`
-	ProtocolVersion int    `json:"protocol_version,omitempty"`
-	Version         string `json:"version,omitempty"`
-	CurrentVersion  string `json:"current_version,omitempty"`
-	Device          string `json:"device,omitempty"`
-	Mountpoint      string `json:"mountpoint,omitempty"`
-	Filesystem      string `json:"filesystem,omitempty"`
-	Label           string `json:"label,omitempty"`
-	Confirm         string `json:"confirm,omitempty"`
+	Operation       string   `json:"operation"`
+	ProtocolVersion int      `json:"protocol_version,omitempty"`
+	Version         string   `json:"version,omitempty"`
+	CurrentVersion  string   `json:"current_version,omitempty"`
+	Device          string   `json:"device,omitempty"`
+	Mountpoint      string   `json:"mountpoint,omitempty"`
+	Filesystem      string   `json:"filesystem,omitempty"`
+	Label           string   `json:"label,omitempty"`
+	Confirm         string   `json:"confirm,omitempty"`
 	SizeMiB         uint64   `json:"size_mib,omitempty"`
 	Interface       string   `json:"interface,omitempty"`
 	Address         string   `json:"address,omitempty"`
@@ -81,15 +81,15 @@ type WireGuardTunnelStat struct {
 }
 
 type Response struct {
-	OK                bool             `json:"ok"`
-	Message           string           `json:"message,omitempty"`
-	Error             string           `json:"error,omitempty"`
-	HelperVersion     string           `json:"helper_version,omitempty"`
-	ProtocolVersion   int              `json:"protocol_version,omitempty"`
-	RollbackAvailable bool             `json:"rollback_available,omitempty"`
-	RollbackVersion   string           `json:"rollback_version,omitempty"`
-	FilesystemStats   []FilesystemStat `json:"filesystem_stats,omitempty"`
-	DiskHealth        []DiskHealthStat `json:"disk_health,omitempty"`
+	OK                 bool                  `json:"ok"`
+	Message            string                `json:"message,omitempty"`
+	Error              string                `json:"error,omitempty"`
+	HelperVersion      string                `json:"helper_version,omitempty"`
+	ProtocolVersion    int                   `json:"protocol_version,omitempty"`
+	RollbackAvailable  bool                  `json:"rollback_available,omitempty"`
+	RollbackVersion    string                `json:"rollback_version,omitempty"`
+	FilesystemStats    []FilesystemStat      `json:"filesystem_stats,omitempty"`
+	DiskHealth         []DiskHealthStat      `json:"disk_health,omitempty"`
 	LVM                []LVMStat             `json:"lvm,omitempty"`
 	WireGuardAvailable bool                  `json:"wireguard_available,omitempty"`
 	WireGuardError     string                `json:"wireguard_error,omitempty"`
