@@ -11,7 +11,7 @@ import (
 
 var (
 	ErrAlreadyInitialized = errors.New("security already initialized")
-	ErrUserExists          = errors.New("user already exists")
+	ErrUserExists         = errors.New("user already exists")
 )
 
 type UserRecord struct {
