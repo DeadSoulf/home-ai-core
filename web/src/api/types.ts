@@ -278,3 +278,11 @@ export type FileFolder = {
   can_write: boolean;
 };
 
+export type FileEntry = {
+  name: string;
+  path: string;
+  type: "directory" | "file" | "symlink" | "other";
+  size_bytes?: number;
+  modified_at: string;
+};
+
