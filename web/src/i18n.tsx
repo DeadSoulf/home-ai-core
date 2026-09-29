@@ -78,7 +78,24 @@ const strings = {
     diskDisplayNamePrompt: "Enter a Home-AI-Core name for {device}.",
     diskNameSaved: "Disk name saved.",
     renamePhysicalDisk: "Rename disk",
-    resizeColumn: "Drag to resize column. Double-click to reset width."
+    resizeColumn: "Drag to resize column. Double-click to reset width.",
+    diskHealthOk: "SMART OK",
+    diskHealthFailed: "SMART failure",
+    smartUnavailable: "SMART unavailable",
+    hoursShort: "h",
+    lifeRemaining: "Life remaining",
+    lvmActive: "LVM active",
+    lvmInactive: "LVM inactive",
+    lvmDataUsed: "LVM data used",
+    technicalDetails: "Technical details",
+    storageErrorSystemDisk: "This operation is blocked because the device belongs to the system disk.",
+    storageErrorLvmBusy: "The LVM volume group is still active or uses another physical disk.",
+    storageErrorSwap: "The swap device could not be disabled safely.",
+    storageErrorKernelReload: "Linux could not refresh the partition table. A device is probably still in use.",
+    storageErrorUnmount: "The filesystem could not be unmounted completely.",
+    storageErrorNoSpace: "There is not enough unallocated space for the requested partition.",
+    storageErrorFormat: "The filesystem could not be created or verified.",
+    partitionSizeExceedsAvailable: "The partition is larger than the available space ({available})."
   },
   ru: {
     starting: "Запуск Home-AI-Core…", controlPlane: "Панель управления", dashboard: "Обзор", system: "Система",
@@ -155,7 +172,24 @@ const strings = {
     diskDisplayNamePrompt: "Введите имя диска {device} в Home-AI-Core.",
     diskNameSaved: "Имя диска сохранено.",
     renamePhysicalDisk: "Переименовать диск",
-    resizeColumn: "Потяните границу для изменения ширины. Двойной щелчок — сброс ширины."
+    resizeColumn: "Потяните границу для изменения ширины. Двойной щелчок — сброс ширины.",
+    diskHealthOk: "SMART: норма",
+    diskHealthFailed: "SMART: ошибка",
+    smartUnavailable: "SMART недоступен",
+    hoursShort: "ч",
+    lifeRemaining: "Остаточный ресурс",
+    lvmActive: "LVM активен",
+    lvmInactive: "LVM неактивен",
+    lvmDataUsed: "Занято в LVM",
+    technicalDetails: "Технические подробности",
+    storageErrorSystemDisk: "Операция заблокирована: устройство относится к системному диску.",
+    storageErrorLvmBusy: "Группа LVM всё ещё активна или использует другой физический диск.",
+    storageErrorSwap: "Не удалось безопасно отключить swap.",
+    storageErrorKernelReload: "Linux не смог обновить таблицу разделов. Вероятно, устройство всё ещё используется.",
+    storageErrorUnmount: "Не удалось полностью размонтировать файловую систему.",
+    storageErrorNoSpace: "Недостаточно нераспределённого места для раздела указанного размера.",
+    storageErrorFormat: "Не удалось создать или проверить файловую систему.",
+    partitionSizeExceedsAvailable: "Размер раздела больше доступного пространства ({available})."
   }
 } as const;
 
