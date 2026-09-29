@@ -1,86 +1,58 @@
-# ADR-0010: Debian Installation Package
+# ADR-0010: Debian Initial Installation Package
 
-- Status: Accepted
-- Date: 2026-09-28
+- Status: Amended
+- Original date: 2026-09-28
+- Amended: 2026-09-29
 
 ## Context
 
-After Web UI Phase 8A, Home-AI-Core is ready for its first installation on physical Debian 13 hardware.
+Home-AI-Core needs a reproducible bootstrap format for clean Debian 13 machines without requiring Go, Node.js or a Git checkout on the target server.
 
-The project needs a reproducible installation format that can later evolve into signed repositories and managed updates.
-
-Installing directly from a Git checkout would make production nodes depend on Go, Node.js, npm and source-tree layout.
+The project now also has a Web-driven application updater, so package installation and normal application updates have different responsibilities.
 
 ## Decision
 
-Home-AI-Core is installed as a native Debian package.
+Use a native Debian package for **initial installation, emergency recovery and package-level transitions**.
 
-The package contains:
+The package installs:
 
-- the prebuilt Go Core binary
-- the prebuilt Web UI static assets
-- the systemd service
+- `/usr/bin/home-ai-core`
+- the production Web UI
+- `home-ai-core.service`
+- `/usr/libexec/home-ai-core/home-ai-core-updater`
+- `home-ai-core-updater.service`
 - the system-user declaration
-- bootstrap environment configuration
+- bootstrap configuration
+- required runtime tools such as filesystem/LVM/SMART utilities
 
-Build dependencies do not become runtime dependencies.
+Supported architectures are amd64 and arm64 on Debian 13.
 
-### Supported systems
+## Normal updates
 
-Initial package targets:
+A normal Home-AI-Core release is not installed by building another Debian package.
 
-- Debian 13 amd64
-- Debian 13 arm64
+After bootstrap, System → Updates installs a verified architecture-specific bundle containing:
 
-### Runtime identity
+- Core binary
+- Web UI
+- updater helper
+- manifest/checksum metadata
 
-The public Core continues to run as the unprivileged `home-ai-core` system account.
+The helper backs up the current application, performs the switch, restarts Core and supports rollback.
 
-The package does not weaken ADR-0003 privilege separation and does not introduce the future privileged helper.
+## Persistent state
 
-### Device visibility
+Both initial package installation and later Web updates preserve:
 
-Core needs read-only visibility of host device inventory for capability discovery.
-
-The systemd unit therefore keeps device nodes visible but uses `DevicePolicy=closed` and an empty capability set. Core can inspect the presence of devices such as `/dev/kvm` but cannot open arbitrary devices.
-
-### Configuration and state
-
-Package upgrades preserve:
-
-- `/etc/home-ai-core/home-ai-core.env`
+- `/etc/home-ai-core/`
 - `/var/lib/home-ai-core/`
+- SQLite state and forward migrations
 
-Database schema migrations remain owned by Core startup.
-
-Package removal does not automatically erase persistent state.
-
-### Network exposure
-
-First physical installation remains loopback-only.
-
-Remote first-owner setup uses an SSH tunnel.
-
-The installer does not change firewall rules, expose port 8080 externally or install a reverse proxy.
-
-### Future distribution
-
-Phase 8.5 creates local `.deb` artifacts.
-
-Signed APT repositories, release signatures, update channels, rollback snapshots and automatic upgrades remain Phase 9/Update Manager work.
+Package removal intentionally does not erase persistent state.
 
 ## Consequences
 
-### Positive
-
-- physical servers do not require Go or Node.js
-- installation matches normal Debian administration
-- systemd ownership/configuration is explicit
-- upgrades preserve state and config
-- later signed APT distribution can use the same artifact format
-
-### Negative
-
-- package signing is not implemented yet
-- rollback is not yet automatic
-- release artifact publishing is still manual
+- clean Debian installation remains conventional;
+- normal upgrades no longer depend on apt or a newly built `.deb`;
+- privileged update/install logic remains outside the network-facing Core;
+- package rebuilds are reserved for bootstrap/recovery or changes that truly require Debian-level installation changes.
