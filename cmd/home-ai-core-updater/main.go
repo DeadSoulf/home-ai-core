@@ -183,6 +183,37 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		return
 	}
 
+	if request.Operation == "wireguard.inspect" {
+		_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
+		ctx, cancel := context.WithTimeout(parent, 25*time.Second)
+		defer cancel()
+		available, wireGuardError, tunnels := inspectWireGuard(ctx)
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+			OK:                 true,
+			Message:            "WireGuard inspected",
+			HelperVersion:      updaterhelper.HelperVersion,
+			ProtocolVersion:    updaterhelper.ProtocolVersion,
+			WireGuardAvailable: available,
+			WireGuardError:     wireGuardError,
+			WireGuardTunnels:   tunnels,
+		})
+		return
+	}
+	if strings.HasPrefix(request.Operation, "network.") || strings.HasPrefix(request.Operation, "wireguard.") {
+		_ = conn.SetDeadline(time.Now().Add(12 * time.Minute))
+		ctx, cancel := context.WithTimeout(parent, 10*time.Minute)
+		defer cancel()
+		message, err := performNetworkOperation(ctx, request)
+		if err != nil {
+			logger.Error("network operation failed", "operation", request.Operation, "interface", request.Interface, "tunnel", request.Tunnel, "error", err)
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})
+			return
+		}
+		logger.Info("network operation completed", "operation", request.Operation, "interface", request.Interface, "tunnel", request.Tunnel)
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{OK: true, Message: message})
+		return
+	}
+
 	if request.Operation == "rollback" {
 		metadata, rollbackAvailable := availableRollback()
 		if !rollbackAvailable || !validVersion(metadata.Version) {
