@@ -103,7 +103,7 @@ func (s *server) networkOperation(
 		map[string]any{
 			"address": input.Address,
 			"gateway": input.Gateway,
-			"mtu": input.MTU,
+			"mtu":     input.MTU,
 		},
 	)
 	s.realtime.Publish(
