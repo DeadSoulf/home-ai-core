@@ -1263,6 +1263,15 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		if actual != expected {
 			return "", fmt.Errorf("filesystem verification failed: expected %s, got %s", expected, actual)
 		}
+		if label != "" {
+			labelOutput, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-ndo", "LABEL", device).CombinedOutput()
+			if err != nil {
+				return "", fmt.Errorf("verify filesystem label: %s", strings.TrimSpace(string(labelOutput)))
+			}
+			if strings.TrimSpace(string(labelOutput)) != label {
+				return "", errors.New("filesystem label verification failed")
+			}
+		}
 		return "device formatted", nil
 	default:
 		return "", errors.New("unsupported storage operation")
