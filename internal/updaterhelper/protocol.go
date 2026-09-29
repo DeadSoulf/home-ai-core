@@ -42,6 +42,8 @@ type LVMStat struct {
 	VGName          string  `json:"vg_name"`
 	LVName          string  `json:"lv_name"`
 	SizeBytes       uint64  `json:"size_bytes,omitempty"`
+	VGSizeBytes     uint64  `json:"vg_size_bytes,omitempty"`
+	VGFreeBytes     uint64  `json:"vg_free_bytes,omitempty"`
 	Active          bool    `json:"active"`
 	DataPercent     *float64 `json:"data_percent,omitempty"`
 	MetadataPercent *float64 `json:"metadata_percent,omitempty"`
