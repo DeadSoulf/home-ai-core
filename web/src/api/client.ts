@@ -9,6 +9,7 @@ import type {
   SystemResponse,
   UpdateStatus,
   UpdaterState,
+  UserAccount,
 } from "./types";
 
 type APIErrorBody = {
@@ -138,6 +139,20 @@ export const api = {
   logout: async () => {
     await postJSON<void>("/api/v1/auth/logout", undefined, true);
     setCSRFToken();
+  },
+
+  users: async () => {
+    const result = await request<{users: UserAccount[]}>("/api/v1/security/users");
+    return result.users;
+  },
+
+  createUser: async (input: {username: string; displayName: string; password: string}) => {
+    const result = await postJSON<{user: UserAccount}>("/api/v1/security/users", {
+      username: input.username,
+      display_name: input.displayName,
+      password: input.password,
+    }, true);
+    return result.user;
   },
 
   system: () => request<SystemResponse>("/api/v1/system"),
