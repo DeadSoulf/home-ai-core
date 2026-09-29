@@ -27,6 +27,7 @@ export type BlockNode = {
   filesystem?: string;
   size_bytes?: number;
   free_bytes?: number;
+  free_known: boolean;
   unallocated_bytes?: number;
   partition_table?: string;
   mountpoints: string[];
