@@ -5,8 +5,8 @@
 > Аудит уже сделанного: [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
-**Опубликован для проверки:** `0.1.64-dev`  
-**Состояние:** Network Management v3 реализован; `0.1.64-dev` добавляет безопасное persistent-управление ifupdown с ownership/read-only защитой внешних профилей  
+**Опубликован для проверки:** `0.1.67-dev`  
+**Состояние:** F2 NAS начат; `0.1.67-dev` добавляет logical pools, private/shared folders, scoped file permissions и Web-раздел **Файлы**  
 **Обновлено:** 2026-09-29
 
 ## Конечный продукт
@@ -444,6 +444,7 @@ AI не может расширять собственные права.
 | `0.1.64-dev` | Network Management v3 | safe ifupdown profiles/ownership |
 | `0.1.65-dev` | Network UI | показывает фактический DHCP IPv4 |
 | `0.1.66-dev` | Network hotfix | network inventory без AF_NETLINK; исправлена пустая таблица интерфейсов |
+| `0.1.67-dev` | 🧪 NAS foundation | logical pools, private/shared folders, scoped permissions, Files Web UI |
 
 ## 10. Правило ведения карты
 
