@@ -28,6 +28,7 @@ type MemoryInfo struct {
 
 type BlockNode struct {
 	Name        string      `json:"name"`
+	DisplayName string      `json:"display_name,omitempty"`
 	Path        string      `json:"path,omitempty"`
 	Type        string      `json:"type"`
 	Filesystem  string      `json:"filesystem,omitempty"`
@@ -47,7 +48,8 @@ type BlockNode struct {
 }
 
 type BlockDevice struct {
-	Name       string      `json:"name"`
+	Name        string      `json:"name"`
+	DisplayName string      `json:"display_name,omitempty"`
 	Path       string      `json:"path"`
 	MajorMinor string      `json:"major_minor,omitempty"`
 	Vendor     string      `json:"vendor,omitempty"`
