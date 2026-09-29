@@ -86,5 +86,6 @@ func Execute(ctx context.Context, input Request) (string, error) {
 		}
 		return "", errors.New(response.Error)
 	}
+	InvalidateInspectionCache()
 	return response.Message, nil
 }
