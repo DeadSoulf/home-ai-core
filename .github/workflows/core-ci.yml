@@ -302,26 +302,3 @@ jobs:
             build/packages/home-ai-core-update.json
           if-no-files-found: error
           retention-days: 14
-
-      - name: Publish development release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -eu
-          VERSION="$(tr -d '\r\n' < VERSION)"
-          TAG="v$VERSION"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" \
-              build/packages/*.deb \
-              build/packages/home-ai-core-update.json \
-              --clobber
-          else
-            gh release create "$TAG" \
-              build/packages/*.deb \
-              build/packages/home-ai-core-update.json \
-              --target "$GITHUB_SHA" \
-              --title "Home-AI-Core $VERSION" \
-              --notes "Automated Home-AI-Core development build $VERSION. Install from Web UI on nodes that already include the Core update helper." \
-              --prerelease
-          fi
