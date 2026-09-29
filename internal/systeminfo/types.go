@@ -27,56 +27,56 @@ type MemoryInfo struct {
 }
 
 type BlockNode struct {
-	Name        string      `json:"name"`
-	DisplayName string      `json:"display_name,omitempty"`
-	Path        string      `json:"path,omitempty"`
-	Type        string      `json:"type"`
-	Filesystem  string      `json:"filesystem,omitempty"`
-	SizeBytes   uint64      `json:"size_bytes,omitempty"`
-	FreeBytes        uint64      `json:"free_bytes,omitempty"`
-	FreeKnown        bool        `json:"free_known"`
-	UnallocatedBytes uint64      `json:"unallocated_bytes,omitempty"`
-	PartitionTable   string      `json:"partition_table,omitempty"`
-	Mountpoints      []string    `json:"mountpoints"`
-	ParentName  string      `json:"parent_name,omitempty"`
-	Label       string      `json:"label,omitempty"`
-	UUID        string      `json:"uuid,omitempty"`
-	Model       string      `json:"model,omitempty"`
-	Vendor      string      `json:"vendor,omitempty"`
-	Serial      string      `json:"serial,omitempty"`
-	Transport   string      `json:"transport,omitempty"`
-	Health      string      `json:"health,omitempty"`
-	TemperatureC     *int    `json:"temperature_c,omitempty"`
-	PowerOnHours     *uint64 `json:"power_on_hours,omitempty"`
-	LifeRemainingPct *int    `json:"life_remaining_percent,omitempty"`
-	SmartAvailable   bool    `json:"smart_available"`
-	SmartError       string  `json:"smart_error,omitempty"`
-	LVMVGName        string   `json:"lvm_vg_name,omitempty"`
-	LVMLVName        string   `json:"lvm_lv_name,omitempty"`
-	LVMActive        *bool    `json:"lvm_active,omitempty"`
-	LVMVGSizeBytes   uint64   `json:"lvm_vg_size_bytes,omitempty"`
-	LVMVGFreeBytes   uint64   `json:"lvm_vg_free_bytes,omitempty"`
-	LVMDataPercent   *float64 `json:"lvm_data_percent,omitempty"`
-	LVMMetadataPercent *float64 `json:"lvm_metadata_percent,omitempty"`
-	Rotational  bool        `json:"rotational"`
-	Removable   bool        `json:"removable"`
-	System      bool        `json:"system"`
-	Children    []BlockNode `json:"children"`
+	Name               string      `json:"name"`
+	DisplayName        string      `json:"display_name,omitempty"`
+	Path               string      `json:"path,omitempty"`
+	Type               string      `json:"type"`
+	Filesystem         string      `json:"filesystem,omitempty"`
+	SizeBytes          uint64      `json:"size_bytes,omitempty"`
+	FreeBytes          uint64      `json:"free_bytes,omitempty"`
+	FreeKnown          bool        `json:"free_known"`
+	UnallocatedBytes   uint64      `json:"unallocated_bytes,omitempty"`
+	PartitionTable     string      `json:"partition_table,omitempty"`
+	Mountpoints        []string    `json:"mountpoints"`
+	ParentName         string      `json:"parent_name,omitempty"`
+	Label              string      `json:"label,omitempty"`
+	UUID               string      `json:"uuid,omitempty"`
+	Model              string      `json:"model,omitempty"`
+	Vendor             string      `json:"vendor,omitempty"`
+	Serial             string      `json:"serial,omitempty"`
+	Transport          string      `json:"transport,omitempty"`
+	Health             string      `json:"health,omitempty"`
+	TemperatureC       *int        `json:"temperature_c,omitempty"`
+	PowerOnHours       *uint64     `json:"power_on_hours,omitempty"`
+	LifeRemainingPct   *int        `json:"life_remaining_percent,omitempty"`
+	SmartAvailable     bool        `json:"smart_available"`
+	SmartError         string      `json:"smart_error,omitempty"`
+	LVMVGName          string      `json:"lvm_vg_name,omitempty"`
+	LVMLVName          string      `json:"lvm_lv_name,omitempty"`
+	LVMActive          *bool       `json:"lvm_active,omitempty"`
+	LVMVGSizeBytes     uint64      `json:"lvm_vg_size_bytes,omitempty"`
+	LVMVGFreeBytes     uint64      `json:"lvm_vg_free_bytes,omitempty"`
+	LVMDataPercent     *float64    `json:"lvm_data_percent,omitempty"`
+	LVMMetadataPercent *float64    `json:"lvm_metadata_percent,omitempty"`
+	Rotational         bool        `json:"rotational"`
+	Removable          bool        `json:"removable"`
+	System             bool        `json:"system"`
+	Children           []BlockNode `json:"children"`
 }
 
 type BlockDevice struct {
 	Name        string      `json:"name"`
 	DisplayName string      `json:"display_name,omitempty"`
-	Path       string      `json:"path"`
-	MajorMinor string      `json:"major_minor,omitempty"`
-	Vendor     string      `json:"vendor,omitempty"`
-	Model      string      `json:"model,omitempty"`
-	Serial     string      `json:"serial,omitempty"`
-	SizeBytes  uint64      `json:"size_bytes,omitempty"`
-	Rotational bool        `json:"rotational"`
-	Removable  bool        `json:"removable"`
-	System     bool        `json:"system"`
-	Partitions []Partition `json:"partitions"`
+	Path        string      `json:"path"`
+	MajorMinor  string      `json:"major_minor,omitempty"`
+	Vendor      string      `json:"vendor,omitempty"`
+	Model       string      `json:"model,omitempty"`
+	Serial      string      `json:"serial,omitempty"`
+	SizeBytes   uint64      `json:"size_bytes,omitempty"`
+	Rotational  bool        `json:"rotational"`
+	Removable   bool        `json:"removable"`
+	System      bool        `json:"system"`
+	Partitions  []Partition `json:"partitions"`
 }
 
 type Partition struct {
@@ -103,14 +103,14 @@ type NetworkInterface struct {
 }
 
 type GPU struct {
-	Card       string `json:"card,omitempty"`
-	Vendor     string `json:"vendor,omitempty"`
-	Model      string `json:"model,omitempty"`
-	VendorID   string `json:"vendor_id,omitempty"`
-	DeviceID   string `json:"device_id,omitempty"`
-	Class      string `json:"class,omitempty"`
-	Driver     string `json:"driver,omitempty"`
-	Modalias   string `json:"modalias,omitempty"`
-	PCIAddress        string   `json:"pci_address,omitempty"`
+	Card               string   `json:"card,omitempty"`
+	Vendor             string   `json:"vendor,omitempty"`
+	Model              string   `json:"model,omitempty"`
+	VendorID           string   `json:"vendor_id,omitempty"`
+	DeviceID           string   `json:"device_id,omitempty"`
+	Class              string   `json:"class,omitempty"`
+	Driver             string   `json:"driver,omitempty"`
+	Modalias           string   `json:"modalias,omitempty"`
+	PCIAddress         string   `json:"pci_address,omitempty"`
 	UtilizationPercent *float64 `json:"utilization_percent,omitempty"`
 }
