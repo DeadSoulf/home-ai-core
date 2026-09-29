@@ -5,6 +5,7 @@ import { LanguageSwitch, useI18n } from "../i18n";
 
 const nav = [
   ["/", "dashboard", ""],
+  ["/files", "files", "security.self.read"],
   ["/system", "system", "system.read"],
   ["/modules", "modules", "modules.read"],
   ["/jobs", "jobs", "jobs.read"],
