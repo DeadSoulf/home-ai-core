@@ -60,6 +60,9 @@ func List(root, relative string) ([]Entry, error) {
 	}
 	result := make([]Entry, 0, len(items))
 	for _, item := range items {
+		if strings.HasPrefix(item.Name(), ".home-ai-upload-") {
+			continue
+		}
 		itemPath := filepath.Join(dir, item.Name())
 		info, err := os.Lstat(itemPath)
 		if err != nil {
