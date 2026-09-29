@@ -16,6 +16,7 @@ type UpdaterService interface {
 	State() updater.State
 	Download(context.Context, string) (updater.State, error)
 	Install(context.Context, string) (updater.State, error)
+	Rollback(context.Context) (updater.State, error)
 }
 
 func (s *server) updateStatus(w http.ResponseWriter, r *http.Request) {
@@ -130,6 +131,52 @@ func (s *server) updateInstall(
 		s.logger.Error("update install failed", "error", err)
 		writeAPIError(w, r, http.StatusBadGateway, "update_install_failed", err.Error(), nil)
 	default:
+		writeJSON(w, http.StatusAccepted, map[string]any{"state": state})
+	}
+}
+
+
+func (s *server) updateRollback(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	if s.updater == nil {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "updater_unavailable", "updater is unavailable", nil)
+		return
+	}
+
+	state, err := s.updater.Rollback(r.Context())
+	switch {
+	case errors.Is(err, updater.ErrBusy):
+		writeAPIError(w, r, http.StatusConflict, "update_busy", err.Error(), nil)
+	case errors.Is(err, updater.ErrNoRollback):
+		writeAPIError(w, r, http.StatusConflict, "rollback_not_available", err.Error(), nil)
+	case errors.Is(err, updater.ErrHelperUpgradeRequired):
+		writeAPIError(w, r, http.StatusConflict, "helper_upgrade_required", err.Error(), nil)
+	case err != nil:
+		s.logger.Error("update rollback failed", "error", err)
+		writeAPIError(w, r, http.StatusBadGateway, "update_rollback_failed", err.Error(), nil)
+	default:
+		s.security.RecordAudit(
+			r.Context(),
+			s.securityRequestContext(r),
+			actor,
+			"update.rollback",
+			"core",
+			state.AvailableVersion,
+			"success",
+			map[string]any{"target_version": state.AvailableVersion},
+		)
 		writeJSON(w, http.StatusAccepted, map[string]any{"state": state})
 	}
 }
