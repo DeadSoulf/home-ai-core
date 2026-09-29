@@ -196,7 +196,7 @@ export function SystemPage({revision}: {revision: number}) {
               <strong>{updateInfo.available ? t("updateAvailable") : t("upToDate")}</strong>
             </div>
           )}
-          {updaterState && updaterState.phase !== "idle" && (
+          {updaterState && updaterState.phase !== "idle" && updaterState.phase !== "succeeded" && (
             <div className="notice">
               <div><strong>{updaterState.message || updaterState.phase}</strong></div>
               <div className="progress"><span style={{width: `${Math.min(100, updaterState.progress_percent || 0)}%`}} /></div>
