@@ -172,7 +172,7 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		return
 	}
 	if strings.HasPrefix(request.Operation, "storage.") {
-		_ = conn.SetDeadline(time.Now().Add(2 * time.Minute))
+		_ = conn.SetDeadline(time.Now().Add(2*time.Minute + 15*time.Second))
 		ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
 		defer cancel()
 		message, err := performStorageOperation(ctx, request)
@@ -1104,15 +1104,8 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		if len(targets) == 0 {
 			return "", errors.New("device is not mounted")
 		}
-		if output, err := exec.CommandContext(ctx, "/usr/bin/umount", "--", device).CombinedOutput(); err != nil {
-			return "", fmt.Errorf("unmount device: %s", strings.TrimSpace(string(output)))
-		}
-		remaining, err := mountedTargets(ctx, device)
-		if err != nil {
-			return "", fmt.Errorf("verify unmount: %w", err)
-		}
-		if len(remaining) != 0 {
-			return "", fmt.Errorf("unmount completed but device is still mounted at: %s", strings.Join(remaining, ", "))
+		if err := unmountTargets(ctx, device, targets); err != nil {
+			return "", err
 		}
 		return "device unmounted", nil
 
@@ -1491,8 +1484,13 @@ func prepareDestructiveChange(ctx context.Context, device string) error {
 			return err
 		}
 		if len(targets) != 0 {
-			if out, err := exec.CommandContext(ctx, "/usr/bin/umount", "--", name).CombinedOutput(); err != nil {
-				return fmt.Errorf("unmount %s: %s", name, strings.TrimSpace(string(out)))
+			for _, target := range targets {
+				if target == "/" {
+					return errors.New("refusing to unmount the root filesystem")
+				}
+			}
+			if err := unmountTargets(ctx, name, targets); err != nil {
+				return err
 			}
 		}
 	}
@@ -1738,6 +1736,27 @@ func validateBlockDevice(value string) (string, error) {
 		return "", errors.New("requested path is not a block device")
 	}
 	return device, nil
+}
+
+func unmountTargets(ctx context.Context, device string, targets []string) error {
+	for i := len(targets) - 1; i >= 0; i-- {
+		target := targets[i]
+		if out, err := exec.CommandContext(ctx, "/usr/bin/umount", "--", target).CombinedOutput(); err != nil {
+			message := strings.TrimSpace(string(out))
+			if message == "" {
+				message = err.Error()
+			}
+			return fmt.Errorf("unmount %s from %s: %s", device, target, message)
+		}
+	}
+	remaining, err := mountedTargets(ctx, device)
+	if err != nil {
+		return fmt.Errorf("verify unmount %s: %w", device, err)
+	}
+	if len(remaining) != 0 {
+		return fmt.Errorf("unmount completed but %s is still mounted at: %s", device, strings.Join(remaining, ", "))
+	}
+	return nil
 }
 
 func mountedTargets(ctx context.Context, device string) ([]string, error) {
