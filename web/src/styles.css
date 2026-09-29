@@ -41,6 +41,14 @@ button { cursor: pointer; }
 .user-summary span { color: #8d9aad; font-size: 12px; }
 
 .main-content { min-width: 0; padding: 30px; background: radial-gradient(circle at 85% 0%, #24304b55, transparent 30%), #101318; }
+.update-banner {
+  width: min(1440px, 100%); margin: 0 auto 18px; border: 1px solid #31549a; border-radius: 12px;
+  padding: 12px 16px; display: flex; align-items: center; gap: 10px; text-align: left;
+  color: #eaf1ff; background: #1b2d50; box-shadow: 0 8px 30px #00000020;
+}
+.update-banner:hover { background: #223967; }
+.update-banner strong { color: #fff; }
+.update-banner-action { margin-left: auto; color: #a9c1ff; font-size: 12px; }
 .page { max-width: 1440px; margin: 0 auto; display: grid; gap: 20px; }
 .page-heading h1 { margin: 0; font-size: 28px; letter-spacing: -0.025em; }
 .page-heading p { margin: 7px 0 0; color: #8d9aad; }
