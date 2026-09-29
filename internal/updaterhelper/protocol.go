@@ -28,6 +28,8 @@ type Request struct {
 	AllowedIPs      []string `json:"allowed_ips,omitempty"`
 	Endpoint        string   `json:"endpoint,omitempty"`
 	Keepalive       int      `json:"keepalive,omitempty"`
+	NetworkMethod   string   `json:"network_method,omitempty"`
+	DNS             []string `json:"dns,omitempty"`
 }
 
 type FilesystemStat struct {
@@ -80,6 +82,19 @@ type WireGuardTunnelStat struct {
 	Peers      []WireGuardPeerStat `json:"peers,omitempty"`
 }
 
+type NetworkProfileStat struct {
+	Interface string   `json:"interface"`
+	Backend   string   `json:"backend"`
+	Supported bool     `json:"supported"`
+	Managed   bool     `json:"managed"`
+	Method    string   `json:"method,omitempty"`
+	Address   string   `json:"address,omitempty"`
+	Gateway   string   `json:"gateway,omitempty"`
+	DNS       []string `json:"dns,omitempty"`
+	Source    string   `json:"source,omitempty"`
+	Error     string   `json:"error,omitempty"`
+}
+
 type Response struct {
 	OK                 bool                  `json:"ok"`
 	Message            string                `json:"message,omitempty"`
@@ -94,6 +109,8 @@ type Response struct {
 	WireGuardAvailable bool                  `json:"wireguard_available,omitempty"`
 	WireGuardError     string                `json:"wireguard_error,omitempty"`
 	WireGuardTunnels   []WireGuardTunnelStat `json:"wireguard_tunnels,omitempty"`
+	NetworkBackend     string                `json:"network_backend,omitempty"`
+	NetworkProfiles    []NetworkProfileStat  `json:"network_profiles,omitempty"`
 }
 
 type Result struct {
