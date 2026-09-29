@@ -11,6 +11,7 @@ import type {
   UpdaterState,
   UserAccount,
   NetworkProfileStatus,
+  FileEntry,
   FileFolder,
   FilePool,
   WireGuardStatus,
@@ -191,6 +192,30 @@ export const api = {
     }, true);
     return result.folder;
   },
+
+  fileEntries: async (folderId: string, path = "") => {
+    const params = new URLSearchParams({folder_id: folderId});
+    if (path) params.set("path", path);
+    const result = await request<{entries: FileEntry[]}>(`/api/v1/files/entries?${params.toString()}`);
+    return result.entries;
+  },
+
+  fileDownloadURL: (folderId: string, path: string) => {
+    const params = new URLSearchParams({folder_id: folderId, path});
+    return `/api/v1/files/download?${params.toString()}`;
+  },
+
+  fileOperation: async (input: {
+    folderId: string;
+    operation: "mkdir" | "delete" | "move";
+    path: string;
+    destination?: string;
+  }) => postJSON<{message: string}>("/api/v1/files/operation", {
+    folder_id: input.folderId,
+    operation: input.operation,
+    path: input.path,
+    destination: input.destination,
+  }, true),
 
   system: () => request<SystemResponse>("/api/v1/system"),
 
