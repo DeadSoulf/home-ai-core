@@ -24,6 +24,8 @@ import (
 
 const (
 	releasesURL       = "https://api.github.com/repos/DeadSoulf/home-ai-core/releases?per_page=20"
+	versionURL        = "https://raw.githubusercontent.com/DeadSoulf/home-ai-core/main/VERSION"
+	releaseDownloadURL = "https://github.com/DeadSoulf/home-ai-core/releases/download"
 	maxReleaseBytes   = 1 << 20
 	maxChecksumBytes  = 4096
 	maxBundleBytes    = 512 << 20
@@ -458,7 +460,11 @@ func (s *Service) Rollback(ctx context.Context) (State, error) {
 func (s *Service) findCandidate(ctx context.Context, requestedVersion string) (candidate, error) {
 	releases, err := s.fetchReleases(ctx)
 	if err != nil {
-		return candidate{}, err
+		fallback, fallbackErr := s.findCandidateFromPublishedVersion(ctx, requestedVersion)
+		if fallbackErr == nil || errors.Is(fallbackErr, ErrNoUpdate) {
+			return fallback, fallbackErr
+		}
+		return candidate{}, fmt.Errorf("GitHub API check failed: %v; fallback check failed: %w", err, fallbackErr)
 	}
 
 	var best *candidate
@@ -524,6 +530,86 @@ func (s *Service) findCandidate(ctx context.Context, requestedVersion string) (c
 		return candidate{}, ErrNoUpdate
 	}
 	return *best, nil
+}
+
+func (s *Service) findCandidateFromPublishedVersion(ctx context.Context, requestedVersion string) (candidate, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, versionURL, nil)
+	if err != nil {
+		return candidate{}, err
+	}
+	req.Header.Set("User-Agent", defaultUserAgent+"/"+s.currentVersion)
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return candidate{}, fmt.Errorf("read published VERSION: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return candidate{}, fmt.Errorf("read published VERSION: HTTP %d", resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 256))
+	if err != nil {
+		return candidate{}, fmt.Errorf("read published VERSION: %w", err)
+	}
+	version := strings.TrimSpace(string(data))
+	if version == "" || safeVersion(version) != version {
+		return candidate{}, errors.New("published VERSION is invalid")
+	}
+	if compareVersions(version, s.currentVersion) <= 0 {
+		return candidate{}, ErrNoUpdate
+	}
+	if requestedVersion != "" && version != requestedVersion {
+		return candidate{}, ErrNoUpdate
+	}
+
+	bundleName := fmt.Sprintf("home-ai-core-update_%s_%s.tar.gz", version, s.architecture)
+	checksumName := bundleName + ".sha256"
+	base := fmt.Sprintf("%s/v%s/", releaseDownloadURL, version)
+	bundleURL := base + bundleName
+	checksumURL := base + checksumName
+
+	published, err := s.releaseAssetExists(ctx, checksumURL)
+	if err != nil {
+		return candidate{}, err
+	}
+	if !published {
+		// VERSION may reach main a few minutes before the workflow publishes
+		// release assets. Treat that window as "no update yet", not a failure.
+		return candidate{}, ErrNoUpdate
+	}
+
+	return candidate{
+		ReleaseStatus: ReleaseStatus{
+			CurrentVersion:   s.currentVersion,
+			AvailableVersion: version,
+			Available:        true,
+			Architecture:     s.architecture,
+			BundleFile:       bundleName,
+		},
+		BundleURL:   bundleURL,
+		ChecksumURL: checksumURL,
+	}, nil
+}
+
+func (s *Service) releaseAssetExists(ctx context.Context, assetURL string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, assetURL, nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Set("User-Agent", defaultUserAgent+"/"+s.currentVersion)
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("check release asset: %w", err)
+	}
+	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusNotFound:
+		return false, nil
+	default:
+		return false, fmt.Errorf("check release asset: HTTP %d", resp.StatusCode)
+	}
 }
 
 type githubRelease struct {
@@ -611,7 +697,10 @@ func (s *Service) downloadArchive(ctx context.Context, url, target string, expec
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download update bundle: HTTP %d", resp.StatusCode)
 	}
-	if resp.ContentLength > 0 && resp.ContentLength != expectedSize {
+	if resp.ContentLength > maxBundleBytes {
+		return errors.New("update bundle exceeds maximum allowed size")
+	}
+	if expectedSize > 0 && resp.ContentLength > 0 && resp.ContentLength != expectedSize {
 		return errors.New("update bundle size does not match release metadata")
 	}
 
@@ -621,7 +710,11 @@ func (s *Service) downloadArchive(ctx context.Context, url, target string, expec
 		return err
 	}
 	hash := sha256.New()
-	written, copyErr := io.Copy(io.MultiWriter(file, hash), io.LimitReader(resp.Body, expectedSize+1))
+	limit := int64(maxBundleBytes + 1)
+	if expectedSize > 0 {
+		limit = expectedSize + 1
+	}
+	written, copyErr := io.Copy(io.MultiWriter(file, hash), io.LimitReader(resp.Body, limit))
 	closeErr := file.Close()
 	if copyErr != nil {
 		_ = os.Remove(tmp)
@@ -631,9 +724,13 @@ func (s *Service) downloadArchive(ctx context.Context, url, target string, expec
 		_ = os.Remove(tmp)
 		return closeErr
 	}
-	if written != expectedSize {
+	if expectedSize > 0 && written != expectedSize {
 		_ = os.Remove(tmp)
 		return fmt.Errorf("update bundle size mismatch: got %d, want %d", written, expectedSize)
+	}
+	if expectedSize <= 0 && written > maxBundleBytes {
+		_ = os.Remove(tmp)
+		return errors.New("update bundle exceeds maximum allowed size")
 	}
 	if actual := hex.EncodeToString(hash.Sum(nil)); actual != expectedHash {
 		_ = os.Remove(tmp)
