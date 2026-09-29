@@ -37,29 +37,29 @@ type DiskHealthStat struct {
 }
 
 type LVMStat struct {
-	Device          string  `json:"device,omitempty"`
-	Name            string  `json:"name"`
-	VGName          string  `json:"vg_name"`
-	LVName          string  `json:"lv_name"`
-	SizeBytes       uint64  `json:"size_bytes,omitempty"`
-	VGSizeBytes     uint64  `json:"vg_size_bytes,omitempty"`
-	VGFreeBytes     uint64  `json:"vg_free_bytes,omitempty"`
-	Active          bool    `json:"active"`
+	Device          string   `json:"device,omitempty"`
+	Name            string   `json:"name"`
+	VGName          string   `json:"vg_name"`
+	LVName          string   `json:"lv_name"`
+	SizeBytes       uint64   `json:"size_bytes,omitempty"`
+	VGSizeBytes     uint64   `json:"vg_size_bytes,omitempty"`
+	VGFreeBytes     uint64   `json:"vg_free_bytes,omitempty"`
+	Active          bool     `json:"active"`
 	DataPercent     *float64 `json:"data_percent,omitempty"`
 	MetadataPercent *float64 `json:"metadata_percent,omitempty"`
 }
 
 type Response struct {
-	OK              bool             `json:"ok"`
-	Message         string           `json:"message,omitempty"`
-	Error           string           `json:"error,omitempty"`
-	HelperVersion   string           `json:"helper_version,omitempty"`
-	ProtocolVersion  int              `json:"protocol_version,omitempty"`
+	OK                bool             `json:"ok"`
+	Message           string           `json:"message,omitempty"`
+	Error             string           `json:"error,omitempty"`
+	HelperVersion     string           `json:"helper_version,omitempty"`
+	ProtocolVersion   int              `json:"protocol_version,omitempty"`
 	RollbackAvailable bool             `json:"rollback_available,omitempty"`
 	RollbackVersion   string           `json:"rollback_version,omitempty"`
-	FilesystemStats  []FilesystemStat `json:"filesystem_stats,omitempty"`
-	DiskHealth       []DiskHealthStat  `json:"disk_health,omitempty"`
-	LVM              []LVMStat         `json:"lvm,omitempty"`
+	FilesystemStats   []FilesystemStat `json:"filesystem_stats,omitempty"`
+	DiskHealth        []DiskHealthStat `json:"disk_health,omitempty"`
+	LVM               []LVMStat        `json:"lvm,omitempty"`
 }
 
 type Result struct {
