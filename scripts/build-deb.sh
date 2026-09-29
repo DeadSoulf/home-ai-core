@@ -60,7 +60,7 @@ Section: admin
 Priority: optional
 Architecture: $ARCH
 Maintainer: Home-AI-Core
-Depends: systemd, pci.ids, apt
+Depends: systemd, pci.ids, apt, util-linux, e2fsprogs, xfsprogs, dosfstools
 Description: Home-AI-Core private home infrastructure control plane
  Home-AI-Core provides a modular Debian-based control plane for private
  home-server infrastructure, modules, jobs, events and the Web UI.
