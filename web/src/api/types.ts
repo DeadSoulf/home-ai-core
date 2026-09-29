@@ -48,11 +48,14 @@ export type SystemResponse = {
       size_bytes?: number;
       rotational: boolean;
       removable: boolean;
+      system: boolean;
       partitions: Array<{
         name: string;
         path: string;
         size_bytes?: number;
         filesystem?: string;
+        uuid?: string;
+        label?: string;
         mountpoints: string[];
       }>;
     }>;
