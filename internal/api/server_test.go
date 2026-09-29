@@ -91,6 +91,15 @@ func (f fakeState) ListNASFolders(context.Context) ([]state.NASFolderRecord, err
 	return f.nasFolders, nil
 }
 
+func (f fakeState) NASFolder(_ context.Context, folderID string) (state.NASFolderRecord, error) {
+	for _, folder := range f.nasFolders {
+		if folder.ID == folderID {
+			return folder, nil
+		}
+	}
+	return state.NASFolderRecord{}, state.ErrNASFolderNotFound
+}
+
 func (f fakeState) DeleteNASFolder(context.Context, string) error {
 	return nil
 }
