@@ -893,7 +893,11 @@ func inspectDiskHealth(ctx context.Context) []updaterhelper.DiskHealthStat {
 			continue
 		}
 
-		stat.SmartAvailable = true
+		stat.SmartAvailable =
+			decoded.SmartStatus != nil ||
+			decoded.Temperature != nil ||
+			decoded.PowerOnTime != nil ||
+			decoded.NVMe != nil
 		if decoded.SmartStatus != nil {
 			if decoded.SmartStatus.Passed {
 				stat.Health = "ok"
@@ -931,7 +935,8 @@ func inspectDiskHealth(ctx context.Context) []updaterhelper.DiskHealthStat {
 			}
 		}
 		if commandErr != nil && stat.Health == "unknown" {
-			stat.SmartError = "smartctl reported a device warning"
+			stat.SmartError = "smartctl could not read SMART data for this device"
+			stat.SmartAvailable = false
 		}
 		result = append(result, stat)
 	}
