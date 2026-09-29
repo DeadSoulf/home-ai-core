@@ -490,7 +490,6 @@ export function StorageDevices({
       {devices.some((disk) => disk.system) && (
         <div className="storage-protection">{t("systemDiskProtection")}</div>
       )}
-      <div className="storage-hint">{t("usbFormatHint")}</div>
     </div>
   );
 }
