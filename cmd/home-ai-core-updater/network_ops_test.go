@@ -79,3 +79,29 @@ func TestWireGuardInterfaceConfig(t *testing.T) {
 		t.Fatalf("port = %d", port)
 	}
 }
+
+func TestTransientPackageCommand(t *testing.T) {
+	got := transientPackageCommand("/usr/bin/apt-get", "install", "-y", "wireguard-tools")
+	want := []string{
+		"--quiet",
+		"--wait",
+		"--pipe",
+		"--collect",
+		"--service-type=exec",
+		"--setenv=DEBIAN_FRONTEND=noninteractive",
+		"--",
+		"/usr/bin/apt-get",
+		"install",
+		"-y",
+		"wireguard-tools",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("command length = %d, want %d: %#v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("command[%d] = %q, want %q; full command %#v", i, got[i], want[i], got)
+		}
+	}
+}
+
