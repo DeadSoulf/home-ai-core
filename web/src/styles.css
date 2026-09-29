@@ -164,6 +164,19 @@ tbody tr:last-child td { border-bottom: 0; }
 .update-callout.current { border: 1px solid #28513f; background: #18342a; }
 .release-notes { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 13px; line-height: 1.6; color: #b9c3d1; max-height: 420px; overflow: auto; }
 
+
+.storage-tree-wrap { display: grid; gap: 12px; }
+.storage-tree-table { min-width: 980px; }
+.storage-tree-table th:nth-child(1) { min-width: 270px; }
+.storage-tree-table th:nth-child(5) { min-width: 180px; }
+.storage-tree-name { display: flex; align-items: center; gap: 7px; min-height: 26px; }
+.storage-tree-branch { color: #64748b; width: 14px; flex: 0 0 14px; }
+.storage-tree-model { margin: 2px 0 0; color: #7f8b9d; font-size: 11px; padding-left: 1px; }
+.storage-inline-label { color: #8d9aad; font-size: 11px; }
+.storage-system-row { background: #2b261833; }
+.storage-tree-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.button.compact { padding: 6px 8px; font-size: 11px; border-radius: 7px; }
+.storage-format-row td { padding: 10px; background: #17130f; }
 .storage-stack { display: grid; gap: 14px; }
 .storage-card { border: 1px solid #2a3340; border-radius: 12px; background: #12171dcc; overflow: hidden; }
 .storage-card-header { padding: 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; border-bottom: 1px solid #252d38; }
