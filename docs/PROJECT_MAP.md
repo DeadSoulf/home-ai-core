@@ -58,7 +58,7 @@ Home-AI должен стать полностью автономной лока
 | Core API | ✅ | Go REST API и health | единый API для Web, AI, voice, clients и cluster |
 | State / migrations | ✅ | SQLite + forward migrations | локальное control-plane состояние |
 | Node identity | ✅ | стабильный ID узла | основа будущего cluster enrollment |
-| Security / Auth | ✅ | owner bootstrap, sessions, RBAC, CSRF, resource-scoped grants | пользователи, комнаты, устройства, камеры, папки и AI policy |
+| Security / Auth | ✅ | owner/member accounts, sessions, RBAC, CSRF, resource-scoped grants | пользователи, комнаты, устройства, камеры, папки и AI policy |
 | Audit | ✅ | аудит действий | критично для AI и опасных операций |
 | Jobs | ✅ | persistent job engine | долгие операции, модели, storage, NVR, cluster |
 | Events | ✅ | durable events | Smart Home/NVR/cluster domain events |
@@ -71,7 +71,7 @@ Home-AI должен стать полностью автономной лока
 | Privileged helper | ✅ | root-граница работает; routing/update/storage физически разделены | host/storage/network privileged actions |
 | Update System v2 | ✅ | Web check/download/install/restart | обновление продукта без обычного .deb |
 | Rollback | 🧪 | реализован | нужен живой acceptance test |
-| Web UI | ✅ foundation | System/Modules/Jobs/Audit и auth shell | основной интерфейс сейчас |
+| Web UI | ✅ foundation | permission-aware navigation, System/Modules/Jobs/Audit/Users, auth shell | основной интерфейс сейчас |
 | CI / Release | ✅ | tests/build/smoke/amd64/arm64 | безопасная разработка и релизы |
 
 ## 2. Что уже доказано на практике
@@ -99,9 +99,21 @@ Check
 
 Используется единое каноническое дерево block devices. Низкоуровневые безопасные storage операции уже дают основу для будущего NAS.
 
+### ✅ Multi-user foundation
+
+Реализовано:
+
+- роли `owner` и `member`;
+- API создания и списка пользователей;
+- Web-раздел **Пользователи**;
+- новые `member` получают только права на собственную учетную запись/сессию;
+- административные страницы скрываются по permissions;
+- ограниченный пользователь не опрашивает недоступные System/Updates/Realtime;
+- resource-scoped permissions готовы для будущего доступа к папкам, комнатам и камерам.
+
 ## 3. Текущая работа
 
-### 🚧 Этап F1 — закончить фундамент
+### ✅ Этап F1 — фундамент готов для продуктовых модулей
 
 Готово:
 
@@ -123,17 +135,33 @@ Check
    - миграция `009_resource_permissions.sql`;
    - ADR-0014;
    - тесты и полный CI.
+5. ✅ Добавлена household multi-user foundation:
+   - роль `member`;
+   - API list/create users;
+   - Web UI управления пользователями;
+   - permission-aware Web navigation;
+   - миграция `010_household_users.sql`;
+   - ADR-0015;
+   - полный CI.
 
-Осталось:
+Отдельно проверить в эксплуатации:
 
-5. 🧪 Реально проверить rollback и повторное обновление на установленном сервере.
-6. ⏭ Добавить targeted tests для privileged routing/validation по мере следующего package-level refactor.
+- 🧪 rollback и повторное обновление на установленном сервере;
+- ⏭ targeted tests для privileged routing/validation при следующем package-level refactor.
 
-Пока rollback ждёт практической проверки на сервере, можно начинать проектирование F2 — File Storage / NAS.
+### 🚧 Этап F2 — File Storage / NAS
+
+Текущий следующий подэтап:
+
+1. определить модель storage spaces/pools;
+2. определить private home каждого пользователя;
+3. определить shared/common folders;
+4. связать доступ с user IDs и resource-scoped permissions;
+5. затем добавить файловое API/Web file manager и сетевые протоколы.
 
 ## 4. Следующие продуктовые этапы
 
-### ⏭ F2 — File Storage / NAS
+### 🚧 F2 — File Storage / NAS
 
 Цель: пользовательское файловое хранилище поверх уже готового low-level storage.
 
