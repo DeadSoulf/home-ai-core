@@ -280,7 +280,13 @@ func copyFile(source, target string, mode os.FileMode) error {
 	if copyErr != nil {
 		return copyErr
 	}
-	return closeErr
+	if closeErr != nil {
+		return closeErr
+	}
+	if err := os.Chmod(target, mode); err != nil {
+		return err
+	}
+	return nil
 }
 
 func copyTree(source, target string) error {
@@ -294,7 +300,10 @@ func copyTree(source, target string) error {
 		}
 		dest := filepath.Join(target, rel)
 		if entry.IsDir() {
-			return os.MkdirAll(dest, 0o755)
+			if err := os.MkdirAll(dest, 0o755); err != nil {
+				return err
+			}
+			return os.Chmod(dest, 0o755)
 		}
 		info, err := entry.Info()
 		if err != nil {
