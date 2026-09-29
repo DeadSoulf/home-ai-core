@@ -99,7 +99,7 @@ export default function App() {
     };
 
     void check();
-    const timer = window.setInterval(check, 60 * 1000);
+    const timer = window.setInterval(check, 5 * 60 * 1000);
     window.addEventListener("focus", refreshWhenVisible);
     document.addEventListener("visibilitychange", refreshWhenVisible);
     window.addEventListener("home-ai-core:update-status", updateStatusEvent);
