@@ -155,6 +155,37 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
     }
   }
 
+  async function deleteEntry(path: string, name: string) {
+    if (!selectedFolder?.can_write) return;
+    if (!window.confirm(t("fileDeleteConfirm").replace("{name}", name))) return;
+    setBusy("browser-delete");
+    setBrowserError("");
+    try {
+      await api.deleteFileEntry(selectedFolder.id, path);
+      await loadEntries(selectedFolder.id, currentPath);
+    } catch (reason) {
+      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function moveEntry(path: string) {
+    if (!selectedFolder?.can_write) return;
+    const target = window.prompt(t("fileMovePrompt"), path);
+    if (!target || target === path) return;
+    setBusy("browser-move");
+    setBrowserError("");
+    try {
+      await api.moveFileEntry(selectedFolder.id, path, target);
+      await loadEntries(selectedFolder.id, currentPath);
+    } catch (reason) {
+      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function downloadEntry(path: string, name: string) {
     if (!selectedFolder) return;
     setBusy("browser-download");
@@ -326,16 +357,38 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                       <td>{entry.kind === "file" ? formatFileSize(entry.size_bytes || 0) : "—"}</td>
                       <td>{new Date(entry.modified_at).toLocaleString()}</td>
                       <td>
-                        {entry.kind === "file" && (
-                          <button
-                            className="button compact secondary"
-                            type="button"
-                            disabled={busy !== ""}
-                            onClick={() => void downloadEntry(entry.path, entry.name)}
-                          >
-                            {t("fileDownload")}
-                          </button>
-                        )}
+                        <div className="network-actions">
+                          {entry.kind === "file" && (
+                            <button
+                              className="button compact secondary"
+                              type="button"
+                              disabled={busy !== ""}
+                              onClick={() => void downloadEntry(entry.path, entry.name)}
+                            >
+                              {t("fileDownload")}
+                            </button>
+                          )}
+                          {selectedFolder.can_write && entry.kind !== "symlink" && (
+                            <>
+                              <button
+                                className="button compact secondary"
+                                type="button"
+                                disabled={busy !== ""}
+                                onClick={() => void moveEntry(entry.path)}
+                              >
+                                {t("fileMoveRename")}
+                              </button>
+                              <button
+                                className="button compact danger"
+                                type="button"
+                                disabled={busy !== ""}
+                                onClick={() => void deleteEntry(entry.path, entry.name)}
+                              >
+                                {t("delete")}
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
