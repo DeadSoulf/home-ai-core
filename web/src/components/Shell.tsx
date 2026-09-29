@@ -39,7 +39,10 @@ export function Shell(props: {
               className={props.path === href ? "nav-item active" : "nav-item"}
               onClick={() => props.onNavigate(href)}
             >
-              {t(label)}
+              <span>{t(label)}</span>
+              {href === "/system" && props.availableUpdate && (
+                <span className="nav-update-badge">{props.availableUpdate}</span>
+              )}
             </button>
           ))}
         </nav>
