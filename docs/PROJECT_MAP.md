@@ -66,6 +66,8 @@ Home-AI должен стать полностью автономной лока
 | Module SDK / Registry | ✅ | manifest, dependencies, capabilities | модульная архитектура продукта |
 | Signed Module Repository | ✅ foundation | подписи и проверка metadata/package | будущая доставка Home-AI модулей |
 | System Info | ✅ | CPU/RAM/GPU/network/storage inventory | локальная диагностика + cluster resources |
+| Network Management | ✅ v1 | up/down, MTU, runtime IP/default-route management, audit | локальное администрирование сети |
+| WireGuard | ✅ foundation | install, tunnel lifecycle, peers, persistent configs | база собственного удалённого доступа |
 | Hardware discovery | ✅ | PCI/GPU/storage данные | ускорители, камеры, adapters |
 | Low-level Storage | ✅ | partitions, format, mount, labels, SMART/LVM | фундамент NAS и NVR storage |
 | Privileged helper | ✅ | root-граница работает; routing/update/storage физически разделены | host/storage/network privileged actions |
@@ -98,6 +100,25 @@ Check
 ### ✅ Storage foundation
 
 Используется единое каноническое дерево block devices. Низкоуровневые безопасные storage операции уже дают основу для будущего NAS.
+
+### ✅ Network Management v1
+
+Реализовано:
+
+- управление link up/down;
+- изменение MTU;
+- добавление/удаление IP-адреса;
+- установка/удаление default route;
+- отдельные permissions `network.read` / `network.manage`;
+- Audit для сетевых действий;
+- Web-управление в **System**;
+- WireGuard tools install по явной команде владельца;
+- создание/запуск/остановка/удаление WireGuard-туннелей;
+- добавление/удаление WireGuard peers;
+- сохранение конфигурации в `/etc/wireguard`;
+- отображение endpoint, allowed IPs, handshake и RX/TX.
+
+Ограничение v1: настройки физических интерфейсов пока runtime-only. Постоянные DHCP/static/DNS-профили будут отдельным сетевым этапом.
 
 ### ✅ Multi-user foundation
 
@@ -253,9 +274,14 @@ AI становится центральным управляющим слоем
 
 #### WireGuard
 
-- собственный secure remote channel;
+Базовый WireGuard уже реализован.
+
+Осталось для полноценного Home-AI remote access:
+
 - device enrollment;
+- выпуск клиентских конфигураций/QR;
 - revocation;
+- policy маршрутов и доступных сервисов;
 - без прямой публикации SMB/NFS в Internet.
 
 #### Windows client
@@ -373,6 +399,7 @@ AI не может расширять собственные права.
 | durable events не подходят для media/high-rate telemetry | оставить media отдельным data plane |
 | SQLite single-node | не превращать локальную схему в неявный cluster contract |
 | cluster leadership не определён | сохранить abstraction, решить позже |
+| physical NIC profiles пока runtime-only | добавить backend-aware DHCP/static/DNS persistence |
 | stable signing/channel | сделать до stable/commercial release |
 | AI self-development может менять систему | только versioned/audited/rollback + approval policy |
 
