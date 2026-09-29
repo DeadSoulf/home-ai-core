@@ -47,6 +47,8 @@ export type BlockNode = {
   lvm_vg_name?: string;
   lvm_lv_name?: string;
   lvm_active?: boolean;
+  lvm_vg_size_bytes?: number;
+  lvm_vg_free_bytes?: number;
   lvm_data_percent?: number;
   lvm_metadata_percent?: number;
   rotational: boolean;
