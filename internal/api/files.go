@@ -2,9 +2,12 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/DeadSoulf/home-ai-core/internal/filedata"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
 	"github.com/DeadSoulf/home-ai-core/internal/storage"
@@ -213,3 +216,184 @@ func (s *server) fileFolders(
 		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 	}
 }
+
+const maxFileUploadBytes int64 = 512 << 20
+
+func (s *server) fileFolderEntries(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	_ authSource,
+) {
+	folder, root, ok := s.authorizedFileFolder(w, r, actor, false)
+	if !ok {
+		return
+	}
+	relative := strings.TrimSpace(r.URL.Query().Get("path"))
+	entries, err := filedata.List(root, relative)
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "file_path_invalid", err.Error(), nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"folder_id": folder.ID,
+		"path":      relative,
+		"entries":   entries,
+	})
+}
+
+func (s *server) fileFolderDirectory(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	folder, root, ok := s.authorizedFileFolder(w, r, actor, true)
+	if !ok {
+		return
+	}
+	var input struct {
+		Path string `json:"path"`
+	}
+	if err := decodeJSON(w, r, &input); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_file_directory", err.Error(), nil)
+		return
+	}
+	input.Path = strings.TrimSpace(input.Path)
+	if err := filedata.CreateDirectory(root, input.Path); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "file_directory_create_failed", err.Error(), nil)
+		return
+	}
+	s.security.RecordAudit(
+		r.Context(),
+		s.securityRequestContext(r),
+		actor,
+		"files.directory.create",
+		"file_folder",
+		folder.ID,
+		"success",
+		map[string]any{"path": input.Path},
+	)
+	s.realtime.Publish(
+		"files.directory.created",
+		map[string]any{"folder_id": folder.ID, "path": input.Path},
+		requestIDFromContext(r.Context()),
+	)
+	writeJSON(w, http.StatusCreated, map[string]any{"path": input.Path})
+}
+
+func (s *server) fileFolderContent(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	write := r.Method == http.MethodPut
+	if write && source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	folder, root, ok := s.authorizedFileFolder(w, r, actor, write)
+	if !ok {
+		return
+	}
+	relative := strings.TrimSpace(r.URL.Query().Get("path"))
+	if relative == "" {
+		writeAPIError(w, r, http.StatusBadRequest, "file_path_required", "file path is required", nil)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		file, info, err := filedata.OpenFile(root, relative)
+		if err != nil {
+			writeAPIError(w, r, http.StatusBadRequest, "file_open_failed", err.Error(), nil)
+			return
+		}
+		defer file.Close()
+		http.ServeContent(w, r, info.Name(), info.ModTime(), file)
+	case http.MethodPut:
+		r.Body = http.MaxBytesReader(w, r.Body, maxFileUploadBytes)
+		written, err := filedata.Upload(root, relative, r.Body)
+		if err != nil {
+			var maxErr *http.MaxBytesError
+			if errors.As(err, &maxErr) {
+				writeAPIError(w, r, http.StatusRequestEntityTooLarge, "file_too_large", "file exceeds upload limit", nil)
+				return
+			}
+			writeAPIError(w, r, http.StatusBadRequest, "file_upload_failed", err.Error(), nil)
+			return
+		}
+		s.security.RecordAudit(
+			r.Context(),
+			s.securityRequestContext(r),
+			actor,
+			"files.file.upload",
+			"file_folder",
+			folder.ID,
+			"success",
+			map[string]any{"path": relative, "size_bytes": written},
+		)
+		s.realtime.Publish(
+			"files.file.uploaded",
+			map[string]any{"folder_id": folder.ID, "path": relative, "size_bytes": written},
+			requestIDFromContext(r.Context()),
+		)
+		writeJSON(w, http.StatusCreated, map[string]any{
+			"path":       relative,
+			"size_bytes": written,
+		})
+	default:
+		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+	}
+}
+
+func (s *server) authorizedFileFolder(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	write bool,
+) (state.NASFolderRecord, string, bool) {
+	folderID := strings.TrimSpace(r.PathValue("folderID"))
+	if folderID == "" {
+		writeAPIError(w, r, http.StatusBadRequest, "file_folder_required", "file folder is required", nil)
+		return state.NASFolderRecord{}, "", false
+	}
+	folder, err := s.state.NASFolder(r.Context(), folderID)
+	if errors.Is(err, state.ErrNASFolderNotFound) {
+		writeAPIError(w, r, http.StatusNotFound, "file_folder_not_found", "file folder not found", nil)
+		return state.NASFolderRecord{}, "", false
+	}
+	if err != nil {
+		writeAPIError(w, r, http.StatusInternalServerError, "file_folder_unavailable", "file folder is unavailable", nil)
+		return state.NASFolderRecord{}, "", false
+	}
+
+	permission := "files.read"
+	if write {
+		permission = "files.write"
+	}
+	if !actor.Has("files.manage") && !actor.Allows(permission, "file_folder", folder.ID) {
+		writeAPIError(
+			w,
+			r,
+			http.StatusForbidden,
+			"permission_denied",
+			fmt.Sprintf("%s permission is required for this folder", permission),
+			nil,
+		)
+		return state.NASFolderRecord{}, "", false
+	}
+
+	root, err := filedata.FolderRoot(folder.PoolRoot, folder.RelativePath)
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadGateway, "file_folder_storage_unavailable", err.Error(), nil)
+		return state.NASFolderRecord{}, "", false
+	}
+	return folder, root, true
+}
+
