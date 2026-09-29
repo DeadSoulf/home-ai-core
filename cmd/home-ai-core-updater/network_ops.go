@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -695,6 +694,3 @@ func sortWireGuardTunnels(items []updaterhelper.WireGuardTunnelStat) {
 	}
 }
 
-func _unusedBytesPackageGuard() {
-	_ = bytes.MinRead
-}
