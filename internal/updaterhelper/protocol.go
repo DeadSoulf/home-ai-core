@@ -17,12 +17,20 @@ type Request struct {
 	SizeMiB         uint64 `json:"size_mib,omitempty"`
 }
 
+type FilesystemStat struct {
+	Device     string `json:"device"`
+	Filesystem string `json:"filesystem,omitempty"`
+	FreeBytes  uint64 `json:"free_bytes,omitempty"`
+	FreeKnown  bool   `json:"free_known"`
+}
+
 type Response struct {
-	OK              bool   `json:"ok"`
-	Message         string `json:"message,omitempty"`
-	Error           string `json:"error,omitempty"`
-	HelperVersion   string `json:"helper_version,omitempty"`
-	ProtocolVersion int    `json:"protocol_version,omitempty"`
+	OK              bool             `json:"ok"`
+	Message         string           `json:"message,omitempty"`
+	Error           string           `json:"error,omitempty"`
+	HelperVersion   string           `json:"helper_version,omitempty"`
+	ProtocolVersion int              `json:"protocol_version,omitempty"`
+	FilesystemStats []FilesystemStat `json:"filesystem_stats,omitempty"`
 }
 
 type Result struct {
