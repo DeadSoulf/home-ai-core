@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../api/client";
-import type { NetworkProfile, NetworkProfileStatus, SystemResponse, WireGuardStatus, WireGuardTunnel } from "../api/types";
+import type { NetworkProfileStatus, SystemResponse, WireGuardStatus, WireGuardTunnel } from "../api/types";
 import { Panel } from "./Panel";
 import { useI18n } from "../i18n";
 import { Status } from "../pages/Dashboard";
