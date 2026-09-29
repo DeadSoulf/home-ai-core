@@ -905,4 +905,3 @@ func TestFileContentRejectsTraversalAndMissingWriteScope(t *testing.T) {
 		t.Fatalf("write without scope status = %d, want %d", rec.Code, http.StatusForbidden)
 	}
 }
-
