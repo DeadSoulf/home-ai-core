@@ -18,12 +18,15 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/modules"
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
+	"github.com/DeadSoulf/home-ai-core/internal/state"
 )
 
 type fakeState struct {
 	pingErr       error
 	schemaVersion int
 	schemaErr     error
+	nasPools      []state.NASPoolRecord
+	nasFolders    []state.NASFolderRecord
 }
 
 func (f fakeState) Ping(context.Context) error {
@@ -44,6 +47,48 @@ func (f fakeState) DiskNames(context.Context) (map[string]string, error) {
 
 func (f fakeState) SetDiskName(context.Context, string, string) error {
 	return nil
+}
+
+func (f fakeState) CreateNASPool(
+	_ context.Context,
+	name, rootPath, createdBy string,
+	now time.Time,
+) (state.NASPoolRecord, error) {
+	return state.NASPoolRecord{
+		ID:        "nsp-test",
+		Name:      name,
+		RootPath:  rootPath,
+		CreatedBy: createdBy,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}, nil
+}
+
+func (f fakeState) ListNASPools(context.Context) ([]state.NASPoolRecord, error) {
+	return f.nasPools, nil
+}
+
+func (f fakeState) CreateNASFolder(
+	_ context.Context,
+	poolID, name, kind, ownerUserID, createdBy string,
+	now time.Time,
+) (state.NASFolderRecord, error) {
+	return state.NASFolderRecord{
+		ID:           "nsf-test",
+		PoolID:       poolID,
+		PoolName:     "Main",
+		Name:         name,
+		Kind:         kind,
+		OwnerUserID:  ownerUserID,
+		RelativePath: "shared/nsf-test",
+		CreatedBy:    createdBy,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}, nil
+}
+
+func (f fakeState) ListNASFolders(context.Context) ([]state.NASFolderRecord, error) {
+	return f.nasFolders, nil
 }
 
 type fakeSecurity struct {
@@ -72,6 +117,9 @@ func defaultFakeSecurity() fakeSecurity {
 				"modules.read",
 				"updates.read",
 				"updates.manage",
+				"files.read",
+				"files.write",
+				"files.manage",
 			},
 		},
 	}
