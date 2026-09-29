@@ -44,7 +44,7 @@ GOOS=linux GOARCH="$GOARCH" CGO_ENABLED=0 go build \
 
 GOOS=linux GOARCH="$GOARCH" CGO_ENABLED=0 go build \
   -trimpath \
-  -ldflags "-s -w" \
+  -ldflags "-s -w -X github.com/DeadSoulf/home-ai-core/internal/updaterhelper.HelperVersion=$VERSION" \
   -o "$STAGE/usr/libexec/home-ai-core/home-ai-core-updater" \
   ./cmd/home-ai-core-updater
 
