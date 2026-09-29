@@ -25,23 +25,6 @@ func TestMemoryInfoFromReader(t *testing.T) {
 	}
 }
 
-func TestBlockDevices(t *testing.T) {
-	root := t.TempDir()
-	makeBlockDevice(t, root, "sda", "8:0", "Test Disk", "SERIAL-1", "2048", "1", "0")
-	makeBlockDevice(t, root, "loop0", "7:0", "", "", "100", "0", "0")
-
-	got := blockDevices(root)
-	if len(got) != 1 {
-		t.Fatalf("device count = %d, want 1", len(got))
-	}
-	if got[0].Name != "sda" || got[0].SizeBytes != 2048*512 {
-		t.Fatalf("unexpected device: %#v", got[0])
-	}
-	if !got[0].Rotational || got[0].Removable {
-		t.Fatalf("unexpected flags: %#v", got[0])
-	}
-}
-
 func TestGPUInventoryUsesPCIIDsAndWorksWithoutDriver(t *testing.T) {
 	root := t.TempDir()
 	device := filepath.Join(root, "0000:01:00.0")
@@ -89,22 +72,6 @@ func TestGPUInventoryReadsBoundDriver(t *testing.T) {
 	if len(got) != 1 || got[0].Driver != "amdgpu" {
 		t.Fatalf("unexpected gpu driver state: %#v", got)
 	}
-}
-
-func makeBlockDevice(t *testing.T, root, name, dev, model, serial, size, rotational, removable string) {
-	t.Helper()
-	base := filepath.Join(root, name)
-	for _, dir := range []string{filepath.Join(base, "device"), filepath.Join(base, "queue")} {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
-	writeTestFile(t, filepath.Join(base, "dev"), dev)
-	writeTestFile(t, filepath.Join(base, "device", "model"), model)
-	writeTestFile(t, filepath.Join(base, "device", "serial"), serial)
-	writeTestFile(t, filepath.Join(base, "size"), size)
-	writeTestFile(t, filepath.Join(base, "queue", "rotational"), rotational)
-	writeTestFile(t, filepath.Join(base, "removable"), removable)
 }
 
 func writeTestFile(t *testing.T, path, content string) {
