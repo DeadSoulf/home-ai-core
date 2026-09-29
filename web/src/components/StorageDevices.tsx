@@ -1,9 +1,60 @@
 import { Fragment, useState } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { api } from "../api/client";
 import type { BlockNode } from "../api/types";
 import { useI18n } from "../i18n";
 
 type Filesystem = "ext4" | "xfs" | "vfat";
+type StorageColumn =
+  | "name"
+  | "type"
+  | "filesystem"
+  | "partitionTable"
+  | "size"
+  | "free"
+  | "mount"
+  | "parent"
+  | "actions";
+
+const defaultColumnWidths: Record<StorageColumn, number> = {
+  name: 290,
+  type: 95,
+  filesystem: 135,
+  partitionTable: 125,
+  size: 115,
+  free: 145,
+  mount: 190,
+  parent: 115,
+  actions: 330,
+};
+
+const minimumColumnWidths: Record<StorageColumn, number> = {
+  name: 150,
+  type: 70,
+  filesystem: 90,
+  partitionTable: 90,
+  size: 85,
+  free: 100,
+  mount: 120,
+  parent: 85,
+  actions: 180,
+};
+
+const storageColumnWidthKey = "home-ai-core.storage.column-widths";
+
+function initialColumnWidths(): Record<StorageColumn, number> {
+  try {
+    const stored = JSON.parse(localStorage.getItem(storageColumnWidthKey) || "{}") as Partial<Record<StorageColumn, number>>;
+    return Object.fromEntries(
+      (Object.keys(defaultColumnWidths) as StorageColumn[]).map((key) => {
+        const value = Number(stored[key]);
+        return [key, Number.isFinite(value) ? Math.max(minimumColumnWidths[key], Math.min(720, value)) : defaultColumnWidths[key]];
+      }),
+    ) as Record<StorageColumn, number>;
+  } catch {
+    return {...defaultColumnWidths};
+  }
+}
 
 function bytes(value = 0) {
   if (value >= 1024 ** 4) return new Intl.NumberFormat(undefined, {maximumFractionDigits: 1}).format(value / 1024 ** 4) + " TiB";
@@ -51,6 +102,61 @@ export function StorageDevices({
       .map((node) => node.path || node.name),
   );
   const [partitionProgress, setPartitionProgress] = useState<{device: string; text: string} | null>(null);
+  const [columnWidths, setColumnWidths] = useState<Record<StorageColumn, number>>(initialColumnWidths);
+
+  function resizeColumn(column: StorageColumn, event: ReactPointerEvent<HTMLSpanElement>) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = columnWidths[column];
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.userSelect = "none";
+
+    const move = (pointerEvent: PointerEvent) => {
+      const width = Math.max(
+        minimumColumnWidths[column],
+        Math.min(720, startWidth + pointerEvent.clientX - startX),
+      );
+      setColumnWidths((current) => {
+        const next = {...current, [column]: width};
+        localStorage.setItem(storageColumnWidthKey, JSON.stringify(next));
+        return next;
+      });
+    };
+    const stop = () => {
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+    };
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+  }
+
+  function resetColumnWidth(column: StorageColumn) {
+    setColumnWidths((current) => {
+      const next = {...current, [column]: defaultColumnWidths[column]};
+      localStorage.setItem(storageColumnWidthKey, JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function storageHeader(column: StorageColumn, label: string) {
+    return (
+      <th>
+        <span>{label}</span>
+        <span
+          className="storage-column-resizer"
+          role="separator"
+          aria-orientation="vertical"
+          title={t("resizeColumn")}
+          onPointerDown={(event) => resizeColumn(column, event)}
+          onDoubleClick={() => resetColumnWidth(column)}
+        />
+      </th>
+    );
+  }
 
   function collapseAll() {
     setCollapsed(
@@ -356,18 +462,32 @@ export function StorageDevices({
       </div>
 
       <div className="table-wrap">
-        <table className="storage-tree-table">
+        <table
+          className="storage-tree-table"
+          style={{width: Object.values(columnWidths).reduce((sum, width) => sum + width, 0)}}
+        >
+          <colgroup>
+            <col style={{width: columnWidths.name}} />
+            <col style={{width: columnWidths.type}} />
+            <col style={{width: columnWidths.filesystem}} />
+            <col style={{width: columnWidths.partitionTable}} />
+            <col style={{width: columnWidths.size}} />
+            <col style={{width: columnWidths.free}} />
+            <col style={{width: columnWidths.mount}} />
+            <col style={{width: columnWidths.parent}} />
+            <col style={{width: columnWidths.actions}} />
+          </colgroup>
           <thead>
             <tr>
-              <th>{t("name")}</th>
-              <th>{t("type")}</th>
-              <th>{t("filesystem")}</th>
-              <th>{t("partitionTable")}</th>
-              <th>{t("size")}</th>
-              <th>{t("freeSpace")}</th>
-              <th>{t("mountPoints")}</th>
-              <th>{t("parentDisk")}</th>
-              <th>{t("actions")}</th>
+              {storageHeader("name", t("name"))}
+              {storageHeader("type", t("type"))}
+              {storageHeader("filesystem", t("filesystem"))}
+              {storageHeader("partitionTable", t("partitionTable"))}
+              {storageHeader("size", t("size"))}
+              {storageHeader("free", t("freeSpace"))}
+              {storageHeader("mount", t("mountPoints"))}
+              {storageHeader("parent", t("parentDisk"))}
+              {storageHeader("actions", t("actions"))}
             </tr>
           </thead>
           <tbody>
