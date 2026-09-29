@@ -28,7 +28,19 @@ func (s *server) updateStatus(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, http.StatusServiceUnavailable, "updater_unavailable", "updater is unavailable", nil)
 		return
 	}
-	status, err := s.updater.Check(r.Context())
+	var status updater.ReleaseStatus
+	var err error
+	if r.URL.Query().Get("fresh") == "1" {
+		if fresh, ok := s.updater.(interface {
+			CheckFresh(context.Context) (updater.ReleaseStatus, error)
+		}); ok {
+			status, err = fresh.CheckFresh(r.Context())
+		} else {
+			status, err = s.updater.Check(r.Context())
+		}
+	} else {
+		status, err = s.updater.Check(r.Context())
+	}
 	if err != nil {
 		s.logger.Error("update check failed", "error", err)
 		writeAPIError(w, r, http.StatusBadGateway, "update_check_failed", "failed to check GitHub for updates", nil)
