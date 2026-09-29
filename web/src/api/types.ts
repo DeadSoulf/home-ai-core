@@ -27,6 +27,8 @@ export type BlockNode = {
   filesystem?: string;
   size_bytes?: number;
   free_bytes?: number;
+  unallocated_bytes?: number;
+  partition_table?: string;
   mountpoints: string[];
   parent_name?: string;
   label?: string;
@@ -182,6 +184,10 @@ export type UpdateStatus = {
   bundle_size_bytes?: number;
   published_at?: string;
   notes?: string;
+  helper_version?: string;
+  helper_protocol?: number;
+  helper_compatible: boolean;
+  helper_error?: string;
 };
 
 export type UpdaterState = {
