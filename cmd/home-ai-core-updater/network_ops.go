@@ -28,10 +28,10 @@ func performNetworkOperation(ctx context.Context, request updaterhelper.Request)
 			return "", err
 		}
 		state := strings.TrimPrefix(request.Operation, "network.link.")
-		if err := runNetworkCommand(ctx, "ip", "link", "set", "dev", iface.Name, state); err != nil {
+		if err := runNetworkCommand(ctx, "ip", "link", "set", "dev", iface, state); err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("interface %s is %s", iface.Name, state), nil
+		return fmt.Sprintf("interface %s is %s", iface, state), nil
 
 	case "network.mtu":
 		iface, err := requireNetworkInterface(request.Interface)
@@ -41,10 +41,10 @@ func performNetworkOperation(ctx context.Context, request updaterhelper.Request)
 		if request.MTU < 576 || request.MTU > 65535 {
 			return "", errors.New("MTU must be between 576 and 65535")
 		}
-		if err := runNetworkCommand(ctx, "ip", "link", "set", "dev", iface.Name, "mtu", strconv.Itoa(request.MTU)); err != nil {
+		if err := runNetworkCommand(ctx, "ip", "link", "set", "dev", iface, "mtu", strconv.Itoa(request.MTU)); err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("MTU for %s set to %d", iface.Name, request.MTU), nil
+		return fmt.Sprintf("MTU for %s set to %d", iface, request.MTU), nil
 
 	case "network.address.add", "network.address.delete":
 		iface, err := requireNetworkInterface(request.Interface)
@@ -59,10 +59,10 @@ func performNetworkOperation(ctx context.Context, request updaterhelper.Request)
 		if request.Operation == "network.address.delete" {
 			action = "del"
 		}
-		if err := runNetworkCommand(ctx, "ip", "address", action, address, "dev", iface.Name); err != nil {
+		if err := runNetworkCommand(ctx, "ip", "address", action, address, "dev", iface); err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("address %s %s on %s", address, action, iface.Name), nil
+		return fmt.Sprintf("address %s %s on %s", address, action, iface), nil
 
 	case "network.gateway.set", "network.gateway.delete":
 		iface, err := requireNetworkInterface(request.Interface)
@@ -79,7 +79,7 @@ func performNetworkOperation(ctx context.Context, request updaterhelper.Request)
 			if ip.To4() == nil {
 				args = append(args, "-6")
 			}
-			args = append(args, "route", "replace", "default", "via", gateway, "dev", iface.Name)
+			args = append(args, "route", "replace", "default", "via", gateway, "dev", iface)
 		} else {
 			if gateway != "" {
 				ip := net.ParseIP(gateway)
@@ -89,16 +89,18 @@ func performNetworkOperation(ctx context.Context, request updaterhelper.Request)
 				if ip.To4() == nil {
 					args = append(args, "-6")
 				}
-				args = append(args, "route", "del", "default", "via", gateway, "dev", iface.Name)
+				args = append(args, "route", "del", "default", "via", gateway, "dev", iface)
 			} else {
-				args = append(args, "route", "del", "default", "dev", iface.Name)
+				args = append(args, "route", "del", "default", "dev", iface)
 			}
 		}
 		if err := runNetworkCommand(ctx, "ip", args...); err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("default gateway updated for %s", iface.Name), nil
+		return fmt.Sprintf("default gateway updated for %s", iface), nil
 
+	case "network.profile.save":
+		return saveNetworkProfile(ctx, request)
 	case "wireguard.install":
 		return installWireGuardTools(ctx)
 	case "wireguard.create":
@@ -118,19 +120,18 @@ func performNetworkOperation(ctx context.Context, request updaterhelper.Request)
 	}
 }
 
-func requireNetworkInterface(name string) (*net.Interface, error) {
+func requireNetworkInterface(name string) (string, error) {
 	name = strings.TrimSpace(name)
 	if !validInterfaceName(name) {
-		return nil, errors.New("invalid network interface name")
+		return "", errors.New("invalid network interface name")
 	}
 	if name == "lo" {
-		return nil, errors.New("loopback interface cannot be managed here")
+		return "", errors.New("loopback interface cannot be managed here")
 	}
-	iface, err := net.InterfaceByName(name)
-	if err != nil {
-		return nil, fmt.Errorf("network interface %s not found", name)
+	if info, err := os.Stat(filepath.Join("/sys/class/net", name)); err != nil || !info.IsDir() {
+		return "", fmt.Errorf("network interface %s not found", name)
 	}
-	return iface, nil
+	return name, nil
 }
 
 func validInterfaceName(name string) bool {
@@ -148,16 +149,46 @@ func validInterfaceName(name string) bool {
 }
 
 func runNetworkCommand(ctx context.Context, command string, args ...string) error {
-	cmd := exec.CommandContext(ctx, command, args...)
+	_, err := runHostCommand(ctx, "", command, args...)
+	return err
+}
+
+func runHostCommand(ctx context.Context, stdin, command string, args ...string) (string, error) {
+	commandPath, err := exec.LookPath(command)
+	if err != nil {
+		return "", fmt.Errorf("%s is unavailable", command)
+	}
+	systemdRun, err := exec.LookPath("systemd-run")
+	if err != nil {
+		return "", errors.New("systemd-run is unavailable")
+	}
+	runArgs := transientHostCommand(commandPath, args...)
+	cmd := exec.CommandContext(ctx, systemdRun, runArgs...)
+	if stdin != "" {
+		cmd.Stdin = strings.NewReader(stdin)
+	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		message := strings.TrimSpace(string(output))
 		if message == "" {
 			message = err.Error()
 		}
-		return fmt.Errorf("%s failed: %s", command, message)
+		return "", fmt.Errorf("%s failed: %s", command, message)
 	}
-	return nil
+	return strings.TrimSpace(string(output)), nil
+}
+
+func transientHostCommand(command string, args ...string) []string {
+	result := []string{
+		"--quiet",
+		"--wait",
+		"--pipe",
+		"--collect",
+		"--service-type=exec",
+		"--",
+		command,
+	}
+	return append(result, args...)
 }
 
 func wireGuardToolsAvailable() bool {
@@ -251,11 +282,11 @@ func createWireGuardTunnel(ctx context.Context, request updaterhelper.Request) (
 
 	privateKey := strings.TrimSpace(request.PrivateKey)
 	if privateKey == "" {
-		output, err := exec.CommandContext(ctx, "wg", "genkey").Output()
+		output, err := runHostCommand(ctx, "", "wg", "genkey")
 		if err != nil {
 			return "", fmt.Errorf("generate WireGuard private key: %w", err)
 		}
-		privateKey = strings.TrimSpace(string(output))
+		privateKey = strings.TrimSpace(output)
 	}
 	publicKey, err := wireGuardPublicKey(ctx, privateKey)
 	if err != nil {
@@ -472,13 +503,11 @@ func applyWireGuardPeer(
 }
 
 func wireGuardPublicKey(ctx context.Context, privateKey string) (string, error) {
-	cmd := exec.CommandContext(ctx, "wg", "pubkey")
-	cmd.Stdin = strings.NewReader(strings.TrimSpace(privateKey) + "\n")
-	output, err := cmd.CombinedOutput()
+	output, err := runHostCommand(ctx, strings.TrimSpace(privateKey)+"\n", "wg", "pubkey")
 	if err != nil {
 		return "", errors.New("invalid WireGuard private key")
 	}
-	publicKey := strings.TrimSpace(string(output))
+	publicKey := strings.TrimSpace(output)
 	if err := validateWireGuardKey(publicKey); err != nil {
 		return "", errors.New("failed to derive WireGuard public key")
 	}
@@ -592,7 +621,8 @@ func removeWireGuardPeer(config, publicKey string) (string, bool) {
 }
 
 func wireGuardActive(ctx context.Context, name string) bool {
-	return exec.CommandContext(ctx, "wg", "show", name).Run() == nil
+	_, err := runHostCommand(ctx, "", "wg", "show", name)
+	return err == nil
 }
 
 func inspectWireGuard(ctx context.Context) (bool, string, []updaterhelper.WireGuardTunnelStat) {
@@ -608,8 +638,8 @@ func inspectWireGuard(ctx context.Context) (bool, string, []updaterhelper.WireGu
 			}
 		}
 	}
-	if output, err := exec.CommandContext(ctx, "wg", "show", "interfaces").Output(); err == nil {
-		for _, name := range strings.Fields(string(output)) {
+	if output, err := runHostCommand(ctx, "", "wg", "show", "interfaces"); err == nil {
+		for _, name := range strings.Fields(output) {
 			if validWireGuardName(name) {
 				names[name] = true
 			}
@@ -659,11 +689,11 @@ func wireGuardInterfaceConfig(config string) (string, int) {
 }
 
 func populateWireGuardRuntime(ctx context.Context, item *updaterhelper.WireGuardTunnelStat) {
-	output, err := exec.CommandContext(ctx, "wg", "show", item.Name, "dump").Output()
+	output, err := runHostCommand(ctx, "", "wg", "show", item.Name, "dump")
 	if err != nil {
 		return
 	}
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	lines := strings.Split(strings.TrimSpace(output), "\n")
 	if len(lines) == 0 || strings.TrimSpace(lines[0]) == "" {
 		return
 	}

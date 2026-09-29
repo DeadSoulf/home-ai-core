@@ -27,6 +27,13 @@ type Request struct {
 	AllowedIPs    []string
 	Endpoint      string
 	Keepalive     int
+	NetworkMethod string
+	DNS           []string
+}
+
+type NetworkProfileStatus struct {
+	Backend  string                             `json:"backend"`
+	Profiles []updaterhelper.NetworkProfileStat `json:"profiles"`
 }
 
 type WireGuardStatus struct {
@@ -39,6 +46,7 @@ func Execute(ctx context.Context, input Request) (string, error) {
 	operation := strings.TrimSpace(input.Operation)
 	switch operation {
 	case "link.up", "link.down", "mtu", "address.add", "address.delete", "gateway.set", "gateway.delete",
+		"profile.save",
 		"wireguard.install", "wireguard.create", "wireguard.up", "wireguard.down", "wireguard.delete",
 		"wireguard.peer.add", "wireguard.peer.delete":
 	default:
@@ -62,6 +70,8 @@ func Execute(ctx context.Context, input Request) (string, error) {
 		AllowedIPs:      trimStrings(input.AllowedIPs),
 		Endpoint:        strings.TrimSpace(input.Endpoint),
 		Keepalive:       input.Keepalive,
+		NetworkMethod:   strings.TrimSpace(input.NetworkMethod),
+		DNS:             trimStrings(input.DNS),
 	}
 	if strings.HasPrefix(operation, "wireguard.") {
 		request.Operation = operation
@@ -73,6 +83,23 @@ func Execute(ctx context.Context, input Request) (string, error) {
 		return "", err
 	}
 	return response.Message, nil
+}
+
+func InspectNetworkProfiles(ctx context.Context) (NetworkProfileStatus, error) {
+	if err := ensureCompatibleHelper(ctx); err != nil {
+		return NetworkProfileStatus{}, err
+	}
+	response, err := callHelper(ctx, updaterhelper.Request{
+		Operation:       "network.profile.inspect",
+		ProtocolVersion: updaterhelper.ProtocolVersion,
+	})
+	if err != nil {
+		return NetworkProfileStatus{}, err
+	}
+	return NetworkProfileStatus{
+		Backend:  response.NetworkBackend,
+		Profiles: append([]updaterhelper.NetworkProfileStat(nil), response.NetworkProfiles...),
+	}, nil
 }
 
 func InspectWireGuard(ctx context.Context) (WireGuardStatus, error) {

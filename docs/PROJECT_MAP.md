@@ -67,7 +67,7 @@ Home-AI должен стать полностью автономной лока
 | Module SDK / Registry | ✅ | manifest, dependencies, capabilities | модульная архитектура продукта |
 | Signed Module Repository | ✅ foundation | подписи и проверка metadata/package | будущая доставка Home-AI модулей |
 | System Info | ✅ | CPU/RAM/GPU/network/storage inventory | локальная диагностика + cluster resources |
-| Network Management | ✅ v1 | up/down, MTU, runtime IP/default-route management, audit | локальное администрирование сети |
+| Network Management | ✅ v2 | runtime controls + persistent DHCP/static/DNS profiles for NetworkManager/systemd-networkd | локальное и постоянное администрирование сети |
 | WireGuard | ✅ foundation | install, tunnel lifecycle, peers, persistent configs | база собственного удалённого доступа |
 | Hardware discovery | ✅ | PCI/GPU/storage данные | ускорители, камеры, adapters |
 | Low-level Storage | ✅ | partitions, format, mount, labels, SMART/LVM | фундамент NAS и NVR storage |
@@ -102,14 +102,21 @@ Check
 
 Используется единое каноническое дерево block devices. Низкоуровневые безопасные storage операции уже дают основу для будущего NAS.
 
-### ✅ Network Management v1
+### ✅ Network Management v2
 
 Реализовано:
 
 - управление link up/down;
 - изменение MTU;
-- добавление/удаление IP-адреса;
-- установка/удаление default route;
+- runtime добавление/удаление IP-адреса;
+- runtime установка/удаление default route;
+- определение активного network backend;
+- persistent DHCP/static IPv4 profiles;
+- persistent gateway и DNS;
+- NetworkManager backend;
+- systemd-networkd backend;
+- ifupdown определяется, но пока не переписывается автоматически;
+- сетевые `ip`/`wg` команды выполняются через transient systemd units и не ослабляют постоянный root-helper;
 - отдельные permissions `network.read` / `network.manage`;
 - Audit для сетевых действий;
 - Web-управление в **System**;
@@ -119,7 +126,7 @@ Check
 - сохранение конфигурации в `/etc/wireguard`;
 - отображение endpoint, allowed IPs, handshake и RX/TX.
 
-Ограничение v1: настройки физических интерфейсов пока runtime-only. Постоянные DHCP/static/DNS-профили будут отдельным сетевым этапом.
+Следующий сетевой долг: безопасное persistent-редактирование ifupdown и затем VLAN/bridges/bonds.
 
 ### ✅ Multi-user foundation
 
@@ -400,7 +407,7 @@ AI не может расширять собственные права.
 | durable events не подходят для media/high-rate telemetry | оставить media отдельным data plane |
 | SQLite single-node | не превращать локальную схему в неявный cluster contract |
 | cluster leadership не определён | сохранить abstraction, решить позже |
-| physical NIC profiles пока runtime-only | добавить backend-aware DHCP/static/DNS persistence |
+| ifupdown persistent profiles пока read-only | добавить безопасный parser/ownership model для /etc/network/interfaces |
 | stable signing/channel | сделать до stable/commercial release |
 | AI self-development может менять систему | только versioned/audited/rollback + approval policy |
 

@@ -10,6 +10,7 @@ import type {
   UpdateStatus,
   UpdaterState,
   UserAccount,
+  NetworkProfileStatus,
   WireGuardStatus,
 } from "./types";
 
@@ -171,6 +172,11 @@ export const api = {
     size_mib?: number;
   }) => postJSON<{message: string}>("/api/v1/storage/operation", input, true),
 
+  networkProfiles: async () => {
+    const result = await request<{network_profiles: NetworkProfileStatus}>("/api/v1/network/profiles");
+    return result.network_profiles;
+  },
+
   wireGuardStatus: async () => {
     const result = await request<{wireguard: WireGuardStatus}>("/api/v1/network/wireguard");
     return result.wireguard;
@@ -185,6 +191,7 @@ export const api = {
       | "address.delete"
       | "gateway.set"
       | "gateway.delete"
+      | "profile.save"
       | "wireguard.install"
       | "wireguard.create"
       | "wireguard.up"
@@ -204,6 +211,8 @@ export const api = {
     allowed_ips?: string[];
     endpoint?: string;
     keepalive?: number;
+    network_method?: "dhcp" | "static";
+    dns?: string[];
   }) => postJSON<{message: string}>("/api/v1/network/operation", input, true),
 
   updateStatus: async (fresh = false) => {
