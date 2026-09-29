@@ -7,32 +7,50 @@ import type { BlockNode } from "../api/types";
 
 function diskFreeBytes(root: BlockNode): number | undefined {
   const seen = new Set<string>();
-  let total = 0;
-  let found = false;
+  let filesystemFree = 0;
+  let foundFilesystem = false;
   let unknownFilesystem = false;
 
   const visit = (node: BlockNode) => {
     const key = node.path || node.uuid || node.name;
-    if (!seen.has(key)) {
-      seen.add(key);
-      const filesystem = (node.filesystem || "").toLowerCase();
-      const dataFilesystem =
-        filesystem !== "" &&
-        filesystem !== "swap" &&
-        filesystem !== "lvm2_member";
-      if (dataFilesystem && !node.free_known) {
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    const filesystem = (node.filesystem || "").toLowerCase();
+    const dataFilesystem =
+      filesystem !== "" &&
+      filesystem !== "swap" &&
+      filesystem !== "lvm2_member";
+
+    if (dataFilesystem) {
+      if (node.free_known) {
+        filesystemFree += node.free_bytes || 0;
+        foundFilesystem = true;
+      } else {
         unknownFilesystem = true;
       }
-      if (node.free_known) {
-        total += node.free_bytes || 0;
-        found = true;
-      }
+    } else if (
+      node.type !== "disk" &&
+      node.type !== "lvm" &&
+      (node.children || []).length === 0 &&
+      !filesystem &&
+      (node.size_bytes || 0) >= 64 * 1024 * 1024
+    ) {
+      // A sizeable leaf device with an unknown filesystem means we cannot
+      // honestly calculate the disk's usable free space.
+      unknownFilesystem = true;
     }
+
     for (const child of node.children || []) visit(child);
   };
 
-  visit(root);
-  return found && !unknownFilesystem ? total : undefined;
+  for (const child of root.children || []) visit(child);
+
+  if (unknownFilesystem) return undefined;
+
+  const unallocated = root.unallocated_bytes || 0;
+  if (!foundFilesystem && unallocated === 0) return undefined;
+  return filesystemFree + unallocated;
 }
 
 function formatBytes(value = 0): string {
