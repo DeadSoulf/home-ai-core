@@ -1,3 +1,9 @@
+export type PermissionScope = {
+  permission: string;
+  resource_type: string;
+  resource_id: string;
+};
+
 export type Actor = {
   type: string;
   id: string;
@@ -5,6 +11,17 @@ export type Actor = {
   display_name?: string;
   roles: string[];
   permissions: string[];
+  resource_permissions?: PermissionScope[];
+};
+
+export type UserAccount = {
+  id: string;
+  username: string;
+  display_name: string;
+  disabled: boolean;
+  created_at: string;
+  last_login_at?: string;
+  roles: string[];
 };
 
 export type SetupStatus = {

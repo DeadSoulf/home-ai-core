@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { APIError, api } from "./client";
+import { APIError, api, setCSRFToken } from "./client";
 
 describe("API client", () => {
   it("parses the Core error envelope", async () => {
@@ -58,6 +58,47 @@ describe("API client", () => {
     expect(init?.credentials).toBe("same-origin");
     expect(String(init?.body)).toContain('"session_mode":"cookie"');
     expect(storage.get("home-ai-core.csrf")).toBe("csrf-test");
+
+    vi.unstubAllGlobals();
+  });
+
+  it("creates a household user with CSRF protection", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({
+        user: {
+          id: "usr_member",
+          username: "alice",
+          display_name: "Alice",
+          disabled: false,
+          created_at: "2026-09-29T00:00:00Z",
+          roles: ["member"],
+        },
+      }), {
+        status: 201,
+        headers: {"Content-Type": "application/json"},
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    });
+
+    setCSRFToken("csrf-create-user");
+    const user = await api.createUser({
+      username: "alice",
+      displayName: "Alice",
+      password: "correct horse battery staple",
+    });
+
+    expect(user.roles).toEqual(["member"]);
+    const [input, init] = fetchMock.mock.calls[0];
+    expect(String(input)).toBe("/api/v1/security/users");
+    expect(init?.method).toBe("POST");
+    expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-create-user");
+    expect(String(init?.body)).toContain('"display_name":"Alice"');
 
     vi.unstubAllGlobals();
   });

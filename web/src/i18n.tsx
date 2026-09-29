@@ -93,7 +93,13 @@ const strings = {
     storageErrorUnmount: "The filesystem could not be unmounted completely.",
     storageErrorNoSpace: "There is not enough unallocated space for the requested partition.",
     storageErrorFormat: "The filesystem could not be created or verified.",
-    partitionSizeExceedsAvailable: "The partition is larger than the available space ({available})."
+    partitionSizeExceedsAvailable: "The partition is larger than the available space ({available}).",
+    users: "Users", usersSubtitle: "Household accounts and access foundation.", userAccounts: "User accounts",
+    roles: "Roles", lastLogin: "Last login", noUsers: "No users found.", addUser: "Add household member",
+    memberPermissionNotice: "New members receive only their own account/session access. Home, camera and file permissions are assigned separately.",
+    userCreated: "User created.", creatingUser: "Creating…", createUser: "Create user",
+    home: "Home", limitedHomeSubtitle: "Your Home-AI account.", yourAccount: "Your account",
+    limitedAccessNotice: "No additional Home-AI resources are assigned to this account yet."
   },
   ru: {
     starting: "Запуск Home-AI-Core…", controlPlane: "Панель управления", dashboard: "Обзор", system: "Система",
@@ -185,7 +191,13 @@ const strings = {
     storageErrorUnmount: "Не удалось полностью размонтировать файловую систему.",
     storageErrorNoSpace: "Недостаточно нераспределённого места для раздела указанного размера.",
     storageErrorFormat: "Не удалось создать или проверить файловую систему.",
-    partitionSizeExceedsAvailable: "Размер раздела больше доступного пространства ({available})."
+    partitionSizeExceedsAvailable: "Размер раздела больше доступного пространства ({available}).",
+    users: "Пользователи", usersSubtitle: "Учетные записи семьи и основа разграничения доступа.", userAccounts: "Учетные записи",
+    roles: "Роли", lastLogin: "Последний вход", noUsers: "Пользователи не найдены.", addUser: "Добавить члена семьи",
+    memberPermissionNotice: "Новый пользователь получает только доступ к своей учетной записи и сессии. Права на дом, камеры и файлы назначаются отдельно.",
+    userCreated: "Пользователь создан.", creatingUser: "Создание…", createUser: "Создать пользователя",
+    home: "Дом", limitedHomeSubtitle: "Ваша учетная запись Home-AI.", yourAccount: "Ваша учетная запись",
+    limitedAccessNotice: "Для этой учетной записи пока не назначены дополнительные ресурсы Home-AI."
   }
 } as const;
 
