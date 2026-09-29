@@ -142,6 +142,15 @@ export const api = {
 
   system: () => request<SystemResponse>("/api/v1/system"),
 
+  storageOperation: async (input: {
+    operation: "mount" | "unmount" | "format";
+    device: string;
+    mountpoint?: string;
+    filesystem?: "ext4" | "xfs" | "vfat";
+    label?: string;
+    confirm?: string;
+  }) => postJSON<{message: string}>("/api/v1/storage/operation", input, true),
+
   updateStatus: async () => {
     const result = await request<{update: UpdateStatus}>("/api/v1/update");
     return result.update;
