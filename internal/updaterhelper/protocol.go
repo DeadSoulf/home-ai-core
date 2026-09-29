@@ -25,6 +25,28 @@ type FilesystemStat struct {
 	FreeKnown  bool   `json:"free_known"`
 }
 
+type DiskHealthStat struct {
+	Device           string  `json:"device"`
+	Transport        string  `json:"transport,omitempty"`
+	Health           string  `json:"health,omitempty"`
+	TemperatureC     *int    `json:"temperature_c,omitempty"`
+	PowerOnHours     *uint64 `json:"power_on_hours,omitempty"`
+	LifeRemainingPct *int    `json:"life_remaining_percent,omitempty"`
+	SmartAvailable   bool    `json:"smart_available"`
+	SmartError       string  `json:"smart_error,omitempty"`
+}
+
+type LVMStat struct {
+	Device          string  `json:"device,omitempty"`
+	Name            string  `json:"name"`
+	VGName          string  `json:"vg_name"`
+	LVName          string  `json:"lv_name"`
+	SizeBytes       uint64  `json:"size_bytes,omitempty"`
+	Active          bool    `json:"active"`
+	DataPercent     *float64 `json:"data_percent,omitempty"`
+	MetadataPercent *float64 `json:"metadata_percent,omitempty"`
+}
+
 type Response struct {
 	OK              bool             `json:"ok"`
 	Message         string           `json:"message,omitempty"`
@@ -34,6 +56,8 @@ type Response struct {
 	RollbackAvailable bool             `json:"rollback_available,omitempty"`
 	RollbackVersion   string           `json:"rollback_version,omitempty"`
 	FilesystemStats  []FilesystemStat `json:"filesystem_stats,omitempty"`
+	DiskHealth       []DiskHealthStat  `json:"disk_health,omitempty"`
+	LVM              []LVMStat         `json:"lvm,omitempty"`
 }
 
 type Result struct {
