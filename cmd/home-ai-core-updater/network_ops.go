@@ -232,12 +232,17 @@ func installWireGuardTools(ctx context.Context) (string, error) {
 }
 
 func transientPackageCommand(command string, args ...string) []string {
-	result := transientHostCommand(command, args...)
-	insertAt := len(result) - len(args) - 1
-	result = append(result[:insertAt],
-		append([]string{"--setenv=DEBIAN_FRONTEND=noninteractive"}, result[insertAt:]...)...,
-	)
-	return result
+	result := []string{
+		"--quiet",
+		"--wait",
+		"--pipe",
+		"--collect",
+		"--service-type=exec",
+		"--setenv=DEBIAN_FRONTEND=noninteractive",
+		"--",
+		command,
+	}
+	return append(result, args...)
 }
 
 func createWireGuardTunnel(ctx context.Context, request updaterhelper.Request) (string, error) {
