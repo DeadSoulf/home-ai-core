@@ -170,15 +170,17 @@ tbody tr:last-child td { border-bottom: 0; }
 
 
 .storage-tree-wrap { display: grid; gap: 12px; }
-.storage-tree-table { min-width: 1040px; border-collapse: separate; border-spacing: 0; }
+.storage-tree-table { min-width: 1220px; border-collapse: separate; border-spacing: 0; }
 .storage-tree-table th { white-space: nowrap; font-size: 11px; letter-spacing: .02em; text-transform: none; color: #9aa8ba; }
 .storage-tree-table th:nth-child(1) { min-width: 280px; }
 .storage-tree-table th:nth-child(2) { width: 90px; }
 .storage-tree-table th:nth-child(3) { width: 130px; }
-.storage-tree-table th:nth-child(4) { width: 110px; }
-.storage-tree-table th:nth-child(5) { min-width: 170px; }
-.storage-tree-table th:nth-child(6) { width: 110px; }
-.storage-tree-table th:nth-child(7) { min-width: 300px; }
+.storage-tree-table th:nth-child(4) { width: 120px; }
+.storage-tree-table th:nth-child(5) { width: 110px; }
+.storage-tree-table th:nth-child(6) { width: 130px; }
+.storage-tree-table th:nth-child(7) { min-width: 170px; }
+.storage-tree-table th:nth-child(8) { width: 110px; }
+.storage-tree-table th:nth-child(9) { min-width: 300px; }
 .storage-tree-table tbody tr:not(.storage-format-row):hover { background: #18212b; }
 .storage-tree-name { display: flex; align-items: center; gap: 7px; min-height: 30px; }
 .storage-display-name { font-size: 13px; font-weight: 700; color: #eef4fb; }
@@ -270,4 +272,11 @@ tbody tr:last-child td { border-bottom: 0; }
   gap: 8px;
   margin-bottom: 10px;
   padding: 0 2px;
+}
+
+.storage-free-detail {
+  margin-top: 3px;
+  font-size: 10px;
+  color: #7f8b9d;
+  white-space: nowrap;
 }
