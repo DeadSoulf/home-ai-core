@@ -32,8 +32,8 @@ type Request struct {
 }
 
 type NetworkProfileStatus struct {
-	Backend  string                               `json:"backend"`
-	Profiles []updaterhelper.NetworkProfileStat   `json:"profiles"`
+	Backend  string                             `json:"backend"`
+	Profiles []updaterhelper.NetworkProfileStat `json:"profiles"`
 }
 
 type WireGuardStatus struct {
