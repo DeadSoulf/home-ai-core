@@ -265,4 +265,3 @@ func TestCreateAndListMemberUser(t *testing.T) {
 		t.Fatalf("duplicate CreateUser() error = %v, want ErrUserExists", err)
 	}
 }
-
