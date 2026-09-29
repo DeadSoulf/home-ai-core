@@ -123,8 +123,8 @@ func (s *server) networkOperation(
 		targetID,
 		"success",
 		map[string]any{
-			"address": input.Address,
-			"gateway": input.Gateway,
+			"address":        input.Address,
+			"gateway":        input.Gateway,
 			"mtu":            input.MTU,
 			"network_method": input.NetworkMethod,
 			"dns":            input.DNS,
