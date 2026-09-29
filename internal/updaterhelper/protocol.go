@@ -8,6 +8,7 @@ type Request struct {
 	Filesystem string `json:"filesystem,omitempty"`
 	Label      string `json:"label,omitempty"`
 	Confirm    string `json:"confirm,omitempty"`
+	SizeMiB    uint64 `json:"size_mib,omitempty"`
 }
 
 type Response struct {
