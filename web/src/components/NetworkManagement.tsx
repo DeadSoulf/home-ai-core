@@ -153,6 +153,8 @@ export function NetworkManagement(props: {
   }
 
   const selectedProfile = profiles?.profiles.find((profile) => profile.interface === selectedInterface);
+  const selectedRuntimeInterface = props.interfaces.find((iface) => iface.name === selectedInterface);
+  const selectedIPv4 = ipv4Addresses(selectedRuntimeInterface);
 
   useEffect(() => {
     if (!selectedProfile) return;
@@ -324,19 +326,22 @@ export function NetworkManagement(props: {
                 <label>
                   {t("networkInterface")}
                   <select value={selectedInterface} onChange={(event) => setSelectedInterface(event.target.value)}>
-                    {profiles.profiles.map((profile) => (
-                      <option key={profile.interface} value={profile.interface}>
-                        {profile.interface} · {
-                          profile.ownership === "external"
-                            ? t("networkProfileExternal")
-                            : profile.ownership === "conflict"
-                              ? t("networkProfileConflict")
-                              : profile.supported
-                                ? (profile.method || t("networkProfileUnconfigured"))
-                                : t("networkProfileUnsupported")
-                        }
-                      </option>
-                    ))}
+                    {profiles.profiles.map((profile) => {
+                      const runtimeInterface = props.interfaces.find((iface) => iface.name === profile.interface);
+                      const currentIPv4 = ipv4Addresses(runtimeInterface);
+                      const profileLabel = profile.ownership === "external"
+                        ? t("networkProfileExternal")
+                        : profile.ownership === "conflict"
+                          ? t("networkProfileConflict")
+                          : profile.supported
+                            ? (profile.method || t("networkProfileUnconfigured"))
+                            : t("networkProfileUnsupported");
+                      return (
+                        <option key={profile.interface} value={profile.interface}>
+                          {profile.interface} · {profileLabel}{currentIPv4.length ? ` · ${currentIPv4.join(", ")}` : ""}
+                        </option>
+                      );
+                    })}
                   </select>
                 </label>
 
@@ -344,6 +349,16 @@ export function NetworkManagement(props: {
                   <>
                     <dl className="details network-profile-details">
                       <dt>{t("networkBackend")}</dt><dd>{selectedProfile.backend}</dd>
+                      <dt>{t("networkCurrentState")}</dt>
+                      <dd>
+                        {selectedRuntimeInterface
+                          ? <Status value={selectedRuntimeInterface.oper_state || (selectedRuntimeInterface.up ? "up" : "down")} />
+                          : "—"}
+                      </dd>
+                      <dt>{t("networkCurrentIpv4")}</dt>
+                      <dd className="mono">{selectedIPv4.join(", ") || "—"}</dd>
+                      <dt>{t("networkCurrentAddresses")}</dt>
+                      <dd className="mono">{selectedRuntimeInterface?.addresses.join(", ") || "—"}</dd>
                       <dt>{t("networkProfileSource")}</dt><dd className="mono">{selectedProfile.source || "—"}</dd>
                       <dt>{t("networkProfileManaged")}</dt><dd>{selectedProfile.managed ? t("yes") : t("no")}</dd>
                       <dt>{t("networkProfileOwnership")}</dt>
@@ -547,3 +562,12 @@ function formatTraffic(value = 0): string {
   }
   return `${current.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
 }
+
+function ipv4Addresses(iface?: NetworkInterface): string[] {
+  if (!iface) return [];
+  return iface.addresses.filter((address) => {
+    const host = address.split("/", 1)[0];
+    return host !== "" && !host.includes(":");
+  });
+}
+
