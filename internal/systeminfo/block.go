@@ -98,6 +98,12 @@ func convertLsblkNode(item lsblkNode) BlockNode {
 		children = append(children, node)
 	}
 
+	if item.Type == "disk" && system {
+		for i := range children {
+			markSystemProtected(&children[i])
+		}
+	}
+
 	var freeBytes uint64
 	freeKnown := false
 	if item.FreeBytes != nil {
@@ -140,6 +146,16 @@ func convertLsblkNode(item lsblkNode) BlockNode {
 		Removable:   item.Removable,
 		System:      system,
 		Children:    children,
+	}
+}
+
+func markSystemProtected(node *BlockNode) {
+	if node == nil {
+		return
+	}
+	node.System = true
+	for i := range node.Children {
+		markSystemProtected(&node.Children[i])
 	}
 }
 
