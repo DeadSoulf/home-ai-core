@@ -396,4 +396,3 @@ func (s *server) authorizedFileFolder(
 	}
 	return folder, root, true
 }
-
