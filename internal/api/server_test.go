@@ -9,6 +9,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -787,3 +789,126 @@ func TestSharedFileFolderCreate(t *testing.T) {
 		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusCreated, rec.Body.String())
 	}
 }
+
+func TestFileEntriesScopedAccess(t *testing.T) {
+	poolRoot := t.TempDir()
+	folder := state.NASFolderRecord{
+		ID:           "nsf-visible",
+		PoolID:       "nsp-main",
+		PoolName:     "Main",
+		PoolRoot:     poolRoot,
+		Name:         "My files",
+		Kind:         "private",
+		OwnerUserID:  "usr-test",
+		RelativePath: "users/usr-test/nsf-visible",
+	}
+	physical := filepath.Join(poolRoot, ".home-ai", filepath.FromSlash(folder.RelativePath))
+	if err := os.MkdirAll(filepath.Join(physical, "Docs"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(physical, "hello.txt"), []byte("hello"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+
+	sec := defaultFakeSecurity()
+	sec.actor.Permissions = []string{"security.self.read"}
+	sec.actor.ResourcePermissions = []security.PermissionScope{
+		{Permission: "files.read", ResourceType: "file_folder", ResourceID: folder.ID},
+	}
+	handler := testHandlerWithSecurity(fakeState{nasFolders: []state.NASFolderRecord{folder}}, sec)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/files/entries?folder_id=nsf-visible",
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var body struct {
+		Entries []struct {
+			Name string `json:"name"`
+			Type string `json:"type"`
+		} `json:"entries"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Entries) != 2 {
+		t.Fatalf("entries = %#v", body.Entries)
+	}
+	if body.Entries[0].Name != "Docs" || body.Entries[0].Type != "directory" {
+		t.Fatalf("directory should sort first: %#v", body.Entries)
+	}
+}
+
+func TestFileOperationRequiresWriteScope(t *testing.T) {
+	folder := state.NASFolderRecord{
+		ID:           "nsf-visible",
+		PoolRoot:     t.TempDir(),
+		RelativePath: "shared/nsf-visible",
+	}
+	sec := defaultFakeSecurity()
+	sec.actor.Permissions = []string{"security.self.read"}
+	sec.actor.ResourcePermissions = []security.PermissionScope{
+		{Permission: "files.read", ResourceType: "file_folder", ResourceID: folder.ID},
+	}
+	handler := testHandlerWithSecurity(fakeState{nasFolders: []state.NASFolderRecord{folder}}, sec)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/files/operation",
+		strings.NewReader(`{"folder_id":"nsf-visible","operation":"mkdir","path":"Docs"}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusForbidden, rec.Body.String())
+	}
+}
+
+func TestFileOperationWithWriteScope(t *testing.T) {
+	poolRoot := t.TempDir()
+	folder := state.NASFolderRecord{
+		ID:           "nsf-visible",
+		PoolRoot:     poolRoot,
+		RelativePath: "shared/nsf-visible",
+	}
+	physical := filepath.Join(poolRoot, ".home-ai", filepath.FromSlash(folder.RelativePath))
+	if err := os.MkdirAll(physical, 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	sec := defaultFakeSecurity()
+	sec.actor.Permissions = []string{"security.self.read"}
+	sec.actor.ResourcePermissions = []security.PermissionScope{
+		{Permission: "files.read", ResourceType: "file_folder", ResourceID: folder.ID},
+		{Permission: "files.write", ResourceType: "file_folder", ResourceID: folder.ID},
+	}
+	handler := testHandlerWithSecurity(fakeState{nasFolders: []state.NASFolderRecord{folder}}, sec)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/files/operation",
+		strings.NewReader(`{"folder_id":"nsf-visible","operation":"mkdir","path":"Docs/2026"}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if info, err := os.Stat(filepath.Join(physical, "Docs", "2026")); err != nil || !info.IsDir() {
+		t.Fatalf("directory was not created: info=%#v err=%v", info, err)
+	}
+}
+
