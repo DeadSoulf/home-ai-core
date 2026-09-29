@@ -622,3 +622,69 @@ tbody tr:last-child td { border-bottom: 0; }
   .network-profile-form { grid-template-columns: 1fr; }
 }
 
+.file-browser-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.file-browser-actions {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.file-browser-actions form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.file-browser-actions input[type="text"],
+.file-browser-actions input:not([type]) {
+  min-width: 220px;
+}
+
+.file-upload-button {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.file-upload-button input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.file-entry-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+@media (max-width: 620px) {
+  .file-browser-actions,
+  .file-browser-actions form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .file-browser-actions input[type="text"],
+  .file-browser-actions input:not([type]) {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
