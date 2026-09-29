@@ -1,8 +1,13 @@
 package updaterhelper
 
 type Request struct {
-	Operation string `json:"operation"`
-	Version   string `json:"version"`
+	Operation  string `json:"operation"`
+	Version    string `json:"version,omitempty"`
+	Device     string `json:"device,omitempty"`
+	Mountpoint string `json:"mountpoint,omitempty"`
+	Filesystem string `json:"filesystem,omitempty"`
+	Label      string `json:"label,omitempty"`
+	Confirm    string `json:"confirm,omitempty"`
 }
 
 type Response struct {
