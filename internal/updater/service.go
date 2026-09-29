@@ -29,7 +29,8 @@ const (
 	maxBundleBytes    = 512 << 20
 	maxExtractedBytes = 768 << 20
 	maxBundleFiles    = 20000
-	defaultUserAgent  = "Home-AI-Core"
+	defaultUserAgent     = "Home-AI-Core"
+	updateCheckCacheTTL  = 10 * time.Minute
 )
 
 var (
@@ -71,6 +72,12 @@ type Service struct {
 	opMu    sync.Mutex
 	stateMu sync.RWMutex
 	state   State
+
+	checkMu          sync.Mutex
+	checkCacheMu     sync.RWMutex
+	checkCache       ReleaseStatus
+	checkCacheAt     time.Time
+	checkCacheLoaded bool
 }
 
 func New(currentVersion, stateDir string) *Service {
@@ -99,47 +106,88 @@ func (s *Service) snapshotState() State {
 }
 
 func (s *Service) Check(ctx context.Context) (ReleaseStatus, error) {
+	return s.check(ctx, false)
+}
+
+func (s *Service) CheckFresh(ctx context.Context) (ReleaseStatus, error) {
+	return s.check(ctx, true)
+}
+
+func (s *Service) check(ctx context.Context, force bool) (ReleaseStatus, error) {
 	helper := s.helperInfo(ctx)
-	s.setState(State{
-		Phase:          PhaseChecking,
-		CurrentVersion: s.currentVersion,
-		UpdatedAt:      time.Now().UTC(),
-	})
+	if !force {
+		if cached, ok := s.cachedReleaseStatus(); ok {
+			return withHelperStatus(cached, helper), nil
+		}
+	}
+
+	s.checkMu.Lock()
+	defer s.checkMu.Unlock()
+
+	if !force {
+		if cached, ok := s.cachedReleaseStatus(); ok {
+			return withHelperStatus(cached, helper), nil
+		}
+	}
+
+	previous := s.snapshotState()
+	preserveState := updateOperationInProgress(previous.Phase)
+	if !preserveState {
+		s.setState(State{
+			Phase:          PhaseChecking,
+			CurrentVersion: s.currentVersion,
+			UpdatedAt:      time.Now().UTC(),
+		})
+	}
 
 	item, err := s.findCandidate(ctx, "")
 	if errors.Is(err, ErrNoUpdate) {
-		status := ReleaseStatus{
-			CurrentVersion:    s.currentVersion,
-			Architecture:      s.architecture,
-			Available:         false,
-			HelperVersion:     helper.Version,
-			HelperProtocol:    helper.ProtocolVersion,
-			HelperAvailable:   helper.Available,
-			HelperCompatible:  helper.Compatible,
-			HelperError:       helper.Error,
-			RollbackAvailable: helper.RollbackAvailable,
-			RollbackVersion:   helper.RollbackVersion,
-		}
-		s.setState(State{
-			Phase:          PhaseIdle,
+		status := withHelperStatus(ReleaseStatus{
 			CurrentVersion: s.currentVersion,
-			Message:        "Home-AI-Core is up to date",
-			UpdatedAt:      time.Now().UTC(),
-		})
+			Architecture:   s.architecture,
+			Available:      false,
+		}, helper)
+		s.storeReleaseStatus(status)
+		if !preserveState {
+			s.setState(State{
+				Phase:          PhaseIdle,
+				CurrentVersion: s.currentVersion,
+				Message:        "Home-AI-Core is up to date",
+				UpdatedAt:      time.Now().UTC(),
+			})
+		}
 		return status, nil
 	}
 	if err != nil {
-		s.failState(err)
+		if cached, ok := s.cachedReleaseStatusAnyAge(); ok {
+			if !preserveState {
+				s.setState(previous)
+			}
+			return withHelperStatus(cached, helper), nil
+		}
+		if !preserveState {
+			s.setState(State{
+				Phase:          PhaseIdle,
+				CurrentVersion: s.currentVersion,
+				Message:        "Update check unavailable",
+				UpdatedAt:      time.Now().UTC(),
+			})
+		}
 		return ReleaseStatus{}, err
 	}
 
-	current := s.snapshotState()
-	if current.Phase == PhaseReady && current.AvailableVersion == item.AvailableVersion {
-		current.CurrentVersion = s.currentVersion
-		current.PublishedAt = item.PublishedAt
-		current.BundleSizeBytes = item.BundleSizeBytes
-		current.UpdatedAt = time.Now().UTC()
-		s.setState(current)
+	status := withHelperStatus(item.ReleaseStatus, helper)
+	s.storeReleaseStatus(status)
+
+	if preserveState {
+		return status, nil
+	}
+	if previous.Phase == PhaseReady && previous.AvailableVersion == item.AvailableVersion {
+		previous.CurrentVersion = s.currentVersion
+		previous.PublishedAt = item.PublishedAt
+		previous.BundleSizeBytes = item.BundleSizeBytes
+		previous.UpdatedAt = time.Now().UTC()
+		s.setState(previous)
 	} else {
 		s.setState(State{
 			Phase:            PhaseAvailable,
@@ -151,14 +199,53 @@ func (s *Service) Check(ctx context.Context) (ReleaseStatus, error) {
 			BundleSizeBytes:  item.BundleSizeBytes,
 		})
 	}
-	item.HelperVersion = helper.Version
-	item.HelperProtocol = helper.ProtocolVersion
-	item.HelperAvailable = helper.Available
-	item.HelperCompatible = helper.Compatible
-	item.HelperError = helper.Error
-	item.RollbackAvailable = helper.RollbackAvailable
-	item.RollbackVersion = helper.RollbackVersion
-	return item.ReleaseStatus, nil
+	return status, nil
+}
+
+func updateOperationInProgress(phase Phase) bool {
+	switch phase {
+	case PhaseDownloading, PhaseReady, PhaseInstalling, PhaseRollingBack, PhaseRestarting:
+		return true
+	default:
+		return false
+	}
+}
+
+func withHelperStatus(status ReleaseStatus, helper HelperInfo) ReleaseStatus {
+	status.HelperVersion = helper.Version
+	status.HelperProtocol = helper.ProtocolVersion
+	status.HelperAvailable = helper.Available
+	status.HelperCompatible = helper.Compatible
+	status.HelperError = helper.Error
+	status.RollbackAvailable = helper.RollbackAvailable
+	status.RollbackVersion = helper.RollbackVersion
+	return status
+}
+
+func (s *Service) cachedReleaseStatus() (ReleaseStatus, bool) {
+	s.checkCacheMu.RLock()
+	defer s.checkCacheMu.RUnlock()
+	if !s.checkCacheLoaded || time.Since(s.checkCacheAt) >= updateCheckCacheTTL {
+		return ReleaseStatus{}, false
+	}
+	return s.checkCache, true
+}
+
+func (s *Service) cachedReleaseStatusAnyAge() (ReleaseStatus, bool) {
+	s.checkCacheMu.RLock()
+	defer s.checkCacheMu.RUnlock()
+	if !s.checkCacheLoaded {
+		return ReleaseStatus{}, false
+	}
+	return s.checkCache, true
+}
+
+func (s *Service) storeReleaseStatus(status ReleaseStatus) {
+	s.checkCacheMu.Lock()
+	s.checkCache = status
+	s.checkCacheAt = time.Now()
+	s.checkCacheLoaded = true
+	s.checkCacheMu.Unlock()
 }
 
 func (s *Service) helperInfo(ctx context.Context) HelperInfo {
