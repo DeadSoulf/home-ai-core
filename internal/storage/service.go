@@ -14,13 +14,15 @@ import (
 const helperSocketPath = "/run/home-ai-core-updater.sock"
 
 type Request struct {
-	Operation  string
-	Device     string
-	Mountpoint string
-	Filesystem string
-	Label      string
-	Confirm    string
-	SizeMiB    uint64
+	Operation    string
+	Device       string
+	Mountpoint   string
+	Filesystem   string
+	Label        string
+	Confirm      string
+	SizeMiB      uint64
+	RootPath     string
+	RelativePath string
 }
 
 func ensureCompatibleHelper(ctx context.Context) error {
@@ -47,7 +49,8 @@ func ensureCompatibleHelper(ctx context.Context) error {
 func Execute(ctx context.Context, input Request) (string, error) {
 	operation := strings.TrimSpace(input.Operation)
 	switch operation {
-	case "mount", "unmount", "format", "partition.create", "partition.delete", "partition.delete_all", "label.rename":
+	case "mount", "unmount", "format", "partition.create", "partition.delete", "partition.delete_all", "label.rename",
+		"nas.prepare_pool", "nas.prepare_folder":
 	default:
 		return "", errors.New("unsupported storage operation")
 	}
@@ -71,6 +74,8 @@ func Execute(ctx context.Context, input Request) (string, error) {
 		Label:           strings.TrimSpace(input.Label),
 		Confirm:         strings.TrimSpace(input.Confirm),
 		SizeMiB:         input.SizeMiB,
+		RootPath:        strings.TrimSpace(input.RootPath),
+		RelativePath:    strings.TrimSpace(input.RelativePath),
 	}
 	if err := json.NewEncoder(conn).Encode(request); err != nil {
 		return "", err
@@ -89,3 +94,21 @@ func Execute(ctx context.Context, input Request) (string, error) {
 	InvalidateInspectionCache()
 	return response.Message, nil
 }
+
+func PrepareNASPool(ctx context.Context, rootPath string) error {
+	_, err := Execute(ctx, Request{
+		Operation: "nas.prepare_pool",
+		RootPath:  rootPath,
+	})
+	return err
+}
+
+func PrepareNASFolder(ctx context.Context, rootPath, relativePath string) error {
+	_, err := Execute(ctx, Request{
+		Operation:    "nas.prepare_folder",
+		RootPath:     rootPath,
+		RelativePath: relativePath,
+	})
+	return err
+}
+
