@@ -16,13 +16,13 @@ import (
 )
 
 const (
-	ifupdownMainPath       = "/etc/network/interfaces"
-	ifupdownDir            = "/etc/network/interfaces.d"
-	ifupdownHomeAIPrefix   = "50-home-ai-"
-	ifupdownManagedMarker  = "# Managed by Home-AI-Core"
-	ifupdownIncludeBegin   = "# BEGIN Home-AI-Core managed include"
-	ifupdownIncludeLine    = "source /etc/network/interfaces.d/*"
-	ifupdownIncludeEnd     = "# END Home-AI-Core managed include"
+	ifupdownMainPath      = "/etc/network/interfaces"
+	ifupdownDir           = "/etc/network/interfaces.d"
+	ifupdownHomeAIPrefix  = "50-home-ai-"
+	ifupdownManagedMarker = "# Managed by Home-AI-Core"
+	ifupdownIncludeBegin  = "# BEGIN Home-AI-Core managed include"
+	ifupdownIncludeLine   = "source /etc/network/interfaces.d/*"
+	ifupdownIncludeEnd    = "# END Home-AI-Core managed include"
 )
 
 type ifupdownStanza struct {
@@ -38,7 +38,7 @@ type ifupdownStanza struct {
 }
 
 type ifupdownInventory struct {
-	Stanzas map[string][]ifupdownStanza
+	Stanzas     map[string][]ifupdownStanza
 	IncludedDir bool
 }
 
