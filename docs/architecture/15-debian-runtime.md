@@ -1,8 +1,8 @@
 # Debian Runtime Layout
 
-Core v0.1 is designed as a normal system service installed on Debian 13.
+Home-AI-Core runs as native Debian 13 services.
 
-## Service identity
+## Service identities
 
 The network-facing Core runs as:
 
@@ -11,52 +11,53 @@ user:  home-ai-core
 group: home-ai-core
 ```
 
-It must never require UID 0 for normal operation.
+It is intentionally unprivileged.
+
+A separate privileged helper runs as root:
+
+```text
+/usr/libexec/home-ai-core/home-ai-core-updater
+```
+
+The helper accepts only typed operations over a Unix socket and verifies the peer UID before processing requests.
 
 ## Filesystem layout
 
 ```text
-/usr/bin/home-ai-core              executable
+/usr/bin/home-ai-core
+/usr/libexec/home-ai-core/home-ai-core-updater
+/usr/share/home-ai-core/web/
 
-/etc/home-ai-core/                 bootstrap configuration
-/var/lib/home-ai-core/             persistent Core state
-/run/home-ai-core/                 runtime IPC/state
+/etc/home-ai-core/
+/var/lib/home-ai-core/
+/var/lib/home-ai-core/update/
+/run/home-ai-core-updater.sock
 ```
-
-systemd creates and owns the configuration, state and runtime directories using its directory-management directives.
 
 ## Default network exposure
 
-The initial Core listens only on:
+Core listens on:
 
 ```text
 127.0.0.1:8080
 ```
 
-until authentication and secure remote-access layers are implemented.
+unless the administrator explicitly changes configuration.
 
-A reverse proxy or future gateway may expose authenticated APIs later.
+## Privilege boundary
 
-## Hardening
+The public Core retains restrictive systemd hardening and does not gain root capabilities for disk or update management.
 
-The systemd unit applies a baseline including:
+Privileged operations are delegated to the helper. Current helper responsibilities include:
 
-- no privilege escalation
-- empty Linux capability sets
-- strict system filesystem protection
-- home-directory protection
-- private temporary directory
-- private device view
-- kernel/control-group protection
-- SUID/SGID restrictions
-- realtime restrictions
-- executable-memory restrictions
-- limited address families
+- verified Core/Web/helper bundle installation and rollback
+- guarded block-device operations
+- SMART/filesystem/LVM inspection that requires device access
 
-Hardening is treated as a tested runtime contract. If a future Core capability conflicts with a hardening control, the preferred solution is to move that capability into an appropriate module or the privileged helper rather than weakening the public Core globally.
+The Web client never supplies an executable path or arbitrary shell command.
 
-## Privileged helper
+## Installation and updates
 
-The future `home-ai-privd` process is intentionally absent from Core v0.1.
+The Debian package creates the service accounts, units and initial binaries.
 
-Adding it requires its own executable, systemd unit, Unix socket permissions, operation protocol and security tests in accordance with ADR-0003.
+Normal application updates then use verified update bundles from the Web UI. The Debian package is retained for initial installation, recovery and package-level dependency/service transitions.
