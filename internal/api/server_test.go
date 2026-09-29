@@ -91,6 +91,10 @@ func (f fakeState) ListNASFolders(context.Context) ([]state.NASFolderRecord, err
 	return f.nasFolders, nil
 }
 
+func (f fakeState) DeleteNASFolder(context.Context, string) error {
+	return nil
+}
+
 type fakeSecurity struct {
 	initialized bool
 	actor       security.Actor
