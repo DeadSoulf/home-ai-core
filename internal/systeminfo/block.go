@@ -31,6 +31,7 @@ type lsblkNode struct {
 	Model       string      `json:"model"`
 	Vendor      string      `json:"vendor"`
 	Serial      string      `json:"serial"`
+	Transport   string      `json:"tran"`
 	Rotational  bool        `json:"rota"`
 	Removable   bool        `json:"rm"`
 	Children    []lsblkNode `json:"children"`
@@ -42,7 +43,7 @@ func lsblkTree() []BlockNode {
 		"--json",
 		"--bytes",
 		"--output",
-		"NAME,PATH,TYPE,FSTYPE,PTTYPE,SIZE,FSAVAIL,MOUNTPOINTS,PKNAME,LABEL,UUID,MODEL,VENDOR,SERIAL,ROTA,RM",
+		"NAME,PATH,TYPE,FSTYPE,PTTYPE,SIZE,FSAVAIL,MOUNTPOINTS,PKNAME,LABEL,UUID,MODEL,VENDOR,SERIAL,TRAN,ROTA,RM",
 	)
 	output, err := command.Output()
 	if err != nil {
@@ -142,6 +143,7 @@ func convertLsblkNode(item lsblkNode) BlockNode {
 		Model:       strings.TrimSpace(item.Model),
 		Vendor:      strings.TrimSpace(item.Vendor),
 		Serial:      strings.TrimSpace(item.Serial),
+		Transport:   strings.ToLower(strings.TrimSpace(item.Transport)),
 		Rotational:  item.Rotational,
 		Removable:   item.Removable,
 		System:      system,
