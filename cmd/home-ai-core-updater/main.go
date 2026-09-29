@@ -104,7 +104,9 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 
 	var request updaterhelper.Request
 	decoder := json.NewDecoder(io.LimitReader(bufio.NewReader(conn), maxRequest+1))
-	decoder.DisallowUnknownFields()
+	// Keep the privileged helper forward-compatible with newer Core/Web clients.
+	// Unknown optional request fields are ignored; every operation still validates
+	// its own required arguments and the peer UID before execution.
 	if err := decoder.Decode(&request); err != nil {
 		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: "invalid updater request"})
 		return
