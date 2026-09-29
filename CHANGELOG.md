@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Repository cleanup and reliability audit
+
+- Removed the unused legacy `internal/coreupdate` version-comparison package.
+- Removed the unregistered Core demo module and empty top-level scaffold directories.
+- Simplified routine CI so Debian packages are built only by the explicit initial-installer workflow.
+- Removed a redundant updater-helper build from the update-release workflow.
+- Switched update-status reads to the dedicated `updates.read` permission.
+- Removed an unused storage inspection wrapper.
+- Hardened storage unmount handling for devices mounted at multiple targets and added socket deadline margin.
+- Refreshed updater, storage, runtime, packaging and repository-layout documentation to match the implemented architecture.
+- Verified routine CI with dependency lock checks, gofmt, schema/shell checks, Web typecheck/tests/build, Go tests/vet, integration smoke test and amd64/arm64 cross-builds.
+
+### Current platform work
+
+
 - Enable and start the privileged Core update helper automatically during Debian package installation.
 
 - Restarted project architecture from a clean working tree.
