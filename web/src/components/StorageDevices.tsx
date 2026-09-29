@@ -585,9 +585,19 @@ export function StorageDevices({
                         )}
                         {node.label && <span className="storage-inline-label">{node.label}</span>}
                       </div>
-                      {depth === 0 && (node.vendor || node.model) && (
+                      {depth === 0 && (
                         <div className="storage-tree-model">
-                          {[node.vendor, node.model].filter(Boolean).join(" ")}
+                          {[node.vendor, node.model].filter(Boolean).join(" ") || node.path || ""}
+                          {node.temperature_c !== undefined ? " · " + node.temperature_c + "°C" : ""}
+                          {node.power_on_hours !== undefined ? " · " + node.power_on_hours.toLocaleString() + " " + t("hoursShort") : ""}
+                          {node.life_remaining_percent !== undefined ? " · " + t("lifeRemaining") + ": " + node.life_remaining_percent + "%" : ""}
+                          {!node.smart_available && node.smart_error ? " · " + t("smartUnavailable") : ""}
+                        </div>
+                      )}
+                      {node.type === "lvm" && (node.lvm_vg_name || node.lvm_lv_name) && (
+                        <div className="storage-tree-model">
+                          {"VG: " + (node.lvm_vg_name || "—") + " · LV: " + (node.lvm_lv_name || "—")}
+                          {node.lvm_data_percent !== undefined ? " · " + t("lvmDataUsed") + ": " + node.lvm_data_percent.toFixed(1) + "%" : ""}
                         </div>
                       )}
                     </td>
