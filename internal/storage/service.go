@@ -63,14 +63,14 @@ func Execute(ctx context.Context, input Request) (string, error) {
 	defer conn.Close()
 
 	request := updaterhelper.Request{
-		Operation:        "storage." + operation,
-		ProtocolVersion:  updaterhelper.ProtocolVersion,
-		Device:           strings.TrimSpace(input.Device),
-		Mountpoint:       strings.TrimSpace(input.Mountpoint),
-		Filesystem:       strings.TrimSpace(input.Filesystem),
-		Label:            strings.TrimSpace(input.Label),
-		Confirm:          strings.TrimSpace(input.Confirm),
-		SizeMiB:          input.SizeMiB,
+		Operation:       "storage." + operation,
+		ProtocolVersion: updaterhelper.ProtocolVersion,
+		Device:          strings.TrimSpace(input.Device),
+		Mountpoint:      strings.TrimSpace(input.Mountpoint),
+		Filesystem:      strings.TrimSpace(input.Filesystem),
+		Label:           strings.TrimSpace(input.Label),
+		Confirm:         strings.TrimSpace(input.Confirm),
+		SizeMiB:         input.SizeMiB,
 	}
 	if err := json.NewEncoder(conn).Encode(request); err != nil {
 		return "", err
