@@ -199,7 +199,10 @@ export function SystemPage({revision}: {revision: number}) {
               <strong>{updateInfo.available ? t("updateAvailable") : t("upToDate")}</strong>
             </div>
           )}
-          {updateInfo && !updateInfo.helper_compatible && (
+          {updateInfo && !updateInfo.helper_available && (
+            <div className="form-error">{t("helperUnavailable")}</div>
+          )}
+          {updateInfo?.helper_available && !updateInfo.helper_compatible && (
             <div className="form-error">{t("helperUpgradeRequired")}</div>
           )}
           {updateInfo?.helper_compatible && (
@@ -230,7 +233,7 @@ export function SystemPage({revision}: {revision: number}) {
               <button
                 type="button"
                 className="button primary"
-                disabled={installingUpdate || updateInfo?.helper_compatible === false}
+                disabled={installingUpdate || updateInfo?.helper_available === false || updateInfo?.helper_compatible === false}
                 onClick={installUpdate}
               >
                 {installingUpdate ? t("installing") : t("installUpdate")}
