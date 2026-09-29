@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../api/client";
-import type { SystemResponse, WireGuardStatus, WireGuardTunnel } from "../api/types";
+import type { NetworkProfile, NetworkProfileStatus, SystemResponse, WireGuardStatus, WireGuardTunnel } from "../api/types";
 import { Panel } from "./Panel";
 import { useI18n } from "../i18n";
 import { Status } from "../pages/Dashboard";
@@ -9,11 +9,19 @@ type NetworkInterface = SystemResponse["system"]["network_interfaces"][number];
 
 export function NetworkManagement(props: {
   interfaces: NetworkInterface[];
-  canReadWireGuard: boolean;
+  canReadNetwork: boolean;
   canManage: boolean;
   onChanged: () => void;
 }) {
   const {t, date} = useI18n();
+  const [profiles, setProfiles] = useState<NetworkProfileStatus>();
+  const [profileError, setProfileError] = useState("");
+  const [selectedInterface, setSelectedInterface] = useState("");
+  const [profileMethod, setProfileMethod] = useState<"dhcp" | "static">("dhcp");
+  const [profileAddress, setProfileAddress] = useState("");
+  const [profileGateway, setProfileGateway] = useState("");
+  const [profileDNS, setProfileDNS] = useState("");
+
   const [wireGuard, setWireGuard] = useState<WireGuardStatus>();
   const [wireGuardError, setWireGuardError] = useState("");
   const [busy, setBusy] = useState("");
@@ -23,8 +31,27 @@ export function NetworkManagement(props: {
   const [tunnelAddress, setTunnelAddress] = useState("10.77.0.1/24");
   const [listenPort, setListenPort] = useState("51820");
 
+  const refreshProfiles = useCallback(async () => {
+    if (!props.canReadNetwork) return;
+    try {
+      const status = await api.networkProfiles();
+      setProfiles(status);
+      setProfileError("");
+      setSelectedInterface((current) => {
+        if (current && status.profiles.some((profile) => profile.interface === current)) {
+          return current;
+        }
+        return status.profiles.find((profile) => profile.supported)?.interface
+          || status.profiles[0]?.interface
+          || "";
+      });
+    } catch (reason) {
+      setProfileError(reason instanceof Error ? reason.message : t("requestFailed"));
+    }
+  }, [props.canReadNetwork, t]);
+
   const refreshWireGuard = useCallback(async () => {
-    if (!props.canReadWireGuard) return;
+    if (!props.canReadNetwork) return;
     try {
       const status = await api.wireGuardStatus();
       setWireGuard(status);
@@ -32,11 +59,12 @@ export function NetworkManagement(props: {
     } catch (reason) {
       setWireGuardError(reason instanceof Error ? reason.message : t("requestFailed"));
     }
-  }, [props.canReadWireGuard, t]);
+  }, [props.canReadNetwork, t]);
 
   useEffect(() => {
+    void refreshProfiles();
     void refreshWireGuard();
-  }, [refreshWireGuard]);
+  }, [refreshProfiles, refreshWireGuard]);
 
   async function runNetworkOperation(
     key: string,
@@ -49,7 +77,7 @@ export function NetworkManagement(props: {
       const result = await api.networkOperation(input);
       setMessage(result.message);
       props.onChanged();
-      await refreshWireGuard();
+      await Promise.all([refreshProfiles(), refreshWireGuard()]);
     } catch (reason) {
       setOperationError(reason instanceof Error ? reason.message : t("requestFailed"));
     } finally {
@@ -121,6 +149,36 @@ export function NetworkManagement(props: {
     await runNetworkOperation(`gateway-delete-${iface.name}`, {
       operation: "gateway.delete",
       interface: iface.name,
+    });
+  }
+
+  const selectedProfile = profiles?.profiles.find((profile) => profile.interface === selectedInterface);
+
+  useEffect(() => {
+    if (!selectedProfile) return;
+    setProfileMethod(selectedProfile.method === "static" ? "static" : "dhcp");
+    setProfileAddress(selectedProfile.address || "");
+    setProfileGateway(selectedProfile.gateway || "");
+    setProfileDNS((selectedProfile.dns || []).join(", "));
+  }, [selectedProfile?.interface, selectedProfile?.method, selectedProfile?.address, selectedProfile?.gateway, selectedProfile?.dns?.join("|")]);
+
+  async function saveProfile(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedProfile || !selectedProfile.supported) return;
+    if (profileMethod === "static" && !profileAddress.trim()) {
+      setOperationError(t("networkProfileAddressRequired"));
+      return;
+    }
+    if (!window.confirm(t("networkProfileApplyConfirm").replace("{interface}", selectedProfile.interface))) {
+      return;
+    }
+    await runNetworkOperation(`profile-${selectedProfile.interface}`, {
+      operation: "profile.save",
+      interface: selectedProfile.interface,
+      network_method: profileMethod,
+      address: profileMethod === "static" ? profileAddress.trim() : undefined,
+      gateway: profileMethod === "static" ? profileGateway.trim() : undefined,
+      dns: profileDNS.split(",").map((value) => value.trim()).filter(Boolean),
     });
   }
 
@@ -253,7 +311,94 @@ export function NetworkManagement(props: {
         </div>
       </Panel>
 
-      {props.canReadWireGuard && (
+      {props.canReadNetwork && (
+        <Panel title={t("networkPersistentProfiles")} className="wide">
+          {profileError && <div className="form-error">{profileError}</div>}
+          {!profiles && !profileError && <span className="muted">{t("loading")}</span>}
+          {profiles && (
+            <div className="network-profile-stack">
+              <div className="notice">
+                {t("networkBackend")}: <strong>{profiles.backend || "unknown"}</strong>
+              </div>
+              <div className="network-profile-grid">
+                <label>
+                  {t("networkInterface")}
+                  <select value={selectedInterface} onChange={(event) => setSelectedInterface(event.target.value)}>
+                    {profiles.profiles.map((profile) => (
+                      <option key={profile.interface} value={profile.interface}>
+                        {profile.interface} · {profile.supported ? (profile.method || t("networkProfileUnconfigured")) : t("networkProfileUnsupported")}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {selectedProfile && (
+                  <>
+                    <dl className="details network-profile-details">
+                      <dt>{t("networkBackend")}</dt><dd>{selectedProfile.backend}</dd>
+                      <dt>{t("networkProfileSource")}</dt><dd className="mono">{selectedProfile.source || "—"}</dd>
+                      <dt>{t("networkProfileManaged")}</dt><dd>{selectedProfile.managed ? t("yes") : t("no")}</dd>
+                    </dl>
+
+                    {!selectedProfile.supported && (
+                      <div className="form-error">
+                        {selectedProfile.error || t("networkProfileUnsupported")}
+                      </div>
+                    )}
+
+                    {selectedProfile.supported && props.canManage && (
+                      <form className="network-profile-form" onSubmit={saveProfile}>
+                        <label>
+                          {t("networkProfileMethod")}
+                          <select value={profileMethod} onChange={(event) => setProfileMethod(event.target.value as "dhcp" | "static")}>
+                            <option value="dhcp">DHCP</option>
+                            <option value="static">{t("networkStatic")}</option>
+                          </select>
+                        </label>
+                        {profileMethod === "static" && (
+                          <>
+                            <label>
+                              {t("networkProfileAddress")}
+                              <input
+                                value={profileAddress}
+                                onChange={(event) => setProfileAddress(event.target.value)}
+                                placeholder="192.168.1.10/24"
+                                required
+                              />
+                            </label>
+                            <label>
+                              {t("networkProfileGateway")}
+                              <input
+                                value={profileGateway}
+                                onChange={(event) => setProfileGateway(event.target.value)}
+                                placeholder="192.168.1.1"
+                              />
+                            </label>
+                          </>
+                        )}
+                        <label>
+                          DNS
+                          <input
+                            value={profileDNS}
+                            onChange={(event) => setProfileDNS(event.target.value)}
+                            placeholder="1.1.1.1, 8.8.8.8"
+                          />
+                        </label>
+                        <div className="notice">{t("networkProfileApplyWarning")}</div>
+                        <button className="button primary" type="submit" disabled={busy !== ""}>
+                          {busy === `profile-${selectedProfile.interface}` ? t("working") : t("networkProfileSaveApply")}
+                        </button>
+                      </form>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </Panel>
+      )}
+
+      {props.canReadNetwork && (
         <Panel title="WireGuard" className="wide">
           {wireGuardError && <div className="form-error">{wireGuardError}</div>}
           {!wireGuard && !wireGuardError && <span className="muted">{t("loading")}</span>}
