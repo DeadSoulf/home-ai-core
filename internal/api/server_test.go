@@ -1129,4 +1129,3 @@ func TestFileTrashMutationsRequireWriteScope(t *testing.T) {
 		t.Fatalf("restore without write scope status = %d, want %d", rec.Code, http.StatusForbidden)
 	}
 }
-
