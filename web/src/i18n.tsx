@@ -133,6 +133,13 @@ const strings = {
     networkProfileAddressRequired: "A static address with CIDR prefix is required.",
     networkProfileUnsupported: "Persistent management is not supported for this interface/backend yet.",
     networkProfileUnconfigured: "not configured", networkStatic: "Static",
+    networkProfileOwnership: "Ownership",
+    networkProfileOwnedHomeAI: "Home-AI managed",
+    networkProfileOwnershipNone: "Not configured",
+    networkProfileExternal: "Externally managed",
+    networkProfileConflict: "Configuration conflict",
+    networkProfileExternalNotice: "This interface is configured in an external ifupdown file. Home-AI shows the settings but will not overwrite them.",
+    networkProfileConflictNotice: "Multiple active IPv4 stanzas were found for this interface. Resolve the conflict manually before Home-AI can manage it.",
     yes: "Yes", no: "No"
   },
   ru: {
@@ -265,6 +272,13 @@ const strings = {
     networkProfileAddressRequired: "Для статической настройки нужен адрес с CIDR-префиксом.",
     networkProfileUnsupported: "Постоянное управление этим интерфейсом/backend пока не поддерживается.",
     networkProfileUnconfigured: "не настроен", networkStatic: "Статический",
+    networkProfileOwnership: "Управление профилем",
+    networkProfileOwnedHomeAI: "Управляется Home-AI",
+    networkProfileOwnershipNone: "Не настроен",
+    networkProfileExternal: "Внешний профиль",
+    networkProfileConflict: "Конфликт конфигурации",
+    networkProfileExternalNotice: "Интерфейс настроен во внешнем ifupdown-файле. Home-AI показывает параметры, но не будет перезаписывать их.",
+    networkProfileConflictNotice: "Для интерфейса найдено несколько активных IPv4 stanza. Сначала устраните конфликт вручную.",
     yes: "Да", no: "Нет"
   }
 } as const;
