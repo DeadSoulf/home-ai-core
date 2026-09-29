@@ -15,10 +15,10 @@ const updaterSocketPath = "/run/home-ai-core-updater.sock"
 var ErrHelperUpgradeRequired = errors.New("system updater helper is outdated; install the latest initial installer once")
 
 type HelperInfo struct {
-	Version         string `json:"version"`
-	ProtocolVersion int    `json:"protocol_version"`
-	Available       bool   `json:"available"`
-	Compatible      bool   `json:"compatible"`
+	Version           string `json:"version"`
+	ProtocolVersion   int    `json:"protocol_version"`
+	Available         bool   `json:"available"`
+	Compatible        bool   `json:"compatible"`
 	RollbackAvailable bool   `json:"rollback_available"`
 	RollbackVersion   string `json:"rollback_version,omitempty"`
 	Error             string `json:"error,omitempty"`
@@ -47,10 +47,10 @@ func queryUpdaterHelperInfo(ctx context.Context) (HelperInfo, error) {
 		return HelperInfo{Available: true, Error: message}, ErrHelperUpgradeRequired
 	}
 	info := HelperInfo{
-		Version:         response.HelperVersion,
-		ProtocolVersion: response.ProtocolVersion,
-		Available:       true,
-		Compatible:      response.ProtocolVersion >= updaterhelper.ProtocolVersion,
+		Version:           response.HelperVersion,
+		ProtocolVersion:   response.ProtocolVersion,
+		Available:         true,
+		Compatible:        response.ProtocolVersion >= updaterhelper.ProtocolVersion,
 		RollbackAvailable: response.RollbackAvailable,
 		RollbackVersion:   response.RollbackVersion,
 	}
