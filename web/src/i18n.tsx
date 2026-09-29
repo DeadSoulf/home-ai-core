@@ -41,7 +41,9 @@ const strings = {
     createPartitionConfirmation: "Create a partition on {device}. Type {confirmation} to continue.",
     deletePartitionConfirmation: "Delete {device}? Its filesystem and all data will become inaccessible. Type {confirmation} to continue.",
     partitionConfirmationMismatch: "Partition operation cancelled: confirmation text did not match.",
-    invalidPartitionSize: "Enter a valid partition size greater than zero."
+    invalidPartitionSize: "Enter a valid partition size greater than zero.",
+    collapsePartitions: "Collapse partitions", expandPartitions: "Expand partitions", renameDisk: "Rename",
+    renameDiskPrompt: "Enter a new filesystem label for {device}.", diskNameRequired: "The new name cannot be empty."
   },
   ru: {
     starting: "Запуск Home-AI-Core…", controlPlane: "Панель управления", dashboard: "Обзор", system: "Система",
@@ -81,7 +83,9 @@ const strings = {
     createPartitionConfirmation: "Создать раздел на {device}. Для продолжения введите {confirmation}.",
     deletePartitionConfirmation: "Удалить {device}? Файловая система и все данные раздела станут недоступны. Для продолжения введите {confirmation}.",
     partitionConfirmationMismatch: "Операция с разделом отменена: текст подтверждения не совпал.",
-    invalidPartitionSize: "Введите корректный размер раздела больше нуля."
+    invalidPartitionSize: "Введите корректный размер раздела больше нуля.",
+    collapsePartitions: "Свернуть разделы", expandPartitions: "Развернуть разделы", renameDisk: "Переименовать",
+    renameDiskPrompt: "Введите новое имя (метку файловой системы) для {device}.", diskNameRequired: "Новое имя не может быть пустым."
   }
 } as const;
 
