@@ -77,7 +77,8 @@ const strings = {
     diskDisplayNamePlaceholder: "For example: Archive",
     diskDisplayNamePrompt: "Enter a Home-AI-Core name for {device}.",
     diskNameSaved: "Disk name saved.",
-    renamePhysicalDisk: "Rename disk"
+    renamePhysicalDisk: "Rename disk",
+    resizeColumn: "Drag to resize column. Double-click to reset width."
   },
   ru: {
     starting: "Запуск Home-AI-Core…", controlPlane: "Панель управления", dashboard: "Обзор", system: "Система",
@@ -153,7 +154,8 @@ const strings = {
     diskDisplayNamePlaceholder: "Например: Архив",
     diskDisplayNamePrompt: "Введите имя диска {device} в Home-AI-Core.",
     diskNameSaved: "Имя диска сохранено.",
-    renamePhysicalDisk: "Переименовать диск"
+    renamePhysicalDisk: "Переименовать диск",
+    resizeColumn: "Потяните границу для изменения ширины. Двойной щелчок — сброс ширины."
   }
 } as const;
 
