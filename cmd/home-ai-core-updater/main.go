@@ -327,6 +327,14 @@ func rollback(ctx context.Context, backup, rollbackWeb string) {
 	} else {
 		_ = copyTree(filepath.Join(backup, "web"), liveWeb)
 	}
+
+	backupHelper := filepath.Join(backup, "helper", "home-ai-core-updater")
+	if info, err := os.Stat(backupHelper); err == nil && info.Mode().IsRegular() {
+		tmpHelper := filepath.Join(filepath.Dir(liveHelper), ".home-ai-core-updater.rollback")
+		if err := copyFile(backupHelper, tmpHelper, 0o755); err == nil {
+			_ = os.Rename(tmpHelper, liveHelper)
+		}
+	}
 	_ = systemctl(ctx, "start", serviceName)
 }
 
