@@ -3,7 +3,6 @@ package systeminfo
 import (
 	"bufio"
 	"os"
-	"strconv"
 	"strings"
 )
 
@@ -35,18 +34,3 @@ func readUEvent(path string) map[string]string {
 	return values
 }
 
-func readUint(path string) uint64 {
-	value := readTrimmed(path)
-	if value == "" {
-		return 0
-	}
-	parsed, err := strconv.ParseUint(value, 10, 64)
-	if err != nil {
-		return 0
-	}
-	return parsed
-}
-
-func readBool01(path string) bool {
-	return readTrimmed(path) == "1"
-}
