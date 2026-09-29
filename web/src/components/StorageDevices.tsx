@@ -578,6 +578,11 @@ export function StorageDevices({
                         {node.type === "disk" && node.health === "failed" && (
                           <span className="status-badge status-failed">{t("diskHealthFailed")}</span>
                         )}
+                        {node.type === "lvm" && node.lvm_active !== undefined && (
+                          <span className={node.lvm_active ? "status-badge status-success" : "status-badge"}>
+                            {node.lvm_active ? t("lvmActive") : t("lvmInactive")}
+                          </span>
+                        )}
                         {node.label && <span className="storage-inline-label">{node.label}</span>}
                       </div>
                       {depth === 0 && (node.vendor || node.model) && (
