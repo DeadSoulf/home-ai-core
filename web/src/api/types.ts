@@ -187,6 +187,7 @@ export type UpdateStatus = {
   notes?: string;
   helper_version?: string;
   helper_protocol?: number;
+  helper_available: boolean;
   helper_compatible: boolean;
   helper_error?: string;
 };
