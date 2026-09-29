@@ -41,6 +41,15 @@ func blockDevices(sysBlockRoot string) []BlockDevice {
 			Removable:  readBool01(filepath.Join(base, "removable")),
 			Partitions: partitions(base, mounts),
 		}
+		device.System = mountedAtRoot(mounts[device.Path])
+		if !device.System {
+			for _, part := range device.Partitions {
+				if mountedAtRoot(mounts[part.Path]) {
+					device.System = true
+					break
+				}
+			}
+		}
 		devices = append(devices, device)
 	}
 
@@ -78,10 +87,14 @@ func partitions(diskPath string, mounts map[string][]mountInfo) []Partition {
 			continue
 		}
 		devicePath := filepath.Join("/dev", name)
+		props := udevBlockProperties(readTrimmed(filepath.Join(partPath, "dev")))
 		p := Partition{
-			Name: name,
-			Path: devicePath,
-			SizeBytes: readUint(filepath.Join(partPath, "size")) * sectorSize,
+			Name:        name,
+			Path:        devicePath,
+			SizeBytes:   readUint(filepath.Join(partPath, "size")) * sectorSize,
+			Filesystem:  props["ID_FS_TYPE"],
+			UUID:        props["ID_FS_UUID"],
+			Label:       props["ID_FS_LABEL"],
 			Mountpoints: []string{},
 		}
 		for _, info := range mounts[devicePath] {
@@ -94,6 +107,40 @@ func partitions(diskPath string, mounts map[string][]mountInfo) []Partition {
 		result = append(result, p)
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
+	return result
+}
+
+func mountedAtRoot(items []mountInfo) bool {
+	for _, item := range items {
+		if item.Mountpoint == "/" {
+			return true
+		}
+	}
+	return false
+}
+
+func udevBlockProperties(majorMinor string) map[string]string {
+	result := map[string]string{}
+	if majorMinor == "" {
+		return result
+	}
+	file, err := os.Open(filepath.Join("/run/udev/data", "b"+majorMinor))
+	if err != nil {
+		return result
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if !strings.HasPrefix(line, "E:") {
+			continue
+		}
+		key, value, ok := strings.Cut(strings.TrimPrefix(line, "E:"), "=")
+		if ok {
+			result[key] = value
+		}
+	}
 	return result
 }
 
