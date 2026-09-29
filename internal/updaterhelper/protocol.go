@@ -87,6 +87,7 @@ type NetworkProfileStat struct {
 	Backend   string   `json:"backend"`
 	Supported bool     `json:"supported"`
 	Managed   bool     `json:"managed"`
+	Ownership string   `json:"ownership,omitempty"`
 	Method    string   `json:"method,omitempty"`
 	Address   string   `json:"address,omitempty"`
 	Gateway   string   `json:"gateway,omitempty"`
