@@ -9,11 +9,20 @@ function diskFreeBytes(root: BlockNode): number | undefined {
   const seen = new Set<string>();
   let total = 0;
   let found = false;
+  let unknownFilesystem = false;
 
   const visit = (node: BlockNode) => {
     const key = node.path || node.uuid || node.name;
     if (!seen.has(key)) {
       seen.add(key);
+      const filesystem = (node.filesystem || "").toLowerCase();
+      const dataFilesystem =
+        filesystem !== "" &&
+        filesystem !== "swap" &&
+        filesystem !== "lvm2_member";
+      if (dataFilesystem && !node.free_known) {
+        unknownFilesystem = true;
+      }
       if (node.free_known) {
         total += node.free_bytes || 0;
         found = true;
@@ -23,7 +32,7 @@ function diskFreeBytes(root: BlockNode): number | undefined {
   };
 
   visit(root);
-  return found ? total : undefined;
+  return found && !unknownFilesystem ? total : undefined;
 }
 
 function formatBytes(value = 0): string {
