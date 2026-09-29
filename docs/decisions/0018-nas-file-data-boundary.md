@@ -61,14 +61,22 @@ Downloads use the standard Go `http.ServeContent` path after authorization and s
 
 ### Initial operations
 
-The first file data slice supports:
+The file data API supports:
 
 - list directory entries;
 - create directory;
 - upload/replace a regular file;
-- download a regular file.
+- download a regular file;
+- delete a regular file or empty directory;
+- move/rename an entry inside the same logical folder.
 
-Delete/move/rename are intentionally deferred to the next slice because they need additional destructive-action audit and overwrite semantics.
+Move/rename never overwrites an existing target.
+
+Directory deletion is deliberately non-recursive. A non-empty directory must be emptied first.
+
+Moving a directory into itself or one of its descendants is rejected.
+
+Delete and move operations require scoped `files.write` (or global `files.manage`) and are recorded in Audit.
 
 ## Consequences
 
@@ -80,9 +88,9 @@ Delete/move/rename are intentionally deferred to the next slice because they nee
 
 ## Deferred
 
-- delete;
-- move;
-- rename;
+- recursive delete;
+- overwrite-on-move;
+- cross-logical-folder move;
 - recursive operations;
 - trash/recycle bin;
 - resumable/chunked uploads;
