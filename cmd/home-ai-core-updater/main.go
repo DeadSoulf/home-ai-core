@@ -355,6 +355,13 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 
 	switch request.Operation {
 	case "storage.mount":
+		targets, err := mountedTargets(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		if len(targets) != 0 {
+			return "", errors.New("device is already mounted")
+		}
 		target := strings.TrimSpace(request.Mountpoint)
 		if target == "" {
 			target = filepath.Join("/mnt/home-ai-core", filepath.Base(device))
@@ -460,8 +467,8 @@ func validateBlockDevice(value string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("stat block device: %w", err)
 	}
-	if info.Mode()&os.ModeDevice == 0 {
-		return "", errors.New("requested path is not a device")
+	if info.Mode()&os.ModeDevice == 0 || info.Mode()&os.ModeCharDevice != 0 {
+		return "", errors.New("requested path is not a block device")
 	}
 	return device, nil
 }
@@ -490,6 +497,9 @@ func samePhysicalDiskAsRoot(ctx context.Context, device string) (bool, error) {
 		return false, fmt.Errorf("resolve root filesystem: %s", strings.TrimSpace(string(rootOutput)))
 	}
 	rootSource := strings.TrimSpace(string(rootOutput))
+	if index := strings.Index(rootSource, "["); index >= 0 {
+		rootSource = rootSource[:index]
+	}
 	if !strings.HasPrefix(rootSource, "/dev/") {
 		return false, errors.New("cannot safely resolve the system disk")
 	}
