@@ -25,13 +25,15 @@ import (
 )
 
 const (
-	socketPath  = "/run/home-ai-core-updater.sock"
-	updateRoot  = "/var/lib/home-ai-core/update"
-	liveBinary  = "/usr/bin/home-ai-core"
-	liveWeb     = "/usr/share/home-ai-core/web"
-	serviceName = "home-ai-core.service"
-	serviceUser = "home-ai-core"
-	maxRequest  = 16 << 10
+	socketPath        = "/run/home-ai-core-updater.sock"
+	updateRoot        = "/var/lib/home-ai-core/update"
+	liveBinary        = "/usr/bin/home-ai-core"
+	liveWeb           = "/usr/share/home-ai-core/web"
+	liveHelper        = "/usr/libexec/home-ai-core/home-ai-core-updater"
+	serviceName       = "home-ai-core.service"
+	helperServiceName = "home-ai-core-updater.service"
+	serviceUser       = "home-ai-core"
+	maxRequest        = 16 << 10
 )
 
 var installMu sync.Mutex
@@ -78,7 +80,12 @@ func main() {
 		_ = listener.Close()
 	}()
 
-	logger.Info("bundle updater helper ready", "socket", socketPath)
+	logger.Info(
+		"bundle updater helper ready",
+		"socket", socketPath,
+		"version", updaterhelper.HelperVersion,
+		"protocol", updaterhelper.ProtocolVersion,
+	)
 	for {
 		conn, err := listener.AcceptUnix()
 		if err != nil {
@@ -109,6 +116,27 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 	// its own required arguments and the peer UID before execution.
 	if err := decoder.Decode(&request); err != nil {
 		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: "invalid updater request"})
+		return
+	}
+	if request.Operation == "info" {
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+			OK:              true,
+			Message:         "helper ready",
+			HelperVersion:   updaterhelper.HelperVersion,
+			ProtocolVersion: updaterhelper.ProtocolVersion,
+		})
+		return
+	}
+	if request.ProtocolVersion > updaterhelper.ProtocolVersion {
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+			Error: fmt.Sprintf(
+				"unsupported helper protocol %d; helper supports %d",
+				request.ProtocolVersion,
+				updaterhelper.ProtocolVersion,
+			),
+			HelperVersion:   updaterhelper.HelperVersion,
+			ProtocolVersion: updaterhelper.ProtocolVersion,
+		})
 		return
 	}
 	if strings.HasPrefix(request.Operation, "storage.") {
@@ -152,7 +180,8 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		time.Sleep(750 * time.Millisecond)
 		ctx, cancel := context.WithTimeout(parent, 3*time.Minute)
 		defer cancel()
-		if err := performInstall(ctx, request.Version, prepared, uid, gid); err != nil {
+		helperUpdated, err := performInstall(ctx, request.Version, prepared, uid, gid)
+		if err != nil {
 			logger.Error("bundle update failed", "version", request.Version, "error", err)
 			_ = writeResult(uid, gid, updaterhelper.Result{
 				Status:    "failed",
@@ -162,45 +191,64 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 			})
 			return
 		}
-		logger.Info("bundle update installed", "version", request.Version)
+		logger.Info("bundle update installed", "version", request.Version, "helper_updated", helperUpdated)
 		_ = writeResult(uid, gid, updaterhelper.Result{
 			Status:    "succeeded",
 			Version:   request.Version,
 			Message:   "update installed",
 			UpdatedAt: time.Now().UTC().Format(time.RFC3339Nano),
 		})
+		if helperUpdated {
+			logger.Info("restarting updater helper to activate new version")
+			_ = exec.Command("/usr/bin/systemctl", "restart", "--no-block", helperServiceName).Run()
+		}
 	}()
 }
 
-func performInstall(ctx context.Context, version, prepared string, uid, gid int) error {
+func performInstall(ctx context.Context, version, prepared string, uid, gid int) (bool, error) {
 	backup := filepath.Join(updateRoot, "backup")
 	if err := os.RemoveAll(backup); err != nil {
-		return err
+		return false, err
 	}
 	if err := os.MkdirAll(filepath.Join(backup, "bin"), 0o700); err != nil {
-		return err
+		return false, err
 	}
 	if err := copyFile(liveBinary, filepath.Join(backup, "bin", "home-ai-core"), 0o700); err != nil {
-		return fmt.Errorf("backup core binary: %w", err)
+		return false, fmt.Errorf("backup core binary: %w", err)
 	}
 	if err := copyTree(liveWeb, filepath.Join(backup, "web")); err != nil {
-		return fmt.Errorf("backup web ui: %w", err)
+		return false, fmt.Errorf("backup web ui: %w", err)
 	}
 
 	newBinary := filepath.Join(filepath.Dir(liveBinary), ".home-ai-core.new")
 	if err := copyFile(filepath.Join(prepared, "bin", "home-ai-core"), newBinary, 0o755); err != nil {
-		return fmt.Errorf("stage new core binary: %w", err)
+		return false, fmt.Errorf("stage new core binary: %w", err)
 	}
 	newWeb := filepath.Join(filepath.Dir(liveWeb), ".home-ai-core-web-new")
 	rollbackWeb := filepath.Join(filepath.Dir(liveWeb), ".home-ai-core-web-rollback")
 	_ = os.RemoveAll(newWeb)
 	_ = os.RemoveAll(rollbackWeb)
 	if err := copyTree(filepath.Join(prepared, "web"), newWeb); err != nil {
-		return fmt.Errorf("stage new web ui: %w", err)
+		return false, fmt.Errorf("stage new web ui: %w", err)
+	}
+
+	helperUpdated := false
+	preparedHelper := filepath.Join(prepared, "helper", "home-ai-core-updater")
+	newHelper := filepath.Join(filepath.Dir(liveHelper), ".home-ai-core-updater.new")
+	if helperInfo, err := os.Stat(preparedHelper); err == nil && helperInfo.Mode().IsRegular() {
+		if err := os.MkdirAll(filepath.Join(backup, "helper"), 0o700); err != nil {
+			return false, fmt.Errorf("prepare helper backup: %w", err)
+		}
+		if err := copyFile(liveHelper, filepath.Join(backup, "helper", "home-ai-core-updater"), 0o700); err != nil {
+			return false, fmt.Errorf("backup updater helper: %w", err)
+		}
+		if err := copyFile(preparedHelper, newHelper, 0o755); err != nil {
+			return false, fmt.Errorf("stage updater helper: %w", err)
+		}
 	}
 
 	if err := systemctl(ctx, "stop", serviceName); err != nil {
-		return fmt.Errorf("stop Home-AI-Core: %w", err)
+		return false, fmt.Errorf("stop Home-AI-Core: %w", err)
 	}
 
 	rollbackNeeded := true
@@ -211,27 +259,39 @@ func performInstall(ctx context.Context, version, prepared string, uid, gid int)
 	}()
 
 	if err := os.Rename(newBinary, liveBinary); err != nil {
-		return fmt.Errorf("replace core binary: %w", err)
+		return false, fmt.Errorf("replace core binary: %w", err)
 	}
 	if err := os.Rename(liveWeb, rollbackWeb); err != nil {
-		return fmt.Errorf("preserve current web ui: %w", err)
+		return false, fmt.Errorf("preserve current web ui: %w", err)
 	}
 	if err := os.Rename(newWeb, liveWeb); err != nil {
 		_ = os.Rename(rollbackWeb, liveWeb)
-		return fmt.Errorf("replace web ui: %w", err)
+		return false, fmt.Errorf("replace web ui: %w", err)
 	}
 
 	if err := systemctl(ctx, "start", serviceName); err != nil {
-		return fmt.Errorf("start updated Home-AI-Core: %w", err)
+		return false, fmt.Errorf("start updated Home-AI-Core: %w", err)
 	}
 	if err := waitActive(ctx, serviceName, 15*time.Second); err != nil {
-		return err
+		return false, err
+	}
+
+	if _, err := os.Stat(newHelper); err == nil {
+		if err := os.Rename(newHelper, liveHelper); err != nil {
+			return false, fmt.Errorf("replace updater helper: %w", err)
+		}
+		if err := os.Chmod(liveHelper, 0o755); err != nil {
+			return false, fmt.Errorf("set updater helper permissions: %w", err)
+		}
+		helperUpdated = true
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return false, fmt.Errorf("inspect staged updater helper: %w", err)
 	}
 
 	rollbackNeeded = false
 	_ = os.RemoveAll(rollbackWeb)
 	_ = os.Chown(filepath.Join(updateRoot, "backup"), uid, gid)
-	return nil
+	return helperUpdated, nil
 }
 
 func rollback(ctx context.Context, backup, rollbackWeb string) {
