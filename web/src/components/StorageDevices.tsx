@@ -1,24 +1,30 @@
 import { useState } from "react";
 import { api } from "../api/client";
-import type { SystemResponse } from "../api/types";
+import type { BlockNode } from "../api/types";
 import { useI18n } from "../i18n";
 
-type BlockDevice = SystemResponse["system"]["block_devices"][number];
-type Partition = BlockDevice["partitions"][number];
 type Filesystem = "ext4" | "xfs" | "vfat";
 
 function bytes(value = 0) {
   if (value >= 1024 ** 4) return new Intl.NumberFormat(undefined, {maximumFractionDigits: 1}).format(value / 1024 ** 4) + " TiB";
   if (value >= 1024 ** 3) return new Intl.NumberFormat(undefined, {maximumFractionDigits: 1}).format(value / 1024 ** 3) + " GiB";
   if (value >= 1024 ** 2) return new Intl.NumberFormat(undefined, {maximumFractionDigits: 1}).format(value / 1024 ** 2) + " MiB";
+  if (value >= 1024) return new Intl.NumberFormat(undefined, {maximumFractionDigits: 1}).format(value / 1024) + " KiB";
   return value + " B";
+}
+
+function flatten(nodes: BlockNode[], depth = 0): Array<{node: BlockNode; depth: number}> {
+  return nodes.flatMap((node) => [
+    {node, depth},
+    ...flatten(node.children || [], depth + 1),
+  ]);
 }
 
 export function StorageDevices({
   devices,
   onChanged,
 }: {
-  devices: BlockDevice[];
+  devices: BlockNode[];
   onChanged: () => void;
 }) {
   const {t} = useI18n();
@@ -29,17 +35,15 @@ export function StorageDevices({
   const [filesystem, setFilesystem] = useState<Filesystem>("ext4");
   const [label, setLabel] = useState("");
 
-  async function perform(
-    operation: "mount" | "unmount",
-    partition: Partition,
-  ) {
-    setBusy(partition.path);
+  async function perform(operation: "mount" | "unmount", node: BlockNode) {
+    if (!node.path) return;
+    setBusy(node.path);
     setError("");
     setMessage("");
     try {
       const result = await api.storageOperation({
         operation,
-        device: partition.path,
+        device: node.path,
       });
       setMessage(result.message);
       onChanged();
@@ -50,11 +54,12 @@ export function StorageDevices({
     }
   }
 
-  async function format(partition: Partition) {
-    const confirmation = `FORMAT ${partition.path}`;
+  async function format(node: BlockNode) {
+    if (!node.path) return;
+    const confirmation = `FORMAT ${node.path}`;
     const typed = window.prompt(
       t("formatTypeConfirmation")
-        .replace("{device}", partition.path)
+        .replace("{device}", node.path)
         .replace("{confirmation}", confirmation),
       "",
     );
@@ -63,13 +68,13 @@ export function StorageDevices({
       return;
     }
 
-    setBusy(partition.path);
+    setBusy(node.path);
     setError("");
     setMessage("");
     try {
       const result = await api.storageOperation({
         operation: "format",
-        device: partition.path,
+        device: node.path,
         filesystem,
         label: label.trim(),
         confirm: confirmation,
@@ -89,150 +94,164 @@ export function StorageDevices({
     return <div className="empty-state">{t("noBlockDevices")}</div>;
   }
 
+  const rows = flatten(devices);
+
   return (
-    <div className="storage-stack">
+    <div className="storage-tree-wrap">
       {error && <div className="form-error">{error}</div>}
       {message && <div className="storage-success">{message}</div>}
 
-      {devices.map((disk) => (
-        <section className="storage-card" key={disk.name}>
-          <div className="storage-card-header">
-            <div>
-              <div className="storage-title-row">
-                <strong>{[disk.vendor, disk.model].filter(Boolean).join(" ") || disk.name}</strong>
-                {disk.system && <span className="status-badge storage-system">{t("systemDisk")}</span>}
-                {disk.removable && <span className="status-badge">{t("removable")}</span>}
-                <span className="status-badge">{disk.rotational ? "HDD" : "SSD / Flash"}</span>
-              </div>
-              <div className="storage-path mono">{disk.path}</div>
-            </div>
-            <div className="storage-size">{bytes(disk.size_bytes)}</div>
-          </div>
-
-          <dl className="storage-meta">
-            <div><dt>{t("serial")}</dt><dd className="mono">{disk.serial || "—"}</dd></div>
-            <div><dt>{t("device")}</dt><dd className="mono">{disk.major_minor || disk.name}</dd></div>
-            <div><dt>{t("partitions")}</dt><dd>{disk.partitions.length}</dd></div>
-          </dl>
-
-          <div className="storage-partitions">
-            {disk.partitions.length === 0 && (
-              <div className="storage-empty-partitions">{t("noPartitions")}</div>
-            )}
-
-            {disk.partitions.map((part) => {
-              const mounted = part.mountpoints.length > 0;
-              const root = part.mountpoints.includes("/");
-              const formatting = formatDevice === part.path;
-              const operationBusy = busy === part.path;
+      <div className="table-wrap">
+        <table className="storage-tree-table">
+          <thead>
+            <tr>
+              <th>NAME</th>
+              <th>TYPE</th>
+              <th>FSTYPE</th>
+              <th>SIZE</th>
+              <th>MOUNTPOINTS</th>
+              <th>PKNAME</th>
+              <th>{t("actions")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({node, depth}, index) => {
+              const mounted = node.mountpoints.length > 0;
+              const root = node.mountpoints.includes("/");
+              const operationBusy = !!node.path && busy === node.path;
+              const formatting = !!node.path && formatDevice === node.path;
+              const mountable =
+                !!node.path &&
+                !!node.filesystem &&
+                node.filesystem !== "swap" &&
+                node.filesystem !== "LVM2_member" &&
+                node.type !== "disk" &&
+                node.type !== "rom";
+              const formattable =
+                !!node.path &&
+                node.type === "part" &&
+                !mounted &&
+                !node.system;
 
               return (
-                <div className="storage-partition" key={part.name}>
-                  <div className="storage-partition-main">
-                    <div className="storage-partition-name">
-                      <strong className="mono">{part.path}</strong>
-                      {part.label && <span>{part.label}</span>}
-                    </div>
-                    <div className="storage-partition-details">
-                      <span>{bytes(part.size_bytes)}</span>
-                      <span>{part.filesystem || t("unknownFilesystem")}</span>
-                      {part.uuid && <span className="mono">UUID {part.uuid}</span>}
-                    </div>
-                    <div className="storage-mount">
-                      <span className={mounted ? "status-badge status-enabled" : "status-badge"}>
-                        {mounted ? t("mounted") : t("notMounted")}
-                      </span>
-                      {mounted && <span className="mono">{part.mountpoints.join(", ")}</span>}
-                    </div>
-                  </div>
-
-                  <div className="storage-actions">
-                    {mounted ? (
-                      <button
-                        type="button"
-                        className="button secondary"
-                        disabled={operationBusy || root}
-                        onClick={() => perform("unmount", part)}
+                <>
+                  <tr key={`${node.path || node.name}-${index}`} className={node.system ? "storage-system-row" : ""}>
+                    <td>
+                      <div
+                        className="storage-tree-name"
+                        style={{paddingLeft: `${depth * 22}px`}}
+                        title={[node.vendor, node.model, node.serial].filter(Boolean).join(" · ")}
                       >
-                        {operationBusy ? t("working") : t("unmount")}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="button secondary"
-                        disabled={operationBusy}
-                        onClick={() => perform("mount", part)}
-                      >
-                        {operationBusy ? t("working") : t("mount")}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="button danger"
-                      disabled={operationBusy || mounted || disk.system}
-                      onClick={() => {
-                        setFormatDevice(formatting ? "" : part.path);
-                        setError("");
-                      }}
-                    >
-                      {t("format")}
-                    </button>
-                  </div>
+                        {depth > 0 && <span className="storage-tree-branch">↳</span>}
+                        <strong className="mono">{node.name}</strong>
+                        {node.system && <span className="status-badge storage-system">{t("systemDisk")}</span>}
+                        {node.label && <span className="storage-inline-label">{node.label}</span>}
+                      </div>
+                      {depth === 0 && (node.vendor || node.model) && (
+                        <div className="storage-tree-model">
+                          {[node.vendor, node.model].filter(Boolean).join(" ")}
+                        </div>
+                      )}
+                    </td>
+                    <td>{node.type || "—"}</td>
+                    <td>{node.filesystem || "—"}</td>
+                    <td className="mono">{bytes(node.size_bytes)}</td>
+                    <td className="mono">{node.mountpoints.join(", ") || "—"}</td>
+                    <td className="mono">{node.parent_name || "—"}</td>
+                    <td>
+                      <div className="storage-tree-actions">
+                        {mounted && mountable && (
+                          <button
+                            type="button"
+                            className="button secondary compact"
+                            disabled={operationBusy || root}
+                            onClick={() => perform("unmount", node)}
+                          >
+                            {operationBusy ? t("working") : t("unmount")}
+                          </button>
+                        )}
+                        {!mounted && mountable && (
+                          <button
+                            type="button"
+                            className="button secondary compact"
+                            disabled={operationBusy}
+                            onClick={() => perform("mount", node)}
+                          >
+                            {operationBusy ? t("working") : t("mount")}
+                          </button>
+                        )}
+                        {node.type === "part" && (
+                          <button
+                            type="button"
+                            className="button danger compact"
+                            disabled={operationBusy || !formattable}
+                            onClick={() => {
+                              setFormatDevice(formatting ? "" : (node.path || ""));
+                              setError("");
+                            }}
+                          >
+                            {t("format")}
+                          </button>
+                        )}
+                        {!mountable && node.type !== "part" && <span className="muted">—</span>}
+                      </div>
+                    </td>
+                  </tr>
 
                   {formatting && (
-                    <div className="storage-format">
-                      <div>
-                        <label>
-                          {t("filesystem")}
-                          <select value={filesystem} onChange={(event) => setFilesystem(event.target.value as Filesystem)}>
-                            <option value="ext4">ext4</option>
-                            <option value="xfs">xfs</option>
-                            <option value="vfat">FAT32 / vfat</option>
-                          </select>
-                        </label>
-                        <label>
-                          {t("volumeLabel")}
-                          <input
-                            value={label}
-                            maxLength={32}
-                            onChange={(event) => setLabel(event.target.value)}
-                            placeholder={t("optional")}
-                          />
-                        </label>
-                      </div>
-                      <div className="storage-format-warning">
-                        {t("formatWarning")}
-                      </div>
-                      <div className="storage-format-actions">
-                        <button
-                          type="button"
-                          className="button secondary"
-                          disabled={operationBusy}
-                          onClick={() => setFormatDevice("")}
-                        >
-                          {t("cancel")}
-                        </button>
-                        <button
-                          type="button"
-                          className="button danger"
-                          disabled={operationBusy}
-                          onClick={() => format(part)}
-                        >
-                          {operationBusy ? t("working") : t("format")}
-                        </button>
-                      </div>
-                    </div>
+                    <tr className="storage-format-row">
+                      <td colSpan={7}>
+                        <div className="storage-format">
+                          <div>
+                            <label>
+                              {t("filesystem")}
+                              <select value={filesystem} onChange={(event) => setFilesystem(event.target.value as Filesystem)}>
+                                <option value="ext4">ext4</option>
+                                <option value="xfs">xfs</option>
+                                <option value="vfat">FAT32 / vfat</option>
+                              </select>
+                            </label>
+                            <label>
+                              {t("volumeLabel")}
+                              <input
+                                value={label}
+                                maxLength={32}
+                                onChange={(event) => setLabel(event.target.value)}
+                                placeholder={t("optional")}
+                              />
+                            </label>
+                          </div>
+                          <div className="storage-format-warning">{t("formatWarning")}</div>
+                          <div className="storage-format-actions">
+                            <button
+                              type="button"
+                              className="button secondary"
+                              disabled={operationBusy}
+                              onClick={() => setFormatDevice("")}
+                            >
+                              {t("cancel")}
+                            </button>
+                            <button
+                              type="button"
+                              className="button danger"
+                              disabled={operationBusy}
+                              onClick={() => format(node)}
+                            >
+                              {operationBusy ? t("working") : t("format")}
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
                   )}
-                </div>
+                </>
               );
             })}
-          </div>
+          </tbody>
+        </table>
+      </div>
 
-          {disk.system && (
-            <div className="storage-protection">{t("systemDiskProtection")}</div>
-          )}
-        </section>
-      ))}
+      <div className="storage-protection">{t("systemDiskProtection")}</div>
     </div>
   );
 }
