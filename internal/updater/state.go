@@ -11,6 +11,7 @@ const (
 	PhaseDownloading Phase = "downloading"
 	PhaseReady       Phase = "ready"
 	PhaseInstalling  Phase = "installing"
+	PhaseRollingBack Phase = "rolling_back"
 	PhaseRestarting  Phase = "restarting"
 	PhaseSucceeded   Phase = "succeeded"
 	PhaseFailed      Phase = "failed"
