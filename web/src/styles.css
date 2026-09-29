@@ -688,3 +688,14 @@ tbody tr:last-child td { border-bottom: 0; }
   }
 }
 
+.file-trash-section {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #303a49;
+}
+
+.file-trash-section h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
