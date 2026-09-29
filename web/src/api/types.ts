@@ -295,3 +295,19 @@ export type FileTrashEntry = {
   deleted_at: string;
 };
 
+export type FileUploadSession = {
+  id: string;
+  target_path: string;
+  size_bytes: number;
+  received_bytes: number;
+  expected_sha256?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FileUploadComplete = {
+  path: string;
+  size_bytes: number;
+  sha256: string;
+};
+
