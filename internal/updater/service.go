@@ -48,6 +48,7 @@ type ReleaseStatus struct {
 	Notes            string     `json:"notes,omitempty"`
 	HelperVersion    string     `json:"helper_version,omitempty"`
 	HelperProtocol   int        `json:"helper_protocol,omitempty"`
+	HelperAvailable  bool       `json:"helper_available"`
 	HelperCompatible bool       `json:"helper_compatible"`
 	HelperError      string     `json:"helper_error,omitempty"`
 }
@@ -110,6 +111,7 @@ func (s *Service) Check(ctx context.Context) (ReleaseStatus, error) {
 			Available:        false,
 			HelperVersion:    helper.Version,
 			HelperProtocol:   helper.ProtocolVersion,
+			HelperAvailable:  helper.Available,
 			HelperCompatible: helper.Compatible,
 			HelperError:      helper.Error,
 		}
@@ -146,6 +148,7 @@ func (s *Service) Check(ctx context.Context) (ReleaseStatus, error) {
 	}
 	item.HelperVersion = helper.Version
 	item.HelperProtocol = helper.ProtocolVersion
+	item.HelperAvailable = helper.Available
 	item.HelperCompatible = helper.Compatible
 	item.HelperError = helper.Error
 	return item.ReleaseStatus, nil
