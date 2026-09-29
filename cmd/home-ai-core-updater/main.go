@@ -1563,9 +1563,23 @@ func deactivateLVMOnDisk(ctx context.Context, device string) error {
 		if err != nil {
 			return fmt.Errorf("deactivate LVM volume group %s: %s", vg, strings.TrimSpace(string(out)))
 		}
-	}
-	if len(targetVGs) != 0 {
 		_ = exec.CommandContext(ctx, "/usr/bin/udevadm", "settle").Run()
+		attrOutput, err := exec.CommandContext(
+			ctx,
+			"/usr/sbin/lvs",
+			"--noheadings",
+			"-o", "lv_attr",
+			"--select", "vg_name="+vg,
+		).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("verify LVM volume group %s: %s", vg, strings.TrimSpace(string(attrOutput)))
+		}
+		for _, line := range strings.Split(string(attrOutput), "\n") {
+			attr := strings.TrimSpace(line)
+			if len(attr) > 4 && attr[4] == 'a' {
+				return fmt.Errorf("LVM volume group %s is still active after deactivation", vg)
+			}
+		}
 	}
 	return nil
 }
