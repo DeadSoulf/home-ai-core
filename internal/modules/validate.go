@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"regexp"
-	"sort"
 	"strings"
 )
 
@@ -237,8 +236,3 @@ func uniqueStrings(label string, values []string, pattern *regexp.Regexp) error 
 	return nil
 }
 
-func normalizedStrings(values []string) []string {
-	out := append([]string(nil), values...)
-	sort.Strings(out)
-	return out
-}
