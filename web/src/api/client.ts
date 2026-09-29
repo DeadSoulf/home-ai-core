@@ -11,6 +11,7 @@ import type {
   UpdaterState,
   UserAccount,
   NetworkProfileStatus,
+  FileEntry,
   FileFolder,
   FilePool,
   WireGuardStatus,
@@ -81,6 +82,22 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new APIError(response.status, body as APIErrorBody);
   }
   return body as T;
+}
+
+async function requestBlob(path: string): Promise<Blob> {
+  const response = await fetch(path, {
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    let body: unknown = {};
+    const contentType = response.headers.get("Content-Type") || "";
+    if (contentType.includes("application/json")) {
+      body = await response.json();
+    }
+    throw new APIError(response.status, body as APIErrorBody);
+  }
+  return response.blob();
 }
 
 async function postJSON<T>(path: string, body?: unknown, csrf = false): Promise<T> {
@@ -190,6 +207,40 @@ export const api = {
       owner_user_id: input.ownerUserId,
     }, true);
     return result.folder;
+  },
+
+  fileEntries: async (folderId: string, path = "") => {
+    const query = new URLSearchParams();
+    if (path) query.set("path", path);
+    const suffix = query.size ? `?${query.toString()}` : "";
+    const result = await request<{entries: FileEntry[]}>(`/api/v1/files/folders/${encodeURIComponent(folderId)}/entries${suffix}`);
+    return result.entries;
+  },
+
+  createFileDirectory: async (folderId: string, path: string) => {
+    return postJSON<{path: string}>(
+      `/api/v1/files/folders/${encodeURIComponent(folderId)}/directories`,
+      {path},
+      true,
+    );
+  },
+
+  uploadFile: async (folderId: string, path: string, file: File) => {
+    const token = getCSRFToken();
+    const headers = new Headers({"Content-Type": file.type || "application/octet-stream"});
+    if (token) headers.set("X-CSRF-Token", token);
+    const query = new URLSearchParams({path});
+    return request<{path: string; size_bytes: number}>(
+      `/api/v1/files/folders/${encodeURIComponent(folderId)}/content?${query.toString()}`,
+      {method: "PUT", headers, body: file},
+    );
+  },
+
+  downloadFile: async (folderId: string, path: string) => {
+    const query = new URLSearchParams({path});
+    return requestBlob(
+      `/api/v1/files/folders/${encodeURIComponent(folderId)}/content?${query.toString()}`,
+    );
   },
 
   system: () => request<SystemResponse>("/api/v1/system"),
