@@ -979,4 +979,3 @@ func TestFileMoveAndDelete(t *testing.T) {
 		t.Fatalf("non-empty directory delete status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }
-
