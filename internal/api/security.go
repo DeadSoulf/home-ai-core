@@ -2,9 +2,9 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
