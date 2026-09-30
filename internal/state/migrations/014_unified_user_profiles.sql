@@ -47,11 +47,11 @@ WHERE name IN (
 );
 
 INSERT INTO role_permissions(role_id, permission_name)
-SELECT role_id, name
-FROM roles
-JOIN permissions
-WHERE role_id IN ('role_friend', 'role_guest')
-  AND name IN ('security.self.read', 'security.sessions.manage');
+SELECT r.id, p.name
+FROM roles r
+CROSS JOIN permissions p
+WHERE r.id IN ('role_friend', 'role_guest')
+  AND p.name IN ('security.self.read', 'security.sessions.manage');
 
 -- Existing shared-folder grants were role-wide for legacy members. Convert
 -- them to per-user grants before removing the role-wide rows so existing
