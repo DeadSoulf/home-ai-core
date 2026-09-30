@@ -19,6 +19,18 @@ SET name = 'friend',
     description = 'Home-AI friend profile'
 WHERE id = 'role_member';
 
+-- Existing shared-folder grants belonged to the old member role. Preserve
+-- that effective access as direct grants before role_member becomes the
+-- customizable Friend profile.
+INSERT OR IGNORE INTO user_resource_permissions(user_id, permission_name, resource_type, resource_id)
+SELECT ur.user_id, rrp.permission_name, rrp.resource_type, rrp.resource_id
+FROM user_roles ur
+JOIN role_resource_permissions rrp ON rrp.role_id = ur.role_id
+WHERE ur.role_id = 'role_member';
+
+DELETE FROM role_resource_permissions
+WHERE role_id = 'role_member';
+
 INSERT OR IGNORE INTO roles(id, name, description, created_at) VALUES
     ('role_parent', 'parent', 'Home-AI parent profile', CURRENT_TIMESTAMP),
     ('role_child', 'child', 'Home-AI child profile', CURRENT_TIMESTAMP),
