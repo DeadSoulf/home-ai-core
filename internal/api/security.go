@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -26,6 +27,9 @@ type SecurityService interface {
 	Authenticate(context.Context, string) (security.Actor, error)
 	Logout(context.Context, security.Actor, security.RequestContext) error
 	CreateUser(context.Context, security.Actor, string, string, string, security.RequestContext) (security.User, error)
+	CreateUserWithAccess(context.Context, security.Actor, string, string, string, security.UserAccessInput, security.RequestContext) (security.User, error)
+	UpdateUserAccess(context.Context, security.Actor, string, security.UserAccessInput, security.RequestContext) (security.User, error)
+	AccessCatalog(context.Context) (security.AccessCatalog, error)
 	ListUsers(context.Context) ([]security.User, error)
 	ListAudit(context.Context, int) ([]security.AuditEntry, error)
 	RecordAudit(context.Context, security.RequestContext, security.Actor, string, string, string, string, map[string]any)
@@ -186,20 +190,28 @@ func (s *server) usersCollection(
 		}
 
 		var request struct {
-			Username    string `json:"username"`
-			DisplayName string `json:"display_name"`
-			Password    string `json:"password"`
+			Username            string                     `json:"username"`
+			DisplayName         string                     `json:"display_name"`
+			Password            string                     `json:"password"`
+			Profile             string                     `json:"profile"`
+			Permissions         []string                   `json:"permissions,omitempty"`
+			ResourcePermissions []security.PermissionScope `json:"resource_permissions,omitempty"`
 		}
 		if err := decodeJSON(w, r, &request); err != nil {
 			writeAPIError(w, r, http.StatusBadRequest, "invalid_request", err.Error(), nil)
 			return
 		}
-		user, err := s.security.CreateUser(
+		user, err := s.security.CreateUserWithAccess(
 			r.Context(),
 			actor,
 			request.Username,
 			request.DisplayName,
 			request.Password,
+			security.UserAccessInput{
+				Profile:             request.Profile,
+				Permissions:         request.Permissions,
+				ResourcePermissions: request.ResourcePermissions,
+			},
 			s.securityRequestContext(r),
 		)
 		switch {
@@ -218,6 +230,79 @@ func (s *server) usersCollection(
 	default:
 		w.Header().Set("Allow", http.MethodGet+", "+http.MethodPost)
 		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+	}
+}
+
+func (s *server) accessCatalog(
+	w http.ResponseWriter,
+	r *http.Request,
+	_ security.Actor,
+	_ authSource,
+) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w, r, http.MethodGet)
+		return
+	}
+	catalog, err := s.security.AccessCatalog(r.Context())
+	if err != nil {
+		writeAPIError(w, r, http.StatusInternalServerError, "access_catalog_unavailable", "access catalog is unavailable", nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"access": catalog})
+}
+
+func (s *server) userAccess(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if r.Method != http.MethodPut {
+		methodNotAllowed(w, r, http.MethodPut)
+		return
+	}
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+
+	var request struct {
+		Profile             string                     `json:"profile"`
+		Permissions         []string                   `json:"permissions,omitempty"`
+		ResourcePermissions []security.PermissionScope `json:"resource_permissions,omitempty"`
+		Disabled            bool                       `json:"disabled"`
+	}
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_request", err.Error(), nil)
+		return
+	}
+
+	user, err := s.security.UpdateUserAccess(
+		r.Context(),
+		actor,
+		r.PathValue("userID"),
+		security.UserAccessInput{
+			Profile:             request.Profile,
+			Permissions:         request.Permissions,
+			ResourcePermissions: request.ResourcePermissions,
+			Disabled:            request.Disabled,
+		},
+		s.securityRequestContext(r),
+	)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		writeAPIError(w, r, http.StatusNotFound, "user_not_found", "user not found", nil)
+	case errors.Is(err, security.ErrLastAdministrator):
+		writeAPIError(w, r, http.StatusConflict, "last_administrator", err.Error(), nil)
+	case err != nil:
+		writeAPIError(w, r, http.StatusBadRequest, "user_access_update_failed", err.Error(), nil)
+	default:
+		s.realtime.Publish(
+			"security.user.access.changed",
+			map[string]any{"user_id": user.ID, "profile": user.Profile},
+			requestIDFromContext(r.Context()),
+		)
+		writeJSON(w, http.StatusOK, map[string]any{"user": user})
 	}
 }
 
