@@ -92,6 +92,8 @@ func New(
 	s.mux.HandleFunc("/api/v1/update/rollback", s.requireAuth("updates.manage", s.updateRollback))
 	s.mux.HandleFunc("/api/v1/storage/operation", s.requireAuth("storage.manage", s.storageOperation))
 	s.mux.HandleFunc("/api/v1/storage/name", s.requireAuth("storage.manage", s.storageName))
+	s.mux.HandleFunc("GET /api/v1/storage/purposes", s.requireAuth("system.read", s.storagePurposes))
+	s.mux.HandleFunc("POST /api/v1/storage/purposes", s.requireAuth("storage.manage", s.storagePurposes))
 	s.mux.HandleFunc("GET /api/v1/files/pools", s.requireAuth("files.manage", s.filePools))
 	s.mux.HandleFunc("POST /api/v1/files/pools", s.requireAuth("files.manage", s.filePools))
 	s.mux.HandleFunc("GET /api/v1/files/smb", s.requireAuth("files.manage", s.smbStatus))

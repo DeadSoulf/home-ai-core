@@ -24,14 +24,16 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
+	"github.com/DeadSoulf/home-ai-core/internal/systeminfo"
 )
 
 type fakeState struct {
-	pingErr       error
-	schemaVersion int
-	schemaErr     error
-	nasPools      []state.NASPoolRecord
-	nasFolders    []state.NASFolderRecord
+	pingErr         error
+	schemaVersion   int
+	schemaErr       error
+	nasPools        []state.NASPoolRecord
+	nasFolders      []state.NASFolderRecord
+	storagePurposes []state.StoragePurposeRecord
 }
 
 func (f fakeState) Ping(context.Context) error {
@@ -52,6 +54,28 @@ func (f fakeState) DiskNames(context.Context) (map[string]string, error) {
 
 func (f fakeState) SetDiskName(context.Context, string, string) error {
 	return nil
+}
+
+func (f fakeState) SetStoragePurpose(
+	_ context.Context,
+	devicePath, filesystemUUID, purpose string,
+	now time.Time,
+) (state.StoragePurposeRecord, error) {
+	return state.StoragePurposeRecord{
+		DevicePath:     devicePath,
+		FilesystemUUID: filesystemUUID,
+		Purpose:        purpose,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}, nil
+}
+
+func (f fakeState) ClearStoragePurpose(context.Context, string, string) error {
+	return nil
+}
+
+func (f fakeState) ListStoragePurposes(context.Context) ([]state.StoragePurposeRecord, error) {
+	return f.storagePurposes, nil
 }
 
 func (f fakeState) CreateNASPool(
@@ -719,6 +743,62 @@ func TestFileFoldersFilterScopedAccess(t *testing.T) {
 	}
 	if !body.Folders[0].CanWrite {
 		t.Fatal("scoped files.write was not reflected in response")
+	}
+}
+
+func TestStoragePurposeResponseFollowsFilesystemUUID(t *testing.T) {
+	records := state.StoragePurposeRecord{
+		DevicePath:     "/dev/sdb1",
+		FilesystemUUID: "uuid-files",
+		Purpose:        state.StoragePurposeFiles,
+	}
+	nodes := []systeminfo.BlockNode{
+		{
+			Path: "/dev/nvme1n1",
+			Type: "disk",
+			Children: []systeminfo.BlockNode{
+				{
+					Path:        "/dev/nvme1n1p1",
+					Type:        "part",
+					Filesystem:  "ext4",
+					UUID:        "uuid-files",
+					Label:       "DATA",
+					Mountpoints: []string{"/mnt/home-ai-core/data"},
+					SizeBytes:   1000,
+					FreeBytes:   400,
+					FreeKnown:   true,
+				},
+			},
+		},
+	}
+
+	response := storagePurposeResponseFor(records, nodes)
+	if !response.Present {
+		t.Fatal("purpose assignment was not matched to present filesystem")
+	}
+	if response.DevicePath != "/dev/nvme1n1p1" {
+		t.Fatalf("device = %q", response.DevicePath)
+	}
+	if response.Purpose != state.StoragePurposeFiles || response.Filesystem != "ext4" {
+		t.Fatalf("unexpected response: %#v", response)
+	}
+	if len(response.Mountpoints) != 1 || response.Mountpoints[0] != "/mnt/home-ai-core/data" {
+		t.Fatalf("mountpoints = %#v", response.Mountpoints)
+	}
+}
+
+func TestStoragePurposeResponseKeepsMissingAssignment(t *testing.T) {
+	record := state.StoragePurposeRecord{
+		DevicePath:     "/dev/sdc1",
+		FilesystemUUID: "uuid-missing",
+		Purpose:        state.StoragePurposeVideo,
+	}
+	response := storagePurposeResponseFor(record, nil)
+	if response.Present {
+		t.Fatal("missing storage was reported as present")
+	}
+	if response.DevicePath != "/dev/sdc1" || response.Purpose != state.StoragePurposeVideo {
+		t.Fatalf("unexpected missing response: %#v", response)
 	}
 }
 

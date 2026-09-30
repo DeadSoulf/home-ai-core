@@ -6,11 +6,21 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.82-dev` — Russian/English native Windows client UI\
-**Текущий срез:** `0.1.82-dev` — published; live bilingual Windows acceptance pending\
-**Следующий engineering milestone:** automatic Windows release discovery/download + SHA-256 verified install handoff\
+**Текущий срез:** F2 storage purpose routing — `files` / `video` для физических разделов и LVM\
+**Следующий engineering milestone:** release storage-purpose slice, live storage acceptance, затем automatic Windows release discovery/download + SHA-256 verified install handoff\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
 
+### Текущий F2 slice — назначение дисков для файлов и видео
+
+- 🚧 У физического data-раздела/LVM появляется явное назначение `files` или `video`.
+- 🚧 При создании нового раздела в **Система → Хранилище** пользователь выбирает: **Файлы** или **Видео**.
+- 🚧 Для существующих несистемных разделов/LVM назначение можно установить, изменить или снять.
+- 🚧 Назначение хранится независимо от NAS pool/folder и переживает смену `/dev/...` имени через filesystem UUID, когда UUID доступен.
+- 🚧 Форматирование сохраняет назначение и перепривязывает новый filesystem UUID; удаление раздела очищает назначение.
+- 🚧 Раздел **Файлы** показывает storage с назначением `files`, включая состояния: отсутствует / нужно форматировать / нужно смонтировать / готов / уже используется file pool.
+- 🚧 Только `files` storage предлагается при создании нового NAS pool; `video` storage зарезервирован для будущего NVR/media data plane.
+- 🚧 ADR-0030 фиксирует physical-purpose boundary и отделяет назначение ёмкости от логических NAS folders.
 ### Выпуск 0.1.82-dev — русский и английский Windows-клиент
 
 - Один Windows `.exe` поддерживает русский и английский интерфейс без отдельной сборки.
@@ -467,6 +477,7 @@ Check
 Нужно:
 
 - ✅ logical storage pools/volumes metadata;
+- 🚧 explicit physical storage purpose (`files` / `video`) with Web assignment and Files filtering;
 - ✅ private folders каждого пользователя;
 - ✅ shared/common folders;
 - ✅ physical directory provisioning + filesystem validation;
@@ -509,7 +520,7 @@ Home Assistant не является основой.
 - live view;
 - continuous/event recording;
 - archive/timeline;
-- выделенная ёмкость архива;
+- выделенная ёмкость архива через storage purpose `video`;
 - ring overwrite самых старых незакреплённых записей;
 - motion/object events;
 - AI vision hooks;
