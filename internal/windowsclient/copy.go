@@ -241,7 +241,11 @@ func (c *Client) VerifyTransfer(ctx context.Context, folderID string, transfer T
 	defer stopClose()
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return UploadResult{}, false, decodeHTTPError(response)
+		err := decodeHTTPError(response)
+		if cause := context.Cause(streamCtx); cause != nil {
+			err = cause
+		}
+		return UploadResult{}, false, err
 	}
 	hasher := sha256.New()
 	size, err := io.Copy(hasher, io.LimitReader(response.Body, transfer.SizeBytes+1))

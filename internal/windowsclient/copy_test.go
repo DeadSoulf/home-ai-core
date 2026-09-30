@@ -433,7 +433,7 @@ func TestVerifyTransferBoundsInactivityAndCallerCancellation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, stall := range []string{"headers", "initial-body", "after-progress", "custom-body", "caller-cancel", "caller-deadline"} {
+	for _, stall := range []string{"headers", "initial-body", "after-progress", "error-body", "custom-body", "caller-cancel", "caller-deadline"} {
 		t.Run(stall, func(t *testing.T) {
 			contentStarted := make(chan struct{})
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -444,7 +444,11 @@ func TestVerifyTransferBoundsInactivityAndCallerCancellation(t *testing.T) {
 					return
 				}
 				if stall != "headers" {
-					w.WriteHeader(http.StatusOK)
+					status := http.StatusOK
+					if stall == "error-body" {
+						status = http.StatusServiceUnavailable
+					}
+					w.WriteHeader(status)
 					w.(http.Flusher).Flush()
 				}
 				if stall == "after-progress" {
