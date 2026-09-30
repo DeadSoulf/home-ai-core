@@ -185,8 +185,8 @@ export const api = {
     username: string;
     displayName: string;
     password: string;
-    profile: UserProfile;
-    permissions: string[];
+    profile?: UserProfile;
+    permissions?: string[];
     resourcePermissions?: PermissionScope[];
   }) => {
     const result = await postJSON<{user: UserAccount}>("/api/v1/security/users", {
@@ -194,7 +194,7 @@ export const api = {
       display_name: input.displayName,
       password: input.password,
       profile: input.profile,
-      permissions: input.permissions,
+      permissions: input.permissions || [],
       resource_permissions: input.resourcePermissions || [],
     }, true);
     return result.user;
