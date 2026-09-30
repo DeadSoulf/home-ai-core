@@ -93,8 +93,8 @@ func TestNASFolderGrants(t *testing.T) {
 	if err != nil {
 		t.Fatalf("userAccess(member) after shared folder error = %v", err)
 	}
-	assertResourcePermission(t, sharedScopes, "files.read", "file_folder", sharedFolder.ID)
-	assertResourcePermission(t, sharedScopes, "files.write", "file_folder", sharedFolder.ID)
+	assertNoResourcePermission(t, sharedScopes, "files.read", "file_folder", sharedFolder.ID)
+	assertNoResourcePermission(t, sharedScopes, "files.write", "file_folder", sharedFolder.ID)
 
 	folders, err := store.ListNASFolders(ctx)
 	if err != nil {
@@ -152,4 +152,25 @@ func assertResourcePermission(
 		resourceID,
 		records,
 	)
+}
+
+func assertNoResourcePermission(
+	t *testing.T,
+	records []ResourcePermissionRecord,
+	permission, resourceType, resourceID string,
+) {
+	t.Helper()
+	for _, record := range records {
+		if record.Permission == permission &&
+			record.ResourceType == resourceType &&
+			record.ResourceID == resourceID {
+			t.Fatalf(
+				"unexpected resource permission %s on %s/%s in %#v",
+				permission,
+				resourceType,
+				resourceID,
+				records,
+			)
+		}
+	}
 }
