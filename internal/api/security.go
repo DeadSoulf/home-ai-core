@@ -201,6 +201,9 @@ func (s *server) usersCollection(
 			writeAPIError(w, r, http.StatusBadRequest, "invalid_request", err.Error(), nil)
 			return
 		}
+		if strings.TrimSpace(request.Profile) == "" {
+			request.Profile = security.ProfileFriend
+		}
 		user, err := s.security.CreateUserWithAccess(
 			r.Context(),
 			actor,
