@@ -55,9 +55,43 @@ jobs:
             build/updates/*.tar.gz.sha256
           if-no-files-found: error
 
+  windows-client:
+    name: Build Windows file client
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.x'
+
+      - name: Build Windows client
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '\r\n' < VERSION)"
+          mkdir -p dist
+          EXE="dist/home-ai-windows-client_${VERSION}_amd64.exe"
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build \
+            -trimpath \
+            -o "$EXE" \
+            ./cmd/home-ai-windows-client
+          sha256sum "$EXE" > "$EXE.sha256"
+
+      - name: Upload Windows client artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-client
+          path: |
+            dist/*.exe
+            dist/*.exe.sha256
+          if-no-files-found: error
   release:
     name: Publish GitHub release
-    needs: build
+    needs: [build, windows-client]
     runs-on: ubuntu-latest
 
     steps:
@@ -69,6 +103,12 @@ jobs:
         with:
           pattern: update-*
           merge-multiple: true
+          path: dist
+
+      - name: Download Windows client
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-client
           path: dist
 
       - name: Publish release
