@@ -220,9 +220,12 @@ func TestCreateAndListMemberUser(t *testing.T) {
 	created, err := service.CreateUser(
 		ctx,
 		owner.Actor,
-		"Alice",
-		"Alice",
-		"another correct horse battery",
+		UserProfileInput{
+			Username:    "Alice",
+			DisplayName: "Alice",
+			Password:    "another correct horse battery",
+			Profile:     ProfileMember,
+		},
 		RequestContext{RequestID: "req-create-user"},
 	)
 	if err != nil {
@@ -257,11 +260,191 @@ func TestCreateAndListMemberUser(t *testing.T) {
 	if _, err := service.CreateUser(
 		ctx,
 		owner.Actor,
-		"ALICE",
-		"Duplicate",
-		"another correct horse battery",
+		UserProfileInput{
+			Username:    "ALICE",
+			DisplayName: "Duplicate",
+			Password:    "another correct horse battery",
+			Profile:     ProfileMember,
+		},
 		RequestContext{},
 	); err != ErrUserExists {
 		t.Fatalf("duplicate CreateUser() error = %v, want ErrUserExists", err)
 	}
 }
+
+func TestUserProfilesSupportCustomPermissionsAndScopedResources(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	store, err := state.Open(ctx, dir)
+	if err != nil {
+		t.Fatalf("state.Open() error = %v", err)
+	}
+	defer store.Close()
+
+	service, err := New(ctx, store, dir)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	tokenBytes, err := os.ReadFile(service.BootstrapTokenPath())
+	if err != nil {
+		t.Fatalf("read bootstrap token: %v", err)
+	}
+	owner, err := service.Bootstrap(
+		ctx,
+		string(tokenBytes),
+		"Owner",
+		"Home Owner",
+		"correct horse battery staple",
+		RequestContext{},
+	)
+	if err != nil {
+		t.Fatalf("Bootstrap() error = %v", err)
+	}
+
+	created, err := service.CreateUser(
+		ctx,
+		owner.Actor,
+		UserProfileInput{
+			Username:    "Kid",
+			DisplayName: "Kid",
+			Password:    "child account password",
+			Profile:     ProfileChild,
+			Permissions: []string{
+				"security.self.read",
+				"security.sessions.manage",
+			},
+			ResourcePermissions: []PermissionScope{
+				{Permission: "files.read", ResourceType: "file_folder", ResourceID: "nsf_media"},
+			},
+		},
+		RequestContext{},
+	)
+	if err != nil {
+		t.Fatalf("CreateUser() error = %v", err)
+	}
+	if created.Profile != ProfileChild {
+		t.Fatalf("profile = %q", created.Profile)
+	}
+	if containsString(created.Permissions, "system.read") {
+		t.Fatalf("custom child permissions unexpectedly include system.read: %#v", created.Permissions)
+	}
+	if len(created.ResourcePermissions) != 1 || created.ResourcePermissions[0].ResourceID != "nsf_media" {
+		t.Fatalf("resource permissions = %#v", created.ResourcePermissions)
+	}
+
+	login, err := service.Login(ctx, "kid", "child account password", RequestContext{})
+	if err != nil {
+		t.Fatalf("Login() error = %v", err)
+	}
+	if login.Actor.Has("system.read") {
+		t.Fatalf("custom permission deny was not effective: %#v", login.Actor.Permissions)
+	}
+	if !login.Actor.Allows("files.read", "file_folder", "nsf_media") {
+		t.Fatalf("scoped file permission missing: %#v", login.Actor.ResourcePermissions)
+	}
+	if login.Actor.Allows("files.write", "file_folder", "nsf_media") {
+		t.Fatal("unexpected scoped file write permission")
+	}
+}
+
+func TestAdministratorProfileHasDynamicFullAccess(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	store, err := state.Open(ctx, dir)
+	if err != nil {
+		t.Fatalf("state.Open() error = %v", err)
+	}
+	defer store.Close()
+
+	service, err := New(ctx, store, dir)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	tokenBytes, err := os.ReadFile(service.BootstrapTokenPath())
+	if err != nil {
+		t.Fatalf("read bootstrap token: %v", err)
+	}
+	owner, err := service.Bootstrap(
+		ctx,
+		string(tokenBytes),
+		"Owner",
+		"Home Owner",
+		"correct horse battery staple",
+		RequestContext{},
+	)
+	if err != nil {
+		t.Fatalf("Bootstrap() error = %v", err)
+	}
+
+	admin, err := service.CreateUser(
+		ctx,
+		owner.Actor,
+		UserProfileInput{
+			Username:    "Admin2",
+			DisplayName: "Second admin",
+			Password:    "administrator account password",
+			Profile:     ProfileAdministrator,
+			Permissions: []string{},
+		},
+		RequestContext{},
+	)
+	if err != nil {
+		t.Fatalf("CreateUser() error = %v", err)
+	}
+	for _, permission := range []string{"security.users.manage", "storage.manage", "files.manage", "network.manage", "updates.manage"} {
+		if !containsString(admin.Permissions, permission) {
+			t.Fatalf("administrator missing %q: %#v", permission, admin.Permissions)
+		}
+	}
+
+	login, err := service.Login(ctx, "admin2", "administrator account password", RequestContext{})
+	if err != nil {
+		t.Fatalf("Login() error = %v", err)
+	}
+	if !login.Actor.Has("security.roles.manage") || !login.Actor.Has("files.manage") {
+		t.Fatalf("administrator does not have full access: %#v", login.Actor.Permissions)
+	}
+}
+
+func TestOwnerCannotBeDisabledOrDemoted(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	store, err := state.Open(ctx, dir)
+	if err != nil {
+		t.Fatalf("state.Open() error = %v", err)
+	}
+	defer store.Close()
+
+	service, err := New(ctx, store, dir)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	tokenBytes, err := os.ReadFile(service.BootstrapTokenPath())
+	if err != nil {
+		t.Fatalf("read bootstrap token: %v", err)
+	}
+	owner, err := service.Bootstrap(
+		ctx,
+		string(tokenBytes),
+		"Owner",
+		"Home Owner",
+		"correct horse battery staple",
+		RequestContext{},
+	)
+	if err != nil {
+		t.Fatalf("Bootstrap() error = %v", err)
+	}
+
+	_, err = service.UpdateUser(ctx, owner.Actor, owner.Actor.ID, UserProfileInput{
+		DisplayName: "Home Owner",
+		Profile:     ProfileGuest,
+		Disabled:    true,
+	}, RequestContext{})
+	if !errors.Is(err, ErrOwnerImmutable) {
+		t.Fatalf("UpdateUser() error = %v, want ErrOwnerImmutable", err)
+	}
+}
+
