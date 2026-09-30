@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
@@ -271,7 +272,7 @@ func renderSMBConfig(workgroup string, shares []updaterhelper.SMBShareRequest) s
 }
 
 func validateManagedSMBConfig(ctx context.Context, content string) error {
-	file, err := os.CreateTemp("/tmp", "home-ai-smb-*.conf")
+	file, err := os.CreateTemp("/etc/samba", ".home-ai-test-*.conf")
 	if err != nil {
 		return err
 	}
