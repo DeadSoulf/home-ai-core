@@ -16,6 +16,11 @@ const baselinePermissions = new Set([
   "security.sessions.manage",
 ]);
 
+const administratorOnlyPermissions = new Set([
+  "security.users.manage",
+  "security.roles.manage",
+]);
+
 export function UsersPage({revision, canManage}: {revision: number; canManage: boolean}) {
   const {t, date} = useI18n();
   const load = useCallback(async () => {
@@ -82,7 +87,11 @@ export function UsersPage({revision, canManage}: {revision: number; canManage: b
     setDisplayName("");
     setPassword("");
     setProfile(user.profile || "friend");
-    setPermissions(user.permissions || []);
+    setPermissions(
+      user.profile === "administrator"
+        ? (user.permissions || [])
+        : (user.permissions || []).filter((permission) => !administratorOnlyPermissions.has(permission)),
+    );
     setResourcePermissions(user.resource_permissions || []);
     setDisabled(user.disabled);
     setFormError("");
@@ -320,8 +329,15 @@ export function UsersPage({revision, canManage}: {revision: number; canManage: b
                   <fieldset key={category} className="permission-group">
                     <legend>{categoryLabel(category, t)}</legend>
                     {values.map((permission) => {
-                      const locked = profile === "administrator" || baselinePermissions.has(permission.name);
-                      const checked = profile === "administrator" || permissions.includes(permission.name) || baselinePermissions.has(permission.name);
+                      const administratorOnly = administratorOnlyPermissions.has(permission.name);
+                      const locked =
+                        profile === "administrator" ||
+                        baselinePermissions.has(permission.name) ||
+                        administratorOnly;
+                      const checked =
+                        profile === "administrator" ||
+                        baselinePermissions.has(permission.name) ||
+                        (!administratorOnly && permissions.includes(permission.name));
                       return (
                         <label key={permission.name} className="permission-row">
                           <input
