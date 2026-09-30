@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, type ReactNode } from "react";
 import { api } from "../api/client";
 import type { NetworkProfile, SystemReadiness } from "../api/types";
 import { useI18n } from "../i18n";
@@ -153,7 +153,7 @@ function ReadinessCard({
   title: string;
   state: "ready" | "warning" | "unavailable";
   details: string;
-  children?: React.ReactNode;
+  children?: ReactNode;
 }) {
   const {t} = useI18n();
   const label = state === "ready"
