@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import type { PermissionScope, UserAccount, UserProfileName } from "../api/types";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
@@ -26,6 +26,7 @@ export function UsersPage({revision, canManage}: {revision: number; canManage: b
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [notice, setNotice] = useState("");
+  const [formInitialized, setFormInitialized] = useState(false);
 
   const users = resource.data?.users || [];
   const catalog = resource.data?.catalog;
@@ -37,6 +38,13 @@ export function UsersPage({revision, canManage}: {revision: number; canManage: b
     const profiles = catalog?.access.profiles || [];
     return profiles.filter((item) => !item.legacy || editingUser?.profile === item.name);
   }, [catalog, editingUser?.profile]);
+
+  useEffect(() => {
+    if (formInitialized || !catalog) return;
+    const defaults = catalog.access.profiles.find((item) => item.name === "parent")?.default_permissions || [];
+    setPermissions([...defaults]);
+    setFormInitialized(true);
+  }, [catalog, formInitialized]);
 
   const groupedPermissions = useMemo(() => {
     const groups = new Map<string, typeof permissionDefinitions>();
