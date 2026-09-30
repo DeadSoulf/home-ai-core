@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/state"
 )
@@ -461,4 +460,3 @@ func defaultAccessForProfile(ctx context.Context, service *Service, profile stri
 	return UserAccessInput{Profile: profile}
 }
 
-var _ = time.Time{}
