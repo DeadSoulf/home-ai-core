@@ -2,6 +2,7 @@ package security
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 
@@ -343,6 +344,29 @@ func TestUnifiedUserAccessCanBeCustomized(t *testing.T) {
 	}
 	if login.Actor.Has("network.manage") {
 		t.Fatal("custom parent access unexpectedly includes network.manage")
+	}
+
+	if _, err := service.UpdateUserAccess(
+		ctx,
+		login.Actor,
+		created.ID,
+		UserAccessInput{Profile: ProfileAdministrator},
+		RequestContext{},
+	); !errors.Is(err, ErrAdministratorRequired) {
+		t.Fatalf("non-admin self-escalation error = %v, want ErrAdministratorRequired", err)
+	}
+
+	if _, err := service.UpdateUserAccess(
+		ctx,
+		admin.Actor,
+		created.ID,
+		UserAccessInput{
+			Profile:     ProfileParent,
+			Permissions: []string{"security.users.manage"},
+		},
+		RequestContext{},
+	); err == nil {
+		t.Fatal("administrator-only permission was assigned to a non-admin profile")
 	}
 
 	updated, err := service.UpdateUserAccess(
