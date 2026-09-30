@@ -110,11 +110,11 @@ type windowsAgentTray struct {
 	closeOnce  sync.Once
 	done       chan struct{}
 
-	statusMu      sync.Mutex
-	statusText    string
-	notifyTitle   string
-	notifyText    string
-	notifyFlags   uint32
+	statusMu    sync.Mutex
+	statusText  string
+	notifyTitle string
+	notifyText  string
+	notifyFlags uint32
 }
 
 var (
@@ -171,8 +171,8 @@ func startAgentTray(logPath, configPath string) (*agentTrayRuntime, error) {
 		return nil, err
 	}
 	return &agentTrayRuntime{
-		RunNow: state.runNow,
-		Exit:   state.exit,
+		RunNow:      state.runNow,
+		Exit:        state.exit,
 		ReportCycle: state.reportCycle,
 		close: func() error {
 			state.closeOnce.Do(func() {
