@@ -164,7 +164,7 @@ func startAgentTray(logPath, configPath string) (*agentTrayRuntime, error) {
 		runNow:     make(chan struct{}, 1),
 		exit:       make(chan struct{}),
 		done:       make(chan struct{}),
-		statusText: agentTraySummary(configPath, time.Now()),
+		statusText: agentTraySummaryLocalized(configPath, time.Now(), preferredUILanguage()),
 	}
 	ready := make(chan error, 1)
 	go state.loop(ready)
@@ -335,15 +335,16 @@ func (state *windowsAgentTray) signalExit() {
 
 func (state *windowsAgentTray) reportCycle(manual bool, count int, runErr error) {
 	state.statusMu.Lock()
-	state.statusText = agentTraySummary(state.configPath, time.Now())
+	language := preferredUILanguage()
+	state.statusText = agentTraySummaryLocalized(state.configPath, time.Now(), language)
 	switch {
 	case runErr != nil:
-		state.notifyTitle = "Home-AI sync failed"
-		state.notifyText = "Open the agent log for details."
+		state.notifyTitle = textForLanguage(language, "sync_failed_title")
+		state.notifyText = textForLanguage(language, "open_log_details")
 		state.notifyFlags = niifError
 	case manual:
-		state.notifyTitle = "Home-AI sync complete"
-		state.notifyText = fmt.Sprintf("%d profile(s) processed.", count)
+		state.notifyTitle = textForLanguage(language, "sync_complete_title")
+		state.notifyText = textForLanguagef(language, "profiles_processed", count)
 		state.notifyFlags = niifInfo
 	default:
 		state.notifyTitle = ""
@@ -361,9 +362,9 @@ func (state *windowsAgentTray) tooltip() string {
 	status := state.statusText
 	state.statusMu.Unlock()
 	if status == "" {
-		return "Home-AI Sync Agent"
+		return textForLanguage(preferredUILanguage(), "tray_name")
 	}
-	return "Home-AI Sync Agent — " + status
+	return textForLanguage(preferredUILanguage(), "tray_name") + " — " + status
 }
 
 func (state *windowsAgentTray) applyStatus() {
@@ -382,7 +383,7 @@ func (state *windowsAgentTray) applyStatus() {
 	notify.HWnd = state.hwnd
 	notify.UID = 1
 	notify.UFlags = nifTip
-	tip := "Home-AI Sync Agent"
+	tip := textForLanguage(preferredUILanguage(), "tray_name")
 	if status != "" {
 		tip += " — " + status
 	}
@@ -409,19 +410,20 @@ func (state *windowsAgentTray) showMenu() {
 		return
 	}
 	defer procDestroyMenu.Call(menu)
-	summary := agentTraySummary(state.configPath, time.Now())
+	language := preferredUILanguage()
+	summary := agentTraySummaryLocalized(state.configPath, time.Now(), language)
 	state.statusMu.Lock()
 	state.statusText = summary
 	state.statusMu.Unlock()
 	appendTrayMenu(menu, mfString|mfGrayed, 0, summary)
 	appendTrayMenu(menu, mfSeparator, 0, "")
-	appendTrayMenu(menu, mfString, traySyncNow, "Sync now")
-	appendTrayMenu(menu, mfString, traySettings, "Settings")
+	appendTrayMenu(menu, mfString, traySyncNow, textForLanguage(language, "sync_now"))
+	appendTrayMenu(menu, mfString, traySettings, textForLanguage(language, "settings"))
 	appendTrayMenu(menu, mfSeparator, 0, "")
-	appendTrayMenu(menu, mfString, trayOpenLog, "Open log")
-	appendTrayMenu(menu, mfString, trayOpenConfig, "Open sync profiles")
+	appendTrayMenu(menu, mfString, trayOpenLog, textForLanguage(language, "open_log"))
+	appendTrayMenu(menu, mfString, trayOpenConfig, textForLanguage(language, "open_sync_profiles"))
 	appendTrayMenu(menu, mfSeparator, 0, "")
-	appendTrayMenu(menu, mfString, trayExit, "Exit")
+	appendTrayMenu(menu, mfString, trayExit, textForLanguage(language, "exit"))
 	var point trayPoint
 	if ok, _, _ := procGetCursorPos.Call(uintptr(unsafe.Pointer(&point))); ok == 0 {
 		return
