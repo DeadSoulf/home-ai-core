@@ -598,13 +598,19 @@ func (state *windowsSettingsUI) beginConnect() {
 	state.setStatus("Connecting to Home-AI...")
 	go func() {
 		result := &settingsConnectResult{}
-		client, err := windowsclient.New(server)
+		canonicalServer, err := windowsclient.NormalizeServerURL(server)
 		if err != nil {
 			result.err = err
 			state.postConnectResult(result)
 			return
 		}
-		result.server = strings.TrimRight(client.BaseURL.String(), "/")
+		client, err := windowsclient.New(canonicalServer)
+		if err != nil {
+			result.err = err
+			state.postConnectResult(result)
+			return
+		}
+		result.server = canonicalServer
 		result.user = user
 		resolvedPassword := password
 		if resolvedPassword == "" {
