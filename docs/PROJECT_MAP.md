@@ -5,7 +5,7 @@
 > Аудит уже сделанного: [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
-**Последний опубликованный релиз:** `0.1.78-dev` — Windows background sync agent + HKCU Run autostart\
+**Последний опубликованный релиз:** `0.1.79-dev` — stable per-user Windows install + native tray controls\
 **Текущий срез:** `0.1.79-dev` — stable per-user Windows install + native tray controls\
 **Следующий engineering milestone:** Windows self-update handoff + richer tray status/notifications\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
