@@ -141,6 +141,26 @@ Keep a foreground scheduler running:
 
 The watcher reloads profile configuration periodically and respects each persisted interval. It does not persist credentials; the password remains only in the process environment. Use `sync disable`, `sync enable` or `sync remove` with `--profile ID` to manage profiles.
 
+## Background sync agent
+
+After saving Windows credentials and creating at least one enabled sync profile, enable per-user autostart:
+
+```powershell
+.\home-ai-windows-client_<version>_amd64.exe agent install
+.\home-ai-windows-client_<version>_amd64.exe agent status
+```
+
+The agent is registered under the current user's Windows `Run` key and starts after that user logs on. The registry command contains only the executable path, `agent run`, and the sync-profile path; it contains no password or token.
+
+`agent install` verifies that every distinct account used by enabled profiles has a Windows Credential Manager password. The background process reuses `sync watch`, runs only one instance per profile file, hides its console, and writes a rotating per-user log at `%LOCALAPPDATA%\HomeAI\sync-agent.log` on normal Windows installations.
+
+Disable autostart with:
+
+```powershell
+.\home-ai-windows-client_<version>_amd64.exe agent remove
+```
+
+Keep the executable at the same path after installation. If you move or rename it, run `agent install` again so the Windows Run entry points at the new location.
 ## Current limitations
 
 - no Windows service/tray startup integration yet;
