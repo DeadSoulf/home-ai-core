@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -16,6 +17,7 @@ import (
 
 const (
 	trayCallbackMessage = 0x8000 + 73
+	trayStatusMessage   = 0x8000 + 74
 
 	wmCommand       = 0x0111
 	wmDestroy       = 0x0002
@@ -24,13 +26,16 @@ const (
 	wmLButtonDblClk = 0x0203
 
 	nimAdd    = 0x00000000
+	nimModify = 0x00000001
 	nimDelete = 0x00000002
 
 	nifMessage = 0x00000001
 	nifIcon    = 0x00000002
 	nifTip     = 0x00000004
+	nifInfo    = 0x00000010
 
 	mfString    = 0x00000000
+	mfGrayed    = 0x00000001
 	mfSeparator = 0x00000800
 
 	tpmRightButton = 0x0002
@@ -39,6 +44,9 @@ const (
 	trayOpenLog    = 1002
 	trayOpenConfig = 1003
 	trayExit       = 1004
+
+	niifInfo  = 0x00000001
+	niifError = 0x00000003
 
 	idiApplication = 32512
 	idcArrow       = 32512
@@ -101,6 +109,12 @@ type windowsAgentTray struct {
 	exitOnce   sync.Once
 	closeOnce  sync.Once
 	done       chan struct{}
+
+	statusMu      sync.Mutex
+	statusText    string
+	notifyTitle   string
+	notifyText    string
+	notifyFlags   uint32
 }
 
 var (
@@ -149,6 +163,7 @@ func startAgentTray(logPath, configPath string) (*agentTrayRuntime, error) {
 		runNow:     make(chan struct{}, 1),
 		exit:       make(chan struct{}),
 		done:       make(chan struct{}),
+		statusText: agentTraySummary(configPath, time.Now()),
 	}
 	ready := make(chan error, 1)
 	go state.loop(ready)
@@ -158,6 +173,7 @@ func startAgentTray(logPath, configPath string) (*agentTrayRuntime, error) {
 	return &agentTrayRuntime{
 		RunNow: state.runNow,
 		Exit:   state.exit,
+		ReportCycle: state.reportCycle,
 		close: func() error {
 			state.closeOnce.Do(func() {
 				if state.hwnd != 0 {
@@ -231,7 +247,7 @@ func (state *windowsAgentTray) loop(ready chan<- error) {
 	notify.UFlags = nifMessage | nifIcon | nifTip
 	notify.UCallbackMessage = trayCallbackMessage
 	notify.HIcon = windows.Handle(icon)
-	copy(notify.SzTip[:], windows.StringToUTF16("Home-AI Sync Agent"))
+	copy(notify.SzTip[:], windows.StringToUTF16(state.tooltip()))
 	added, _, addErr := procShellNotifyIconW.Call(nimAdd, uintptr(unsafe.Pointer(&notify)))
 	if added == 0 {
 		procDestroyWindow.Call(uintptr(state.hwnd))
@@ -275,6 +291,11 @@ func trayWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintpt
 			state.openPath(state.logPath)
 			return 0
 		}
+	case trayStatusMessage:
+		if state != nil {
+			state.applyStatus()
+		}
+		return 0
 	case wmCommand:
 		if state == nil {
 			break
@@ -309,12 +330,88 @@ func (state *windowsAgentTray) signalExit() {
 	state.exitOnce.Do(func() { close(state.exit) })
 }
 
+func (state *windowsAgentTray) reportCycle(manual bool, count int, runErr error) {
+	state.statusMu.Lock()
+	state.statusText = agentTraySummary(state.configPath, time.Now())
+	switch {
+	case runErr != nil:
+		state.notifyTitle = "Home-AI sync failed"
+		state.notifyText = "Open the agent log for details."
+		state.notifyFlags = niifError
+	case manual:
+		state.notifyTitle = "Home-AI sync complete"
+		state.notifyText = fmt.Sprintf("%d profile(s) processed.", count)
+		state.notifyFlags = niifInfo
+	default:
+		state.notifyTitle = ""
+		state.notifyText = ""
+		state.notifyFlags = 0
+	}
+	state.statusMu.Unlock()
+	if state.hwnd != 0 {
+		procPostMessageW.Call(uintptr(state.hwnd), trayStatusMessage, 0, 0)
+	}
+}
+
+func (state *windowsAgentTray) tooltip() string {
+	state.statusMu.Lock()
+	status := state.statusText
+	state.statusMu.Unlock()
+	if status == "" {
+		return "Home-AI Sync Agent"
+	}
+	return "Home-AI Sync Agent — " + status
+}
+
+func (state *windowsAgentTray) applyStatus() {
+	state.statusMu.Lock()
+	status := state.statusText
+	title := state.notifyTitle
+	message := state.notifyText
+	flags := state.notifyFlags
+	state.notifyTitle = ""
+	state.notifyText = ""
+	state.notifyFlags = 0
+	state.statusMu.Unlock()
+
+	var notify trayNotifyIconData
+	notify.CbSize = uint32(unsafe.Sizeof(notify))
+	notify.HWnd = state.hwnd
+	notify.UID = 1
+	notify.UFlags = nifTip
+	tip := "Home-AI Sync Agent"
+	if status != "" {
+		tip += " — " + status
+	}
+	copy(notify.SzTip[:], windows.StringToUTF16(tip))
+	procShellNotifyIconW.Call(nimModify, uintptr(unsafe.Pointer(&notify)))
+
+	if message == "" {
+		return
+	}
+	notify = trayNotifyIconData{}
+	notify.CbSize = uint32(unsafe.Sizeof(notify))
+	notify.HWnd = state.hwnd
+	notify.UID = 1
+	notify.UFlags = nifInfo
+	copy(notify.SzInfoTitle[:], windows.StringToUTF16(title))
+	copy(notify.SzInfo[:], windows.StringToUTF16(message))
+	notify.DwInfoFlags = flags
+	procShellNotifyIconW.Call(nimModify, uintptr(unsafe.Pointer(&notify)))
+}
+
 func (state *windowsAgentTray) showMenu() {
 	menu, _, _ := procCreatePopupMenu.Call()
 	if menu == 0 {
 		return
 	}
 	defer procDestroyMenu.Call(menu)
+	summary := agentTraySummary(state.configPath, time.Now())
+	state.statusMu.Lock()
+	state.statusText = summary
+	state.statusMu.Unlock()
+	appendTrayMenu(menu, mfString|mfGrayed, 0, summary)
+	appendTrayMenu(menu, mfSeparator, 0, "")
 	appendTrayMenu(menu, mfString, traySyncNow, "Sync now")
 	appendTrayMenu(menu, mfSeparator, 0, "")
 	appendTrayMenu(menu, mfString, trayOpenLog, "Open log")
