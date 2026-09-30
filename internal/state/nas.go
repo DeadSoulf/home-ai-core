@@ -207,17 +207,6 @@ func (s *Store) CreateNASFolder(
 				return NASFolderRecord{}, fmt.Errorf("grant private folder permission: %w", err)
 			}
 		}
-	} else {
-		for _, permission := range []string{"files.read", "files.write"} {
-			if _, err := tx.ExecContext(ctx, `
-				INSERT OR IGNORE INTO role_resource_permissions(
-					role_id, permission_name, resource_type, resource_id
-				)
-				VALUES ('role_member', ?, 'file_folder', ?)
-			`, permission, id); err != nil {
-				return NASFolderRecord{}, fmt.Errorf("grant shared folder permission: %w", err)
-			}
-		}
 	}
 
 	if err := tx.Commit(); err != nil {
