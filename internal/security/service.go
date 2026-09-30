@@ -256,7 +256,7 @@ func (s *Service) CreateUser(
 	if err != nil {
 		return User{}, err
 	}
-	record, err := s.store.CreateUser(
+	_, err = s.store.CreateUser(
 		ctx,
 		userID,
 		username,
