@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/windowsclient"
