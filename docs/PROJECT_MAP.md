@@ -6,10 +6,23 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.79-dev` — stable per-user Windows install + native tray controls\
-**Текущий срез:** `0.1.79-dev` — stable per-user Windows install + native tray controls\
-**Следующий engineering milestone:** 🚧 Windows self-update handoff + richer tray status/notifications — реализация ведётся поверх `0.1.79-dev`\
+**Текущий release target:** `0.1.80-dev` — Windows self-update handoff + tray health/notifications\
+**Следующий engineering milestone:** automatic Windows release discovery/download + SHA-256 verified install handoff\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
+
+### Выпуск 0.1.80-dev
+
+- `client install` и `agent install` умеют обновлять stable per-user binary даже при запущенном tray-agent.
+- При Windows sharing/access lock новый client находит только Home-AI-owned tray window, отправляет штатный `WM_CLOSE` и до 15 секунд повторяет atomic replacement.
+- После успешной замены managed autostart-agent запускается снова под тем же Windows user.
+- HKCU Run разбирается только в точном Home-AI canonical формате; произвольная shell command не принимается.
+- SHA-256 content comparison не перезапускает agent, если installed binary уже совпадает с source.
+- Tray показывает количество enabled profiles и последний `OK` / `FAILED` результат.
+- Failed sync cycle даёт Windows notification; manual **Sync now** сообщает о завершении; успешные фоновые циклы не создают notification spam.
+- Native Windows CI реально проверяет locked executable → tray `WM_CLOSE` → release handle → atomic replace.
+- ADR-0027 и полный `core-ci` прошли до release PR.
+- Практическая проверка upgrade `0.1.79-dev → 0.1.80-dev` на реальном Windows остаётся acceptance step.
 
 ### Выпуск 0.1.79-dev
 
@@ -413,7 +426,7 @@ Check
 9. ✅ ADR-0026 + native Windows tests + полный core-ci;
 10. 🧪 реальная Windows acceptance установки, tray и обновления установленного binary остаётся незавершённой.
 
-Основной следующий engineering milestone: Windows self-update handoff + richer tray status/notifications. Stable per-user install и базовый native tray готовы в `0.1.79-dev`; следующий срез должен позволить безопасно обновить запущенную установленную копию и показывать пользователю фактическое состояние sync/ошибки. Live Windows/NAS acceptance, logout/reboot autostart acceptance, SMB и rollback остаются отдельными практическими проверками перед отметкой F2 как завершённого.
+Основной следующий engineering milestone: automatic Windows release discovery/download + SHA-256 verified install handoff. Self-update handoff и tray health/notifications входят в `0.1.80-dev`; live Windows/NAS acceptance, logout/reboot autostart acceptance, SMB и rollback остаются отдельными практическими проверками перед отметкой F2 как завершённого.
 
 ## 4. Следующие продуктовые этапы
 
