@@ -142,9 +142,6 @@ func runSync(args []string) error {
 		if poll < time.Second || poll > 5*time.Minute {
 			return errors.New("--poll must be between 1s and 5m")
 		}
-		if os.Getenv(passwordEnv) == "" {
-			return fmt.Errorf("%s is required", passwordEnv)
-		}
 		if err := validateSyncWatchSelection(configPath, profileID); err != nil {
 			return err
 		}
@@ -236,10 +233,6 @@ func executeSyncProfiles(
 	if len(selected) == 0 {
 		return 0, nil
 	}
-	if os.Getenv(passwordEnv) == "" {
-		return 0, fmt.Errorf("%s is required", passwordEnv)
-	}
-
 	var runErrors []error
 	for _, profile := range selected {
 		if err := ctx.Err(); err != nil {
