@@ -626,13 +626,6 @@ func (s *Store) CountEnabledUsersWithRole(ctx context.Context, roleID string) (i
 	return count, nil
 }
 
-func boolInt(value bool) int {
-	if value {
-		return 1
-	}
-	return 0
-}
-
 func (s *Store) GrantRoleResourcePermission(
 	ctx context.Context,
 	roleID, permission, resourceType, resourceID string,
