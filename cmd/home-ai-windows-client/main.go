@@ -24,8 +24,7 @@ func main() {
 
 func run(args []string) error {
 	if len(args) == 0 {
-		printUsage()
-		return errors.New("command is required")
+		return runDefaultCommand()
 	}
 
 	switch args[0] {
@@ -45,6 +44,8 @@ func run(args []string) error {
 		return runAgent(args[1:])
 	case "client":
 		return runClient(args[1:])
+	case "settings":
+		return runSettingsUI(args[1:])
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -240,4 +241,5 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  agent remove")
 	fmt.Fprintln(os.Stderr, "  agent run [--config FILE] [--poll 30s]")
 	fmt.Fprintln(os.Stderr, "  client install|status")
+	fmt.Fprintln(os.Stderr, "  settings [--config FILE] [--settings FILE]")
 }
