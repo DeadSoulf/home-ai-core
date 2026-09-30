@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/windowsclient"
 )
@@ -37,11 +38,27 @@ func runClient(args []string) error {
 		if err != nil {
 			return fmt.Errorf("locate Windows client executable: %w", err)
 		}
-		path, err := windowsclient.InstallUserClient(executable)
+		result, err := windowsclient.InstallUserClientWithHandoff(executable, 15*time.Second)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Home-AI Windows client installed: %s\n", path)
+		if result.AgentExitRequested {
+			info, statusErr := windowsclient.UserAgentAutostartStatus()
+			if statusErr != nil {
+				return fmt.Errorf("read agent autostart after client update: %w", statusErr)
+			}
+			if info.Enabled {
+				if err := windowsclient.StartUserAgent(result.Path, info.ConfigPath); err != nil {
+					return fmt.Errorf("restart Home-AI sync agent: %w", err)
+				}
+				fmt.Println("Home-AI sync agent restarted after client update.")
+			}
+		}
+		if result.Changed {
+			fmt.Printf("Home-AI Windows client installed: %s\n", result.Path)
+		} else {
+			fmt.Printf("Home-AI Windows client is already current: %s\n", result.Path)
+		}
 		return nil
 	case "status":
 		path, installed, err := windowsclient.UserClientInstallStatus()

@@ -7,7 +7,7 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.79-dev` — stable per-user Windows install + native tray controls\
 **Текущий срез:** `0.1.79-dev` — stable per-user Windows install + native tray controls\
-**Следующий engineering milestone:** Windows self-update handoff + richer tray status/notifications\
+**Следующий engineering milestone:** 🚧 Windows self-update handoff + richer tray status/notifications — реализация ведётся поверх `0.1.79-dev`\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
 

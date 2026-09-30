@@ -126,7 +126,23 @@ func TestWatchSyncProfilesRunNowUsesSameSchedulerLoop(t *testing.T) {
 	runNow <- struct{}{}
 	ctx, cancel := context.WithTimeout(context.Background(), 750*time.Millisecond)
 	defer cancel()
-	if err := watchSyncProfiles(ctx, config, "", 1, false, time.Second, runNow); err != nil {
+	var callbackManual bool
+	var callbackCount int
+	var callbackErr error
+	if err := watchSyncProfiles(
+		ctx,
+		config,
+		"",
+		1,
+		false,
+		time.Second,
+		runNow,
+		func(manual bool, count int, err error) {
+			callbackManual = manual
+			callbackCount = count
+			callbackErr = err
+		},
+	); err != nil {
 		t.Fatal(err)
 	}
 	profiles, err := windowsclient.LoadSyncProfiles(config)
@@ -136,5 +152,8 @@ func TestWatchSyncProfilesRunNowUsesSameSchedulerLoop(t *testing.T) {
 	if len(profiles) != 1 || profiles[0].LastAttemptAt == nil ||
 		!profiles[0].LastAttemptAt.After(initial) || profiles[0].LastError == "" {
 		t.Fatalf("trigger did not execute a forced sync: %#v", profiles)
+	}
+	if !callbackManual || callbackCount != 1 || callbackErr == nil {
+		t.Fatalf("cycle callback = manual:%t count:%d err:%v", callbackManual, callbackCount, callbackErr)
 	}
 }

@@ -144,7 +144,7 @@ func runSync(args []string) error {
 		}
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer cancel()
-		return watchSyncProfiles(ctx, configPath, profileID, retries, restartStale, poll, nil)
+		return watchSyncProfiles(ctx, configPath, profileID, retries, restartStale, poll, nil, nil)
 	}
 	return nil
 }
@@ -157,6 +157,7 @@ func watchSyncProfiles(
 	restartStale bool,
 	poll time.Duration,
 	runNow <-chan struct{},
+	onCycle func(manual bool, count int, err error),
 ) error {
 	if retries < 1 {
 		return errors.New("sync watcher retries must be positive")
@@ -173,10 +174,14 @@ func watchSyncProfiles(
 		if ctx.Err() != nil {
 			return nil
 		}
-		_, runErr := executeSyncProfiles(ctx, configPath, profileID, !forceRun, retries, restartStale)
+		manual := forceRun
+		count, runErr := executeSyncProfiles(ctx, configPath, profileID, !forceRun, retries, restartStale)
 		forceRun = false
 		if ctx.Err() != nil {
 			return nil
+		}
+		if onCycle != nil && (manual || count > 0) {
+			onCycle(manual, count, runErr)
 		}
 		if runErr != nil {
 			fmt.Fprintln(os.Stderr, "sync cycle:", runErr)
