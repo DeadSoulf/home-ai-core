@@ -19,7 +19,10 @@ const (
 	ProfileFriend        = "friend"
 )
 
-var ErrLastAdministrator = errors.New("at least one enabled administrator must remain")
+var (
+	ErrLastAdministrator     = errors.New("at least one enabled administrator must remain")
+	ErrAdministratorRequired = errors.New("administrator profile is required to manage user access")
+)
 
 type ProfileTemplate struct {
 	ID                 string   `json:"id"`
@@ -209,6 +212,9 @@ func (s *Service) CreateUserWithAccess(
 	access UserAccessInput,
 	meta RequestContext,
 ) (User, error) {
+	if !actorIsAdministrator(actor) {
+		return User{}, ErrAdministratorRequired
+	}
 	profile, permissions, scopes, err := s.normalizeAccess(ctx, access)
 	if err != nil {
 		return User{}, err
@@ -283,6 +289,9 @@ func (s *Service) UpdateUserAccess(
 	access UserAccessInput,
 	meta RequestContext,
 ) (User, error) {
+	if !actorIsAdministrator(actor) {
+		return User{}, ErrAdministratorRequired
+	}
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
 		return User{}, errors.New("user id is required")
@@ -379,6 +388,9 @@ func (s *Service) normalizeAccess(
 		if !available[permission] {
 			return "", nil, nil, fmt.Errorf("unknown permission %q", permission)
 		}
+		if profile != ProfileAdministrator && administratorOnlyPermission(permission) {
+			return "", nil, nil, fmt.Errorf("permission %q requires administrator profile", permission)
+		}
 		permissionSet[permission] = true
 	}
 	permissions := make([]string, 0, len(permissionSet))
@@ -442,6 +454,24 @@ func (s *Service) normalizeAccess(
 		permissions = permissionNamesFromDefinitions(catalog.Permissions)
 	}
 	return profile, permissions, scopes, nil
+}
+
+func actorIsAdministrator(actor Actor) bool {
+	for _, role := range actor.Roles {
+		if role == ProfileAdministrator || role == "owner" {
+			return true
+		}
+	}
+	return false
+}
+
+func administratorOnlyPermission(permission string) bool {
+	switch permission {
+	case "security.users.manage", "security.roles.manage":
+		return true
+	default:
+		return false
+	}
 }
 
 func permissionNamesFromDefinitions(records []PermissionDefinition) []string {
