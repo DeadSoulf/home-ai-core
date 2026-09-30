@@ -12,6 +12,12 @@ import (
 
 var ErrUserClientInstallUnsupported = errors.New("per-user Windows client installation is unavailable on this platform")
 
+type UserClientInstallResult struct {
+	Path               string
+	Changed            bool
+	AgentExitRequested bool
+}
+
 func installExecutable(source, destination string) error {
 	source = strings.TrimSpace(source)
 	destination = strings.TrimSpace(destination)
@@ -115,6 +121,21 @@ func hashRegularFile(filename string) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%x", hash.Sum(nil)), nil
+}
+
+func sameRegularFileContent(left, right string) (bool, error) {
+	leftHash, err := hashRegularFile(left)
+	if err != nil {
+		return false, err
+	}
+	rightHash, err := hashRegularFile(right)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return leftHash == rightHash, nil
 }
 
 func sameCleanPath(left, right string) bool {
