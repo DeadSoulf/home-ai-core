@@ -241,11 +241,23 @@ Check
 7. ✅ scoped `files.read/files.write`, CSRF и Audit;
 8. ✅ Web recycle-bin UI + API/Web tests.
 
+Шестой вертикальный срез:
+
+1. ✅ disk-backed resumable upload sessions;
+2. ✅ upload state переживает restart Core;
+3. ✅ последовательные chunks до 8 MiB;
+4. ✅ точный server-reported offset для resume;
+5. ✅ SHA-256 проверка каждого chunk;
+6. ✅ SHA-256 всего файла перед atomic commit;
+7. ✅ Web progress + resume по file fingerprint;
+8. ✅ cancel/restart несовпадающей незавершённой загрузки;
+9. ✅ ADR-0019 и API/Web/filedata tests.
+
 Следующий подэтап:
 
-1. resumable/chunked upload + checksums;
-2. затем SMB;
-3. Windows file-copy client.
+1. SMB;
+2. затем Windows file-copy client;
+3. NFS — при необходимости.
 
 ## 4. Следующие продуктовые этапы
 
@@ -260,8 +272,8 @@ Check
 - ✅ shared/common folders;
 - ✅ physical directory provisioning + filesystem validation;
 - ✅ file CRUD API foundation (browse/create/upload/download/delete/move/rename);
-- 🚧 Web file manager (browser + mutations + recycle bin готовы; resumable дальше);
-- SMB;
+- ✅ Web file manager (browser + mutations + recycle bin + resumable upload);
+- 🚧 SMB;
 - NFS при необходимости;
 - quotas/policies;
 - snapshots/backup where supported;

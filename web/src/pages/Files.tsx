@@ -36,6 +36,12 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
   const [trashVisible, setTrashVisible] = useState(false);
   const [trashEntries, setTrashEntries] = useState<Awaited<ReturnType<typeof api.fileTrash>>>([]);
   const [trashLoading, setTrashLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{
+    name: string;
+    received: number;
+    total: number;
+    resumed: boolean;
+  }>();
 
   async function createPool(event: FormEvent) {
     event.preventDefault();
@@ -150,12 +156,81 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
     if (!file || !selectedFolder || !selectedFolder.can_write) return;
     setBusy("browser-upload");
     setBrowserError("");
+    setNotice("");
+
+    const targetPath = joinFilePath(currentPath, file.name);
+    const fingerprint = `${file.name}:${file.size}:${file.lastModified}`;
     try {
-      await api.uploadFile(selectedFolder.id, joinFilePath(currentPath, file.name), file);
+      const uploads = await api.fileUploads(selectedFolder.id);
+      let session = uploads.find((item) =>
+        item.path === targetPath &&
+        item.total_bytes === file.size &&
+        item.client_fingerprint === fingerprint
+      );
+
+      if (!session) {
+        const stale = uploads.find((item) => item.path === targetPath);
+        if (stale) {
+          if (!window.confirm(t("fileUploadRestartConfirm").replace("{name}", file.name))) {
+            return;
+          }
+          await api.cancelFileUpload(selectedFolder.id, stale.id);
+        }
+        session = await api.createFileUpload(selectedFolder.id, {
+          path: targetPath,
+          totalBytes: file.size,
+          clientFingerprint: fingerprint,
+        });
+      }
+
+      let resumed = session.received_bytes > 0;
+      if (resumed && session.chunks?.length) {
+        const verified = await verifyUploadedChunks(file, session.chunks);
+        if (!verified) {
+          await api.cancelFileUpload(selectedFolder.id, session.id);
+          session = await api.createFileUpload(selectedFolder.id, {
+            path: targetPath,
+            totalBytes: file.size,
+            clientFingerprint: fingerprint,
+          });
+          resumed = false;
+        }
+      }
+
+      setUploadProgress({
+        name: file.name,
+        received: session.received_bytes,
+        total: file.size,
+        resumed,
+      });
+
+      while (session.received_bytes < file.size) {
+        const offset = session.received_bytes;
+        const chunk = file.slice(offset, Math.min(offset + fileUploadChunkBytes, file.size));
+        const checksum = await sha256Blob(chunk);
+        session = await api.uploadFileChunk(
+          selectedFolder.id,
+          session.id,
+          offset,
+          chunk,
+          checksum,
+        );
+        setUploadProgress({
+          name: file.name,
+          received: session.received_bytes,
+          total: file.size,
+          resumed,
+        });
+      }
+
+      const result = await api.completeFileUpload(selectedFolder.id, session.id);
+      setNotice(t("fileUploadCompleteChecksum").replace("{sha256}", result.sha256));
       await loadEntries(selectedFolder.id, currentPath);
     } catch (reason) {
-      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+      const message = reason instanceof Error ? reason.message : t("requestFailed");
+      setBrowserError(`${t("fileUploadInterrupted")} ${message}`);
     } finally {
+      setUploadProgress(undefined);
       setBusy("");
     }
   }
@@ -388,6 +463,26 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                   }}
                 />
               </label>
+            </div>
+          )}
+
+          {uploadProgress && (
+            <div className="file-upload-progress">
+              <progress
+                max={Math.max(uploadProgress.total, 1)}
+                value={uploadProgress.received}
+              />
+              <span>
+                {t("fileUploadProgress")
+                  .replace("{name}", uploadProgress.name)
+                  .replace(
+                    "{percent}",
+                    String(uploadProgress.total === 0
+                      ? 100
+                      : Math.floor((uploadProgress.received / uploadProgress.total) * 100)),
+                  )}
+                {uploadProgress.resumed ? ` · ${t("fileUploadResumed")}` : ""}
+              </span>
             </div>
           )}
 
@@ -683,5 +778,35 @@ function formatFileSize(bytes: number): string {
     index++;
   }
   return `${value.toFixed(value >= 10 ? 1 : 2)} ${units[index]}`;
+}
+
+const fileUploadChunkBytes = 8 * 1024 * 1024;
+
+async function verifyUploadedChunks(
+  file: File,
+  chunks: Array<{offset: number; size: number; sha256: string}>,
+): Promise<boolean> {
+  if (!globalThis.crypto?.subtle) return true;
+  for (const chunk of chunks) {
+    if (chunk.offset < 0 || chunk.size <= 0 || chunk.offset + chunk.size > file.size) {
+      return false;
+    }
+    const digest = await sha256Blob(file.slice(chunk.offset, chunk.offset + chunk.size));
+    if (digest && digest !== chunk.sha256) {
+      return false;
+    }
+  }
+  return true;
+}
+
+async function sha256Blob(blob: Blob): Promise<string | undefined> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) return undefined;
+  try {
+    const digest = await subtle.digest("SHA-256", await blob.arrayBuffer());
+    return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return undefined;
+  }
 }
 

@@ -382,4 +382,95 @@ describe("API client", () => {
     vi.unstubAllGlobals();
   });
 
+
+  it("creates, appends and completes a resumable file upload", async () => {
+    const upload = {
+      id: "0123456789abcdef0123456789abcdef",
+      path: "large.bin",
+      total_bytes: 5,
+      received_bytes: 0,
+      client_fingerprint: "large.bin:5:1",
+      chunks: [],
+      created_at: "2026-09-30T12:00:00Z",
+      updated_at: "2026-09-30T12:00:00Z",
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/uploads") && init?.method === "POST") {
+        return new Response(JSON.stringify({upload}), {
+          status: 201,
+          headers: {"Content-Type": "application/json"},
+        });
+      }
+      if (url.endsWith("/chunk")) {
+        return new Response(JSON.stringify({
+          upload: {
+            ...upload,
+            received_bytes: 5,
+            chunks: [{offset: 0, size: 5, sha256: "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"}],
+          },
+        }), {
+          status: 200,
+          headers: {"Content-Type": "application/json"},
+        });
+      }
+      if (url.endsWith("/complete")) {
+        return new Response(JSON.stringify({
+          file: {
+            path: "large.bin",
+            size_bytes: 5,
+            sha256: "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+          },
+        }), {
+          status: 200,
+          headers: {"Content-Type": "application/json"},
+        });
+      }
+      return new Response(JSON.stringify({uploads: [upload]}), {
+        status: 200,
+        headers: {"Content-Type": "application/json"},
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    });
+
+    setCSRFToken("csrf-resume");
+    const listed = await api.fileUploads("nsf-test");
+    expect(listed).toHaveLength(1);
+
+    const created = await api.createFileUpload("nsf-test", {
+      path: "large.bin",
+      totalBytes: 5,
+      clientFingerprint: "large.bin:5:1",
+    });
+    const chunked = await api.uploadFileChunk(
+      "nsf-test",
+      created.id,
+      0,
+      new Blob(["hello"]),
+      "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+    );
+    expect(chunked.received_bytes).toBe(5);
+
+    const completed = await api.completeFileUpload("nsf-test", created.id);
+    expect(completed.sha256).toBe("2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824");
+
+    const [, createInit] = fetchMock.mock.calls[1];
+    expect(createInit?.method).toBe("POST");
+    expect(new Headers(createInit?.headers).get("X-CSRF-Token")).toBe("csrf-resume");
+
+    const [, chunkInit] = fetchMock.mock.calls[2];
+    expect(chunkInit?.method).toBe("PUT");
+    expect(new Headers(chunkInit?.headers).get("Upload-Offset")).toBe("0");
+    expect(new Headers(chunkInit?.headers).get("X-Chunk-SHA256")).toContain("2cf24dba");
+    expect(new Headers(chunkInit?.headers).get("X-CSRF-Token")).toBe("csrf-resume");
+
+    vi.unstubAllGlobals();
+  });
+
 });

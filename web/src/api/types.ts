@@ -295,3 +295,27 @@ export type FileTrashEntry = {
   deleted_at: string;
 };
 
+export type FileUploadChunk = {
+  offset: number;
+  size: number;
+  sha256: string;
+};
+
+export type FileUploadSession = {
+  id: string;
+  path: string;
+  total_bytes: number;
+  received_bytes: number;
+  expected_sha256?: string;
+  client_fingerprint?: string;
+  chunks?: FileUploadChunk[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type FileUploadResult = {
+  path: string;
+  size_bytes: number;
+  sha256: string;
+};
+

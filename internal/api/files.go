@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -349,6 +350,241 @@ func (s *server) fileFolderContent(
 		})
 	default:
 		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+	}
+}
+
+func (s *server) fileFolderUploads(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	folder, root, ok := s.authorizedFileFolder(w, r, actor, true)
+	if !ok {
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		uploads, err := filedata.ListUploads(root)
+		if err != nil {
+			writeAPIError(w, r, http.StatusBadGateway, "file_uploads_unavailable", err.Error(), nil)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"uploads": uploads})
+	case http.MethodPost:
+		if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+			writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+			return
+		}
+		var input struct {
+			Path              string `json:"path"`
+			TotalBytes        int64  `json:"total_bytes"`
+			SHA256            string `json:"sha256,omitempty"`
+			ClientFingerprint string `json:"client_fingerprint,omitempty"`
+		}
+		if err := decodeJSON(w, r, &input); err != nil {
+			writeAPIError(w, r, http.StatusBadRequest, "invalid_file_upload", err.Error(), nil)
+			return
+		}
+		session, err := filedata.CreateUpload(
+			root,
+			strings.TrimSpace(input.Path),
+			input.TotalBytes,
+			input.SHA256,
+			input.ClientFingerprint,
+			time.Now().UTC(),
+		)
+		switch {
+		case errors.Is(err, filedata.ErrUploadTargetExists), errors.Is(err, filedata.ErrUploadAlreadyActive):
+			writeAPIError(w, r, http.StatusConflict, "file_upload_conflict", err.Error(), nil)
+		case err != nil:
+			writeAPIError(w, r, http.StatusBadRequest, "file_upload_create_failed", err.Error(), nil)
+		default:
+			s.security.RecordAudit(
+				r.Context(),
+				s.securityRequestContext(r),
+				actor,
+				"files.upload.create",
+				"file_folder",
+				folder.ID,
+				"success",
+				map[string]any{
+					"upload_id":   session.ID,
+					"path":        session.Path,
+					"total_bytes": session.TotalBytes,
+				},
+			)
+			writeJSON(w, http.StatusCreated, map[string]any{"upload": session})
+		}
+	default:
+		w.Header().Set("Allow", http.MethodGet+", "+http.MethodPost)
+		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+	}
+}
+
+func (s *server) fileFolderUpload(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	folder, root, ok := s.authorizedFileFolder(w, r, actor, true)
+	if !ok {
+		return
+	}
+	uploadID := strings.TrimSpace(r.PathValue("uploadID"))
+
+	switch r.Method {
+	case http.MethodGet:
+		session, err := filedata.GetUpload(root, uploadID)
+		if errors.Is(err, filedata.ErrUploadNotFound) {
+			writeAPIError(w, r, http.StatusNotFound, "file_upload_not_found", "upload session not found", nil)
+			return
+		}
+		if err != nil {
+			writeAPIError(w, r, http.StatusBadRequest, "file_upload_unavailable", err.Error(), nil)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"upload": session})
+	case http.MethodDelete:
+		if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+			writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+			return
+		}
+		if err := filedata.CancelUpload(root, uploadID); err != nil {
+			if errors.Is(err, filedata.ErrUploadNotFound) {
+				writeAPIError(w, r, http.StatusNotFound, "file_upload_not_found", "upload session not found", nil)
+				return
+			}
+			writeAPIError(w, r, http.StatusBadRequest, "file_upload_cancel_failed", err.Error(), nil)
+			return
+		}
+		s.security.RecordAudit(
+			r.Context(),
+			s.securityRequestContext(r),
+			actor,
+			"files.upload.cancel",
+			"file_folder",
+			folder.ID,
+			"success",
+			map[string]any{"upload_id": uploadID},
+		)
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		w.Header().Set("Allow", http.MethodGet+", "+http.MethodDelete)
+		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+	}
+}
+
+func (s *server) fileFolderUploadChunk(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if r.Method != http.MethodPut {
+		w.Header().Set("Allow", http.MethodPut)
+		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		return
+	}
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	_, root, ok := s.authorizedFileFolder(w, r, actor, true)
+	if !ok {
+		return
+	}
+
+	offset, err := strconv.ParseInt(strings.TrimSpace(r.Header.Get("Upload-Offset")), 10, 64)
+	if err != nil || offset < 0 {
+		writeAPIError(w, r, http.StatusBadRequest, "file_upload_offset_invalid", "valid Upload-Offset header is required", nil)
+		return
+	}
+	session, err := filedata.AppendUploadChunk(
+		root,
+		strings.TrimSpace(r.PathValue("uploadID")),
+		offset,
+		r.Header.Get("X-Chunk-SHA256"),
+		r.Body,
+		filedata.MaxUploadChunkBytes,
+		time.Now().UTC(),
+	)
+	switch {
+	case errors.Is(err, filedata.ErrUploadNotFound):
+		writeAPIError(w, r, http.StatusNotFound, "file_upload_not_found", "upload session not found", nil)
+	case errors.Is(err, filedata.ErrUploadOffsetMismatch):
+		writeAPIError(w, r, http.StatusConflict, "file_upload_offset_mismatch", err.Error(), nil)
+	case errors.Is(err, filedata.ErrUploadChecksumMismatch):
+		writeAPIError(w, r, http.StatusUnprocessableEntity, "file_upload_checksum_mismatch", err.Error(), nil)
+	case errors.Is(err, filedata.ErrUploadChunkTooLarge):
+		writeAPIError(w, r, http.StatusRequestEntityTooLarge, "file_upload_chunk_too_large", err.Error(), nil)
+	case err != nil:
+		writeAPIError(w, r, http.StatusBadRequest, "file_upload_chunk_failed", err.Error(), nil)
+	default:
+		w.Header().Set("Upload-Offset", strconv.FormatInt(session.ReceivedBytes, 10))
+		writeJSON(w, http.StatusOK, map[string]any{"upload": session})
+	}
+}
+
+func (s *server) fileFolderUploadComplete(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
+		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		return
+	}
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	folder, root, ok := s.authorizedFileFolder(w, r, actor, true)
+	if !ok {
+		return
+	}
+	uploadID := strings.TrimSpace(r.PathValue("uploadID"))
+	result, err := filedata.CompleteUpload(root, uploadID)
+	switch {
+	case errors.Is(err, filedata.ErrUploadNotFound):
+		writeAPIError(w, r, http.StatusNotFound, "file_upload_not_found", "upload session not found", nil)
+	case errors.Is(err, filedata.ErrUploadChecksumMismatch):
+		writeAPIError(w, r, http.StatusUnprocessableEntity, "file_upload_checksum_mismatch", err.Error(), nil)
+	case errors.Is(err, filedata.ErrUploadTargetExists):
+		writeAPIError(w, r, http.StatusConflict, "file_upload_target_exists", err.Error(), nil)
+	case err != nil:
+		writeAPIError(w, r, http.StatusBadRequest, "file_upload_complete_failed", err.Error(), nil)
+	default:
+		s.security.RecordAudit(
+			r.Context(),
+			s.securityRequestContext(r),
+			actor,
+			"files.file.upload.complete",
+			"file_folder",
+			folder.ID,
+			"success",
+			map[string]any{
+				"upload_id":  uploadID,
+				"path":       result.Path,
+				"size_bytes": result.SizeBytes,
+				"sha256":     result.SHA256,
+			},
+		)
+		s.realtime.Publish(
+			"files.file.uploaded",
+			map[string]any{
+				"folder_id":  folder.ID,
+				"path":       result.Path,
+				"size_bytes": result.SizeBytes,
+				"sha256":     result.SHA256,
+			},
+			requestIDFromContext(r.Context()),
+		)
+		writeJSON(w, http.StatusOK, map[string]any{"file": result})
 	}
 }
 
