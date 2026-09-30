@@ -5,9 +5,9 @@
 > Аудит уже сделанного: [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
-**Последний опубликованный релиз:** `0.1.80-dev` — Windows self-update handoff + tray health/notifications\
-**Текущий срез:** `0.1.81-dev` release candidate — Windows native settings GUI merged; release pending\
-**Следующий engineering milestone:** live Windows GUI acceptance, then automatic release discovery/download + SHA-256 verified install handoff\
+**Последний опубликованный релиз:** `0.1.81-dev` — native Windows settings GUI + sync/agent controls\
+**Текущий срез:** `0.1.81-dev` — published; live Windows GUI acceptance pending\
+**Следующий engineering milestone:** automatic Windows release discovery/download + SHA-256 verified install handoff\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
 
