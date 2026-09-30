@@ -187,7 +187,6 @@ func TestSyncProfilePersistenceAndSchedule(t *testing.T) {
 	}
 }
 
-
 func TestUpdateSyncProfilePreservesState(t *testing.T) {
 	source := filepath.Join(t.TempDir(), "source.txt")
 	writeCopyFile(t, source, "data")
