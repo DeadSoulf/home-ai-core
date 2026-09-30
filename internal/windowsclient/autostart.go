@@ -24,13 +24,12 @@ func buildUserAgentCommand(executable, configPath string) (string, error) {
 		return "", errors.New("agent executable and sync config paths must be absolute")
 	}
 	for _, value := range []string{executable, configPath} {
-		if strings.Contains(value, "\"") || strings.ContainsAny(value, "\r\n") {
+		if strings.Contains(value, """) || strings.ContainsAny(value, "\r\n") {
 			return "", errors.New("agent paths cannot contain quotes or control characters")
 		}
 	}
-	return "\"" + executable + "\" agent run --config \"" + configPath + "\"", nil
+	return """ + executable + "" agent run --config "" + configPath + """, nil
 }
-
 
 func ParseUserAgentCommand(command string) (string, string, error) {
 	command = strings.TrimSpace(command)
@@ -56,7 +55,7 @@ func ParseUserAgentCommand(command string) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
-	if rebuilt != """ + executable + "" " + remainder {
+	if rebuilt != """+executable+"" "+remainder {
 		return "", "", errors.New("agent Run command is not canonical")
 	}
 	return filepath.Clean(executable), filepath.Clean(configPath), nil
