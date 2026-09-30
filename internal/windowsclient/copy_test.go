@@ -570,6 +570,9 @@ func newCopyTestServer(t *testing.T) *copyTestServer {
 				err = filedata.CreateDirectory(remote.root, body.Path)
 			}
 			value = map[string]any{"path": body.Path}
+		case endpoint == "entry" && r.Method == http.MethodDelete:
+			entry, trashErr := filedata.Trash(remote.root, r.URL.Query().Get("path"), time.Now())
+			err, value = trashErr, map[string]any{"trash": entry}
 		case endpoint == "content":
 			file, info, openErr := filedata.OpenFile(remote.root, r.URL.Query().Get("path"))
 			if openErr == nil {
