@@ -28,9 +28,9 @@ import (
 )
 
 type fakeState struct {
-	pingErr       error
-	schemaVersion int
-	schemaErr     error
+	pingErr         error
+	schemaVersion   int
+	schemaErr       error
 	nasPools        []state.NASPoolRecord
 	nasFolders      []state.NASFolderRecord
 	storagePurposes []state.StoragePurposeRecord
@@ -758,15 +758,15 @@ func TestStoragePurposeResponseFollowsFilesystemUUID(t *testing.T) {
 			Type: "disk",
 			Children: []systeminfo.BlockNode{
 				{
-					Path:         "/dev/nvme1n1p1",
-					Type:         "part",
-					Filesystem:   "ext4",
-					UUID:         "uuid-files",
-					Label:        "DATA",
-					Mountpoints:  []string{"/mnt/home-ai-core/data"},
-					SizeBytes:    1000,
-					FreeBytes:    400,
-					FreeKnown:    true,
+					Path:        "/dev/nvme1n1p1",
+					Type:        "part",
+					Filesystem:  "ext4",
+					UUID:        "uuid-files",
+					Label:       "DATA",
+					Mountpoints: []string{"/mnt/home-ai-core/data"},
+					SizeBytes:   1000,
+					FreeBytes:   400,
+					FreeKnown:   true,
 				},
 			},
 		},
