@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.77-dev
+
+- Added Windows Credential Manager storage for Home-AI passwords without putting secrets in queue/sync JSON or command-line arguments.
+- Added `credentials save/status/delete` CLI commands; `HOME_AI_PASSWORD` remains the explicit highest-priority one-shot override.
+- Added Credential Manager fallback for Windows `folders`, copy, queue and scheduled sync authentication after process restart.
+- Added native Windows tests that round-trip a real generic credential and authenticate the Home-AI client without an environment password.
+- Added ADR-0024 and clarified that the future background launcher must run in the user's logon session rather than as LocalSystem.
+
 ## 0.1.76-dev
 
 - Added persistent Windows push-sync profiles with explicit intervals and enable/disable state; profiles store no password or bearer token.

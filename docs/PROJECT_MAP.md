@@ -5,11 +5,22 @@
 > Аудит уже сделанного: [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
-**Последний опубликованный релиз:** `0.1.75-dev` — persistent Windows copy queue + recursive folder copy\
-**Текущий срез:** `0.1.76-dev` — scheduled Windows push sync с явной конфликтной политикой (`stop` / `skip` / `replace-to-trash`)\
-**Следующий engineering milestone:** Windows user-session background agent/tray; secure credential storage через Windows Credential Manager уже реализуется отдельным срезом\
+**Последний опубликованный релиз:** `0.1.76-dev` — scheduled Windows push sync\
+**Текущий срез:** `0.1.77-dev` — Windows Credential Manager authentication без секретов в JSON/CLI\
+**Следующий engineering milestone:** Windows user-session background agent/tray + безопасный autostart после logon\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
+
+### Выпуск 0.1.77-dev
+
+- Добавлен Windows Credential Manager store для Home-AI password.
+- `HOME_AI_PASSWORD` остаётся приоритетным one-shot override; при его отсутствии Windows-клиент использует сохранённый credential.
+- Добавлены `credentials save/status/delete`; пароль не принимается через command line и не печатается.
+- `folders`, copy, queue и scheduled sync могут аутентифицироваться после restart процесса без password в queue/sync JSON.
+- Generic credential scoped к тому же Windows user на локальной машине.
+- Native Windows CI реально проверяет save/read/replace/delete и login без env password.
+- ADR-0024 фиксирует, что будущий background agent должен работать в user logon session, а не как LocalSystem.
+- Следующий срез: user-session autostart/background agent и затем tray UI.
 
 ### Выпуск 0.1.76-dev
 
@@ -306,8 +317,9 @@ Check
 1. live SMB acceptance на установленном сервере;
 2. 🧪 Windows persistent copy queue + recursive folder copy — опубликовано в `0.1.75-dev`; автоматические тесты прошли, пользовательская проверка на Windows/NAS остаётся;
 3. ✅ scheduled/automatic push sync — persistent profiles, due-run/watch scheduler и explicit conflict policy реализованы в `0.1.76-dev`;
-4. 🚧 Windows background agent/tray: Credential Manager foundation реализуется; user-session autostart остаётся следующим шагом;
-5. NFS — при необходимости.
+4. ✅ Windows Credential Manager authentication — реализовано в `0.1.77-dev`;
+5. 🚧 Windows user-session background agent/tray + autostart после logon;
+6. NFS — при необходимости.
 
 Девятый вертикальный срез (`0.1.75-dev`):
 
@@ -336,7 +348,21 @@ Check
 10. ✅ ADR-0023 + native Windows tests + полный core-ci;
 11. 🧪 пользовательская приёмка scheduled sync на реальном Windows/NAS остаётся незавершённой.
 
-Основной следующий engineering milestone: 🚧 Windows user-session background agent/tray. Credential Manager foundation уже реализуется, чтобы sync мог аутентифицироваться после restart процесса без пароля в JSON/CLI; следующим шагом остаётся безопасный autostart после Windows logon. Live SMB, обновление/откат и физическая приёмка Windows queue/sync остаются практическими проверками перед отметкой F2 как завершённого.
+Одиннадцатый вертикальный срез (`0.1.77-dev`):
+
+1. ✅ Windows Credential Manager generic credential store;
+2. ✅ password keying по normalized server URL + username;
+3. ✅ local-machine / same-user persistence;
+4. ✅ `HOME_AI_PASSWORD` остаётся explicit override;
+5. ✅ Credential Manager fallback для обычных copy/queue/sync flows;
+6. ✅ `credentials save/status/delete` без password argument;
+7. ✅ queue/sync JSON по-прежнему не содержит password/token;
+8. ✅ secret buffers очищаются where practical, password не логируется;
+9. ✅ native Windows real credential round-trip test;
+10. ✅ ADR-0024;
+11. 🧪 пользовательская проверка Credential Manager на реальном Windows остаётся незавершённой.
+
+Основной следующий engineering milestone: 🚧 Windows user-session background agent/tray + безопасный autostart после Windows logon. Credential Manager authentication готов в `0.1.77-dev`; LocalSystem service не используется как default, потому что он не разделяет пользовательский credential set. Live SMB, обновление/откат и физическая приёмка Windows queue/sync остаются практическими проверками перед отметкой F2 как завершённого.
 
 ## 4. Следующие продуктовые этапы
 
@@ -460,7 +486,8 @@ AI становится центральным управляющим слоем
 
 - 🧪 persistent local transfer queue и recursive folder copy реализованы в `0.1.75-dev`; остаётся пользовательская проверка на Windows и NAS;
 - ✅ scheduled/automatic push sync реализован в `0.1.76-dev`: persistent profiles, due-run/watch и explicit conflicts (`stop` / `skip` / `replace-to-trash`);
-- 🚧 background agent/tray: Windows Credential Manager foundation в разработке, затем user-session autostart;
+- ✅ Windows Credential Manager authentication реализован в `0.1.77-dev`;
+- 🚧 user-session background agent/tray + autostart после logon;
 - LAN + remote/WireGuard operation.
 
 Это не Windows system-image backup.
@@ -592,7 +619,8 @@ AI не может расширять собственные права.
 | `0.1.73-dev` | 🧪 Windows CLI foundation | одиночные файлы, resume, SHA-256, отдельный Windows release asset |
 | `0.1.74-dev` | 🧪 Web navigation | опубликована; сгруппированное меню и отдельные разделы Системы; пользовательская приёмка не подтверждена |
 | `0.1.75-dev` | 🧪 Windows copy queue | опубликован; очередь и перенос дерева папок, пользовательская приёмка остаётся |
-| `0.1.76-dev` | 🧪 Windows scheduled push sync | persistent profiles, due-run/watch, explicit conflict policy; пользовательская приёмка остаётся |
+| `0.1.76-dev` | 🧪 Windows scheduled push sync | опубликован; persistent profiles, due-run/watch, explicit conflict policy; пользовательская приёмка остаётся |
+| `0.1.77-dev` | 🧪 Windows Credential Manager | secure same-user password storage + auth fallback; пользовательская приёмка остаётся |
 
 ## 10. Правило ведения карты
 
