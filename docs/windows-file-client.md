@@ -171,12 +171,16 @@ You can also install or refresh the per-user copy explicitly:
 
 When the background agent is running, the Windows notification-area icon provides **Sync now**, **Open log**, **Open sync profiles**, and **Exit**. **Sync now** signals the existing sequential scheduler rather than starting a second copy process.
 
-If Windows refuses to replace the installed executable because the current agent still has it open, choose **Exit** from the tray and rerun `client install`.
+When updating from a newer downloaded release, `client install` now handles a running tray agent automatically. If the installed executable is locked, the new client requests a clean tray-agent exit, retries the atomic replacement for up to 15 seconds, and restarts the agent when its managed autostart entry is enabled.
+
+The tray status line shows the number of enabled profiles and the latest `OK` / `FAILED` result. The tooltip refreshes after sync cycles. Failed cycles show a Windows notification; successful background cycles stay silent, while manual **Sync now** reports completion.
+
+This handoff installs an executable you already downloaded. Automatic release discovery/download is not part of this slice.
 
 ## Current limitations
 
-- tray UI is intentionally minimal and does not edit sync profiles yet;
-- executable updates are explicit and can require exiting the running tray agent first;
+- tray UI is intentionally lightweight and does not edit sync profiles yet;
+- Windows client release discovery/download remains manual; the install handoff itself is automatic;
 - no bidirectional sync or local-delete propagation;
 - no sync-history/recycle-bin retention policy;
 - queue history pruning is still deferred.
