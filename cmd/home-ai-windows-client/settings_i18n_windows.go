@@ -4,8 +4,10 @@ package main
 
 import (
 	"fmt"
+	"unsafe"
 
 	"github.com/DeadSoulf/home-ai-core/internal/windowsclient"
+	"golang.org/x/sys/windows"
 )
 
 func (state *windowsSettingsUI) tr(key string) string {
@@ -90,4 +92,16 @@ func (state *windowsSettingsUI) changeLanguage() {
 	_ = state.reloadProfiles(state.selectedProfileID)
 	state.refreshAgentStatus()
 	state.setStatus(state.tr("ready"))
+	notifyTrayLanguageChanged()
+}
+
+func notifyTrayLanguageChanged() {
+	className, err := windows.UTF16PtrFromString("HomeAIWindowsSyncTray")
+	if err != nil {
+		return
+	}
+	hwnd, _, _ := procSettingsFindWindow.Call(uintptr(unsafe.Pointer(className)), 0)
+	if hwnd != 0 {
+		procSettingsPostMessage.Call(hwnd, trayStatusMessage, 0, 0)
+	}
 }
