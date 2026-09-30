@@ -218,6 +218,44 @@ func (f fakeSecurity) CreateUser(
 	}, nil
 }
 
+func (f fakeSecurity) CreateUserWithAccess(
+	context.Context,
+	security.Actor,
+	string,
+	string,
+	string,
+	security.UserAccessInput,
+	security.RequestContext,
+) (security.User, error) {
+	return security.User{
+		ID:          "usr-member",
+		Username:    "member",
+		DisplayName: "Member",
+		Roles:       []string{"friend"},
+		Profile:     "friend",
+	}, nil
+}
+
+func (f fakeSecurity) UpdateUserAccess(
+	context.Context,
+	security.Actor,
+	string,
+	security.UserAccessInput,
+	security.RequestContext,
+) (security.User, error) {
+	return security.User{
+		ID:          "usr-member",
+		Username:    "member",
+		DisplayName: "Member",
+		Roles:       []string{"friend"},
+		Profile:     "friend",
+	}, nil
+}
+
+func (f fakeSecurity) AccessCatalog(context.Context) (security.AccessCatalog, error) {
+	return security.AccessCatalog{}, nil
+}
+
 func (f fakeSecurity) ListUsers(context.Context) ([]security.User, error) {
 	return []security.User{
 		{
