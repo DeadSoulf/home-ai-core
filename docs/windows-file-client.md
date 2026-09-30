@@ -22,6 +22,12 @@ Each Home-AI development release publishes two separate Windows client assets:
 home-ai-windows-client_<version>_amd64.exe
 home-ai-windows-client_<version>_amd64.exe.sha256
 
+## Windows client language
+
+The native Windows UI supports **Русский** and **English** in the same executable. On the first GUI launch, Russian Windows locales default to Russian; other Windows locales default to English. The language selector in the settings window applies immediately and the selection is saved for later GUI and tray sessions.
+
+The saved language is non-secret metadata in `%APPDATA%\\HomeAI\\windows-client.json`. Passwords remain in Windows Credential Manager. The diagnostic command-line interface remains English.
+
 ## Windows settings UI
 
 On Windows, launch the client without arguments to open the native settings window:

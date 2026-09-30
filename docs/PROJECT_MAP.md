@@ -6,11 +6,23 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.81-dev` — native Windows settings GUI + sync/agent controls\
-**Текущий срез:** `0.1.81-dev` — published; live Windows GUI acceptance pending\
-**Следующий engineering milestone:** automatic Windows release discovery/download + SHA-256 verified install handoff\
+**Текущий срез:** Windows client RU/EN localization — PR #52; candidate for `0.1.82-dev`\
+**Следующий engineering milestone:** release RU/EN client, then automatic Windows release discovery/download + SHA-256 verified install handoff\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
 
+### Кандидат 0.1.82-dev — русский и английский Windows-клиент
+
+- Один Windows `.exe` поддерживает русский и английский интерфейс без отдельной сборки.
+- При первом запуске русская Windows locale выбирает русский; остальные locale используют английский.
+- В окне настроек есть переключатель **Русский / English**, который применяется сразу и сохраняется.
+- Выбранный язык хранится как non-secret поле `language` в `windows-client.json`; пароль остаётся только в Windows Credential Manager.
+- Локализованы labels, buttons, conflict policy, profile status, client-side validation, confirmations и status messages.
+- Tray использует тот же язык: меню, sync summary, tooltip и notifications.
+- Смена языка посылает running tray-agent refresh message без перезапуска sync scheduler.
+- Низкоуровневые server/OS error details остаются verbatim, но показываются внутри локализованного error framing.
+- CLI пока остаётся английским диагностическим интерфейсом.
+- ADR-0029 фиксирует localization boundary.
 ### Выпуск 0.1.81-dev — полноценные настройки Windows-клиента
 
 - Запуск Windows-клиента без аргументов открывает нативное окно настроек; существующий CLI сохраняется.

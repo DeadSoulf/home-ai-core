@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/windowsclient"
@@ -22,9 +21,13 @@ func (tray *agentTrayRuntime) Close() error {
 }
 
 func agentTraySummary(configPath string, now time.Time) string {
+	return agentTraySummaryLocalized(configPath, now, uiLanguageEnglish)
+}
+
+func agentTraySummaryLocalized(configPath string, now time.Time, language string) string {
 	profiles, err := windowsclient.LoadSyncProfiles(configPath)
 	if err != nil {
-		return "profiles unavailable"
+		return textForLanguage(language, "profiles_unavailable")
 	}
 	enabled := 0
 	var latest *windowsclient.SyncProfile
@@ -42,15 +45,15 @@ func agentTraySummary(configPath string, now time.Time) string {
 		}
 	}
 	if enabled == 0 {
-		return "no enabled profiles"
+		return textForLanguage(language, "no_enabled_profiles")
 	}
 	if latest == nil || latest.LastAttemptAt == nil {
-		return fmt.Sprintf("%d enabled · not synced yet", enabled)
+		return textForLanguagef(language, "summary_enabled_new", enabled)
 	}
 	result := "OK"
 	if latest.LastError != "" {
-		result = "FAILED"
+		result = textForLanguage(language, "failed")
 	}
 	when := latest.LastAttemptAt.In(now.Location()).Format("15:04")
-	return fmt.Sprintf("%d enabled · last %s %s", enabled, result, when)
+	return textForLanguagef(language, "summary_last", enabled, result, when)
 }

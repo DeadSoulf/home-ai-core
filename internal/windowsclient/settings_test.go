@@ -11,6 +11,7 @@ func TestClientSettingsRoundTrip(t *testing.T) {
 		Version:   1,
 		ServerURL: "http://home-ai.local:8080",
 		Username:  "alice",
+		Language:  "ru",
 	}
 	if err := SaveClientSettings(filename, want); err != nil {
 		t.Fatal(err)
@@ -31,5 +32,12 @@ func TestLoadClientSettingsMissingReturnsEmptyDefaults(t *testing.T) {
 	}
 	if got.Version != 1 || got.ServerURL != "" || got.Username != "" {
 		t.Fatalf("unexpected defaults: %#v", got)
+	}
+}
+
+func TestClientSettingsRejectUnsupportedLanguage(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "settings.json")
+	if err := SaveClientSettings(filename, ClientSettings{Version: 1, Language: "de"}); err == nil {
+		t.Fatal("unsupported language was accepted")
 	}
 }
