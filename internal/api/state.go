@@ -13,6 +13,9 @@ type State interface {
 	ClearTerminalJobs(ctx context.Context) (int64, error)
 	DiskNames(ctx context.Context) (map[string]string, error)
 	SetDiskName(ctx context.Context, stableID, displayName string) error
+	SetStoragePurpose(ctx context.Context, devicePath, filesystemUUID, purpose string, now time.Time) (state.StoragePurposeRecord, error)
+	ClearStoragePurpose(ctx context.Context, devicePath, filesystemUUID string) error
+	ListStoragePurposes(ctx context.Context) ([]state.StoragePurposeRecord, error)
 
 	CreateNASPool(ctx context.Context, name, rootPath, createdBy string, now time.Time) (state.NASPoolRecord, error)
 	ListNASPools(ctx context.Context) ([]state.NASPoolRecord, error)
