@@ -5,11 +5,22 @@
 > Аудит уже сделанного: [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
-**Основа текущего этапа:** опубликованный `0.1.74-dev` — упрощённая навигация Web\
-**Текущий срез:** `0.1.75-dev` — очередь копирования и перенос папок Windows-клиентом\
-**Следующий срез в разработке:** scheduled Windows push sync с явной конфликтной политикой (`stop` / `skip` / `replace-to-trash`)\
+**Последний опубликованный релиз:** `0.1.75-dev` — persistent Windows copy queue + recursive folder copy\
+**Текущий срез:** `0.1.76-dev` — scheduled Windows push sync с явной конфликтной политикой (`stop` / `skip` / `replace-to-trash`)\
+**Следующий engineering milestone:** Windows background service/tray + secure credential storage\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
+
+### Выпуск 0.1.76-dev
+
+- Реализованы persistent sync profiles Windows-клиента без сохранения пароля/токена.
+- `sync run` выполняет выбранный профиль либо все due-профили; `sync watch` запускает foreground scheduler и перечитывает конфигурацию.
+- Каждый цикл строит свежий plan, поэтому новые и изменённые локальные файлы попадают в следующий запуск.
+- Конфликты обрабатываются только явной политикой: `stop`, `skip`, `replace-to-trash`.
+- `replace-to-trash` перемещает точный конфликтующий объект в корзину Home-AI; конфликтующий ancestor автоматически не удаляется.
+- Локальные удаления пока не зеркалируются на NAS: это additive push sync, а не destructive mirror.
+- ADR-0023, native Windows tests и полный `core-ci` прошли до merge PR #43.
+- Следующий клиентский срез: background service/tray и безопасное хранение учётных данных для работы после перезагрузки Windows.
 
 ### Выпуск 0.1.74-dev
 
@@ -293,9 +304,9 @@ Check
 Следующий подэтап:
 
 1. live SMB acceptance на установленном сервере;
-2. 🧪 Windows persistent copy queue + recursive folder copy — реализовано, тесты API/Windows и восстановления очереди прошли; выпуск `0.1.75-dev` готовится к публикации;
-3. scheduled/automatic sync;
-4. Windows GUI/tray;
+2. 🧪 Windows persistent copy queue + recursive folder copy — опубликовано в `0.1.75-dev`; автоматические тесты прошли, пользовательская проверка на Windows/NAS остаётся;
+3. ✅ scheduled/automatic push sync — persistent profiles, due-run/watch scheduler и explicit conflict policy реализованы в `0.1.76-dev`;
+4. 🚧 Windows background service/tray + secure credential storage;
 5. NFS — при необходимости.
 
 Девятый вертикальный срез (`0.1.75-dev`):
@@ -311,7 +322,21 @@ Check
 9. ✅ ADR-0022, CLI guide, tests против Core API и native Windows tests;
 10. 🧪 пользовательская приёмка на установленном NAS/Windows остаётся незавершённой.
 
-Основной следующий engineering milestone: 🚧 scheduled/automatic Windows push sync с явной политикой конфликтов. Реализация ведётся отдельным срезом: persistent sync profiles, due-run/watch scheduler и recoverable `replace-to-trash`; локальные удаления пока не зеркалируются. Live SMB, обновление/откат и физическая приёмка текущего Windows-клиента остаются практическими проверками перед отметкой F2 как завершённого.
+Десятый вертикальный срез (`0.1.76-dev`):
+
+1. ✅ persistent non-secret sync profiles;
+2. ✅ интервалы и enabled/disabled state;
+3. ✅ fresh rescan/plan на каждом запуске;
+4. ✅ `sync run` для ручного запуска выбранного или due-профилей;
+5. ✅ `sync watch` как foreground scheduler;
+6. ✅ conflict policy `stop` / `skip` / `replace-to-trash`;
+7. ✅ recoverable replacement через существующую Home-AI recycle bin;
+8. ✅ запрет автоматического удаления конфликтующего ancestor;
+9. ✅ локальные удаления не распространяются на NAS в этом срезе;
+10. ✅ ADR-0023 + native Windows tests + полный core-ci;
+11. 🧪 пользовательская приёмка scheduled sync на реальном Windows/NAS остаётся незавершённой.
+
+Основной следующий engineering milestone: 🚧 Windows background service/tray + secure credential storage, чтобы `0.1.76-dev` sync мог работать после перезагрузки Windows без хранения пароля в JSON/CLI. Live SMB, обновление/откат и физическая приёмка Windows queue/sync остаются практическими проверками перед отметкой F2 как завершённого.
 
 ## 4. Следующие продуктовые этапы
 
@@ -434,8 +459,8 @@ AI становится центральным управляющим слоем
 Следующие срезы:
 
 - 🧪 persistent local transfer queue и recursive folder copy реализованы в `0.1.75-dev`; остаётся пользовательская проверка на Windows и NAS;
-- 🚧 schedule/automatic push sync: persistent profiles + explicit conflicts (`stop` / `skip` / `replace-to-trash`) в разработке;
-- GUI/tray;
+- ✅ scheduled/automatic push sync реализован в `0.1.76-dev`: persistent profiles, due-run/watch и explicit conflicts (`stop` / `skip` / `replace-to-trash`);
+- 🚧 background service/tray + secure credential storage;
 - LAN + remote/WireGuard operation.
 
 Это не Windows system-image backup.
@@ -566,7 +591,8 @@ AI не может расширять собственные права.
 | `0.1.67-dev` | 🧪 NAS foundation | logical pools, private/shared folders, scoped permissions, Files Web UI |
 | `0.1.73-dev` | 🧪 Windows CLI foundation | одиночные файлы, resume, SHA-256, отдельный Windows release asset |
 | `0.1.74-dev` | 🧪 Web navigation | опубликована; сгруппированное меню и отдельные разделы Системы; пользовательская приёмка не подтверждена |
-| `0.1.75-dev` | 🧪 Windows copy queue | очередь и перенос дерева папок; подготовка следующего выпуска |
+| `0.1.75-dev` | 🧪 Windows copy queue | опубликован; очередь и перенос дерева папок, пользовательская приёмка остаётся |
+| `0.1.76-dev` | 🧪 Windows scheduled push sync | persistent profiles, due-run/watch, explicit conflict policy; пользовательская приёмка остаётся |
 
 ## 10. Правило ведения карты
 

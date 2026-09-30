@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.76-dev
+
+- Added persistent Windows push-sync profiles with explicit intervals and enable/disable state; profiles store no password or bearer token.
+- Added `sync add/list/run/watch/enable/disable/remove` CLI commands and fresh source rescanning on every sync run.
+- Added explicit destination conflict policies: `stop`, `skip` and recoverable `replace-to-trash` using the existing Home-AI recycle bin.
+- Refuse automatic replacement of conflicting ancestor paths, and keep this first sync mode additive: local deletions are not mirrored to the server.
+- Added ADR-0023, Windows-native tests and full core CI coverage for scheduled sync behavior.
+
 ## 0.1.75-dev
 
 - Added recursive Windows file-client copying, including empty directories and safe creation of missing destination directories.
