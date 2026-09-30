@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../api/client";
-import type { BlockNode } from "../api/types";
+import type { StoragePurposeAssignment } from "../api/types";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
 import { useResource } from "../hooks/useResource";
 import { useI18n } from "../i18n";
@@ -11,15 +11,15 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
   const load = useCallback(async () => {
     const folders = await api.fileFolders();
     if (!canManage) {
-      return {folders, pools: [], users: [], system: undefined, smb: undefined};
+      return {folders, pools: [], users: [], storagePurposes: [], smb: undefined};
     }
-    const [pools, users, system, smb] = await Promise.all([
+    const [pools, users, storagePurposes, smb] = await Promise.all([
       api.filePools(),
       api.users(),
-      api.system(),
+      api.storagePurposes(),
       api.smbStatus(),
     ]);
-    return {folders, pools, users, system, smb};
+    return {folders, pools, users, storagePurposes, smb};
   }, [canManage]);
   const resource = useResource(load, revision);
 
@@ -422,7 +422,9 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
   const folders = resource.data?.folders || [];
   const pools = resource.data?.pools || [];
   const users = resource.data?.users || [];
-  const mountOptions = nasMountOptions(resource.data?.system?.system.block_tree || []);
+  const fileStorage = (resource.data?.storagePurposes || []).filter((item) => item.purpose === "files");
+  const mountOptions = fileStorageMountOptions(fileStorage);
+  const poolRoots = new Set(pools.map((pool) => pool.root_path));
   const smbStatus = resource.data?.smb;
   const userName = new Map(users.map((user) => [user.id, user.display_name || user.username]));
 
@@ -833,6 +835,55 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
       )}
 
       {canManage && (
+        <Panel title={t("fileAssignedStorage")} className="wide">
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>{t("device")}</th>
+                  <th>{t("name")}</th>
+                  <th>{t("filesystem")}</th>
+                  <th>{t("mountPoints")}</th>
+                  <th>{t("freeSpace")}</th>
+                  <th>{t("state")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fileStorage.map((storage) => {
+                  const usableMounts = storage.mountpoints.filter((path) => path.startsWith("/mnt/home-ai-core/"));
+                  const alreadyPool = usableMounts.some((path) => poolRoots.has(path));
+                  return (
+                    <tr key={storage.filesystem_uuid || storage.device}>
+                      <td className="mono">{storage.device}</td>
+                      <td>{storage.label || "—"}</td>
+                      <td>{storage.filesystem || "—"}</td>
+                      <td className="mono">{storage.mountpoints.join(", ") || "—"}</td>
+                      <td>{storage.free_known ? formatFileSize(storage.free_bytes || 0) : "—"}</td>
+                      <td>
+                        {!storage.present
+                          ? t("fileStorageMissing")
+                          : alreadyPool
+                            ? t("fileStoragePoolReady")
+                            : usableMounts.length > 0
+                              ? t("fileStorageReady")
+                              : t("fileStorageNeedsMount")}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {fileStorage.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="muted">{t("fileNoAssignedStorage")}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <p className="muted small">{t("fileAssignedStorageNotice")}</p>
+        </Panel>
+      )}
+
+      {canManage && (
         <div className="two-column">
           <Panel title={t("fileCreatePool")}>
             <form className="user-form" onSubmit={createPool}>
@@ -861,7 +912,11 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                   ))}
                 </select>
               </label>
-              {mountOptions.length === 0 && <div className="notice">{t("fileNoMountedStorage")}</div>}
+              {mountOptions.length === 0 && (
+                <div className="notice">
+                  {fileStorage.length === 0 ? t("fileNoAssignedStorage") : t("fileAssignedStorageNeedsMount")}
+                </div>
+              )}
               <p className="muted small">{t("filePoolFoundationNotice")}</p>
               <button className="button primary" type="submit" disabled={busy !== "" || mountOptions.length === 0}>
                 {busy === "pool" ? t("working") : t("fileCreatePool")}
@@ -946,23 +1001,19 @@ type NASMountOption = {
   device?: string;
 };
 
-function nasMountOptions(nodes: BlockNode[]): NASMountOption[] {
+function fileStorageMountOptions(assignments: StoragePurposeAssignment[]): NASMountOption[] {
   const byPath = new Map<string, NASMountOption>();
-  const visit = (node: BlockNode) => {
-    if (!node.system && node.filesystem) {
-      for (const mountpoint of node.mountpoints || []) {
-        if (mountpoint.startsWith("/mnt/home-ai-core/")) {
-          byPath.set(mountpoint, {
-            path: mountpoint,
-            filesystem: node.filesystem,
-            device: node.path || node.name,
-          });
-        }
-      }
+  for (const storage of assignments) {
+    if (!storage.present || !storage.filesystem) continue;
+    for (const mountpoint of storage.mountpoints || []) {
+      if (!mountpoint.startsWith("/mnt/home-ai-core/")) continue;
+      byPath.set(mountpoint, {
+        path: mountpoint,
+        filesystem: storage.filesystem,
+        device: storage.device,
+      });
     }
-    for (const child of node.children || []) visit(child);
-  };
-  for (const node of nodes) visit(node);
+  }
   return [...byPath.values()].sort((a, b) => a.path.localeCompare(b.path));
 }
 
