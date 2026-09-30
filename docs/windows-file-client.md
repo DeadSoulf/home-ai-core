@@ -34,6 +34,18 @@ Remove-Item Env:HOME_AI_PASSWORD
 
 The password is not accepted as a command-line argument and is not stored by the client.
 
+On Windows, the client can instead store the password in Windows Credential Manager. `HOME_AI_PASSWORD` still takes precedence when it is present.
+
+```powershell
+$env:HOME_AI_PASSWORD = 'your Home-AI password'
+.\home-ai-windows-client_<version>_amd64.exe credentials save --server http://HOME_AI_SERVER:8080 --username alice
+Remove-Item Env:HOME_AI_PASSWORD
+
+.\home-ai-windows-client_<version>_amd64.exe credentials status --server http://HOME_AI_SERVER:8080 --username alice
+```
+
+After that, `folders`, `copy`, `queue run`, `sync run` and `sync watch` can authenticate without an environment password. Remove the saved password with `credentials delete --server ... --username ...`. The secret is not copied into queue or sync-profile JSON.
+
 ## List folders
 
 .\home-ai-windows-client_<version>_amd64.exe folders --server http://HOME_AI_SERVER:8080 --username alice
@@ -132,7 +144,7 @@ The watcher reloads profile configuration periodically and respects each persist
 ## Current limitations
 
 - no Windows service/tray startup integration yet;
-- no Windows Credential Manager yet;
+- Windows Credential Manager is implemented; user-session autostart/background launcher is still pending;
 - no bidirectional sync or local-delete propagation;
 - no sync-history/recycle-bin retention policy;
 - queue history pruning is still deferred.
