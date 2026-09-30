@@ -11,6 +11,18 @@
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
 
+### Текущий security slice — единый пользователь ядра
+
+- 🚧 Один Core user ID становится канонической учётной записью человека для всего Home-AI.
+- 🚧 Профили **Администратор / Родитель / Ребёнок / Друг / Гость** задают стартовые шаблоны прав.
+- 🚧 Администратор при создании и редактировании пользователя видит общий каталог возможностей и может включить/отключить конкретные permissions.
+- 🚧 `owner` и `administrator` имеют полный динамический доступ ко всему permission catalog; bootstrap-owner нельзя отключить или понизить.
+- 🚧 Для конкретных ресурсов используется существующий scoped-grant механизм; первый UI позволяет отдельно дать чтение/запись к выбранным NAS folders.
+- 🚧 Новые shared NAS folders больше не выдаются автоматически всем пользователям; доступ задаётся явно.
+- 🚧 Миграция сохраняет прежний доступ существующих `member` к shared folders как персональные grants.
+- 🚧 SMB остаётся проекцией Core-пользователя, а не отдельной системой идентичностей.
+- 🚧 ADR-0031 фиксирует unified identity/profile boundary.
+
 ### Текущий F2 slice — назначение дисков для файлов и видео
 
 - 🚧 У физического data-раздела/LVM появляется явное назначение `files` или `video`.
@@ -167,7 +179,7 @@ Home-AI должен стать полностью автономной лока
 | Core API | ✅ | Go REST API и health | единый API для Web, AI, voice, clients и cluster |
 | State / migrations | ✅ | SQLite + forward migrations | локальное control-plane состояние |
 | Node identity | ✅ | стабильный ID узла | основа будущего cluster enrollment |
-| Security / Auth | ✅ | owner/member accounts, sessions, RBAC, CSRF, resource-scoped grants | пользователи, комнаты, устройства, камеры, папки и AI policy |
+| Security / Auth | 🚧 unified users | owner + Administrator/Parent/Child/Friend/Guest templates, per-user allow/deny, sessions, RBAC, CSRF, resource-scoped grants | единая identity/policy модель для NAS, NVR, Smart Home, AI и клиентов |
 | Audit | ✅ | аудит действий | критично для AI и опасных операций |
 | Jobs | ✅ | persistent job engine | долгие операции, модели, storage, NVR, cluster |
 | Events | ✅ | durable events | Smart Home/NVR/cluster domain events |
@@ -240,17 +252,19 @@ Check
 
 Следующий сетевой долг: explicit import/takeover внешнего ifupdown-профиля (отдельным подтверждаемым действием), затем VLAN/bridges/bonds.
 
-### ✅ Multi-user foundation
+### 🚧 Unified multi-user access
 
-Реализовано:
+Фундамент `owner/member` расширяется до единой пользовательской модели ядра:
 
-- роли `owner` и `member`;
-- API создания и списка пользователей;
-- Web-раздел **Пользователи**;
-- новые `member` получают только права на собственную учетную запись/сессию;
-- административные страницы скрываются по permissions;
-- ограниченный пользователь не опрашивает недоступные System/Updates/Realtime;
-- resource-scoped permissions готовы для будущего доступа к папкам, комнатам и камерам.
+- один пользователь Home-AI используется всеми подсистемами;
+- профили Administrator / Parent / Child / Friend / Guest работают как шаблоны;
+- доступ не ограничен профилем: администратор редактирует каждую capability отдельно;
+- поддерживаются прямые per-user allow/deny поверх role defaults;
+- bootstrap-owner защищён от отключения/понижения;
+- Web-раздел **Пользователи** становится единой матрицей доступа;
+- NAS folder read/write выдаётся конкретным пользователям через scoped grants;
+- прежние shared-folder grants мигрируют без потери доступа;
+- комнаты, устройства и камеры позже подключаются к той же resource-scoped модели.
 
 ## 3. Текущая работа
 
@@ -301,7 +315,7 @@ Check
 4. ✅ `files.read/files.write/files.manage`;
 5. ✅ scoped grants на конкретную папку;
 6. ✅ private folder → выбранный пользователь;
-7. ✅ shared folder → роль `member`;
+7. 🚧 shared folder → explicit per-user scoped access (legacy member grants мигрируются);
 8. ✅ API list/create pools и folders;
 9. ✅ Web-раздел **Файлы** с фильтрацией по effective permissions;
 10. ✅ ADR-0016 и тесты.
