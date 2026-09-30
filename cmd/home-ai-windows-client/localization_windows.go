@@ -9,10 +9,8 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-var (
-	localeKernel32              = windows.NewLazySystemDLL("kernel32.dll")
-	procGetUserDefaultLocaleName = localeKernel32.NewProc("GetUserDefaultLocaleName")
-)
+var localeKernel32 = windows.NewLazySystemDLL("kernel32.dll")
+var procGetUserDefaultLocaleName = localeKernel32.NewProc("GetUserDefaultLocaleName")
 
 func defaultUILanguage() string {
 	var buffer [85]uint16
