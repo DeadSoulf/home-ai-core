@@ -3,10 +3,10 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"unsafe"
@@ -24,21 +24,28 @@ const (
 	wmLButtonDblClk = 0x0203
 
 	nimAdd    = 0x00000000
+	nimModify = 0x00000001
 	nimDelete = 0x00000002
 
 	nifMessage = 0x00000001
 	nifIcon    = 0x00000002
 	nifTip     = 0x00000004
+	nifInfo    = 0x00000010
+
+	niifInfo  = 0x00000001
+	niifError = 0x00000003
 
 	mfString    = 0x00000000
+	mfDisabled  = 0x00000002
 	mfSeparator = 0x00000800
 
 	tpmRightButton = 0x0002
 
 	traySyncNow    = 1001
-	trayOpenLog    = 1002
-	trayOpenConfig = 1003
-	trayExit       = 1004
+	trayUpdateNow  = 1002
+	trayOpenLog    = 1003
+	trayOpenConfig = 1004
+	trayExit       = 1005
 
 	idiApplication = 32512
 	idcArrow       = 32512
@@ -93,14 +100,18 @@ type trayNotifyIconData struct {
 }
 
 type windowsAgentTray struct {
-	hwnd       windows.Handle
-	logPath    string
-	configPath string
-	runNow     chan struct{}
-	exit       chan struct{}
-	exitOnce   sync.Once
-	closeOnce  sync.Once
-	done       chan struct{}
+	hwnd          windows.Handle
+	logPath       string
+	configPath    string
+	clientVersion string
+	runNow        chan struct{}
+	updateNow     chan struct{}
+	exit          chan struct{}
+	exitOnce      sync.Once
+	closeOnce     sync.Once
+	done          chan struct{}
+	uiMu          sync.Mutex
+	closed        bool
 }
 
 var (
@@ -134,7 +145,7 @@ var activeWindowsTray struct {
 	value *windowsAgentTray
 }
 
-func startAgentTray(logPath, configPath string) (*agentTrayRuntime, error) {
+func startAgentTray(logPath, configPath, clientVersion string) (*agentTrayRuntime, error) {
 	logPath, err := filepath.Abs(logPath)
 	if err != nil {
 		return nil, fmt.Errorf("resolve tray log path: %w", err)
@@ -143,12 +154,18 @@ func startAgentTray(logPath, configPath string) (*agentTrayRuntime, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve tray sync config path: %w", err)
 	}
+	clientVersion = strings.TrimSpace(clientVersion)
+	if clientVersion == "" {
+		clientVersion = "dev"
+	}
 	state := &windowsAgentTray{
-		logPath:    logPath,
-		configPath: configPath,
-		runNow:     make(chan struct{}, 1),
-		exit:       make(chan struct{}),
-		done:       make(chan struct{}),
+		logPath:       logPath,
+		configPath:    configPath,
+		clientVersion: clientVersion,
+		runNow:        make(chan struct{}, 1),
+		updateNow:     make(chan struct{}, 1),
+		exit:          make(chan struct{}),
+		done:          make(chan struct{}),
 	}
 	ready := make(chan error, 1)
 	go state.loop(ready)
@@ -156,8 +173,11 @@ func startAgentTray(logPath, configPath string) (*agentTrayRuntime, error) {
 		return nil, err
 	}
 	return &agentTrayRuntime{
-		RunNow: state.runNow,
-		Exit:   state.exit,
+		RunNow:    state.runNow,
+		UpdateNow: state.updateNow,
+		Exit:      state.exit,
+		setStatus: state.setStatus,
+		notify:    state.notify,
 		close: func() error {
 			state.closeOnce.Do(func() {
 				if state.hwnd != 0 {
@@ -231,14 +251,19 @@ func (state *windowsAgentTray) loop(ready chan<- error) {
 	notify.UFlags = nifMessage | nifIcon | nifTip
 	notify.UCallbackMessage = trayCallbackMessage
 	notify.HIcon = windows.Handle(icon)
-	copy(notify.SzTip[:], windows.StringToUTF16("Home-AI Sync Agent"))
+	copyTrayUTF16(notify.SzTip[:], "Home-AI "+state.clientVersion+" — Idle")
 	added, _, addErr := procShellNotifyIconW.Call(nimAdd, uintptr(unsafe.Pointer(&notify)))
 	if added == 0 {
 		procDestroyWindow.Call(uintptr(state.hwnd))
 		ready <- fmt.Errorf("add tray icon: %w", addErr)
 		return
 	}
-	defer procShellNotifyIconW.Call(nimDelete, uintptr(unsafe.Pointer(&notify)))
+	defer func() {
+		state.uiMu.Lock()
+		state.closed = true
+		procShellNotifyIconW.Call(nimDelete, uintptr(unsafe.Pointer(&notify)))
+		state.uiMu.Unlock()
+	}()
 	ready <- nil
 
 	var msg trayMessage
@@ -285,6 +310,11 @@ func trayWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintpt
 			case state.runNow <- struct{}{}:
 			default:
 			}
+		case trayUpdateNow:
+			select {
+			case state.updateNow <- struct{}{}:
+			default:
+			}
 		case trayOpenLog:
 			state.openPath(state.logPath)
 		case trayOpenConfig:
@@ -315,7 +345,10 @@ func (state *windowsAgentTray) showMenu() {
 		return
 	}
 	defer procDestroyMenu.Call(menu)
+	appendTrayMenu(menu, mfString|mfDisabled, 0, "Home-AI "+state.clientVersion)
+	appendTrayMenu(menu, mfSeparator, 0, "")
 	appendTrayMenu(menu, mfString, traySyncNow, "Sync now")
+	appendTrayMenu(menu, mfString, trayUpdateNow, "Update client...")
 	appendTrayMenu(menu, mfSeparator, 0, "")
 	appendTrayMenu(menu, mfString, trayOpenLog, "Open log")
 	appendTrayMenu(menu, mfString, trayOpenConfig, "Open sync profiles")
@@ -337,6 +370,46 @@ func (state *windowsAgentTray) showMenu() {
 	)
 }
 
+func (state *windowsAgentTray) setStatus(status string) {
+	status = strings.TrimSpace(status)
+	if status == "" {
+		status = "Idle"
+	}
+	state.uiMu.Lock()
+	defer state.uiMu.Unlock()
+	if state.closed || state.hwnd == 0 {
+		return
+	}
+	var data trayNotifyIconData
+	data.CbSize = uint32(unsafe.Sizeof(data))
+	data.HWnd = state.hwnd
+	data.UID = 1
+	data.UFlags = nifTip
+	copyTrayUTF16(data.SzTip[:], "Home-AI "+state.clientVersion+" — "+status)
+	procShellNotifyIconW.Call(nimModify, uintptr(unsafe.Pointer(&data)))
+}
+
+func (state *windowsAgentTray) notify(title, message string, isError bool) {
+	state.uiMu.Lock()
+	defer state.uiMu.Unlock()
+	if state.closed || state.hwnd == 0 {
+		return
+	}
+	var data trayNotifyIconData
+	data.CbSize = uint32(unsafe.Sizeof(data))
+	data.HWnd = state.hwnd
+	data.UID = 1
+	data.UFlags = nifInfo
+	copyTrayUTF16(data.SzInfoTitle[:], title)
+	copyTrayUTF16(data.SzInfo[:], message)
+	if isError {
+		data.DwInfoFlags = niifError
+	} else {
+		data.DwInfoFlags = niifInfo
+	}
+	procShellNotifyIconW.Call(nimModify, uintptr(unsafe.Pointer(&data)))
+}
+
 func appendTrayMenu(menu uintptr, flags uint32, id uint16, label string) {
 	var text *uint16
 	if label != "" {
@@ -345,13 +418,26 @@ func appendTrayMenu(menu uintptr, flags uint32, id uint16, label string) {
 	procAppendMenuW.Call(menu, uintptr(flags), uintptr(id), uintptr(unsafe.Pointer(text)))
 }
 
+func copyTrayUTF16(destination []uint16, value string) {
+	if len(destination) == 0 {
+		return
+	}
+	runes := []rune(strings.ReplaceAll(value, "\x00", ""))
+	if len(runes) > len(destination)-1 {
+		runes = runes[:len(destination)-1]
+	}
+	encoded := windows.StringToUTF16(string(runes))
+	copy(destination, encoded)
+	destination[len(destination)-1] = 0
+}
+
 func (state *windowsAgentTray) openPath(path string) {
 	verb, _ := windows.UTF16PtrFromString("open")
 	target, err := windows.UTF16PtrFromString(path)
 	if err != nil {
 		return
 	}
-	result, _, _ := procShellExecuteW.Call(
+	procShellExecuteW.Call(
 		0,
 		uintptr(unsafe.Pointer(verb)),
 		uintptr(unsafe.Pointer(target)),
@@ -359,7 +445,4 @@ func (state *windowsAgentTray) openPath(path string) {
 		0,
 		1,
 	)
-	if result <= 32 {
-		_ = errors.New("ShellExecuteW failed")
-	}
 }
