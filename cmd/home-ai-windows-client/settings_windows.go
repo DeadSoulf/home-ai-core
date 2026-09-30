@@ -175,6 +175,8 @@ type windowsSettingsUI struct {
 
 	folders           []windowsclient.Folder
 	folderIDs         []string
+	foldersServer     string
+	foldersUser       string
 	profiles          []windowsclient.SyncProfile
 	selectedProfileID string
 
@@ -696,8 +698,10 @@ func (state *windowsSettingsUI) finishConnect() {
 	state.setText(state.serverEdit, result.server)
 	state.setText(state.usernameEdit, result.user)
 	state.setText(state.passwordEdit, "")
-	state.folders = append([]windowsclient.Folder(nil), result.folders...)
 	preferred := state.currentFolderID()
+	state.folders = append([]windowsclient.Folder(nil), result.folders...)
+	state.foldersServer = result.server
+	state.foldersUser = result.user
 	state.populateFolders(preferred)
 	writable := 0
 	for _, folder := range result.folders {
@@ -801,6 +805,12 @@ func (state *windowsSettingsUI) selectProfileFromList() {
 
 func (state *windowsSettingsUI) applyProfile(profile windowsclient.SyncProfile) {
 	state.selectedProfileID = profile.ID
+	if state.foldersServer != profile.ServerURL || state.foldersUser != profile.Username {
+		state.folders = nil
+		state.folderIDs = nil
+		state.foldersServer = ""
+		state.foldersUser = ""
+	}
 	state.setText(state.serverEdit, profile.ServerURL)
 	state.setText(state.usernameEdit, profile.Username)
 	state.setText(state.sourceEdit, profile.Source)
@@ -899,13 +909,20 @@ func (state *windowsSettingsUI) populateFolders(preferred string) {
 }
 
 func (state *windowsSettingsUI) currentFolderID() string {
-	index := state.comboSelection(state.folderCombo)
-	if index >= 0 && index < len(state.folderIDs) {
-		return state.folderIDs[index]
+	server, err := windowsclient.NormalizeServerURL(strings.TrimSpace(state.text(state.serverEdit)))
+	if err != nil {
+		return ""
+	}
+	user := strings.TrimSpace(state.text(state.usernameEdit))
+	if server == state.foldersServer && user == state.foldersUser {
+		index := state.comboSelection(state.folderCombo)
+		if index >= 0 && index < len(state.folderIDs) {
+			return state.folderIDs[index]
+		}
 	}
 	if state.selectedProfileID != "" {
 		for _, profile := range state.profiles {
-			if profile.ID == state.selectedProfileID {
+			if profile.ID == state.selectedProfileID && profile.ServerURL == server && profile.Username == user {
 				return profile.FolderID
 			}
 		}
