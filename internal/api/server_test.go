@@ -203,18 +203,42 @@ func (f fakeSecurity) Logout(context.Context, security.Actor, security.RequestCo
 }
 
 func (f fakeSecurity) CreateUser(
-	context.Context,
-	security.Actor,
-	string,
-	string,
-	string,
-	security.RequestContext,
+	_ context.Context,
+	_ security.Actor,
+	input security.UserProfileInput,
+	_ security.RequestContext,
 ) (security.User, error) {
+	profile := input.Profile
+	if profile == "" {
+		profile = security.ProfileMember
+	}
 	return security.User{
 		ID:          "usr-member",
-		Username:    "member",
-		DisplayName: "Member",
-		Roles:       []string{"member"},
+		Username:    input.Username,
+		DisplayName: input.DisplayName,
+		Roles:       []string{profile},
+		Profile:     profile,
+		Permissions: append([]string(nil), input.Permissions...),
+		ResourcePermissions: append([]security.PermissionScope(nil), input.ResourcePermissions...),
+	}, nil
+}
+
+func (f fakeSecurity) UpdateUser(
+	_ context.Context,
+	_ security.Actor,
+	userID string,
+	input security.UserProfileInput,
+	_ security.RequestContext,
+) (security.User, error) {
+	return security.User{
+		ID:                  userID,
+		Username:            "member",
+		DisplayName:         input.DisplayName,
+		Disabled:            input.Disabled,
+		Roles:               []string{input.Profile},
+		Profile:             input.Profile,
+		Permissions:         append([]string(nil), input.Permissions...),
+		ResourcePermissions: append([]security.PermissionScope(nil), input.ResourcePermissions...),
 	}, nil
 }
 
@@ -225,6 +249,31 @@ func (f fakeSecurity) ListUsers(context.Context) ([]security.User, error) {
 			Username:    "owner",
 			DisplayName: "Owner",
 			Roles:       []string{"owner"},
+			Profile:     security.ProfileAdministrator,
+			Owner:       true,
+		},
+	}, nil
+}
+
+func (f fakeSecurity) AccessCatalog(context.Context) (security.AccessCatalog, error) {
+	return security.AccessCatalog{
+		Permissions: []security.PermissionDefinition{
+			{Name: "files.read", Description: "Read files"},
+			{Name: "files.write", Description: "Write files"},
+			{Name: "system.read", Description: "Read system"},
+		},
+		Profiles: []security.ProfileTemplate{
+			{
+				Name:               security.ProfileAdministrator,
+				Description:        "Administrator",
+				DefaultPermissions: []string{"files.read", "files.write", "system.read"},
+				FullAccess:         true,
+			},
+			{
+				Name:               security.ProfileParent,
+				Description:        "Parent",
+				DefaultPermissions: []string{"system.read"},
+			},
 		},
 	}, nil
 }
