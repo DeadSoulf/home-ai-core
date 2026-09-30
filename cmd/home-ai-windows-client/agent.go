@@ -81,13 +81,14 @@ func runAgent(args []string) error {
 		if err != nil {
 			return fmt.Errorf("locate Windows client executable: %w", err)
 		}
-		executable, err = filepath.Abs(executable)
+		installed, err := windowsclient.InstallUserClient(executable)
 		if err != nil {
-			return fmt.Errorf("resolve Windows client executable: %w", err)
+			return fmt.Errorf("install Home-AI Windows client: %w", err)
 		}
-		if err := windowsclient.InstallUserAgentAutostart(executable, configPath); err != nil {
+		if err := windowsclient.InstallUserAgentAutostart(installed, configPath); err != nil {
 			return err
 		}
+		fmt.Printf("Home-AI Windows client installed: %s\n", installed)
 		fmt.Println("Home-AI sync agent autostart enabled for the current Windows user.")
 		fmt.Println("The agent will start after the user logs on.")
 		return nil
