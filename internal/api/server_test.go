@@ -743,6 +743,80 @@ func TestCreateUserWithBearerSession(t *testing.T) {
 	}
 }
 
+func TestUserAccessCatalogIncludesFileFolderResources(t *testing.T) {
+	handler := testHandler(fakeState{
+		nasFolders: []state.NASFolderRecord{
+			{
+				ID:       "nsf-family",
+				PoolName: "Main",
+				Name:     "Family",
+				Kind:     "shared",
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/security/access-catalog", nil)
+	req.Header.Set("Authorization", "Bearer test")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var body struct {
+		Access struct {
+			Permissions []security.PermissionDefinition `json:"permissions"`
+			Profiles    []security.ProfileTemplate      `json:"profiles"`
+		} `json:"access"`
+		Resources []accessResourceResponse `json:"resources"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Resources) != 1 || body.Resources[0].ID != "nsf-family" {
+		t.Fatalf("resources = %#v", body.Resources)
+	}
+	if len(body.Access.Profiles) == 0 || len(body.Access.Permissions) == 0 {
+		t.Fatalf("access catalog incomplete: %#v", body.Access)
+	}
+}
+
+func TestCreateUserRejectsUnknownScopedResource(t *testing.T) {
+	handler := testHandler(fakeState{})
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/security/users",
+		strings.NewReader(`{
+			"username":"guest",
+			"display_name":"Guest",
+			"password":"correct horse battery staple",
+			"profile":"guest",
+			"permissions":["security.self.read"],
+			"resource_permissions":[{
+				"permission":"files.read",
+				"resource_type":"file_folder",
+				"resource_id":"nsf-missing"
+			}]
+		}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+	var body errorEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Error.Code != "invalid_resource_permission" {
+		t.Fatalf("error code = %q", body.Error.Code)
+	}
+}
+
 func TestFileFoldersFilterScopedAccess(t *testing.T) {
 	sec := defaultFakeSecurity()
 	sec.actor.Permissions = []string{"security.self.read"}
