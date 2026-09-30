@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.82-dev
+
+- Added Russian and English localization to the native Windows settings client in one executable.
+- Added first-launch Windows locale detection: Russian locales default to Russian, other locales default to English.
+- Added a live **Русский / English** selector and persisted the non-secret language preference in `windows-client.json`.
+- Localized settings labels, buttons, conflict policies, profile status, client-side validation, confirmations and status messages.
+- Localized tray menu, sync summary, tooltip and success/failure notifications using the same saved language.
+- Refresh the running tray immediately when the language changes without restarting the sync scheduler.
+- Keep passwords exclusively in Windows Credential Manager; language selection does not affect credentials or sync profiles.
+- Keep low-level server/OS error details verbatim inside localized error framing; the diagnostic CLI remains English.
+- Added ADR-0029, localization persistence/translation tests, native Windows tests and full cross-platform CI coverage.
 ## 0.1.81-dev
 
 - Added a native Win32 settings window to the existing Windows client while preserving all CLI commands.
