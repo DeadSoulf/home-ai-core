@@ -195,3 +195,129 @@ func TestListHidesUploadArtifacts(t *testing.T) {
 		t.Fatalf("upload artifacts leaked into listing: %#v", entries)
 	}
 }
+
+func TestCompleteUploadPreservesLateDestinationAndSession(t *testing.T) {
+	for _, kind := range []string{"file", "directory", "symlink"} {
+		t.Run(kind, func(t *testing.T) {
+			root := t.TempDir()
+			payload := []byte("incoming upload")
+			session := createCompletedTestUpload(t, root, "target", payload)
+			target := filepath.Join(root, "target")
+			createUploadTestTarget(t, kind, target)
+			before, err := os.Lstat(target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := CompleteUpload(root, session.ID); !errors.Is(err, ErrUploadTargetExists) {
+				t.Fatalf("CompleteUpload() error = %v, want target exists", err)
+			}
+			resumed, err := GetUpload(root, session.ID)
+			if err != nil || resumed.ReceivedBytes != int64(len(payload)) {
+				t.Fatalf("conflicted session = %#v, error = %v", resumed, err)
+			}
+			data, err := os.ReadFile(uploadPartPath(root, session.ID))
+			if err != nil || !bytes.Equal(data, payload) {
+				t.Fatalf("upload part data = %q, error = %v", data, err)
+			}
+			if err := CancelUpload(root, session.ID); err != nil {
+				t.Fatalf("CancelUpload() error = %v", err)
+			}
+			after, err := os.Lstat(target)
+			if err != nil || !os.SameFile(before, after) {
+				t.Fatalf("existing %s replaced or removed, error = %v", kind, err)
+			}
+			if kind == "file" {
+				data, err := os.ReadFile(target)
+				if err != nil || string(data) != "keep existing contents" {
+					t.Fatalf("existing file data = %q, error = %v", data, err)
+				}
+			}
+		})
+	}
+}
+
+func TestCompleteUploadCompetingSessions(t *testing.T) {
+	root := t.TempDir()
+	payloads := [][]byte{[]byte("first upload"), []byte("second upload")}
+	sessions := []UploadSession{
+		createCompletedTestUpload(t, root, "first.bin", payloads[0]),
+		createCompletedTestUpload(t, root, "second.bin", payloads[1]),
+	}
+	// Sessions can collide if their creation races with another caller. Point
+	// two complete sessions at one destination to exercise commit arbitration.
+	for i := range sessions {
+		sessions[i].Path = "shared.bin"
+		if err := writeUploadMetadata(root, sessions[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	type attempt struct {
+		index  int
+		result UploadResult
+		err    error
+	}
+	start := make(chan struct{})
+	results := make(chan attempt, len(sessions))
+	for i := range sessions {
+		go func(index int) {
+			<-start
+			result, err := CompleteUpload(root, sessions[index].ID)
+			results <- attempt{index, result, err}
+		}(i)
+	}
+	close(start)
+	winner := -1
+	loser := -1
+	for range sessions {
+		outcome := <-results
+		if outcome.err == nil {
+			if winner != -1 {
+				t.Fatal("both upload sessions committed")
+			}
+			winner = outcome.index
+			hash := sha256.Sum256(payloads[winner])
+			if outcome.result.Path != "shared.bin" || outcome.result.SizeBytes != int64(len(payloads[winner])) ||
+				outcome.result.SHA256 != hex.EncodeToString(hash[:]) {
+				t.Fatalf("committed result = %#v", outcome.result)
+			}
+		} else {
+			if !errors.Is(outcome.err, ErrUploadTargetExists) {
+				t.Fatalf("competing completion error = %v", outcome.err)
+			}
+			loser = outcome.index
+		}
+	}
+	if winner == -1 || loser == -1 {
+		t.Fatalf("winner = %d, loser = %d", winner, loser)
+	}
+	if _, err := GetUpload(root, sessions[winner].ID); !errors.Is(err, ErrUploadNotFound) {
+		t.Fatalf("successful upload session retained: %v", err)
+	}
+	if _, err := GetUpload(root, sessions[loser].ID); err != nil {
+		t.Fatalf("conflicted upload session lost: %v", err)
+	}
+	data, err := os.ReadFile(uploadPartPath(root, sessions[loser].ID))
+	if err != nil || !bytes.Equal(data, payloads[loser]) {
+		t.Fatalf("conflicted part = %q, error = %v", data, err)
+	}
+	if err := CancelUpload(root, sessions[loser].ID); err != nil {
+		t.Fatal(err)
+	}
+	data, err = os.ReadFile(filepath.Join(root, "shared.bin"))
+	if err != nil || !bytes.Equal(data, payloads[winner]) {
+		t.Fatalf("destination data = %q, winner = %d, error = %v", data, winner, err)
+	}
+}
+
+func createCompletedTestUpload(t *testing.T, root, path string, payload []byte) UploadSession {
+	t.Helper()
+	session, err := CreateUpload(root, path, int64(len(payload)), "", "", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err = AppendUploadChunk(root, session.ID, 0, "", bytes.NewReader(payload), MaxUploadChunkBytes, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return session
+}

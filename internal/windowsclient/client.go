@@ -66,6 +66,7 @@ type UploadOptions struct {
 	Retries      int
 	RestartStale bool
 	Progress     func(Progress)
+	copySnapshot *Transfer
 }
 
 type Progress struct {
@@ -157,11 +158,18 @@ func (c *Client) UploadFile(
 		return UploadResult{}, errors.New("folder ID is required")
 	}
 	info, err := os.Stat(sourcePath)
+	if options.copySnapshot != nil {
+		info, err = inspectCopySource(sourcePath)
+	}
 	if err != nil {
 		return UploadResult{}, fmt.Errorf("inspect source file: %w", err)
 	}
 	if !info.Mode().IsRegular() {
 		return UploadResult{}, errors.New("source must be a regular file")
+	}
+	if snapshot := options.copySnapshot; snapshot != nil &&
+		(info.Size() != snapshot.SizeBytes || info.ModTime().UnixNano() != snapshot.ModTimeNS) {
+		return UploadResult{}, errors.New("queued source file changed since it was planned")
 	}
 
 	destination := strings.TrimSpace(options.Destination)
@@ -183,9 +191,17 @@ func (c *Client) UploadFile(
 		retries = defaultRetries
 	}
 
-	fullSHA, err := hashFile(sourcePath)
+	var fullSHA string
+	if options.copySnapshot != nil {
+		fullSHA, err = hashCopySource(sourcePath, info)
+	} else {
+		fullSHA, err = hashFile(sourcePath)
+	}
 	if err != nil {
 		return UploadResult{}, err
+	}
+	if snapshot := options.copySnapshot; snapshot != nil && !strings.EqualFold(fullSHA, snapshot.SHA256) {
+		return UploadResult{}, errors.New("queued source file changed since it was planned")
 	}
 	fingerprint := fileFingerprint(info)
 
@@ -256,6 +272,19 @@ func (c *Client) UploadFile(
 		return UploadResult{}, fmt.Errorf("open source file: %w", err)
 	}
 	defer file.Close()
+	if options.copySnapshot != nil {
+		opened, err := file.Stat()
+		if err != nil {
+			return UploadResult{}, err
+		}
+		current, err := inspectCopySource(sourcePath)
+		if err != nil {
+			return UploadResult{}, err
+		}
+		if !opened.Mode().IsRegular() || !sameCopySnapshot(info, opened) || !sameCopySnapshot(info, current) {
+			return UploadResult{}, errors.New("queued source file changed before upload")
+		}
+	}
 
 	offset := session.ReceivedBytes
 	if offset < 0 || offset > info.Size() {
@@ -319,6 +348,11 @@ func (c *Client) UploadFile(
 		reportProgress(options.Progress, destination, offset, info.Size(), resumed)
 	}
 
+	if options.copySnapshot != nil {
+		if err := validateCopySource(*options.copySnapshot); err != nil {
+			return UploadResult{}, err
+		}
+	}
 	result, err := c.completeUpload(ctx, folderID, session.ID)
 	if err != nil {
 		return UploadResult{}, err

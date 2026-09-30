@@ -33,6 +33,10 @@ func run(args []string) error {
 		return runFolders(args[1:])
 	case "upload":
 		return runUpload(args[1:])
+	case "copy":
+		return runCopy(args[1:])
+	case "queue":
+		return runQueue(args[1:])
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -195,4 +199,9 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "Commands:")
 	fmt.Fprintln(os.Stderr, "  folders --server URL --username USER")
 	fmt.Fprintln(os.Stderr, "  upload  --server URL --username USER --folder ID --source FILE [--dest PATH] [--restart-stale]")
+	fmt.Fprintln(os.Stderr, "  copy    --server URL --username USER --folder ID --source FILE_OR_DIRECTORY [--dest PATH]")
+	fmt.Fprintln(os.Stderr, "  queue add   --server URL --username USER --folder ID --source FILE_OR_DIRECTORY [--dest PATH] [--queue FILE]")
+	fmt.Fprintln(os.Stderr, "  queue list  [--queue FILE]")
+	fmt.Fprintln(os.Stderr, "  queue run   [--queue FILE] [--retries COUNT]")
+	fmt.Fprintln(os.Stderr, "  queue retry --job ID [--queue FILE]")
 }

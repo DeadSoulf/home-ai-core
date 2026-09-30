@@ -28,12 +28,11 @@ The client is cross-built for Windows amd64 and published as a separate release 
 
 Benefits: a real Windows-to-Home-AI transfer path exists before GUI work; transfers resume after interruption; integrity is checked end-to-end; the same engine can later power GUI/background service workflows.
 
-Current limitations: one explicit file per command, no persistent local queue, no recursive folder copy, no scheduler, no Credential Manager integration, and no GUI yet.
+The persistent queue and recursive copy follow-up is implemented in [ADR-0022](0022-windows-copy-queue.md). Current limitations: no scheduler, no Credential Manager integration, and no GUI yet.
 
 ## Deferred
 
 - Windows GUI and tray/service mode;
-- persistent queue and recursive folder copy;
 - scheduled/automatic sync and conflict policy;
 - Windows Credential Manager/device enrollment;
 - WireGuard remote-client integration.
