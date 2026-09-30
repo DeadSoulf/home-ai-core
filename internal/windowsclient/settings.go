@@ -19,6 +19,7 @@ type ClientSettings struct {
 	Version   int    `json:"version"`
 	ServerURL string `json:"server_url,omitempty"`
 	Username  string `json:"username,omitempty"`
+	Language  string `json:"language,omitempty"`
 }
 
 func LoadClientSettings(filename string) (ClientSettings, error) {
@@ -120,6 +121,9 @@ func normalizeClientSettingsFilename(filename string) (string, error) {
 func validateClientSettings(settings ClientSettings) error {
 	if settings.Version != clientSettingsVersion {
 		return fmt.Errorf("unsupported client settings version %d", settings.Version)
+	}
+	if settings.Language != "" && settings.Language != "en" && settings.Language != "ru" {
+		return errors.New("unsupported client language")
 	}
 	if settings.ServerURL == "" && settings.Username == "" {
 		return nil
