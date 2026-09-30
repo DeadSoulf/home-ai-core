@@ -44,6 +44,7 @@ const (
 	trayOpenLog    = 1002
 	trayOpenConfig = 1003
 	trayExit       = 1004
+	traySettings   = 1005
 
 	niifInfo  = 0x00000001
 	niifError = 0x00000003
@@ -288,7 +289,7 @@ func trayWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintpt
 			state.showMenu()
 			return 0
 		case wmLButtonDblClk:
-			state.openPath(state.logPath)
+			_ = startSettingsProcess(state.configPath)
 			return 0
 		}
 	case trayStatusMessage:
@@ -310,6 +311,8 @@ func trayWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintpt
 			state.openPath(state.logPath)
 		case trayOpenConfig:
 			state.openPath(state.configPath)
+		case traySettings:
+			_ = startSettingsProcess(state.configPath)
 		case trayExit:
 			state.signalExit()
 			procDestroyWindow.Call(hwnd)
@@ -413,6 +416,7 @@ func (state *windowsAgentTray) showMenu() {
 	appendTrayMenu(menu, mfString|mfGrayed, 0, summary)
 	appendTrayMenu(menu, mfSeparator, 0, "")
 	appendTrayMenu(menu, mfString, traySyncNow, "Sync now")
+	appendTrayMenu(menu, mfString, traySettings, "Settings")
 	appendTrayMenu(menu, mfSeparator, 0, "")
 	appendTrayMenu(menu, mfString, trayOpenLog, "Open log")
 	appendTrayMenu(menu, mfString, trayOpenConfig, "Open sync profiles")
