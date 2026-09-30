@@ -7,6 +7,7 @@ import { useI18n } from "../i18n";
 import { PageHeading } from "./Dashboard";
 import { StorageDevices } from "../components/StorageDevices";
 import { NetworkManagement } from "../components/NetworkManagement";
+import { ReadinessDiagnostics } from "../components/ReadinessDiagnostics";
 
 function bytes(value = 0) {
   return new Intl.NumberFormat(undefined, {maximumFractionDigits: 1}).format(value / 1024 ** 3) + " GiB";
@@ -329,6 +330,8 @@ export function SystemPage({
             onChanged={() => setMetricsTick((current) => current + 1)}
           />
         </Panel>
+
+        <ReadinessDiagnostics revision={revision + metricsTick} />
 
         <NetworkManagement
           interfaces={value.system.network_interfaces}
