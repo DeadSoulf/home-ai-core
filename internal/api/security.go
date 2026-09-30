@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"encoding/json"
 	"errors"
 	"io"
@@ -25,8 +26,10 @@ type SecurityService interface {
 	Login(context.Context, string, string, security.RequestContext) (security.AuthResult, error)
 	Authenticate(context.Context, string) (security.Actor, error)
 	Logout(context.Context, security.Actor, security.RequestContext) error
-	CreateUser(context.Context, security.Actor, string, string, string, security.RequestContext) (security.User, error)
+	CreateUser(context.Context, security.Actor, security.UserProfileInput, security.RequestContext) (security.User, error)
+	UpdateUser(context.Context, security.Actor, string, security.UserProfileInput, security.RequestContext) (security.User, error)
 	ListUsers(context.Context) ([]security.User, error)
+	AccessCatalog(context.Context) (security.AccessCatalog, error)
 	ListAudit(context.Context, int) ([]security.AuditEntry, error)
 	RecordAudit(context.Context, security.RequestContext, security.Actor, string, string, string, string, map[string]any)
 }
@@ -165,6 +168,16 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request, actor security.A
 	s.realtime.Publish("security.session.revoked", map[string]any{"user_id": actor.ID}, requestIDFromContext(r.Context()))
 }
 
+type userAccessRequest struct {
+	Username            string                     `json:"username,omitempty"`
+	DisplayName         string                     `json:"display_name"`
+	Password            string                     `json:"password,omitempty"`
+	Profile             string                     `json:"profile,omitempty"`
+	Disabled            bool                       `json:"disabled,omitempty"`
+	Permissions         []string                   `json:"permissions,omitempty"`
+	ResourcePermissions []security.PermissionScope `json:"resource_permissions,omitempty"`
+}
+
 func (s *server) usersCollection(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -179,46 +192,188 @@ func (s *server) usersCollection(
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"users": users})
+
 	case http.MethodPost:
 		if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
 			writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
 			return
 		}
-
-		var request struct {
-			Username    string `json:"username"`
-			DisplayName string `json:"display_name"`
-			Password    string `json:"password"`
-		}
+		var request userAccessRequest
 		if err := decodeJSON(w, r, &request); err != nil {
 			writeAPIError(w, r, http.StatusBadRequest, "invalid_request", err.Error(), nil)
+			return
+		}
+		if err := s.validateUserResourcePermissions(r.Context(), request.ResourcePermissions); err != nil {
+			writeAPIError(w, r, http.StatusBadRequest, "invalid_resource_permission", err.Error(), nil)
 			return
 		}
 		user, err := s.security.CreateUser(
 			r.Context(),
 			actor,
-			request.Username,
-			request.DisplayName,
-			request.Password,
+			security.UserProfileInput{
+				Username:            request.Username,
+				DisplayName:         request.DisplayName,
+				Password:            request.Password,
+				Profile:             request.Profile,
+				Permissions:         request.Permissions,
+				ResourcePermissions: request.ResourcePermissions,
+			},
 			s.securityRequestContext(r),
 		)
 		switch {
 		case errors.Is(err, security.ErrUserExists):
 			writeAPIError(w, r, http.StatusConflict, "user_exists", "username already exists", nil)
+		case errors.Is(err, security.ErrInvalidProfile):
+			writeAPIError(w, r, http.StatusBadRequest, "invalid_user_profile", "invalid user profile", nil)
 		case err != nil:
 			writeAPIError(w, r, http.StatusBadRequest, "user_create_failed", err.Error(), nil)
 		default:
 			s.realtime.Publish(
 				"security.user.created",
-				map[string]any{"user_id": user.ID},
+				map[string]any{"user_id": user.ID, "profile": user.Profile},
 				requestIDFromContext(r.Context()),
 			)
 			writeJSON(w, http.StatusCreated, map[string]any{"user": user})
 		}
+
 	default:
 		w.Header().Set("Allow", http.MethodGet+", "+http.MethodPost)
 		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 	}
+}
+
+func (s *server) userResource(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if r.Method != http.MethodPut {
+		methodNotAllowed(w, r, http.MethodPut)
+		return
+	}
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+
+	userID := strings.TrimSpace(r.PathValue("id"))
+	if userID == "" {
+		writeAPIError(w, r, http.StatusBadRequest, "user_id_required", "user id is required", nil)
+		return
+	}
+	var request userAccessRequest
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_request", err.Error(), nil)
+		return
+	}
+	if err := s.validateUserResourcePermissions(r.Context(), request.ResourcePermissions); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_resource_permission", err.Error(), nil)
+		return
+	}
+
+	user, err := s.security.UpdateUser(
+		r.Context(),
+		actor,
+		userID,
+		security.UserProfileInput{
+			DisplayName:         request.DisplayName,
+			Password:            request.Password,
+			Profile:             request.Profile,
+			Disabled:            request.Disabled,
+			Permissions:         request.Permissions,
+			ResourcePermissions: request.ResourcePermissions,
+		},
+		s.securityRequestContext(r),
+	)
+	switch {
+	case errors.Is(err, security.ErrUserNotFound):
+		writeAPIError(w, r, http.StatusNotFound, "user_not_found", "user not found", nil)
+	case errors.Is(err, security.ErrOwnerImmutable):
+		writeAPIError(w, r, http.StatusConflict, "owner_profile_immutable", err.Error(), nil)
+	case errors.Is(err, security.ErrInvalidProfile):
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_user_profile", "invalid user profile", nil)
+	case err != nil:
+		writeAPIError(w, r, http.StatusBadRequest, "user_update_failed", err.Error(), nil)
+	default:
+		s.realtime.Publish(
+			"security.user.updated",
+			map[string]any{"user_id": user.ID, "profile": user.Profile, "disabled": user.Disabled},
+			requestIDFromContext(r.Context()),
+		)
+		writeJSON(w, http.StatusOK, map[string]any{"user": user})
+	}
+}
+
+type accessResourceResponse struct {
+	Type                 string   `json:"type"`
+	ID                   string   `json:"id"`
+	Name                 string   `json:"name"`
+	Kind                 string   `json:"kind,omitempty"`
+	Container            string   `json:"container,omitempty"`
+	SupportedPermissions []string `json:"supported_permissions"`
+}
+
+func (s *server) userAccessCatalog(
+	w http.ResponseWriter,
+	r *http.Request,
+	_ security.Actor,
+	_ authSource,
+) {
+	catalog, err := s.security.AccessCatalog(r.Context())
+	if err != nil {
+		writeAPIError(w, r, http.StatusInternalServerError, "access_catalog_unavailable", "access catalog is unavailable", nil)
+		return
+	}
+	folders, err := s.state.ListNASFolders(r.Context())
+	if err != nil {
+		writeAPIError(w, r, http.StatusInternalServerError, "access_resources_unavailable", "access resources are unavailable", nil)
+		return
+	}
+	resources := make([]accessResourceResponse, 0, len(folders))
+	for _, folder := range folders {
+		resources = append(resources, accessResourceResponse{
+			Type:                 "file_folder",
+			ID:                   folder.ID,
+			Name:                 folder.Name,
+			Kind:                 folder.Kind,
+			Container:            folder.PoolName,
+			SupportedPermissions: []string{"files.read", "files.write"},
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"access":    catalog,
+		"resources": resources,
+	})
+}
+
+func (s *server) validateUserResourcePermissions(
+	ctx context.Context,
+	scopes []security.PermissionScope,
+) error {
+	if len(scopes) == 0 {
+		return nil
+	}
+	folders, err := s.state.ListNASFolders(ctx)
+	if err != nil {
+		return fmt.Errorf("read file folder catalog: %w", err)
+	}
+	folderIDs := make(map[string]bool, len(folders))
+	for _, folder := range folders {
+		folderIDs[folder.ID] = true
+	}
+	for _, scope := range scopes {
+		if scope.ResourceType != "file_folder" {
+			return fmt.Errorf("unsupported resource type %q", scope.ResourceType)
+		}
+		if !folderIDs[scope.ResourceID] {
+			return fmt.Errorf("file folder %q does not exist", scope.ResourceID)
+		}
+		if scope.Permission != "files.read" && scope.Permission != "files.write" {
+			return fmt.Errorf("file folder supports only files.read and files.write")
+		}
+	}
+	return nil
 }
 
 func (s *server) audit(w http.ResponseWriter, r *http.Request, _ security.Actor) {
