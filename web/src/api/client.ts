@@ -17,6 +17,7 @@ import type {
   FileUploadResult,
   FileUploadSession,
   FilePool,
+  SMBStatus,
   WireGuardStatus,
 } from "./types";
 
@@ -191,6 +192,23 @@ export const api = {
     }, true);
     return result.pool;
   },
+
+  smbStatus: async () => {
+    const result = await request<{smb: SMBStatus}>("/api/v1/files/smb");
+    return result.smb;
+  },
+
+  smbOperation: async (input: {
+    operation: "install" | "set_password" | "apply";
+    userId?: string;
+    password?: string;
+    workgroup?: string;
+  }) => postJSON<{message: string}>("/api/v1/files/smb/operation", {
+    operation: input.operation,
+    user_id: input.userId,
+    password: input.password,
+    workgroup: input.workgroup,
+  }, true),
 
   fileFolders: async () => {
     const result = await request<{folders: FileFolder[]}>("/api/v1/files/folders");
