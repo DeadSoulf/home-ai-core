@@ -201,14 +201,14 @@ func (c *Client) VerifyTransfer(ctx context.Context, folderID string, transfer T
 		return UploadResult{}, false, err
 	}
 	if entry.Kind != transfer.Kind {
-		return UploadResult{}, false, fmt.Errorf("destination %s already exists as %s, want %s", destination, entry.Kind, transfer.Kind)
+		return UploadResult{}, false, newDestinationConflict(destination, fmt.Sprintf("already exists as %s, want %s", entry.Kind, transfer.Kind))
 	}
 	result := UploadResult{Path: destination}
 	if transfer.Kind == "directory" {
 		return result, true, nil
 	}
 	if entry.SizeBytes != transfer.SizeBytes {
-		return UploadResult{}, false, fmt.Errorf("destination %s already exists with different content", destination)
+		return UploadResult{}, false, newDestinationConflict(destination, "already exists with different content")
 	}
 	endpoint := "/api/v1/files/folders/" + url.PathEscape(folderID) + "/content?path=" + url.QueryEscape(destination)
 	// Readback may take longer than a chunk request. Preserve transport and
@@ -254,7 +254,7 @@ func (c *Client) VerifyTransfer(ctx context.Context, folderID string, transfer T
 	}
 	checksum := hex.EncodeToString(hasher.Sum(nil))
 	if size != transfer.SizeBytes || !strings.EqualFold(checksum, transfer.SHA256) {
-		return UploadResult{}, false, fmt.Errorf("destination %s already exists with different content", destination)
+		return UploadResult{}, false, newDestinationConflict(destination, "already exists with different content")
 	}
 	result.SizeBytes, result.SHA256 = size, checksum
 	return result, true, nil
@@ -377,7 +377,7 @@ func (c *Client) findCopyEntry(ctx context.Context, folderID, destination string
 			return *found, true, nil
 		}
 		if found.Kind != "directory" {
-			return copyEntry{}, false, fmt.Errorf("destination ancestor %s is not a directory", candidate)
+			return copyEntry{}, false, newDestinationConflict(candidate, "is not a directory")
 		}
 		parent = candidate
 	}
