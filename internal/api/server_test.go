@@ -30,8 +30,9 @@ type fakeState struct {
 	pingErr       error
 	schemaVersion int
 	schemaErr     error
-	nasPools      []state.NASPoolRecord
-	nasFolders    []state.NASFolderRecord
+	nasPools        []state.NASPoolRecord
+	nasFolders      []state.NASFolderRecord
+	storagePurposes []state.StoragePurposeRecord
 }
 
 func (f fakeState) Ping(context.Context) error {
@@ -52,6 +53,28 @@ func (f fakeState) DiskNames(context.Context) (map[string]string, error) {
 
 func (f fakeState) SetDiskName(context.Context, string, string) error {
 	return nil
+}
+
+func (f fakeState) SetStoragePurpose(
+	_ context.Context,
+	devicePath, filesystemUUID, purpose string,
+	now time.Time,
+) (state.StoragePurposeRecord, error) {
+	return state.StoragePurposeRecord{
+		DevicePath:     devicePath,
+		FilesystemUUID: filesystemUUID,
+		Purpose:        purpose,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}, nil
+}
+
+func (f fakeState) ClearStoragePurpose(context.Context, string, string) error {
+	return nil
+}
+
+func (f fakeState) ListStoragePurposes(context.Context) ([]state.StoragePurposeRecord, error) {
+	return f.storagePurposes, nil
 }
 
 func (f fakeState) CreateNASPool(
