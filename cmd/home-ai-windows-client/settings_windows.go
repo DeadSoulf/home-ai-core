@@ -54,19 +54,19 @@ const (
 	settingsSWShow    = 5
 	settingsSWRestore = 9
 
-	settingsBNClicked    = 0
-	settingsLBNSelect    = 1
-	settingsCBNSelect    = 1
-	settingsCBErr        = ^uintptr(0)
-	settingsLBErr        = ^uintptr(0)
-	settingsCBReset      = 0x014B
-	settingsCBAddString  = 0x0143
-	settingsCBGetCurSel  = 0x0147
-	settingsCBSetCurSel  = 0x014E
-	settingsLBReset      = 0x0184
-	settingsLBAddString  = 0x0180
-	settingsLBGetCurSel  = 0x0188
-	settingsLBSetCurSel  = 0x0186
+	settingsBNClicked   = 0
+	settingsLBNSelect   = 1
+	settingsCBNSelect   = 1
+	settingsCBErr       = ^uintptr(0)
+	settingsLBErr       = ^uintptr(0)
+	settingsCBReset     = 0x014B
+	settingsCBAddString = 0x0143
+	settingsCBGetCurSel = 0x0147
+	settingsCBSetCurSel = 0x014E
+	settingsLBReset     = 0x0184
+	settingsLBAddString = 0x0180
+	settingsLBGetCurSel = 0x0188
+	settingsLBSetCurSel = 0x0186
 
 	settingsMBOK          = 0x00000000
 	settingsMBYesNo       = 0x00000004
