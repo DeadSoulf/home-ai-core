@@ -2,7 +2,6 @@ package windowsclient
 
 import (
 	"errors"
-	"fmt"
 	"path/filepath"
 	"strings"
 )
@@ -23,13 +22,9 @@ func buildUserAgentCommand(executable, configPath string) (string, error) {
 		return "", errors.New("agent executable and sync config paths must be absolute")
 	}
 	for _, value := range []string{executable, configPath} {
-		if strings.ContainsAny(value, ""\r\n") {
+		if strings.Contains(value, """) || strings.ContainsAny(value, "\r\n") {
 			return "", errors.New("agent paths cannot contain quotes or control characters")
 		}
 	}
-	command := """ + executable + "" agent run --config "" + configPath + """
-	if strings.TrimSpace(command) == "" {
-		return "", fmt.Errorf("build user agent command")
-	}
-	return command, nil
+	return """ + executable + "" agent run --config "" + configPath + """, nil
 }
