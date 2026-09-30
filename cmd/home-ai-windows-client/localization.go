@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"strings"
+
+	"github.com/DeadSoulf/home-ai-core/internal/windowsclient"
 )
 
 const (
@@ -200,4 +202,16 @@ func textForLanguage(language, key string) string {
 
 func textForLanguagef(language, key string, args ...any) string {
 	return fmt.Sprintf(textForLanguage(language, key), args...)
+}
+
+func preferredUILanguage() string {
+	path, err := defaultClientSettingsPath()
+	if err != nil {
+		return defaultUILanguage()
+	}
+	settings, err := windowsclient.LoadClientSettings(path)
+	if err != nil || settings.Language == "" {
+		return defaultUILanguage()
+	}
+	return normalizeUILanguage(settings.Language)
 }
