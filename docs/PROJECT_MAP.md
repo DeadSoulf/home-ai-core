@@ -266,11 +266,27 @@ Check
 9. ✅ Web SMB status/users/shares/credentials UI;
 10. ✅ ADR-0020 и helper/API/Web tests.
 
+Восьмой вертикальный срез:
+
+1. ✅ Windows file-copy engine;
+2. ✅ token-mode login без сохранения пароля/токена;
+3. ✅ список разрешённых NAS folders;
+4. ✅ resumable upload поверх стандартного Home-AI API;
+5. ✅ per-chunk SHA-256 + whole-file SHA-256;
+6. ✅ resume verification по server chunk history;
+7. ✅ retry transient HTTP/network failures;
+8. ✅ explicit stale-upload replacement policy;
+9. ✅ Windows amd64 CLI cross-build;
+10. ✅ .exe + SHA256 публикуются отдельными release assets;
+11. ✅ ADR-0021 + usage guide + end-to-end tests.
+
 Следующий подэтап:
 
 1. live SMB acceptance на установленном сервере;
-2. Windows file-copy client;
-3. NFS — при необходимости.
+2. Windows persistent copy queue + recursive folder copy;
+3. scheduled/automatic sync;
+4. Windows GUI/tray;
+5. NFS — при необходимости.
 
 ## 4. Следующие продуктовые этапы
 
@@ -380,11 +396,23 @@ AI становится центральным управляющим слоем
 
 #### Windows client
 
-- копирование выбранных файлов на Home-AI;
-- private/shared destination;
-- resumable transfers;
-- integrity checking;
-- LAN + remote operation.
+Первый рабочий CLI/engine уже реализован:
+
+- ✅ token-mode Home-AI login;
+- ✅ список разрешённых private/shared destinations;
+- ✅ копирование выбранного файла;
+- ✅ resumable transfers;
+- ✅ per-chunk + whole-file SHA-256;
+- ✅ retry/resume;
+- ✅ Windows amd64 release asset.
+
+Следующие срезы:
+
+- persistent local transfer queue;
+- recursive folder copy;
+- schedule/automatic sync;
+- GUI/tray;
+- LAN + remote/WireGuard operation.
 
 Это не Windows system-image backup.
 

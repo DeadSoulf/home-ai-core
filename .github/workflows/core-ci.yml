@@ -191,3 +191,7 @@ jobs:
           for arch in amd64 arm64; do
             GOOS=linux GOARCH="$arch" CGO_ENABLED=0 go build               -trimpath               -ldflags "-s -w -X github.com/DeadSoulf/home-ai-core/internal/version.Version=$VERSION"               -o "/tmp/home-ai-core-linux-$arch"               ./cmd/home-ai-core
           done
+
+      - name: Cross-build Windows file client
+        run: |
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build             -trimpath             -o /tmp/home-ai-windows-client.exe             ./cmd/home-ai-windows-client
