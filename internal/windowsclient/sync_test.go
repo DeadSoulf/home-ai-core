@@ -187,6 +187,63 @@ func TestSyncProfilePersistenceAndSchedule(t *testing.T) {
 	}
 }
 
+
+func TestUpdateSyncProfilePreservesState(t *testing.T) {
+	source := filepath.Join(t.TempDir(), "source.txt")
+	writeCopyFile(t, source, "data")
+	nextSource := filepath.Join(t.TempDir(), "next.txt")
+	writeCopyFile(t, nextSource, "next")
+	config := filepath.Join(t.TempDir(), "sync.json")
+
+	profile, err := AddSyncProfile(config, SyncProfileInput{
+		ServerURL:      "http://example.com",
+		Username:       "alice",
+		FolderID:       "nsf_old",
+		Source:         source,
+		Destination:    "old/source.txt",
+		Every:          5 * time.Minute,
+		ConflictPolicy: SyncConflictStop,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	attempt := time.Now().UTC().Add(time.Second)
+	if err := RecordSyncProfileResult(config, profile.ID, attempt, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetSyncProfileEnabled(config, profile.ID, false); err != nil {
+		t.Fatal(err)
+	}
+
+	updated, err := UpdateSyncProfile(config, profile.ID, SyncProfileInput{
+		ServerURL:      "https://home-ai.example",
+		Username:       "bob",
+		FolderID:       "nsf_new",
+		Source:         nextSource,
+		Destination:    "new/next.txt",
+		Every:          30 * time.Minute,
+		ConflictPolicy: SyncConflictReplaceToTrash,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.ID != profile.ID || updated.Enabled {
+		t.Fatalf("updated identity/state = %#v", updated)
+	}
+	if updated.LastSuccessAt == nil || !updated.LastSuccessAt.Equal(attempt) {
+		t.Fatalf("updated result history = %#v", updated)
+	}
+	if updated.CreatedAt != profile.CreatedAt {
+		t.Fatalf("created_at changed: %v -> %v", profile.CreatedAt, updated.CreatedAt)
+	}
+	if updated.ServerURL != "https://home-ai.example" || updated.Username != "bob" ||
+		updated.FolderID != "nsf_new" || updated.Source != nextSource ||
+		updated.Destination != "new/next.txt" || updated.Interval() != 30*time.Minute ||
+		updated.ConflictPolicy != SyncConflictReplaceToTrash {
+		t.Fatalf("updated fields = %#v", updated)
+	}
+}
+
 func TestAddSyncProfileRejectsUnsafeConfiguration(t *testing.T) {
 	source := filepath.Join(t.TempDir(), "source.txt")
 	writeCopyFile(t, source, "data")
