@@ -138,14 +138,14 @@ func profileFromRoles(roles []string) string {
 
 func containsString(values []string, expected string) bool {
 	for _, value := range values {
-		if value == expected { return true }
+		if value == expected {\n\t\t\treturn true\n\t\t}
 	}
 	return false
 }
 
 func (s *Service) normalizeRequestedPermissions(ctx context.Context, profile string, requested []string) ([]string, error) {
 	catalog, err := s.AccessCatalog(ctx)
-	if err != nil { return nil, err }
+	if err != nil {\n\t\treturn nil, err\n\t}
 	valid := make(map[string]bool, len(catalog.Permissions))
 	all := make([]string, 0, len(catalog.Permissions))
 	for _, permission := range catalog.Permissions {
@@ -153,21 +153,21 @@ func (s *Service) normalizeRequestedPermissions(ctx context.Context, profile str
 		all = append(all, permission.Name)
 	}
 	sort.Strings(all)
-	if profile == ProfileAdministrator { return all, nil }
+	if profile == ProfileAdministrator {\n\t\treturn all, nil\n\t}
 	if requested == nil {
 		for _, template := range catalog.Profiles {
-			if template.Name == profile { return append([]string(nil), template.DefaultPermissions...), nil }
+			if template.Name == profile {\n\t\t\t\treturn append([]string(nil), template.DefaultPermissions...), nil\n\t\t\t}
 		}
 		return nil, ErrInvalidProfile
 	}
 	resultSet := map[string]bool{}
 	for _, permission := range requested {
 		permission = strings.TrimSpace(permission)
-		if !valid[permission] { return nil, fmt.Errorf("unknown permission %q", permission) }
+		if !valid[permission] {\n\t\t\treturn nil, fmt.Errorf("unknown permission %q", permission)\n\t\t}
 		resultSet[permission] = true
 	}
 	result := make([]string, 0, len(resultSet))
-	for permission := range resultSet { result = append(result, permission) }
+	for permission := range resultSet {\n\t\tresult = append(result, permission)\n\t}
 	sort.Strings(result)
 	return result, nil
 }
@@ -176,15 +176,15 @@ func (s *Service) normalizeResourcePermissions(ctx context.Context, requested []
 	catalog, err := s.AccessCatalog(ctx)
 	if err != nil { return nil, err }
 	valid := make(map[string]bool, len(catalog.Permissions))
-	for _, permission := range catalog.Permissions { valid[permission.Name] = true }
+	for _, permission := range catalog.Permissions {\n\t\tvalid[permission.Name] = true\n\t}
 	result := make([]PermissionScope, 0, len(requested))
 	seen := map[string]bool{}
 	for _, scope := range requested {
 		scope.Permission = strings.TrimSpace(scope.Permission)
 		scope.ResourceType = strings.TrimSpace(scope.ResourceType)
 		scope.ResourceID = strings.TrimSpace(scope.ResourceID)
-		if !valid[scope.Permission] { return nil, fmt.Errorf("unknown scoped permission %q", scope.Permission) }
-		if scope.ResourceType == "" || scope.ResourceID == "" { return nil, errors.New("resource permission requires resource type and id") }
+		if !valid[scope.Permission] {\n\t\t\treturn nil, fmt.Errorf("unknown scoped permission %q", scope.Permission)\n\t\t}
+		if scope.ResourceType == "" || scope.ResourceID == "" {\n\t\t\treturn nil, errors.New("resource permission requires resource type and id")\n\t\t}
 		switch scope.ResourceType {
 		case "file_folder":
 			if scope.Permission != "files.read" && scope.Permission != "files.write" {
@@ -194,13 +194,13 @@ func (s *Service) normalizeResourcePermissions(ctx context.Context, requested []
 			return nil, fmt.Errorf("unsupported resource type %q", scope.ResourceType)
 		}
 		key := scope.Permission + "\x00" + scope.ResourceType + "\x00" + scope.ResourceID
-		if seen[key] { continue }
+		if seen[key] {\n\t\t\tcontinue\n\t\t}
 		seen[key] = true
 		result = append(result, scope)
 	}
 	sort.Slice(result, func(i, j int) bool {
-		if result[i].ResourceType != result[j].ResourceType { return result[i].ResourceType < result[j].ResourceType }
-		if result[i].ResourceID != result[j].ResourceID { return result[i].ResourceID < result[j].ResourceID }
+		if result[i].ResourceType != result[j].ResourceType {\n\t\t\treturn result[i].ResourceType < result[j].ResourceType\n\t\t}
+		if result[i].ResourceID != result[j].ResourceID {\n\t\t\treturn result[i].ResourceID < result[j].ResourceID\n\t\t}
 		return result[i].Permission < result[j].Permission
 	})
 	return result, nil
