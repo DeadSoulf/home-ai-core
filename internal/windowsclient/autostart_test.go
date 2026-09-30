@@ -47,3 +47,31 @@ func TestAgentLockIsExclusiveAndReleases(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+
+func TestParseUserAgentCommandRoundTrip(t *testing.T) {
+	root := t.TempDir()
+	executable := filepath.Join(root, "Home AI", "client.exe")
+	config := filepath.Join(root, "Profile Data", "sync.json")
+	command, err := buildUserAgentCommand(executable, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotExecutable, gotConfig, err := ParseUserAgentCommand(command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotExecutable != filepath.Clean(executable) || gotConfig != filepath.Clean(config) {
+		t.Fatalf("parsed = %q, %q", gotExecutable, gotConfig)
+	}
+	for _, invalid := range []string{
+		"",
+		"client.exe agent run --config sync.json",
+		""" + executable + "" sync watch --config "" + config + """,
+		""" + executable + "" agent run --config "" + config + "" extra",
+	} {
+		if _, _, err := ParseUserAgentCommand(invalid); err == nil {
+			t.Fatalf("accepted invalid Run command %q", invalid)
+		}
+	}
+}
