@@ -30,12 +30,12 @@ type Client struct {
 }
 
 type Folder struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Kind        string `json:"kind"`
-	PoolName    string `json:"pool_name"`
-	CanRead     bool   `json:"can_read"`
-	CanWrite    bool   `json:"can_write"`
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Kind     string `json:"kind"`
+	PoolName string `json:"pool_name"`
+	CanRead  bool   `json:"can_read"`
+	CanWrite bool   `json:"can_write"`
 }
 
 type UploadChunk struct {
@@ -61,11 +61,11 @@ type UploadResult struct {
 }
 
 type UploadOptions struct {
-	Destination string
-	ChunkSize   int64
-	Retries     int
+	Destination  string
+	ChunkSize    int64
+	Retries      int
 	RestartStale bool
-	Progress    func(Progress)
+	Progress     func(Progress)
 }
 
 type Progress struct {
@@ -83,8 +83,8 @@ type apiErrorBody struct {
 }
 
 type HTTPError struct {
-	Status int
-	Code   string
+	Status  int
+	Code    string
 	Message string
 }
 
@@ -112,15 +112,15 @@ func New(rawBaseURL string) (*Client, error) {
 	}
 	parsed.Path = strings.TrimRight(parsed.Path, "/")
 	return &Client{
-		BaseURL: parsed,
+		BaseURL:    parsed,
 		HTTPClient: &http.Client{Timeout: 90 * time.Second},
 	}, nil
 }
 
 func (c *Client) Login(ctx context.Context, username, password string) error {
 	payload := map[string]string{
-		"username": strings.TrimSpace(username),
-		"password": password,
+		"username":     strings.TrimSpace(username),
+		"password":     password,
 		"session_mode": "token",
 	}
 	var response struct {
@@ -353,9 +353,9 @@ func (c *Client) createUpload(
 		Upload UploadSession `json:"upload"`
 	}
 	payload := map[string]any{
-		"path": path,
-		"total_bytes": totalBytes,
-		"sha256": expectedSHA,
+		"path":               path,
+		"total_bytes":        totalBytes,
+		"sha256":             expectedSHA,
 		"client_fingerprint": fingerprint,
 	}
 	endpoint := "/api/v1/files/folders/" + url.PathEscape(folderID) + "/uploads"
@@ -494,8 +494,8 @@ func decodeHTTPError(response *http.Response) error {
 	payload := apiErrorBody{}
 	_ = json.NewDecoder(io.LimitReader(response.Body, 64<<10)).Decode(&payload)
 	return &HTTPError{
-		Status: response.StatusCode,
-		Code: payload.Error.Code,
+		Status:  response.StatusCode,
+		Code:    payload.Error.Code,
 		Message: payload.Error.Message,
 	}
 }
@@ -550,10 +550,10 @@ func reportProgress(callback func(Progress), path string, uploaded, total int64,
 		return
 	}
 	callback(Progress{
-		Path: path,
+		Path:          path,
 		UploadedBytes: uploaded,
-		TotalBytes: total,
-		Resumed: resumed,
+		TotalBytes:    total,
+		Resumed:       resumed,
 	})
 }
 
