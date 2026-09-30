@@ -568,10 +568,10 @@ func (s *server) fileFolderUploadComplete(
 			folder.ID,
 			"success",
 			map[string]any{
-				"upload_id":   uploadID,
-				"path":        result.Path,
-				"size_bytes":  result.SizeBytes,
-				"sha256":      result.SHA256,
+				"upload_id":  uploadID,
+				"path":       result.Path,
+				"size_bytes": result.SizeBytes,
+				"sha256":     result.SHA256,
 			},
 		)
 		s.realtime.Publish(
