@@ -41,6 +41,8 @@ func run(args []string) error {
 		return runSync(args[1:])
 	case "credentials":
 		return runCredentials(args[1:])
+	case "agent":
+		return runAgent(args[1:])
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -231,4 +233,8 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  sync watch   [--profile ID] [--config FILE]")
 	fmt.Fprintln(os.Stderr, "  sync enable|disable|remove --profile ID [--config FILE]")
 	fmt.Fprintln(os.Stderr, "  credentials save|status|delete --server URL --username USER")
+	fmt.Fprintln(os.Stderr, "  agent install [--config FILE]")
+	fmt.Fprintln(os.Stderr, "  agent status")
+	fmt.Fprintln(os.Stderr, "  agent remove")
+	fmt.Fprintln(os.Stderr, "  agent run [--config FILE] [--poll 30s]")
 }
