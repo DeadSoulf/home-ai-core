@@ -68,7 +68,6 @@ func StartUserAgent(executable, configPath string) error {
 	return nil
 }
 
-
 func UserAgentRunning() bool {
 	className, err := windows.UTF16PtrFromString(windowsAgentTrayClass)
 	if err != nil {
