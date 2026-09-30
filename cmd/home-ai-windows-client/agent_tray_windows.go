@@ -17,10 +17,10 @@ import (
 const (
 	trayCallbackMessage = 0x8000 + 73
 
-	wmCommand      = 0x0111
-	wmDestroy      = 0x0002
-	wmClose        = 0x0010
-	wmRButtonUp    = 0x0205
+	wmCommand       = 0x0111
+	wmDestroy       = 0x0002
+	wmClose         = 0x0010
+	wmRButtonUp     = 0x0205
 	wmLButtonDblClk = 0x0203
 
 	nimAdd    = 0x00000000
@@ -35,10 +35,10 @@ const (
 
 	tpmRightButton = 0x0002
 
-	traySyncNow   = 1001
-	trayOpenLog   = 1002
+	traySyncNow    = 1001
+	trayOpenLog    = 1002
 	trayOpenConfig = 1003
-	trayExit      = 1004
+	trayExit       = 1004
 
 	idiApplication = 32512
 	idcArrow       = 32512
@@ -104,29 +104,29 @@ type windowsAgentTray struct {
 }
 
 var (
-	trayUser32            = windows.NewLazySystemDLL("user32.dll")
-	trayShell32           = windows.NewLazySystemDLL("shell32.dll")
-	trayKernel32          = windows.NewLazySystemDLL("kernel32.dll")
-	procRegisterClassExW  = trayUser32.NewProc("RegisterClassExW")
-	procCreateWindowExW   = trayUser32.NewProc("CreateWindowExW")
-	procDefWindowProcW    = trayUser32.NewProc("DefWindowProcW")
-	procDestroyWindow     = trayUser32.NewProc("DestroyWindow")
-	procPostMessageW      = trayUser32.NewProc("PostMessageW")
-	procPostQuitMessage   = trayUser32.NewProc("PostQuitMessage")
-	procGetMessageW       = trayUser32.NewProc("GetMessageW")
-	procTranslateMessage  = trayUser32.NewProc("TranslateMessage")
-	procDispatchMessageW  = trayUser32.NewProc("DispatchMessageW")
-	procLoadIconW         = trayUser32.NewProc("LoadIconW")
-	procLoadCursorW       = trayUser32.NewProc("LoadCursorW")
-	procCreatePopupMenu   = trayUser32.NewProc("CreatePopupMenu")
-	procAppendMenuW       = trayUser32.NewProc("AppendMenuW")
-	procDestroyMenu       = trayUser32.NewProc("DestroyMenu")
-	procGetCursorPos      = trayUser32.NewProc("GetCursorPos")
+	trayUser32              = windows.NewLazySystemDLL("user32.dll")
+	trayShell32             = windows.NewLazySystemDLL("shell32.dll")
+	trayKernel32            = windows.NewLazySystemDLL("kernel32.dll")
+	procRegisterClassExW    = trayUser32.NewProc("RegisterClassExW")
+	procCreateWindowExW     = trayUser32.NewProc("CreateWindowExW")
+	procDefWindowProcW      = trayUser32.NewProc("DefWindowProcW")
+	procDestroyWindow       = trayUser32.NewProc("DestroyWindow")
+	procPostMessageW        = trayUser32.NewProc("PostMessageW")
+	procPostQuitMessage     = trayUser32.NewProc("PostQuitMessage")
+	procGetMessageW         = trayUser32.NewProc("GetMessageW")
+	procTranslateMessage    = trayUser32.NewProc("TranslateMessage")
+	procDispatchMessageW    = trayUser32.NewProc("DispatchMessageW")
+	procLoadIconW           = trayUser32.NewProc("LoadIconW")
+	procLoadCursorW         = trayUser32.NewProc("LoadCursorW")
+	procCreatePopupMenu     = trayUser32.NewProc("CreatePopupMenu")
+	procAppendMenuW         = trayUser32.NewProc("AppendMenuW")
+	procDestroyMenu         = trayUser32.NewProc("DestroyMenu")
+	procGetCursorPos        = trayUser32.NewProc("GetCursorPos")
 	procSetForegroundWindow = trayUser32.NewProc("SetForegroundWindow")
-	procTrackPopupMenu    = trayUser32.NewProc("TrackPopupMenu")
-	procShellNotifyIconW  = trayShell32.NewProc("Shell_NotifyIconW")
-	procShellExecuteW     = trayShell32.NewProc("ShellExecuteW")
-	procGetModuleHandleW  = trayKernel32.NewProc("GetModuleHandleW")
+	procTrackPopupMenu      = trayUser32.NewProc("TrackPopupMenu")
+	procShellNotifyIconW    = trayShell32.NewProc("Shell_NotifyIconW")
+	procShellExecuteW       = trayShell32.NewProc("ShellExecuteW")
+	procGetModuleHandleW    = trayKernel32.NewProc("GetModuleHandleW")
 )
 
 var activeWindowsTray struct {
@@ -144,11 +144,11 @@ func startAgentTray(logPath, configPath string) (*agentTrayRuntime, error) {
 		return nil, fmt.Errorf("resolve tray sync config path: %w", err)
 	}
 	state := &windowsAgentTray{
-		logPath: logPath,
+		logPath:    logPath,
 		configPath: configPath,
-		runNow: make(chan struct{}, 1),
-		exit: make(chan struct{}),
-		done: make(chan struct{}),
+		runNow:     make(chan struct{}, 1),
+		exit:       make(chan struct{}),
+		done:       make(chan struct{}),
 	}
 	ready := make(chan error, 1)
 	go state.loop(ready)
@@ -157,7 +157,7 @@ func startAgentTray(logPath, configPath string) (*agentTrayRuntime, error) {
 	}
 	return &agentTrayRuntime{
 		RunNow: state.runNow,
-		Exit: state.exit,
+		Exit:   state.exit,
 		close: func() error {
 			state.closeOnce.Do(func() {
 				if state.hwnd != 0 {
@@ -185,13 +185,13 @@ func (state *windowsAgentTray) loop(ready chan<- error) {
 	icon, _, _ := procLoadIconW.Call(0, idiApplication)
 	cursor, _, _ := procLoadCursorW.Call(0, idcArrow)
 	class := trayWndClassEx{
-		CbSize: uint32(unsafe.Sizeof(trayWndClassEx{})),
-		LpfnWndProc: syscall.NewCallback(trayWindowProc),
-		HInstance: windows.Handle(module),
-		HIcon: windows.Handle(icon),
-		HCursor: windows.Handle(cursor),
+		CbSize:        uint32(unsafe.Sizeof(trayWndClassEx{})),
+		LpfnWndProc:   syscall.NewCallback(trayWindowProc),
+		HInstance:     windows.Handle(module),
+		HIcon:         windows.Handle(icon),
+		HCursor:       windows.Handle(cursor),
 		LpszClassName: className,
-		HIconSm: windows.Handle(icon),
+		HIconSm:       windows.Handle(icon),
 	}
 	atom, _, registerErr := procRegisterClassExW.Call(uintptr(unsafe.Pointer(&class)))
 	if atom == 0 {
