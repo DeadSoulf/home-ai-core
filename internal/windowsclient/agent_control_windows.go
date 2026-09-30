@@ -67,3 +67,52 @@ func StartUserAgent(executable, configPath string) error {
 	}
 	return nil
 }
+
+func UserAgentRunning() bool {
+	className, err := windows.UTF16PtrFromString(windowsAgentTrayClass)
+	if err != nil {
+		return false
+	}
+	windowName, err := windows.UTF16PtrFromString(windowsAgentTrayTitle)
+	if err != nil {
+		return false
+	}
+	hwnd, _, _ := procFindWindowW.Call(
+		uintptr(unsafe.Pointer(className)),
+		uintptr(unsafe.Pointer(windowName)),
+	)
+	return hwnd != 0
+}
+
+func SignalUserAgentSyncNow() (bool, error) {
+	className, err := windows.UTF16PtrFromString(windowsAgentTrayClass)
+	if err != nil {
+		return false, err
+	}
+	windowName, err := windows.UTF16PtrFromString(windowsAgentTrayTitle)
+	if err != nil {
+		return false, err
+	}
+	hwnd, _, callErr := procFindWindowW.Call(
+		uintptr(unsafe.Pointer(className)),
+		uintptr(unsafe.Pointer(windowName)),
+	)
+	if hwnd == 0 {
+		if callErr != nil && !errors.Is(callErr, windows.ERROR_SUCCESS) {
+			return false, fmt.Errorf("find Home-AI tray agent: %w", callErr)
+		}
+		return false, nil
+	}
+	const (
+		wmCommand     = 0x0111
+		traySyncNowID = 1001
+	)
+	result, _, callErr := procPostMessageAgentW.Call(hwnd, wmCommand, traySyncNowID, 0)
+	if result == 0 {
+		if callErr == nil || errors.Is(callErr, windows.ERROR_SUCCESS) {
+			callErr = syscall.EINVAL
+		}
+		return false, fmt.Errorf("signal Home-AI sync agent: %w", callErr)
+	}
+	return true, nil
+}

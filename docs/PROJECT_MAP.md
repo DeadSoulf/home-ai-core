@@ -6,11 +6,24 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.80-dev` — Windows self-update handoff + tray health/notifications\
-**Текущий срез:** `0.1.80-dev` — published; live Windows upgrade/tray acceptance pending\
-**Следующий engineering milestone:** automatic Windows release discovery/download + SHA-256 verified install handoff\
+**Текущий срез:** Windows native settings GUI — PR #50; candidate for `0.1.81-dev`\
+**Следующий engineering milestone:** package/release the GUI client, complete live Windows acceptance, then automatic release discovery/download + SHA-256 verified install handoff\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
 
+### Кандидат 0.1.81-dev — полноценные настройки Windows-клиента
+
+- Запуск Windows-клиента без аргументов открывает нативное окно настроек; существующий CLI сохраняется.
+- В окне доступны сервер, пользователь, пароль, подключение и discovery доступных writable NAS folders.
+- Пароль после успешного входа сохраняется только в Windows Credential Manager; JSON настроек хранит только server URL и username.
+- Можно выбрать локальную папку стандартным Windows dialog и создать/редактировать sync profile.
+- Профили можно включать, выключать и удалять; редактирование сохраняет ID, enabled state и историю последнего результата.
+- Настраиваются interval и conflict policy `stop` / `skip` / `replace-to-trash`.
+- **Sync now** при запущенном agent сигналит существующему scheduler и не создаёт второй параллельный sync.
+- Из GUI можно включить/выключить per-user background agent; отображаются autostart и running state.
+- Tray получает **Settings**; double-click также открывает окно настроек.
+- ADR-0028 фиксирует credential boundary и переиспользование существующего sync backend.
+- До выпуска остаются полный CI и практическая проверка GUI на реальном Windows.
 ### Выпуск 0.1.80-dev
 
 - `client install` и `agent install` умеют обновлять stable per-user binary даже при запущенном tray-agent.

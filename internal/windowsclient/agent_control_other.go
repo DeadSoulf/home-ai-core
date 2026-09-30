@@ -9,3 +9,11 @@ func RequestUserAgentExit() (bool, error) {
 func StartUserAgent(executable, configPath string) error {
 	return ErrUserAutostartUnsupported
 }
+
+func UserAgentRunning() bool {
+	return false
+}
+
+func SignalUserAgentSyncNow() (bool, error) {
+	return false, ErrCredentialStoreUnsupported
+}

@@ -536,6 +536,10 @@ func normalizeQueueServer(raw string) (string, error) {
 	return u.String(), nil
 }
 
+func NormalizeServerURL(raw string) (string, error) {
+	return normalizeQueueServer(raw)
+}
+
 func validateQueue(state queueState) error {
 	if state.Version != queueVersion {
 		return fmt.Errorf("unsupported queue version %d", state.Version)
