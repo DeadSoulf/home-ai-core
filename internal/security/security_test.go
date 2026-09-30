@@ -296,6 +296,16 @@ func TestUnifiedUserAccessCanBeCustomized(t *testing.T) {
 		t.Fatalf("Bootstrap() error = %v", err)
 	}
 
+	now := service.now().UTC()
+	pool, err := store.CreateNASPool(ctx, "Main", "/srv/home-ai/main", admin.Actor.ID, now)
+	if err != nil {
+		t.Fatalf("CreateNASPool() error = %v", err)
+	}
+	folder, err := store.CreateNASFolder(ctx, pool.ID, "Family", "shared", "", admin.Actor.ID, now)
+	if err != nil {
+		t.Fatalf("CreateNASFolder() error = %v", err)
+	}
+
 	created, err := service.CreateUserWithAccess(
 		ctx,
 		admin.Actor,
@@ -306,7 +316,7 @@ func TestUnifiedUserAccessCanBeCustomized(t *testing.T) {
 			Profile:     ProfileParent,
 			Permissions: []string{"system.read", "network.read"},
 			ResourcePermissions: []PermissionScope{
-				{Permission: "files.read", ResourceType: "file_folder", ResourceID: "nsf-family"},
+				{Permission: "files.read", ResourceType: "file_folder", ResourceID: folder.ID},
 			},
 		},
 		RequestContext{},
@@ -328,7 +338,7 @@ func TestUnifiedUserAccessCanBeCustomized(t *testing.T) {
 	if !login.Actor.Has("system.read") || !login.Actor.Has("network.read") {
 		t.Fatalf("actor permissions = %#v", login.Actor.Permissions)
 	}
-	if !login.Actor.Allows("files.read", "file_folder", "nsf-family") {
+	if !login.Actor.Allows("files.read", "file_folder", folder.ID) {
 		t.Fatal("scoped file permission was not effective")
 	}
 	if login.Actor.Has("network.manage") {
@@ -365,7 +375,7 @@ func TestUnifiedUserAccessCanBeCustomized(t *testing.T) {
 	if actor.Has("network.read") {
 		t.Fatal("existing session did not pick up the access change")
 	}
-	if actor.Allows("files.read", "file_folder", "nsf-family") {
+	if actor.Allows("files.read", "file_folder", folder.ID) {
 		t.Fatal("existing session retained removed resource access")
 	}
 }
