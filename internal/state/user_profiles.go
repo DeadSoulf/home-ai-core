@@ -237,7 +237,7 @@ func (s *Store) UpdateUserProfile(
 			UPDATE users
 			SET display_name = ?, password_hash = ?, disabled = ?, updated_at = ?
 			WHERE id = ?
-		`, update.DisplayName, update.PasswordHash, boolInt(update.Disabled), timestamp, userID); err != nil {
+		`, update.DisplayName, update.PasswordHash, userProfileBoolInt(update.Disabled), timestamp, userID); err != nil {
 			return UserAccountRecord{}, fmt.Errorf("update user profile: %w", err)
 		}
 	} else {
@@ -245,7 +245,7 @@ func (s *Store) UpdateUserProfile(
 			UPDATE users
 			SET display_name = ?, disabled = ?, updated_at = ?
 			WHERE id = ?
-		`, update.DisplayName, boolInt(update.Disabled), timestamp, userID); err != nil {
+		`, update.DisplayName, userProfileBoolInt(update.Disabled), timestamp, userID); err != nil {
 			return UserAccountRecord{}, fmt.Errorf("update user profile: %w", err)
 		}
 	}
@@ -273,7 +273,7 @@ func (s *Store) UpdateUserProfile(
 			if _, err := tx.ExecContext(ctx, `
 				INSERT INTO user_permission_overrides(user_id, permission_name, allowed)
 				VALUES (?, ?, ?)
-			`, userID, name, boolInt(desired[name])); err != nil {
+			`, userID, name, userProfileBoolInt(desired[name])); err != nil {
 				return UserAccountRecord{}, fmt.Errorf("save user permission override: %w", err)
 			}
 		}
@@ -306,7 +306,7 @@ func (s *Store) UpdateUserProfile(
 	return s.UserAccount(ctx, userID)
 }
 
-func boolInt(value bool) int {
+func userProfileBoolInt(value bool) int {
 	if value {
 		return 1
 	}
