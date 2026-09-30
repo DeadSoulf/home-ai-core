@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.78-dev
+
+- Added a per-user Windows background sync agent with `agent install/status/remove/run` commands.
+- Added current-user HKCU Run autostart after Windows logon; the startup command contains no password or bearer token.
+- Require enabled sync profiles and matching Windows Credential Manager entries before enabling autostart.
+- Added a single-instance OS lock, hidden Windows console runtime, and rotating per-user sync-agent log.
+- Reuse the existing scheduled sync watcher and Credential Manager authentication without introducing a LocalSystem service.
+- Added ADR-0025 and native Windows HKCU Run round-trip tests.
+
 ## 0.1.77-dev
 
 - Added Windows Credential Manager storage for Home-AI passwords without putting secrets in queue/sync JSON or command-line arguments.

@@ -6,10 +6,21 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.77-dev` — Windows Credential Manager authentication + secure password fallback\
-**Текущий срез:** `0.1.77-dev` — Windows Credential Manager authentication без секретов в JSON/CLI\
-**Следующий engineering milestone:** Windows user-session background agent с HKCU Run autostart реализуется; tray UI остаётся следующим клиентским срезом\
+**Текущий срез:** `0.1.78-dev` — Windows user-session background sync agent + HKCU Run autostart\
+**Следующий engineering milestone:** tray UI + стабильный per-user install/update path для Windows-клиента\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
+
+### Выпуск 0.1.78-dev
+
+- Добавлены `agent install/status/remove/run` для Windows background sync agent.
+- Autostart регистрируется в `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run` текущего пользователя и запускается после logon.
+- Run command содержит только путь к `.exe`, `agent run` и путь к sync-config; password/token туда не попадают.
+- `agent install` требует хотя бы один enabled sync profile и сохранённые Credential Manager credentials для всех используемых accounts.
+- Agent использует single-instance OS lock на profile-set, скрывает console window и пишет rotating local log.
+- Scheduler и authentication переиспользуют существующие `sync watch` + Windows Credential Manager.
+- ADR-0025 и native Windows HKCU Run round-trip tests прошли до merge PR #45.
+- Ограничение: это user-session agent, не LocalSystem service; tray UI и стабильный install path остаются следующим срезом.
 
 ### Выпуск 0.1.77-dev
 
@@ -318,8 +329,9 @@ Check
 2. 🧪 Windows persistent copy queue + recursive folder copy — опубликовано в `0.1.75-dev`; автоматические тесты прошли, пользовательская проверка на Windows/NAS остаётся;
 3. ✅ scheduled/automatic push sync — persistent profiles, due-run/watch scheduler и explicit conflict policy реализованы в `0.1.76-dev`;
 4. ✅ Windows Credential Manager authentication — реализовано в `0.1.77-dev`;
-5. 🚧 Windows user-session background agent: HKCU Run autostart + single-instance/logging реализуются; tray UI позже;
-6. NFS — при необходимости.
+5. ✅ Windows user-session background agent — HKCU Run autostart + single-instance/logging реализованы в `0.1.78-dev`;
+6. 🚧 Windows tray UI + стабильный per-user install/update path;
+7. NFS — при необходимости.
 
 Девятый вертикальный срез (`0.1.75-dev`):
 
@@ -362,7 +374,21 @@ Check
 10. ✅ ADR-0024;
 11. 🧪 пользовательская проверка Credential Manager на реальном Windows остаётся незавершённой.
 
-Основной следующий engineering milestone: 🚧 Windows user-session background agent с безопасным autostart после Windows logon. HKCU Run registration, single-instance lock и local rotating log реализуются отдельным срезом поверх Credential Manager; после него следующий UI-срез — tray. Live SMB, обновление/откат и физическая приёмка Windows queue/sync остаются практическими проверками перед отметкой F2 как завершённого.
+Двенадцатый вертикальный срез (`0.1.78-dev`):
+
+1. ✅ `agent install/status/remove/run`;
+2. ✅ current-user HKCU Run autostart после Windows logon;
+3. ✅ startup command без password/token;
+4. ✅ install readiness: enabled profiles + Credential Manager credentials;
+5. ✅ single-instance OS lock per sync config;
+6. ✅ hidden Windows console для background run;
+7. ✅ rotating per-user local agent log;
+8. ✅ переиспользование `sync watch` и существующей conflict policy;
+9. ✅ native Windows HKCU Run round-trip test;
+10. ✅ ADR-0025;
+11. 🧪 пользовательская проверка autostart после logout/reboot остаётся незавершённой.
+
+Основной следующий engineering milestone: 🚧 Windows tray UI + стабильный per-user install/update path. Background agent foundation готов в `0.1.78-dev`; live Windows/NAS acceptance, logout/reboot autostart acceptance, SMB и rollback остаются отдельными практическими проверками. Live SMB, обновление/откат и физическая приёмка Windows queue/sync остаются практическими проверками перед отметкой F2 как завершённого.
 
 ## 4. Следующие продуктовые этапы
 
@@ -487,8 +513,8 @@ AI становится центральным управляющим слоем
 - 🧪 persistent local transfer queue и recursive folder copy реализованы в `0.1.75-dev`; остаётся пользовательская проверка на Windows и NAS;
 - ✅ scheduled/automatic push sync реализован в `0.1.76-dev`: persistent profiles, due-run/watch и explicit conflicts (`stop` / `skip` / `replace-to-trash`);
 - ✅ Windows Credential Manager authentication реализован в `0.1.77-dev`;
-- 🚧 user-session background agent: HKCU Run autostart + single-instance/logging в разработке;
-- tray UI после стабилизации background-agent contract;
+- ✅ user-session background agent реализован в `0.1.78-dev`: HKCU Run autostart + single-instance/logging;
+- 🚧 tray UI + stable per-user install/update path;
 - LAN + remote/WireGuard operation.
 
 Это не Windows system-image backup.
@@ -621,7 +647,8 @@ AI не может расширять собственные права.
 | `0.1.74-dev` | 🧪 Web navigation | опубликована; сгруппированное меню и отдельные разделы Системы; пользовательская приёмка не подтверждена |
 | `0.1.75-dev` | 🧪 Windows copy queue | опубликован; очередь и перенос дерева папок, пользовательская приёмка остаётся |
 | `0.1.76-dev` | 🧪 Windows scheduled push sync | опубликован; persistent profiles, due-run/watch, explicit conflict policy; пользовательская приёмка остаётся |
-| `0.1.77-dev` | 🧪 Windows Credential Manager | secure same-user password storage + auth fallback; пользовательская приёмка остаётся |
+| `0.1.77-dev` | 🧪 Windows Credential Manager | опубликован; secure same-user password storage + auth fallback; пользовательская приёмка остаётся |
+| `0.1.78-dev` | 🧪 Windows background sync agent | HKCU Run autostart, lock/logging; reboot/logon acceptance остаётся |
 
 ## 10. Правило ведения карты
 
