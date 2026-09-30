@@ -1,7 +1,7 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { api } from "../api/client";
-import type { BlockNode } from "../api/types";
+import type { BlockNode, StoragePurpose, StoragePurposeAssignment } from "../api/types";
 import { useI18n } from "../i18n";
 
 type Filesystem = "ext4" | "xfs" | "vfat";
@@ -98,6 +98,8 @@ export function StorageDevices({
   const [filesystem, setFilesystem] = useState<Filesystem>("ext4");
   const [label, setLabel] = useState("");
   const [diskName, setDiskName] = useState("");
+  const [partitionPurpose, setPartitionPurpose] = useState<StoragePurpose>("files");
+  const [purposes, setPurposes] = useState<StoragePurposeAssignment[]>([]);
   const [collapsed, setCollapsed] = useState<string[]>(() =>
     devices
       .filter((node) => node.type === "disk")
@@ -105,6 +107,46 @@ export function StorageDevices({
   );
   const [partitionProgress, setPartitionProgress] = useState<{device: string; text: string} | null>(null);
   const [columnWidths, setColumnWidths] = useState<Record<StorageColumn, number>>(initialColumnWidths);
+
+  async function refreshPurposes() {
+    if (!canManage) {
+      setPurposes([]);
+      return;
+    }
+    try {
+      setPurposes(await api.storagePurposes());
+    } catch (reason) {
+      setStorageError(reason);
+    }
+  }
+
+  useEffect(() => {
+    void refreshPurposes();
+  }, [canManage]);
+
+  function purposeForNode(node: BlockNode): StoragePurposeAssignment | undefined {
+    if (node.uuid) {
+      const byUUID = purposes.find((item) => item.filesystem_uuid === node.uuid);
+      if (byUUID) return byUUID;
+    }
+    return purposes.find((item) => item.device === node.path);
+  }
+
+  async function changePurpose(node: BlockNode, purpose: "" | StoragePurpose) {
+    if (!node.path) return;
+    setBusy(node.path);
+    setError("");
+    setMessage("");
+    try {
+      await api.setStoragePurpose(node.path, purpose || undefined);
+      setMessage(purpose ? t("storagePurposeSaved") : t("storagePurposeCleared"));
+      await refreshPurposes();
+    } catch (reason) {
+      setStorageError(reason);
+    } finally {
+      setBusy("");
+    }
+  }
 
   function setStorageError(reason: unknown) {
     const detail = reason instanceof Error ? reason.message : t("requestFailed");
@@ -301,6 +343,7 @@ export function StorageDevices({
       setFormatDevice("");
       setLabel("");
       onChanged();
+      await refreshPurposes();
     } catch (reason) {
       setStorageError(reason);
     } finally {
@@ -348,17 +391,20 @@ export function StorageDevices({
         operation: "partition.create",
         device: node.path,
         size_mib: sizeMiB || undefined,
+        purpose: partitionPurpose,
         confirm: confirmation,
       });
       if (diskName.trim()) {
         await api.setDiskName(node.path, diskName.trim());
       }
       setPartitionProgress({device: node.path, text: t("partitionRefreshing")});
-      setMessage(result.message);
+      setMessage(result.warning ? `${result.message} · ${result.warning}` : result.message);
       setCreateDisk("");
       setPartitionSizeGiB("");
       setDiskName("");
+      setPartitionPurpose("files");
       onChanged();
+      await refreshPurposes();
       setPartitionProgress({device: node.path, text: t("partitionCreated")});
       window.setTimeout(() => setPartitionProgress(null), 1200);
     } catch (reason) {
@@ -396,6 +442,7 @@ export function StorageDevices({
       setPartitionProgress({device: node.path, text: t("partitionRefreshing")});
       setMessage(result.message);
       onChanged();
+      await refreshPurposes();
       setPartitionProgress({device: node.path, text: t("partitionsDeletedAll")});
       window.setTimeout(() => setPartitionProgress(null), 1200);
     } catch (reason) {
@@ -433,6 +480,7 @@ export function StorageDevices({
       setPartitionProgress({device: node.path, text: t("partitionRefreshing")});
       setMessage(result.message);
       onChanged();
+      await refreshPurposes();
       setPartitionProgress({device: node.path, text: t("partitionDeleted")});
       window.setTimeout(() => setPartitionProgress(null), 1200);
     } catch (reason) {
@@ -518,6 +566,7 @@ export function StorageDevices({
               const operationBusy = !!node.path && busy === node.path;
               const formatting = !!node.path && formatDevice === node.path;
               const creating = !!node.path && createDisk === node.path;
+              const purposeAssignment = purposeForNode(node);
               const collapseKey = node.path || node.name;
               const isCollapsed = collapsed.includes(collapseKey);
               const mountable =
@@ -589,6 +638,11 @@ export function StorageDevices({
                           </span>
                         )}
                         {node.label && <span className="storage-inline-label">{node.label}</span>}
+                        {purposeAssignment && (
+                          <span className="status-badge">
+                            {purposeAssignment.purpose === "files" ? t("storagePurposeFiles") : t("storagePurposeVideo")}
+                          </span>
+                        )}
                       </div>
                       {depth === 0 && (
                         <div className="storage-tree-model">
@@ -687,6 +741,20 @@ export function StorageDevices({
                             </button>
                           </>
                         )}
+                        {(node.type === "part" || node.type === "lvm") && !node.system && (
+                          <label className="storage-purpose-control">
+                            <span>{t("storagePurpose")}</span>
+                            <select
+                              value={purposeAssignment?.purpose || ""}
+                              disabled={operationBusy}
+                              onChange={(event) => void changePurpose(node, event.target.value as "" | StoragePurpose)}
+                            >
+                              <option value="">{t("storagePurposeNone")}</option>
+                              <option value="files">{t("storagePurposeFiles")}</option>
+                              <option value="video">{t("storagePurposeVideo")}</option>
+                            </select>
+                          </label>
+                        )}
                         {node.type === "part" && (
                           <>
                             <button
@@ -739,6 +807,16 @@ export function StorageDevices({
                                 placeholder={t("allRemainingSpace")}
                               />
                             </label>
+                            <label>
+                              {t("storagePurpose")}
+                              <select
+                                value={partitionPurpose}
+                                onChange={(event) => setPartitionPurpose(event.target.value as StoragePurpose)}
+                              >
+                                <option value="files">{t("storagePurposeFiles")}</option>
+                                <option value="video">{t("storagePurposeVideo")}</option>
+                              </select>
+                            </label>
                           </div>
                           <div className="storage-capacity-summary">
                             <strong>{t("unallocated")}:</strong> {bytes(node.unallocated_bytes || 0)}
@@ -753,6 +831,7 @@ export function StorageDevices({
                                 setCreateDisk("");
                                 setPartitionSizeGiB("");
                                 setDiskName("");
+                                setPartitionPurpose("files");
                               }}
                             >
                               {t("cancel")}
