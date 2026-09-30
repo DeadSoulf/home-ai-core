@@ -48,7 +48,6 @@ func TestAgentLockIsExclusiveAndReleases(t *testing.T) {
 	}
 }
 
-
 func TestParseUserAgentCommandRoundTrip(t *testing.T) {
 	root := t.TempDir()
 	executable := filepath.Join(root, "Home AI", "client.exe")
