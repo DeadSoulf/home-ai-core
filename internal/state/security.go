@@ -25,8 +25,10 @@ type UserRecord struct {
 }
 
 type UserAccountRecord struct {
-	User  UserRecord
-	Roles []string
+	User                UserRecord
+	Roles               []string
+	Permissions         []string
+	ResourcePermissions []ResourcePermissionRecord
 }
 
 type ResourcePermissionRecord struct {
@@ -202,11 +204,16 @@ func (s *Store) ListUsers(ctx context.Context) ([]UserAccountRecord, error) {
 
 	result := make([]UserAccountRecord, 0, len(users))
 	for _, user := range users {
-		roles, err := s.userRoles(ctx, user.ID)
+		roles, permissions, resourcePermissions, err := s.userAccess(ctx, user.ID)
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, UserAccountRecord{User: user, Roles: roles})
+		result = append(result, UserAccountRecord{
+			User:                user,
+			Roles:               roles,
+			Permissions:         permissions,
+			ResourcePermissions: resourcePermissions,
+		})
 	}
 	return result, nil
 }
@@ -360,11 +367,42 @@ func (s *Store) userAccess(ctx context.Context, userID string) ([]string, []stri
 		return nil, nil, nil, fmt.Errorf("close role rows: %w", err)
 	}
 
-	permissionRows, err := s.db.QueryContext(ctx, `
-		SELECT DISTINCT rp.permission_name FROM role_permissions rp
-		JOIN user_roles ur ON ur.role_id = rp.role_id
-		WHERE ur.user_id = ? ORDER BY rp.permission_name
-	`, userID)
+	isFullAccess := false
+	for _, role := range roles {
+		if role == "owner" || role == "administrator" {
+			isFullAccess = true
+			break
+		}
+	}
+
+	var permissionRows *sql.Rows
+	if isFullAccess {
+		permissionRows, err = s.db.QueryContext(ctx, `
+			SELECT name
+			FROM permissions
+			ORDER BY name
+		`)
+	} else {
+		permissionRows, err = s.db.QueryContext(ctx, `
+			SELECT permission_name
+			FROM (
+				SELECT rp.permission_name AS permission_name
+				FROM role_permissions rp
+				JOIN user_roles ur ON ur.role_id = rp.role_id
+				WHERE ur.user_id = ?
+				UNION
+				SELECT permission_name
+				FROM user_permission_overrides
+				WHERE user_id = ? AND allowed = 1
+			)
+			WHERE permission_name NOT IN (
+				SELECT permission_name
+				FROM user_permission_overrides
+				WHERE user_id = ? AND allowed = 0
+			)
+			ORDER BY permission_name
+		`, userID, userID, userID)
+	}
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("read user permissions: %w", err)
 	}
