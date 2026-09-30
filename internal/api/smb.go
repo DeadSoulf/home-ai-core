@@ -264,7 +264,7 @@ func (s *server) buildSMBModel(r *http.Request) (smbModel, error) {
 			FolderName: folder.Name,
 			Kind:       folder.Kind,
 			ShareName:  shareName,
-			UNC:        "\\" + hostname + "\" + shareName,
+			UNC:        fmt.Sprintf(`\\%s\%s`, hostname, shareName),
 		})
 	}
 
