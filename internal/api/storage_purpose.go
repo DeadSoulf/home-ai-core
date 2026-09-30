@@ -143,7 +143,7 @@ func (s *server) storagePurposes(
 		})
 
 	default:
-		methodNotAllowed(w, r, http.MethodGet, http.MethodPost)
+		methodNotAllowed(w, r, http.MethodGet+", "+http.MethodPost)
 	}
 }
 
