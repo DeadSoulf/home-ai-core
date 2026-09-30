@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.79-dev
+
+- Added a stable per-user Windows client install path at `%LOCALAPPDATA%\\HomeAI\\bin\\home-ai-windows-client.exe`.
+- Added `client install/status`; installation uses a temporary file, durable write, atomic replacement and SHA-256 verification.
+- Changed `agent install` to register the stable installed executable instead of an arbitrary downloaded release path.
+- Added a native Win32 notification-area tray without a third-party GUI dependency.
+- Added tray actions for `Sync now`, opening the agent log, opening sync profiles, and clean agent exit.
+- Routed manual tray sync through the existing sequential scheduler and single-instance agent rather than starting a second process.
+- Added ADR-0026, stable-path/native Windows tests, and full core CI coverage.
 ## 0.1.78-dev
 
 - Added a per-user Windows background sync agent with `agent install/status/remove/run` commands.

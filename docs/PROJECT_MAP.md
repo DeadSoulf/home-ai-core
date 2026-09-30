@@ -6,10 +6,22 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.78-dev` — Windows background sync agent + HKCU Run autostart\
-**Текущий срез:** `0.1.78-dev` — Windows user-session background sync agent + HKCU Run autostart\
-**Следующий engineering milestone:** 🚧 tray UI + стабильный per-user install/update path для Windows-клиента — реализация ведётся в следующем срезе\
+**Текущий срез:** `0.1.79-dev` — stable per-user Windows install + native tray controls\
+**Следующий engineering milestone:** Windows self-update handoff + richer tray status/notifications\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
+
+### Выпуск 0.1.79-dev
+
+- Windows-клиент получает стабильный per-user путь `%LOCALAPPDATA%\\HomeAI\\bin\\home-ai-windows-client.exe`.
+- `client install/status` позволяют установить или проверить текущую пользовательскую копию без admin rights.
+- Установка использует temp-file, durable write, atomic replace и SHA-256 verification.
+- `agent install` теперь сначала устанавливает клиент в стабильный путь и регистрирует HKCU Run именно на эту копию.
+- Добавлен native Win32 tray без внешней GUI-зависимости.
+- Tray actions: **Sync now**, **Open log**, **Open sync profiles**, **Exit**.
+- **Sync now** использует существующий sequential scheduler внутри того же single-instance agent; второй sync-процесс не запускается.
+- ADR-0026, native Windows tests и полный `core-ci` прошли до release PR.
+- Практическая проверка установки/tray/autostart на реальном Windows остаётся acceptance step.
 
 ### Выпуск 0.1.78-dev
 
@@ -330,7 +342,7 @@ Check
 3. ✅ scheduled/automatic push sync — persistent profiles, due-run/watch scheduler и explicit conflict policy реализованы в `0.1.76-dev`;
 4. ✅ Windows Credential Manager authentication — реализовано в `0.1.77-dev`;
 5. ✅ Windows user-session background agent — HKCU Run autostart + single-instance/logging реализованы в `0.1.78-dev`;
-6. 🚧 Windows tray UI + стабильный per-user install/update path — stable `%LOCALAPPDATA%\\HomeAI\\bin` install, tray `Sync now/Open log/Open profiles/Exit` в разработке;
+6. 🧪 Windows tray UI + стабильный per-user install/update path — реализовано в `0.1.79-dev`; native/full CI пройдены, пользовательская Windows acceptance остаётся;
 7. NFS — при необходимости.
 
 Девятый вертикальный срез (`0.1.75-dev`):
@@ -388,7 +400,20 @@ Check
 10. ✅ ADR-0025;
 11. 🧪 пользовательская проверка autostart после logout/reboot остаётся незавершённой.
 
-Основной следующий engineering milestone: 🚧 Windows tray UI + стабильный per-user install/update path. Реализация начата поверх `0.1.78-dev`: agent install переводится на стабильный `%LOCALAPPDATA%` binary path, tray использует тот же scheduler/single-instance процесс. Live Windows/NAS acceptance, logout/reboot autostart acceptance, SMB и rollback остаются отдельными практическими проверками. Live SMB, обновление/откат и физическая приёмка Windows queue/sync остаются практическими проверками перед отметкой F2 как завершённого.
+Тринадцатый вертикальный срез (`0.1.79-dev`):
+
+1. ✅ stable per-user binary path `%LOCALAPPDATA%\\HomeAI\\bin\\home-ai-windows-client.exe`;
+2. ✅ `client install/status`;
+3. ✅ atomic executable copy/update + SHA-256 verification;
+4. ✅ `agent install` регистрирует стабильную установленную копию;
+5. ✅ native Win32 notification-area tray без внешней GUI dependency;
+6. ✅ tray `Sync now` через существующий scheduler;
+7. ✅ tray `Open log` / `Open sync profiles` / `Exit`;
+8. ✅ single-instance semantics сохранены, второй sync process не создаётся;
+9. ✅ ADR-0026 + native Windows tests + полный core-ci;
+10. 🧪 реальная Windows acceptance установки, tray и обновления установленного binary остаётся незавершённой.
+
+Основной следующий engineering milestone: Windows self-update handoff + richer tray status/notifications. Stable per-user install и базовый native tray готовы в `0.1.79-dev`; следующий срез должен позволить безопасно обновить запущенную установленную копию и показывать пользователю фактическое состояние sync/ошибки. Live Windows/NAS acceptance, logout/reboot autostart acceptance, SMB и rollback остаются отдельными практическими проверками перед отметкой F2 как завершённого.
 
 ## 4. Следующие продуктовые этапы
 
@@ -649,6 +674,7 @@ AI не может расширять собственные права.
 | `0.1.76-dev` | 🧪 Windows scheduled push sync | опубликован; persistent profiles, due-run/watch, explicit conflict policy; пользовательская приёмка остаётся |
 | `0.1.77-dev` | 🧪 Windows Credential Manager | опубликован; secure same-user password storage + auth fallback; пользовательская приёмка остаётся |
 | `0.1.78-dev` | 🧪 Windows background sync agent | HKCU Run autostart, lock/logging; reboot/logon acceptance остаётся |
+| `0.1.79-dev` | 🧪 Windows stable install + tray | `%LOCALAPPDATA%` install, native tray controls; real Windows acceptance остаётся |
 
 ## 10. Правило ведения карты
 
