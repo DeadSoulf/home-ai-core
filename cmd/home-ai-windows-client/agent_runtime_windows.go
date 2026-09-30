@@ -10,10 +10,10 @@ import (
 )
 
 var (
-	kernel32ConsoleDLL    = windows.NewLazySystemDLL("kernel32.dll")
-	procGetConsoleWindow  = kernel32ConsoleDLL.NewProc("GetConsoleWindow")
-	user32ConsoleDLL      = windows.NewLazySystemDLL("user32.dll")
-	procShowWindow        = user32ConsoleDLL.NewProc("ShowWindow")
+	kernel32ConsoleDLL   = windows.NewLazySystemDLL("kernel32.dll")
+	procGetConsoleWindow = kernel32ConsoleDLL.NewProc("GetConsoleWindow")
+	user32ConsoleDLL     = windows.NewLazySystemDLL("user32.dll")
+	procShowWindow       = user32ConsoleDLL.NewProc("ShowWindow")
 )
 
 func prepareAgentRuntime(logPath string) (func() error, error) {
