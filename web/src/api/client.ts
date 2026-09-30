@@ -17,6 +17,8 @@ import type {
   FileUploadResult,
   FileUploadSession,
   FilePool,
+  StoragePurpose,
+  StoragePurposeAssignment,
   SMBStatus,
   WireGuardStatus,
 } from "./types";
@@ -178,6 +180,20 @@ export const api = {
       password: input.password,
     }, true);
     return result.user;
+  },
+
+  storagePurposes: async () => {
+    const result = await request<{assignments: StoragePurposeAssignment[]}>("/api/v1/storage/purposes");
+    return result.assignments;
+  },
+
+  setStoragePurpose: async (device: string, purpose?: StoragePurpose) => {
+    const result = await postJSON<{assignment?: StoragePurposeAssignment}>(
+      "/api/v1/storage/purposes",
+      {device, purpose: purpose || "none"},
+      true,
+    );
+    return result.assignment;
   },
 
   filePools: async () => {
