@@ -204,19 +204,12 @@ func (s *server) buildSMBModel(r *http.Request) (smbModel, error) {
 
 	activeUsers := make([]security.User, 0, len(users))
 	userNames := map[string]string{}
-	ownerIDs := map[string]struct{}{}
 	for _, user := range users {
 		if user.Disabled {
 			continue
 		}
 		activeUsers = append(activeUsers, user)
 		userNames[user.ID] = smbSystemUsername(user.ID)
-		for _, role := range user.Roles {
-			if role == "owner" {
-				ownerIDs[user.ID] = struct{}{}
-				break
-			}
-		}
 	}
 
 	hostname, _ := os.Hostname()
@@ -228,35 +221,29 @@ func (s *server) buildSMBModel(r *http.Request) (smbModel, error) {
 			return smbModel{}, fmt.Errorf("resolve SMB folder %s: %w", folder.ID, err)
 		}
 
-		allowed := map[string]struct{}{}
-		for ownerID := range ownerIDs {
-			if name := userNames[ownerID]; name != "" {
-				allowed[name] = struct{}{}
+		readUsers := make([]string, 0, len(activeUsers))
+		writeUsers := make([]string, 0, len(activeUsers))
+		for _, user := range activeUsers {
+			name := userNames[user.ID]
+			if name == "" {
+				continue
+			}
+			if userAllowsFileFolder(user, "files.read", folder.ID) || userHasPermission(user, "files.manage") {
+				readUsers = append(readUsers, name)
+			}
+			if userAllowsFileFolder(user, "files.write", folder.ID) || userHasPermission(user, "files.manage") {
+				writeUsers = append(writeUsers, name)
 			}
 		}
-		if folder.Kind == "private" {
-			if name := userNames[folder.OwnerUserID]; name != "" {
-				allowed[name] = struct{}{}
-			}
-		} else {
-			for _, user := range activeUsers {
-				if name := userNames[user.ID]; name != "" {
-					allowed[name] = struct{}{}
-				}
-			}
-		}
-
-		writeUsers := make([]string, 0, len(allowed))
-		for name := range allowed {
-			writeUsers = append(writeUsers, name)
-		}
-		if len(writeUsers) == 0 {
+		if len(readUsers) == 0 && len(writeUsers) == 0 {
 			continue
 		}
+
 		shareName := smbShareName(folder)
 		shares = append(shares, smb.Share{
 			Name:       shareName,
 			Path:       root,
+			ReadUsers:  readUsers,
 			WriteUsers: writeUsers,
 		})
 		views = append(views, smbShareResponse{
@@ -274,6 +261,29 @@ func (s *server) buildSMBModel(r *http.Request) (smbModel, error) {
 		Shares:     shares,
 		ShareViews: views,
 	}, nil
+}
+
+func userHasPermission(user security.User, permission string) bool {
+	for _, current := range user.Permissions {
+		if current == permission {
+			return true
+		}
+	}
+	return false
+}
+
+func userAllowsFileFolder(user security.User, permission, folderID string) bool {
+	if userHasPermission(user, permission) {
+		return true
+	}
+	for _, scope := range user.ResourcePermissions {
+		if scope.Permission == permission &&
+			scope.ResourceType == "file_folder" &&
+			scope.ResourceID == folderID {
+			return true
+		}
+	}
+	return false
 }
 
 func smbSystemUsername(userID string) string {

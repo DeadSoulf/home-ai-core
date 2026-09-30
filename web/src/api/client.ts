@@ -10,6 +10,9 @@ import type {
   UpdateStatus,
   UpdaterState,
   UserAccount,
+  UserProfile,
+  PermissionScope,
+  AccessCatalog,
   NetworkProfileStatus,
   FileEntry,
   FileFolder,
@@ -173,12 +176,52 @@ export const api = {
     return result.users;
   },
 
-  createUser: async (input: {username: string; displayName: string; password: string}) => {
+  userAccessCatalog: async () => {
+    const result = await request<{access: AccessCatalog}>("/api/v1/security/access-catalog");
+    return result.access;
+  },
+
+  createUser: async (input: {
+    username: string;
+    displayName: string;
+    password: string;
+    profile?: UserProfile;
+    permissions?: string[];
+    resourcePermissions?: PermissionScope[];
+  }) => {
     const result = await postJSON<{user: UserAccount}>("/api/v1/security/users", {
       username: input.username,
       display_name: input.displayName,
       password: input.password,
+      profile: input.profile,
+      permissions: input.permissions || [],
+      resource_permissions: input.resourcePermissions || [],
     }, true);
+    return result.user;
+  },
+
+  updateUserAccess: async (userId: string, input: {
+    profile: UserProfile;
+    permissions: string[];
+    resourcePermissions?: PermissionScope[];
+    disabled: boolean;
+  }) => {
+    const headers = new Headers({"Content-Type": "application/json"});
+    const token = getCSRFToken();
+    if (token) headers.set("X-CSRF-Token", token);
+    const result = await request<{user: UserAccount}>(
+      `/api/v1/security/users/${encodeURIComponent(userId)}/access`,
+      {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({
+          profile: input.profile,
+          permissions: input.permissions,
+          resource_permissions: input.resourcePermissions || [],
+          disabled: input.disabled,
+        }),
+      },
+    );
     return result.user;
   },
 

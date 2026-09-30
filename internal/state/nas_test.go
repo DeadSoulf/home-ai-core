@@ -93,8 +93,11 @@ func TestNASFolderGrants(t *testing.T) {
 	if err != nil {
 		t.Fatalf("userAccess(member) after shared folder error = %v", err)
 	}
-	assertResourcePermission(t, sharedScopes, "files.read", "file_folder", sharedFolder.ID)
-	assertResourcePermission(t, sharedScopes, "files.write", "file_folder", sharedFolder.ID)
+	for _, scope := range sharedScopes {
+		if scope.ResourceType == "file_folder" && scope.ResourceID == sharedFolder.ID {
+			t.Fatalf("shared folder should wait for explicit per-user access, got %#v", scope)
+		}
+	}
 
 	folders, err := store.ListNASFolders(ctx)
 	if err != nil {

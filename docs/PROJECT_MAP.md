@@ -167,7 +167,7 @@ Home-AI должен стать полностью автономной лока
 | Core API | ✅ | Go REST API и health | единый API для Web, AI, voice, clients и cluster |
 | State / migrations | ✅ | SQLite + forward migrations | локальное control-plane состояние |
 | Node identity | ✅ | стабильный ID узла | основа будущего cluster enrollment |
-| Security / Auth | ✅ | owner/member accounts, sessions, RBAC, CSRF, resource-scoped grants | пользователи, комнаты, устройства, камеры, папки и AI policy |
+| Security / Auth | 🚧 unified users | единые Core accounts, профили Administrator/Parent/Child/Guest/Friend, direct permissions, sessions, RBAC, CSRF, resource-scoped grants | один пользователь и единая policy для Web, NAS, NVR, Smart Home, камер и AI |
 | Audit | ✅ | аудит действий | критично для AI и опасных операций |
 | Jobs | ✅ | persistent job engine | долгие операции, модели, storage, NVR, cluster |
 | Events | ✅ | durable events | Smart Home/NVR/cluster domain events |
@@ -240,17 +240,22 @@ Check
 
 Следующий сетевой долг: explicit import/takeover внешнего ifupdown-профиля (отдельным подтверждаемым действием), затем VLAN/bridges/bonds.
 
-### ✅ Multi-user foundation
+### 🚧 Unified multi-user access
 
-Реализовано:
+Базовый multi-user фундамент уже работал, теперь он превращается в единую систему пользователей всего Home-AI:
 
-- роли `owner` и `member`;
-- API создания и списка пользователей;
-- Web-раздел **Пользователи**;
-- новые `member` получают только права на собственную учетную запись/сессию;
-- административные страницы скрываются по permissions;
-- ограниченный пользователь не опрашивает недоступные System/Updates/Realtime;
-- resource-scoped permissions готовы для будущего доступа к папкам, комнатам и камерам.
+- один Core user ID используется всеми модулями вместо отдельных NAS/NVR/Smart-Home пользователей;
+- профили: **Administrator / Parent / Child / Guest / Friend**;
+- Administrator имеет полный доступ и защищён от удаления последнего администратора;
+- Parent / Child / Guest / Friend — стартовые шаблоны, а не жёсткие наборы прав;
+- прямые global permissions назначаются конкретному пользователю;
+- Web **Пользователи** показывает общий каталог возможностей Core и позволяет включать/выключать их;
+- resource-scoped permissions остаются точными grants на конкретный объект;
+- файловые папки уже доступны как ресурсы с отдельными правами чтения/записи;
+- существующие shared-folder grants старого `member` мигрируют в персональные grants;
+- новые shared folders не привязаны к одной роли: доступ выбирается по пользователям;
+- тот же механизм должен использоваться будущими комнатами, устройствами, камерами/NVR и AI tools;
+- ADR-0031 фиксирует каноническую модель identity/access.
 
 ## 3. Текущая работа
 
@@ -277,13 +282,23 @@ Check
    - ADR-0014;
    - тесты и полный CI.
 5. ✅ Добавлена household multi-user foundation:
-   - роль `member`;
+   - исходные owner/member accounts;
    - API list/create users;
-   - Web UI управления пользователями;
    - permission-aware Web navigation;
+   - resource-scoped grants;
    - миграция `010_household_users.sql`;
-   - ADR-0015;
-   - полный CI.
+   - ADR-0015.
+6. 🚧 Unified user access:
+   - профили Administrator / Parent / Child / Guest / Friend;
+   - единый permission catalog всего Core;
+   - direct per-user global permissions;
+   - редактирование effective access существующих пользователей;
+   - explicit per-user resource access;
+   - защита последнего Administrator;
+   - миграция `014_unified_user_access.sql`;
+   - ADR-0031;
+   - Web access editor + RU/EN UI;
+   - следующий шаг после CI: live acceptance на сервере.
 
 Отдельно проверить в эксплуатации:
 
@@ -301,7 +316,7 @@ Check
 4. ✅ `files.read/files.write/files.manage`;
 5. ✅ scoped grants на конкретную папку;
 6. ✅ private folder → выбранный пользователь;
-7. ✅ shared folder → роль `member`;
+7. 🚧 shared folder → explicit per-user access через общий редактор пользователей;
 8. ✅ API list/create pools и folders;
 9. ✅ Web-раздел **Файлы** с фильтрацией по effective permissions;
 10. ✅ ADR-0016 и тесты.
@@ -365,10 +380,10 @@ Check
 
 1. ✅ explicit Samba installation;
 2. ✅ managed SMB shares только для Home-AI logical folders;
-3. ✅ private folder → владелец + owner;
-4. ✅ shared folder → активные household users;
-5. ✅ owner получает RW ко всем managed shares;
-6. ✅ guest access запрещён, SMB2.10 minimum;
+3. ✅ private folder → владелец + Administrator;
+4. 🚧 shared folder → только пользователи с explicit files.read/files.write grant;
+5. 🚧 Administrator получает RW ко всем managed shares через files.manage;
+6. ✅ анонимный SMB guest access запрещён, SMB2.10 minimum;
 7. ✅ отдельные SMB credentials без хранения пароля в Core;
 8. ✅ managed /etc/samba/home-ai.conf + backup/include/testparm/reload;
 9. ✅ Web SMB status/users/shares/credentials UI;

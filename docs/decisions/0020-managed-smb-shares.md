@@ -44,13 +44,18 @@ Physical share paths are resolved through the existing `filedata.FolderRoot` bou
 - is a real directory;
 - is owned by the Home-AI Core service identity.
 
-The initial access mapping is:
+The initial implementation mapped private/shared semantics directly. ADR-0031 supersedes that ACL mapping now that the unified access editor exists.
 
-- private folder: its Home-AI owner plus Home-AI owner-role users;
-- shared folder: all active household users;
-- Home-AI owner-role users: read/write access to every generated share.
+The current access mapping is derived from the same effective Core authorization used by Web/API:
 
-This matches the current NAS product model. More granular resource-grant-to-SMB ACL synchronization is deferred until the grants management UI exists.
+- `files.manage`: read/write access to every generated share;
+- global `files.read` / `files.write`: the corresponding access to every folder;
+- scoped `files.read` / `files.write` on a `file_folder`: access only to that exact folder;
+- disabled users: excluded.
+
+Private-folder owners keep their direct scoped grants created with the folder. Shared folders receive no automatic all-household grant; the administrator selects users explicitly in the unified Users access editor.
+
+This keeps SMB and HTTP authorization aligned instead of maintaining a second ACL policy.
 
 ### Samba process identity
 
@@ -117,12 +122,11 @@ Trade-offs:
 
 - users have a separate SMB credential;
 - generated SMB usernames are internal identifiers rather than the Home-AI login name;
-- current SMB ACL mapping follows private/shared semantics rather than arbitrary resource grants;
+- SMB ACL generation now depends on the unified Core permission/resource model defined by ADR-0031;
 - live Samba installation/connectivity still requires acceptance testing on the installed server.
 
 ## Deferred
 
-- UI for granular per-folder SMB grants;
 - disable/remove SMB credential when a Home-AI user is disabled/deleted;
 - SMB quotas;
 - SMB snapshots/Previous Versions integration;
