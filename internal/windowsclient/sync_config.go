@@ -149,6 +149,93 @@ func AddSyncProfile(filename string, input SyncProfileInput) (SyncProfile, error
 	return profile, nil
 }
 
+
+func UpdateSyncProfile(filename, profileID string, input SyncProfileInput) (SyncProfile, error) {
+	profileID = strings.TrimSpace(profileID)
+	if profileID == "" {
+		return SyncProfile{}, errors.New("sync profile ID is required")
+	}
+	server, err := normalizeQueueServer(input.ServerURL)
+	if err != nil {
+		return SyncProfile{}, err
+	}
+	username := strings.TrimSpace(input.Username)
+	folderID := strings.TrimSpace(input.FolderID)
+	if username == "" || folderID == "" {
+		return SyncProfile{}, errors.New("username and folder ID are required")
+	}
+	if strings.TrimSpace(input.Source) == "" {
+		return SyncProfile{}, errors.New("source path is required")
+	}
+	source, err := filepath.Abs(input.Source)
+	if err != nil {
+		return SyncProfile{}, fmt.Errorf("resolve sync source: %w", err)
+	}
+	info, err := os.Lstat(source)
+	if err != nil {
+		return SyncProfile{}, fmt.Errorf("inspect sync source: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 || (!info.IsDir() && !info.Mode().IsRegular()) {
+		return SyncProfile{}, errors.New("sync source must be a regular file or real directory")
+	}
+	destination := strings.TrimSpace(input.Destination)
+	if destination == "" {
+		destination = filepath.Base(source)
+	}
+	destination, err = normalizeCopyDestination(destination)
+	if err != nil {
+		return SyncProfile{}, err
+	}
+	if input.Every < minSyncInterval || input.Every > maxSyncInterval {
+		return SyncProfile{}, fmt.Errorf("sync interval must be between %s and %s", minSyncInterval, maxSyncInterval)
+	}
+	policy, err := NormalizeSyncConflictPolicy(input.ConflictPolicy)
+	if err != nil {
+		return SyncProfile{}, err
+	}
+
+	var updated SyncProfile
+	err = updateSyncConfig(filename, func(state *syncConfigState) error {
+		index := -1
+		for i := range state.Profiles {
+			if state.Profiles[i].ID == profileID {
+				index = i
+				break
+			}
+		}
+		if index < 0 {
+			return fmt.Errorf("sync profile %s not found", profileID)
+		}
+		for i, existing := range state.Profiles {
+			if i == index {
+				continue
+			}
+			if existing.ServerURL == server &&
+				existing.Username == username &&
+				existing.FolderID == folderID &&
+				existing.Source == source &&
+				existing.Destination == destination {
+				return errors.New("an equivalent sync profile already exists")
+			}
+		}
+		profile := &state.Profiles[index]
+		profile.ServerURL = server
+		profile.Username = username
+		profile.FolderID = folderID
+		profile.Source = source
+		profile.Destination = destination
+		profile.EverySeconds = int64(input.Every / time.Second)
+		profile.ConflictPolicy = policy
+		profile.UpdatedAt = time.Now().UTC()
+		updated = *profile
+		return nil
+	})
+	if err != nil {
+		return SyncProfile{}, err
+	}
+	return updated, nil
+}
+
 func RemoveSyncProfile(filename, profileID string) error {
 	profileID = strings.TrimSpace(profileID)
 	if profileID == "" {
