@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"time"
@@ -135,16 +137,23 @@ func runAgent(args []string) error {
 		}
 		defer cleanup()
 		fmt.Printf("%s Home-AI sync agent starting\n", time.Now().Format(time.RFC3339))
-		watchArgs := []string{
-			"watch",
-			"--config", configPath,
-			"--poll", poll.String(),
-			"--retries", fmt.Sprintf("%d", retries),
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer cancel()
+		tray, err := startAgentTray(logPath, configPath)
+		if err != nil {
+			return fmt.Errorf("start tray UI: %w", err)
 		}
-		if restartStale {
-			watchArgs = append(watchArgs, "--restart-stale")
+		defer tray.Close()
+		if tray.Exit != nil {
+			go func() {
+				select {
+				case <-tray.Exit:
+					cancel()
+				case <-ctx.Done():
+				}
+			}()
 		}
-		err = runSync(watchArgs)
+		err = watchSyncProfiles(ctx, configPath, "", retries, restartStale, poll, tray.RunNow)
 		fmt.Printf("%s Home-AI sync agent stopped: %v\n", time.Now().Format(time.RFC3339), err)
 		return err
 	}
