@@ -47,11 +47,11 @@ func TestLoginFoldersAndResumableUploadWithRetry(t *testing.T) {
 			requireBearer(t, r)
 			writeTestJSON(w, http.StatusOK, map[string]any{
 				"folders": []map[string]any{{
-					"id": "nsf_test",
-					"name": "Family",
-					"kind": "shared",
+					"id":        "nsf_test",
+					"name":      "Family",
+					"kind":      "shared",
 					"pool_name": "Main",
-					"can_read": true,
+					"can_read":  true,
 					"can_write": true,
 				}},
 			})
@@ -65,9 +65,9 @@ func TestLoginFoldersAndResumableUploadWithRetry(t *testing.T) {
 		case r.URL.Path == "/api/v1/files/folders/nsf_test/uploads" && r.Method == http.MethodPost:
 			requireBearer(t, r)
 			var body struct {
-				Path string `json:"path"`
-				TotalBytes int64 `json:"total_bytes"`
-				SHA256 string `json:"sha256"`
+				Path              string `json:"path"`
+				TotalBytes        int64  `json:"total_bytes"`
+				SHA256            string `json:"sha256"`
 				ClientFingerprint string `json:"client_fingerprint"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -80,13 +80,13 @@ func TestLoginFoldersAndResumableUploadWithRetry(t *testing.T) {
 			createdExpectedSHA = body.SHA256
 			writeTestJSON(w, http.StatusCreated, map[string]any{
 				"upload": map[string]any{
-					"id": uploadID,
-					"path": body.Path,
-					"total_bytes": body.TotalBytes,
-					"received_bytes": 0,
-					"expected_sha256": body.SHA256,
+					"id":                 uploadID,
+					"path":               body.Path,
+					"total_bytes":        body.TotalBytes,
+					"received_bytes":     0,
+					"expected_sha256":    body.SHA256,
 					"client_fingerprint": body.ClientFingerprint,
-					"chunks": []any{},
+					"chunks":             []any{},
 				},
 			})
 			return
@@ -119,11 +119,11 @@ func TestLoginFoldersAndResumableUploadWithRetry(t *testing.T) {
 			mu.Unlock()
 			writeTestJSON(w, http.StatusOK, map[string]any{
 				"upload": map[string]any{
-					"id": uploadID,
-					"path": "backup/data.bin",
-					"total_bytes": len(payload),
-					"received_bytes": next,
-					"expected_sha256": fullSHA,
+					"id":                 uploadID,
+					"path":               "backup/data.bin",
+					"total_bytes":        len(payload),
+					"received_bytes":     next,
+					"expected_sha256":    fullSHA,
 					"client_fingerprint": createdFingerprint,
 				},
 			})
@@ -139,9 +139,9 @@ func TestLoginFoldersAndResumableUploadWithRetry(t *testing.T) {
 			}
 			writeTestJSON(w, http.StatusOK, map[string]any{
 				"file": map[string]any{
-					"path": "backup/data.bin",
+					"path":       "backup/data.bin",
 					"size_bytes": len(payload),
-					"sha256": fullSHA,
+					"sha256":     fullSHA,
 				},
 			})
 			return
@@ -174,8 +174,8 @@ func TestLoginFoldersAndResumableUploadWithRetry(t *testing.T) {
 	var progress []Progress
 	result, err := client.UploadFile(ctx, "nsf_test", source, UploadOptions{
 		Destination: "backup/data.bin",
-		ChunkSize: 5,
-		Retries: 3,
+		ChunkSize:   5,
+		Retries:     3,
 		Progress: func(value Progress) {
 			progress = append(progress, value)
 		},
@@ -220,15 +220,15 @@ func TestUploadResumesMatchingSession(t *testing.T) {
 		switch {
 		case r.URL.Path == "/api/v1/files/folders/nsf_test/uploads" && r.Method == http.MethodGet:
 			writeTestJSON(w, http.StatusOK, map[string]any{"uploads": []map[string]any{{
-				"id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-				"path": "resume.bin",
-				"total_bytes": len(payload),
-				"received_bytes": len(first),
-				"expected_sha256": hex.EncodeToString(fullSum[:]),
+				"id":                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				"path":               "resume.bin",
+				"total_bytes":        len(payload),
+				"received_bytes":     len(first),
+				"expected_sha256":    hex.EncodeToString(fullSum[:]),
 				"client_fingerprint": fingerprint,
 				"chunks": []map[string]any{{
 					"offset": 0,
-					"size": len(first),
+					"size":   len(first),
 					"sha256": hex.EncodeToString(firstSum[:]),
 				}},
 			}}})
@@ -241,17 +241,17 @@ func TestUploadResumesMatchingSession(t *testing.T) {
 			data, _ := io.ReadAll(r.Body)
 			received = append(received, data...)
 			writeTestJSON(w, http.StatusOK, map[string]any{"upload": map[string]any{
-				"id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-				"path": "resume.bin",
-				"total_bytes": len(payload),
+				"id":             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				"path":           "resume.bin",
+				"total_bytes":    len(payload),
 				"received_bytes": len(received),
 			}})
 			return
 		case strings.HasSuffix(r.URL.Path, "/complete"):
 			writeTestJSON(w, http.StatusOK, map[string]any{"file": map[string]any{
-				"path": "resume.bin",
+				"path":       "resume.bin",
 				"size_bytes": len(payload),
-				"sha256": hex.EncodeToString(fullSum[:]),
+				"sha256":     hex.EncodeToString(fullSum[:]),
 			}})
 			return
 		}
@@ -264,7 +264,7 @@ func TestUploadResumesMatchingSession(t *testing.T) {
 	var sawResumed bool
 	_, err = client.UploadFile(context.Background(), "nsf_test", source, UploadOptions{
 		Destination: "resume.bin",
-		ChunkSize: 8,
+		ChunkSize:   8,
 		Progress: func(value Progress) {
 			sawResumed = sawResumed || value.Resumed
 		},
