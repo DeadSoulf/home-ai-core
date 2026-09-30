@@ -57,7 +57,16 @@ func UserAgentAutostartStatus() (UserAutostartInfo, error) {
 	if command == "" {
 		return UserAutostartInfo{}, errors.New("Windows user Run value is empty")
 	}
-	return UserAutostartInfo{Enabled: true, Command: command}, nil
+	executable, configPath, err := ParseUserAgentCommand(command)
+	if err != nil {
+		return UserAutostartInfo{}, fmt.Errorf("parse Windows user Run value: %w", err)
+	}
+	return UserAutostartInfo{
+		Enabled:    true,
+		Command:    command,
+		Executable: executable,
+		ConfigPath: configPath,
+	}, nil
 }
 
 func RemoveUserAgentAutostart() error {
