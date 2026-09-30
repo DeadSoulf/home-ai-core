@@ -1,6 +1,6 @@
 # Windows file-copy client
 
-The Home-AI Windows client is a command-line file-copy tool using the same resumable NAS upload API as the Web file manager.
+The Home-AI Windows client is a native Windows sync application using the same resumable NAS upload API as the Web file manager. A Win32 settings window is the normal setup surface; the CLI remains available for diagnostics and automation.
 
 Supported now:
 
@@ -21,6 +21,20 @@ Each Home-AI development release publishes two separate Windows client assets:
 
 home-ai-windows-client_<version>_amd64.exe
 home-ai-windows-client_<version>_amd64.exe.sha256
+
+## Windows settings UI
+
+On Windows, launch the client without arguments to open the native settings window:
+
+```powershell
+.\home-ai-windows-client_<version>_amd64.exe
+```
+
+The settings window can connect to Home-AI, discover writable NAS folders, choose a local folder, create or edit sync profiles, select the interval and conflict policy, run sync manually, and enable or disable the background agent.
+
+The last server URL and username are stored in `%APPDATA%\HomeAI\windows-client.json`. Passwords are never stored there: after a successful connection they are kept in Windows Credential Manager. Sync profiles remain in `%APPDATA%\HomeAI\sync-profiles.json` and contain no password or bearer token.
+
+Once the background agent is enabled, the tray menu includes **Settings** and **Sync now**. Double-clicking the tray icon opens the settings window. If the agent is already running, GUI **Sync now** signals that existing scheduler instead of starting another one.
 
 ## PowerShell authentication
 
@@ -179,8 +193,9 @@ This handoff installs an executable you already downloaded. Automatic release di
 
 ## Current limitations
 
-- tray UI is intentionally lightweight and does not edit sync profiles yet;
+- the first native settings UI focuses on connection, sync profiles and agent control; richer transfer history/progress is still deferred;
 - Windows client release discovery/download remains manual; the install handoff itself is automatic;
+- a conventional Windows installer / Start Menu / uninstall entry is still deferred;
 - no bidirectional sync or local-delete propagation;
 - no sync-history/recycle-bin retention policy;
 - queue history pruning is still deferred.
