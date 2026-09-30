@@ -862,11 +862,13 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                       <td>
                         {!storage.present
                           ? t("fileStorageMissing")
-                          : alreadyPool
-                            ? t("fileStoragePoolReady")
-                            : usableMounts.length > 0
-                              ? t("fileStorageReady")
-                              : t("fileStorageNeedsMount")}
+                          : !storage.filesystem
+                            ? t("fileStorageNeedsFormat")
+                            : alreadyPool
+                              ? t("fileStoragePoolReady")
+                              : usableMounts.length > 0
+                                ? t("fileStorageReady")
+                                : t("fileStorageNeedsMount")}
                       </td>
                     </tr>
                   );
