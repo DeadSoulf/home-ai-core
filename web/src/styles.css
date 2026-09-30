@@ -494,6 +494,87 @@ tbody tr:last-child td { border-bottom: 0; }
 .user-form input:focus,
 .user-form select:focus { border-color: #5c85ff; box-shadow: 0 0 0 3px #4f7cff22; }
 .user-form .button { width: fit-content; }
+.user-access-form { display: grid; gap: 18px; }
+.user-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.user-profile-grid label {
+  display: grid;
+  gap: 7px;
+  color: #c9d2df;
+  font-size: 13px;
+}
+.user-profile-grid input,
+.user-profile-grid select {
+  width: 100%;
+  border: 1px solid #303a49;
+  background: #10151c;
+  color: #fff;
+  border-radius: 9px;
+  padding: 10px 11px;
+  outline: none;
+}
+.user-disabled-control {
+  grid-template-columns: auto 1fr !important;
+  align-items: center;
+  align-self: end;
+  padding: 10px 0;
+}
+.user-disabled-control input { width: auto; }
+.user-access-section {
+  border-top: 1px solid #2b3441;
+  padding-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+.user-access-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+.user-access-section-head h3 { margin: 0 0 4px; }
+.permission-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.permission-group {
+  border: 1px solid #303a49;
+  border-radius: 10px;
+  padding: 10px 12px 12px;
+  min-width: 0;
+}
+.permission-group legend {
+  padding: 0 6px;
+  color: #dce6f2;
+  font-size: 12px;
+  font-weight: 700;
+}
+.permission-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  padding: 7px 0;
+  color: #d4deea;
+}
+.permission-option input { margin-top: 3px; }
+.permission-option span { display: grid; gap: 2px; min-width: 0; }
+.permission-option strong { font-size: 12px; word-break: break-word; }
+.permission-option small { color: #8593a7; font-size: 11px; line-height: 1.35; }
+.user-access-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+@media (max-width: 760px) {
+  .user-profile-grid,
+  .permission-groups { grid-template-columns: 1fr; }
+  .user-access-section-head { align-items: stretch; flex-direction: column; }
+}
 .account-access-note { margin: 18px 0 0; padding-top: 14px; border-top: 1px solid #252d38; }
 @media (max-width: 760px) {
   .sidebar nav { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(92px, 1fr); }
