@@ -44,7 +44,7 @@ func (state *windowsSettingsUI) applyLanguageTexts() {
 		{"agent_disable", "disable_agent"},
 		{"status_title", "status"},
 	} {
-		controlKey, textKey := item[0], item[1]{
+		controlKey, textKey := item[0], item[1]
 		if hwnd := state.localized[controlKey]; hwnd != 0 {
 			state.setText(hwnd, state.tr(textKey))
 		}
