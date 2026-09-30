@@ -17,6 +17,9 @@ var (
 	ErrAlreadyInitialized    = errors.New("security already initialized")
 	ErrUnauthorized          = errors.New("authentication required")
 	ErrUserExists            = errors.New("user already exists")
+	ErrUserNotFound          = errors.New("user not found")
+	ErrInvalidProfile        = errors.New("invalid user profile")
+	ErrOwnerImmutable        = errors.New("owner access profile cannot be changed")
 )
 
 const sessionLifetime = 24 * time.Hour
@@ -28,13 +31,17 @@ type RequestContext struct {
 }
 
 type User struct {
-	ID          string     `json:"id"`
-	Username    string     `json:"username"`
-	DisplayName string     `json:"display_name"`
-	Disabled    bool       `json:"disabled"`
-	CreatedAt   time.Time  `json:"created_at"`
-	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
-	Roles       []string   `json:"roles"`
+	ID                  string            `json:"id"`
+	Username            string            `json:"username"`
+	DisplayName         string            `json:"display_name"`
+	Disabled            bool              `json:"disabled"`
+	CreatedAt           time.Time         `json:"created_at"`
+	LastLoginAt         *time.Time        `json:"last_login_at,omitempty"`
+	Roles               []string          `json:"roles"`
+	Profile             string            `json:"profile"`
+	Owner               bool              `json:"owner"`
+	Permissions         []string          `json:"permissions"`
+	ResourcePermissions []PermissionScope `json:"resource_permissions,omitempty"`
 }
 
 type PermissionScope struct {
@@ -212,33 +219,50 @@ func (s *Service) Bootstrap(
 func (s *Service) CreateUser(
 	ctx context.Context,
 	actor Actor,
-	username, displayName, password string,
+	input UserProfileInput,
 	meta RequestContext,
 ) (User, error) {
-	username, err := NormalizeUsername(username)
+	username, err := NormalizeUsername(input.Username)
 	if err != nil {
 		return User{}, err
 	}
-	displayName, err = NormalizeDisplayName(displayName, username)
+	displayName, err := NormalizeDisplayName(input.DisplayName, username)
 	if err != nil {
 		return User{}, err
 	}
-	passwordHash, err := HashPassword(password)
-	if err != nil {
-		return User{}, err
-	}
-	userID, err := newID("usr_")
+	passwordHash, err := HashPassword(input.Password)
 	if err != nil {
 		return User{}, err
 	}
 
+	profile := normalizeProfile(input.Profile)
+	if profile == "" {
+		profile = ProfileMember
+	}
+	roleName, roleID, err := roleForProfile(profile)
+	if err != nil {
+		return User{}, err
+	}
+	permissions, err := s.normalizeRequestedPermissions(ctx, profile, input.Permissions)
+	if err != nil {
+		return User{}, err
+	}
+	resourcePermissions, err := s.normalizeResourcePermissions(ctx, input.ResourcePermissions)
+	if err != nil {
+		return User{}, err
+	}
+
+	userID, err := newID("usr_")
+	if err != nil {
+		return User{}, err
+	}
 	record, err := s.store.CreateUser(
 		ctx,
 		userID,
 		username,
 		displayName,
 		passwordHash,
-		"role_member",
+		roleID,
 		s.now().UTC(),
 	)
 	if errors.Is(err, state.ErrUserExists) {
@@ -248,10 +272,18 @@ func (s *Service) CreateUser(
 		return User{}, err
 	}
 
-	user := userFromRecord(state.UserAccountRecord{
-		User:  record,
-		Roles: []string{"member"},
-	})
+	account, err := s.store.UpdateUserProfile(ctx, userID, state.UserProfileUpdate{
+		DisplayName:         displayName,
+		Disabled:            false,
+		RoleName:            roleName,
+		Permissions:         permissions,
+		ResourcePermissions: resourcePermissionRecords(resourcePermissions),
+	}, s.now().UTC())
+	if err != nil {
+		return User{}, err
+	}
+
+	user := userFromRecord(account)
 	s.audit(
 		ctx,
 		meta,
@@ -260,7 +292,108 @@ func (s *Service) CreateUser(
 		"user",
 		user.ID,
 		"success",
-		map[string]any{"username": user.Username, "roles": user.Roles},
+		map[string]any{
+			"username":    user.Username,
+			"profile":     user.Profile,
+			"permissions": user.Permissions,
+		},
+	)
+	return user, nil
+}
+
+func (s *Service) UpdateUser(
+	ctx context.Context,
+	actor Actor,
+	userID string,
+	input UserProfileInput,
+	meta RequestContext,
+) (User, error) {
+	current, err := s.store.UserAccount(ctx, userID)
+	if errors.Is(err, state.ErrUserNotFound) {
+		return User{}, ErrUserNotFound
+	}
+	if err != nil {
+		return User{}, err
+	}
+
+	displayName, err := NormalizeDisplayName(input.DisplayName, current.User.Username)
+	if err != nil {
+		return User{}, err
+	}
+	passwordHash := ""
+	if input.Password != "" {
+		passwordHash, err = HashPassword(input.Password)
+		if err != nil {
+			return User{}, err
+		}
+	}
+
+	isOwner := containsString(current.Roles, "owner")
+	profile := normalizeProfile(input.Profile)
+	if isOwner {
+		if input.Disabled {
+			return User{}, ErrOwnerImmutable
+		}
+		if profile != "" && profile != ProfileAdministrator {
+			return User{}, ErrOwnerImmutable
+		}
+		profile = ProfileAdministrator
+	} else if profile == "" {
+		profile = profileFromRoles(current.Roles)
+	}
+	if profile == "" {
+		return User{}, ErrInvalidProfile
+	}
+
+	roleName, _, err := roleForProfile(profile)
+	if err != nil {
+		return User{}, err
+	}
+	if isOwner {
+		roleName = "owner"
+	}
+
+	permissions, err := s.normalizeRequestedPermissions(ctx, profile, input.Permissions)
+	if err != nil {
+		return User{}, err
+	}
+	resourcePermissions, err := s.normalizeResourcePermissions(ctx, input.ResourcePermissions)
+	if err != nil {
+		return User{}, err
+	}
+
+	account, err := s.store.UpdateUserProfile(ctx, userID, state.UserProfileUpdate{
+		DisplayName:         displayName,
+		PasswordHash:        passwordHash,
+		Disabled:            input.Disabled && !isOwner,
+		RoleName:            roleName,
+		Permissions:         permissions,
+		ResourcePermissions: resourcePermissionRecords(resourcePermissions),
+	}, s.now().UTC())
+	if errors.Is(err, state.ErrUserNotFound) {
+		return User{}, ErrUserNotFound
+	}
+	if errors.Is(err, state.ErrRoleNotFound) {
+		return User{}, ErrInvalidProfile
+	}
+	if err != nil {
+		return User{}, err
+	}
+
+	user := userFromRecord(account)
+	s.audit(
+		ctx,
+		meta,
+		actor,
+		"security.user.update",
+		"user",
+		user.ID,
+		"success",
+		map[string]any{
+			"profile":     user.Profile,
+			"disabled":    user.Disabled,
+			"permissions": user.Permissions,
+		},
 	)
 	return user, nil
 }
@@ -279,13 +412,17 @@ func (s *Service) ListUsers(ctx context.Context) ([]User, error) {
 
 func userFromRecord(record state.UserAccountRecord) User {
 	return User{
-		ID:          record.User.ID,
-		Username:    record.User.Username,
-		DisplayName: record.User.DisplayName,
-		Disabled:    record.User.Disabled,
-		CreatedAt:   record.User.CreatedAt,
-		LastLoginAt: record.User.LastLoginAt,
-		Roles:       record.Roles,
+		ID:                  record.User.ID,
+		Username:            record.User.Username,
+		DisplayName:         record.User.DisplayName,
+		Disabled:            record.User.Disabled,
+		CreatedAt:           record.User.CreatedAt,
+		LastLoginAt:         record.User.LastLoginAt,
+		Roles:               record.Roles,
+		Profile:             profileFromRoles(record.Roles),
+		Owner:               containsString(record.Roles, "owner"),
+		Permissions:         append([]string(nil), record.Permissions...),
+		ResourcePermissions: permissionScopes(record.ResourcePermissions),
 	}
 }
 
