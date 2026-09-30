@@ -1265,4 +1265,3 @@ func TestResumableFileUploadAPI(t *testing.T) {
 		t.Fatalf("uploaded data = %q", data)
 	}
 }
-
