@@ -34,7 +34,7 @@ func TestAgentTraySummaryTracksLatestEnabledProfile(t *testing.T) {
 		!strings.Contains(summary, "not synced yet") {
 		t.Fatalf("initial summary = %q", summary)
 	}
-	attempt := time.Date(2026, 9, 30, 18, 15, 0, 0, time.UTC)
+	attempt := profile.CreatedAt.Add(time.Minute)
 	if err := windowsclient.RecordSyncProfileResult(config, profile.ID, attempt, nil); err != nil {
 		t.Fatal(err)
 	}
