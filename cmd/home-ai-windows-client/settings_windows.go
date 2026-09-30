@@ -640,7 +640,7 @@ func (state *windowsSettingsUI) beginConnect() {
 	user := strings.TrimSpace(state.text(state.usernameEdit))
 	password := state.text(state.passwordEdit)
 	if server == "" || user == "" {
-		state.showError("Server URL and username are required.")
+		state.showError(state.tr("account_required"))
 		return
 	}
 	state.setStatus(state.tr("connecting"))
