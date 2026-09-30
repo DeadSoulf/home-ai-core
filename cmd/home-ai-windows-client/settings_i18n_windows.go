@@ -20,30 +20,31 @@ func (state *windowsSettingsUI) trf(key string, args ...any) string {
 
 func (state *windowsSettingsUI) applyLanguageTexts() {
 	state.setText(state.hwnd, state.tr("window_title"))
-	for controlKey, textKey := range map[string]string{
-		"language_label":   "language",
-		"server_label":     "server",
-		"connect_button":   "connect_save",
-		"user_label":       "user",
-		"password_label":   "password",
-		"password_hint":    "password_hint",
-		"remote_label":     "remote_folder",
-		"local_label":      "local_source",
-		"browse_button":    "browse",
-		"destination_label":"destination",
-		"interval_label":   "interval",
-		"conflict_label":   "conflict",
-		"new_button":       "new_clear",
-		"enable_button":    "enable",
-		"disable_button":   "disable",
-		"delete_button":    "delete",
-		"refresh_button":   "refresh",
-		"profiles_label":   "sync_profiles",
-		"sync_button":      "sync_now",
-		"agent_enable":     "enable_agent",
-		"agent_disable":    "disable_agent",
-		"status_title":     "status",
+	for _, item := range [][2]string{
+		{"language_label", "language"},
+		{"server_label", "server"},
+		{"connect_button", "connect_save"},
+		{"user_label", "user"},
+		{"password_label", "password"},
+		{"password_hint", "password_hint"},
+		{"remote_label", "remote_folder"},
+		{"local_label", "local_source"},
+		{"browse_button", "browse"},
+		{"destination_label", "destination"},
+		{"interval_label", "interval"},
+		{"conflict_label", "conflict"},
+		{"new_button", "new_clear"},
+		{"enable_button", "enable"},
+		{"disable_button", "disable"},
+		{"delete_button", "delete"},
+		{"refresh_button", "refresh"},
+		{"profiles_label", "sync_profiles"},
+		{"sync_button", "sync_now"},
+		{"agent_enable", "enable_agent"},
+		{"agent_disable", "disable_agent"},
+		{"status_title", "status"},
 	} {
+		controlKey, textKey := item[0], item[1]{
 		if hwnd := state.localized[controlKey]; hwnd != 0 {
 			state.setText(hwnd, state.tr(textKey))
 		}
