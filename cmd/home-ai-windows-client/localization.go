@@ -209,6 +209,10 @@ func preferredUILanguage() string {
 	if err != nil {
 		return defaultUILanguage()
 	}
+	return preferredUILanguageForSettingsPath(path)
+}
+
+func preferredUILanguageForSettingsPath(path string) string {
 	settings, err := windowsclient.LoadClientSettings(path)
 	if err != nil || settings.Language == "" {
 		return defaultUILanguage()
