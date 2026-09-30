@@ -2,6 +2,6 @@
 
 package main
 
-func startAgentTray(logPath, configPath string) (*agentTrayRuntime, error) {
+func startAgentTray(logPath, configPath, clientVersion string) (*agentTrayRuntime, error) {
 	return &agentTrayRuntime{}, nil
 }
