@@ -389,6 +389,16 @@ func (s *Service) normalizeAccess(
 	}
 	sort.Strings(permissions)
 
+	resourcePermissions := map[string]map[string]bool{}
+	for _, resource := range catalog.Resources {
+		key := resource.Type + "\x00" + resource.ID
+		allowed := map[string]bool{}
+		for _, permission := range resource.Permissions {
+			allowed[permission] = true
+		}
+		resourcePermissions[key] = allowed
+	}
+
 	scopeSet := map[string]PermissionScope{}
 	for _, scope := range access.ResourcePermissions {
 		scope.Permission = strings.TrimSpace(scope.Permission)
@@ -399,6 +409,19 @@ func (s *Service) normalizeAccess(
 		}
 		if !available[scope.Permission] {
 			return "", nil, nil, fmt.Errorf("unknown permission %q", scope.Permission)
+		}
+		resourceKey := scope.ResourceType + "\x00" + scope.ResourceID
+		allowedPermissions, ok := resourcePermissions[resourceKey]
+		if !ok {
+			return "", nil, nil, fmt.Errorf("unknown access resource %s/%s", scope.ResourceType, scope.ResourceID)
+		}
+		if !allowedPermissions[scope.Permission] {
+			return "", nil, nil, fmt.Errorf(
+				"permission %q is not supported by resource %s/%s",
+				scope.Permission,
+				scope.ResourceType,
+				scope.ResourceID,
+			)
 		}
 		key := scope.Permission + "\x00" + scope.ResourceType + "\x00" + scope.ResourceID
 		scopeSet[key] = scope
