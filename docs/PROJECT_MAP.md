@@ -7,6 +7,7 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Основа текущего этапа:** опубликованный `0.1.74-dev` — упрощённая навигация Web\
 **Текущий срез:** `0.1.75-dev` — очередь копирования и перенос папок Windows-клиентом\
+**Следующий срез в разработке:** scheduled Windows push sync с явной конфликтной политикой (`stop` / `skip` / `replace-to-trash`)\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
 
@@ -310,7 +311,7 @@ Check
 9. ✅ ADR-0022, CLI guide, tests против Core API и native Windows tests;
 10. 🧪 пользовательская приёмка на установленном NAS/Windows остаётся незавершённой.
 
-Основной следующий engineering milestone: scheduled/automatic Windows sync с явной политикой конфликтов. Live SMB, обновление/откат и физическая приёмка текущего Windows-клиента остаются практическими проверками перед отметкой F2 как завершённого.
+Основной следующий engineering milestone: 🚧 scheduled/automatic Windows push sync с явной политикой конфликтов. Реализация ведётся отдельным срезом: persistent sync profiles, due-run/watch scheduler и recoverable `replace-to-trash`; локальные удаления пока не зеркалируются. Live SMB, обновление/откат и физическая приёмка текущего Windows-клиента остаются практическими проверками перед отметкой F2 как завершённого.
 
 ## 4. Следующие продуктовые этапы
 
@@ -433,7 +434,7 @@ AI становится центральным управляющим слоем
 Следующие срезы:
 
 - 🧪 persistent local transfer queue и recursive folder copy реализованы в `0.1.75-dev`; остаётся пользовательская проверка на Windows и NAS;
-- schedule/automatic sync;
+- 🚧 schedule/automatic push sync: persistent profiles + explicit conflicts (`stop` / `skip` / `replace-to-trash`) в разработке;
 - GUI/tray;
 - LAN + remote/WireGuard operation.
 

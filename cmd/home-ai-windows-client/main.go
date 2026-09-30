@@ -37,6 +37,8 @@ func run(args []string) error {
 		return runCopy(args[1:])
 	case "queue":
 		return runQueue(args[1:])
+	case "sync":
+		return runSync(args[1:])
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -204,4 +206,9 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  queue list  [--queue FILE]")
 	fmt.Fprintln(os.Stderr, "  queue run   [--queue FILE] [--retries COUNT]")
 	fmt.Fprintln(os.Stderr, "  queue retry --job ID [--queue FILE]")
+	fmt.Fprintln(os.Stderr, "  sync add     --server URL --username USER --folder ID --source FILE_OR_DIRECTORY [--dest PATH] [--every 15m] [--conflict stop|skip|replace-to-trash]")
+	fmt.Fprintln(os.Stderr, "  sync list    [--config FILE]")
+	fmt.Fprintln(os.Stderr, "  sync run     [--profile ID] [--config FILE]")
+	fmt.Fprintln(os.Stderr, "  sync watch   [--profile ID] [--config FILE]")
+	fmt.Fprintln(os.Stderr, "  sync enable|disable|remove --profile ID [--config FILE]")
 }

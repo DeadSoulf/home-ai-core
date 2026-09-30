@@ -12,6 +12,8 @@ Supported now:
 - resume after interruption;
 - per-chunk SHA-256 and final whole-file SHA-256;
 - retry for transient transfer failures.
+- persistent scheduled push-sync profiles;
+- explicit sync conflict policies: stop, skip or replace-to-trash.
 
 ## Download
 
@@ -87,9 +89,50 @@ If the server already committed a file but the client lost the response, the cli
 
 Content verification permits a long transfer while bytes keep arriving. The connection still has an inactivity limit and respects Ctrl+C.
 
+## Scheduled push sync
+
+Create a profile without logging in:
+
+```powershell
+.\home-ai-windows-client_<version>_amd64.exe sync add --server http://HOME_AI_SERVER:8080 --username alice --folder nsf_xxxxxxxxxxxxxxxx --source C:\Users\Alice\Documents --dest Backups\Documents --every 15m --conflict stop
+.\home-ai-windows-client_<version>_amd64.exe sync list
+```
+
+Profiles are stored in `%APPDATA%\HomeAI\sync-profiles.json` by default and contain no password or bearer token.
+
+Conflict policies are explicit:
+
+- `stop` stops on a different existing destination;
+- `skip` leaves that remote item unchanged and continues;
+- `replace-to-trash` first moves the exact conflicting remote item to the Home-AI recycle bin, then copies the local version.
+
+A conflicting parent/ancestor is never automatically replaced. Local deletions are not propagated to the server in this first sync mode.
+
+Run one profile immediately:
+
+```powershell
+$env:HOME_AI_PASSWORD = 'your Home-AI password'
+.\home-ai-windows-client_<version>_amd64.exe sync run --profile SYNC_PROFILE_ID
+```
+
+Run all enabled profiles that are due:
+
+```powershell
+.\home-ai-windows-client_<version>_amd64.exe sync run
+```
+
+Keep a foreground scheduler running:
+
+```powershell
+.\home-ai-windows-client_<version>_amd64.exe sync watch
+```
+
+The watcher reloads profile configuration periodically and respects each persisted interval. It does not persist credentials; the password remains only in the process environment. Use `sync disable`, `sync enable` or `sync remove` with `--profile ID` to manage profiles.
+
 ## Current limitations
 
-- no scheduled/automatic sync;
-- no existing-file replacement policy or queue history pruning;
-- no GUI/tray client;
-- no Windows Credential Manager yet.
+- no Windows service/tray startup integration yet;
+- no Windows Credential Manager yet;
+- no bidirectional sync or local-delete propagation;
+- no sync-history/recycle-bin retention policy;
+- queue history pruning is still deferred.
