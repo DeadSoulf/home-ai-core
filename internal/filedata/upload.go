@@ -327,7 +327,7 @@ func CompleteUpload(root, id string) (UploadResult, error) {
 		return UploadResult{}, ErrUploadChecksumMismatch
 	}
 
-	relative, target, err := validateUploadTarget(root, session.Path)
+	relative, target, err := validateUploadTargetPath(root, session.Path)
 	if err != nil {
 		return UploadResult{}, err
 	}
@@ -342,7 +342,10 @@ func CompleteUpload(root, id string) (UploadResult, error) {
 	if err := source.Close(); err != nil {
 		return UploadResult{}, err
 	}
-	if err := os.Rename(partPath, target); err != nil {
+	if err := installUploadPart(partPath, target); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return UploadResult{}, ErrUploadTargetExists
+		}
 		return UploadResult{}, fmt.Errorf("commit upload: %w", err)
 	}
 	if parent, err := os.Open(filepath.Dir(target)); err == nil {

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.75-dev
+
+- Added recursive Windows file-client copying, including empty directories and safe creation of missing destination directories.
+- Added a persistent local transfer queue with add/list/run/retry commands, process locking, atomic saves and recovery after interruption.
+- Preserve completed work and verify queued source snapshots and existing destination checksums before treating a transfer as complete; credentials remain process-only.
+- Commit resumable server uploads atomically without replacing a concurrently created target.
+- Documented the queue contract, usage and remaining live NAS/SMB acceptance work.
+
 ## 0.1.74-dev
 
 - Grouped Web navigation into Server, Services and Management, with a compact mobile drawer and keyboard support.

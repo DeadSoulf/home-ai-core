@@ -5,8 +5,8 @@
 > Аудит уже сделанного: [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
-**Последний опубликованный выпуск:** `0.1.73-dev`  
-**Подготовлен для проверки:** `0.1.74-dev` — упрощённая навигация Web  
+**Основа текущего этапа:** опубликованный `0.1.74-dev` — упрощённая навигация Web\
+**Текущий срез:** `0.1.75-dev` — очередь копирования и перенос папок Windows-клиентом\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
 
@@ -292,10 +292,25 @@ Check
 Следующий подэтап:
 
 1. live SMB acceptance на установленном сервере;
-2. Windows persistent copy queue + recursive folder copy;
+2. 🧪 Windows persistent copy queue + recursive folder copy — реализовано, тесты API/Windows и восстановления очереди прошли; выпуск `0.1.75-dev` готовится к публикации;
 3. scheduled/automatic sync;
 4. Windows GUI/tray;
 5. NFS — при необходимости.
+
+Девятый вертикальный срез (`0.1.75-dev`):
+
+1. ✅ persistent local JSON transfer queue без паролей/токенов;
+2. ✅ atomic checkpoints и OS process lock, освобождаемый при завершении процесса;
+3. ✅ recursive copy с сохранением структуры и пустых каталогов;
+4. ✅ frozen source plan с size/mtime/SHA-256 и запретом symlink traversal;
+5. ✅ completed items пропускаются; interrupted running items восстанавливаются как pending;
+6. ✅ явный retry failed job без потери завершённых элементов;
+7. ✅ проверка существующего файла по скачанным байтам и SHA-256 для восстановления потерянного ответа;
+8. ✅ atomic server upload commit без перезаписи одновременно созданного target;
+9. ✅ ADR-0022, CLI guide, tests против Core API и native Windows tests;
+10. 🧪 пользовательская приёмка на установленном NAS/Windows остаётся незавершённой.
+
+Основной следующий engineering milestone: scheduled/automatic Windows sync с явной политикой конфликтов. Live SMB, обновление/откат и физическая приёмка текущего Windows-клиента остаются практическими проверками перед отметкой F2 как завершённого.
 
 ## 4. Следующие продуктовые этапы
 
@@ -417,8 +432,7 @@ AI становится центральным управляющим слоем
 
 Следующие срезы:
 
-- persistent local transfer queue;
-- recursive folder copy;
+- 🧪 persistent local transfer queue и recursive folder copy реализованы в `0.1.75-dev`; остаётся пользовательская проверка на Windows и NAS;
 - schedule/automatic sync;
 - GUI/tray;
 - LAN + remote/WireGuard operation.
@@ -549,6 +563,9 @@ AI не может расширять собственные права.
 | `0.1.65-dev` | Network UI | показывает фактический DHCP IPv4 |
 | `0.1.66-dev` | Network hotfix | network inventory без AF_NETLINK; исправлена пустая таблица интерфейсов |
 | `0.1.67-dev` | 🧪 NAS foundation | logical pools, private/shared folders, scoped permissions, Files Web UI |
+| `0.1.73-dev` | 🧪 Windows CLI foundation | одиночные файлы, resume, SHA-256, отдельный Windows release asset |
+| `0.1.74-dev` | 🧪 Web navigation | опубликована; сгруппированное меню и отдельные разделы Системы; пользовательская приёмка не подтверждена |
+| `0.1.75-dev` | 🧪 Windows copy queue | очередь и перенос дерева папок; подготовка следующего выпуска |
 
 ## 10. Правило ведения карты
 

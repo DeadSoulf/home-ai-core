@@ -58,6 +58,7 @@ The repository currently includes:
   - helper protocol/version compatibility;
   - cached GitHub release discovery with fallback;
 - Debian 13 initial installer for amd64 and arm64.
+- Windows file-copy client with resumable uploads, recursive directory copying and a persistent local transfer queue; see [usage](docs/windows-file-client.md).
 
 ## Installation and updates
 

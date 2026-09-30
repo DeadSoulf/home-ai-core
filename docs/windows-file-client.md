@@ -1,12 +1,14 @@
 # Windows file-copy client
 
-The first Home-AI Windows client is a command-line file-copy tool using the same resumable NAS upload API as the Web file manager.
+The Home-AI Windows client is a command-line file-copy tool using the same resumable NAS upload API as the Web file manager.
 
 Supported now:
 
 - token-mode Home-AI login;
 - listing accessible NAS folders;
 - copying one local file to a selected Home-AI folder;
+- recursive directory copying, including empty directories;
+- a persistent local queue with explicit add, list, run and retry commands;
 - resume after interruption;
 - per-chunk SHA-256 and final whole-file SHA-256;
 - retry for transient transfer failures.
@@ -40,10 +42,54 @@ The password is not accepted as a command-line argument and is not stored by the
 
 Running the same command again after interruption resumes a matching unfinished upload. Use --restart-stale only when you explicitly want to cancel a different unfinished upload for the same destination.
 
+## Copy a directory
+
+```powershell
+.\home-ai-windows-client_<version>_amd64.exe copy --server http://HOME_AI_SERVER:8080 --username alice --folder nsf_xxxxxxxxxxxxxxxx --source C:\Users\Alice\Documents --dest Backups/Documents
+```
+
+`copy` plans the whole source tree before transfer. It creates missing destination directories and preserves empty directories. Without `--dest`, the source file/directory name is used. Relative paths stay inside the selected Home-AI folder. Symlinks and special files are rejected; an existing different file is a conflict, not an overwrite.
+
+This immediate command uses server resumable uploads. Use the queue below to retain the complete multi-file plan across client restarts.
+
+## Persistent queue
+
+Add work without logging in or transferring files:
+
+```powershell
+.\home-ai-windows-client_<version>_amd64.exe queue add --server http://HOME_AI_SERVER:8080 --username alice --folder nsf_xxxxxxxxxxxxxxxx --source C:\Users\Alice\Documents --dest Backups/Documents
+.\home-ai-windows-client_<version>_amd64.exe queue list
+```
+
+Then set `HOME_AI_PASSWORD` as above and run pending transfers:
+
+```powershell
+.\home-ai-windows-client_<version>_amd64.exe queue run
+Remove-Item Env:HOME_AI_PASSWORD
+```
+
+The default queue is `%APPDATA%\HomeAI\transfer-queue.json` on Windows. Every queue command accepts `--queue C:\Path\queue.json` for a different queue. A queue belongs to one server and username; use a separate file for another account or server. Passwords and bearer tokens are never stored in the queue. A new process authenticates again.
+
+Only one process can open a queue at a time. The checkpoint is limited to 64 MiB; adding a plan that exceeds this limit fails without changing the saved queue. Split very large plans between queue files.
+
+Ctrl+C or a canceled/timed-out transfer leaves interrupted work pending. Run `queue run` again to continue. Completed entries are retained and skipped; partially uploaded files resume from the server's verified offset. A process that was killed releases its OS lock; running entries become pending when the queue reopens.
+
+Other failures stop the queue and remain visible in `queue list`. Retry the affected job explicitly:
+
+```powershell
+.\home-ai-windows-client_<version>_amd64.exe queue retry --job JOB_ID
+.\home-ai-windows-client_<version>_amd64.exe queue run
+```
+
+The queued source snapshot includes size, modification time and SHA-256. A changed or missing source fails; retry keeps the original plan, so restore the original source or add a new job for the changed files. Retry preserves already completed entries. The queue does not rescan a directory to add files created after planning.
+
+If the server already committed a file but the client lost the response, the client verifies the existing file's size and SHA-256 before recording success. This reads the remote file back and may take time for large files. A different existing file is never replaced. `--restart-stale` on `queue add` only authorizes replacement of a mismatched unfinished upload; it does not authorize replacing an existing file.
+
+Content verification permits a long transfer while bytes keep arriving. The connection still has an inactivity limit and respects Ctrl+C.
+
 ## Current limitations
 
-- no recursive folder copy;
-- no persistent transfer queue;
 - no scheduled/automatic sync;
+- no existing-file replacement policy or queue history pruning;
 - no GUI/tray client;
 - no Windows Credential Manager yet.

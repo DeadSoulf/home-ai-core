@@ -14,6 +14,20 @@ permissions:
   contents: read
 
 jobs:
+  windows-client-test:
+    name: Windows client tests
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.x'
+          check-latest: false
+      - name: Test Windows copy engine, queue and CLI
+        run: go test ./internal/windowsclient ./cmd/home-ai-windows-client
+
   test:
     runs-on: ubuntu-latest
     steps:
