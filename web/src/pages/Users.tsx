@@ -8,7 +8,7 @@ import type {
 } from "../api/types";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
 import { useResource } from "../hooks/useResource";
-import { useI18n } from "../i18n";
+import { useI18n, type StringKey } from "../i18n";
 import { PageHeading, Status } from "./Dashboard";
 
 const baselinePermissions = new Set([
@@ -397,7 +397,7 @@ export function UsersPage({revision, canManage}: {revision: number; canManage: b
   );
 }
 
-function profileLabel(profile: UserProfile, t: (key: string) => string) {
+function profileLabel(profile: UserProfile, t: (key: StringKey) => string) {
   switch (profile) {
     case "administrator": return t("userProfileAdministrator");
     case "parent": return t("userProfileParent");
@@ -407,7 +407,7 @@ function profileLabel(profile: UserProfile, t: (key: string) => string) {
   }
 }
 
-function categoryLabel(category: string, t: (key: string) => string) {
+function categoryLabel(category: string, t: (key: StringKey) => string) {
   switch (category) {
     case "system": return t("userCategorySystem");
     case "events": return t("userCategoryEvents");
@@ -423,7 +423,7 @@ function categoryLabel(category: string, t: (key: string) => string) {
   }
 }
 
-function resourcePermissionLabel(permission: string, t: (key: string) => string) {
+function resourcePermissionLabel(permission: string, t: (key: StringKey) => string) {
   switch (permission) {
     case "files.read": return t("userResourceRead");
     case "files.write": return t("userResourceWrite");
