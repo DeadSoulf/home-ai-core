@@ -6,32 +6,44 @@ const ProtocolVersion = 2
 var HelperVersion = "dev"
 
 type Request struct {
-	Operation       string   `json:"operation"`
-	ProtocolVersion int      `json:"protocol_version,omitempty"`
-	Version         string   `json:"version,omitempty"`
-	CurrentVersion  string   `json:"current_version,omitempty"`
-	Device          string   `json:"device,omitempty"`
-	Mountpoint      string   `json:"mountpoint,omitempty"`
-	Filesystem      string   `json:"filesystem,omitempty"`
-	Label           string   `json:"label,omitempty"`
-	Confirm         string   `json:"confirm,omitempty"`
-	SizeMiB         uint64   `json:"size_mib,omitempty"`
-	Interface       string   `json:"interface,omitempty"`
-	Address         string   `json:"address,omitempty"`
-	Gateway         string   `json:"gateway,omitempty"`
-	MTU             int      `json:"mtu,omitempty"`
-	Tunnel          string   `json:"tunnel,omitempty"`
-	ListenPort      int      `json:"listen_port,omitempty"`
-	PrivateKey      string   `json:"private_key,omitempty"`
-	PeerPublicKey   string   `json:"peer_public_key,omitempty"`
-	PresharedKey    string   `json:"preshared_key,omitempty"`
-	AllowedIPs      []string `json:"allowed_ips,omitempty"`
-	Endpoint        string   `json:"endpoint,omitempty"`
-	Keepalive       int      `json:"keepalive,omitempty"`
-	NetworkMethod   string   `json:"network_method,omitempty"`
-	DNS             []string `json:"dns,omitempty"`
-	RootPath        string   `json:"root_path,omitempty"`
-	RelativePath    string   `json:"relative_path,omitempty"`
+	Operation       string            `json:"operation"`
+	ProtocolVersion int               `json:"protocol_version,omitempty"`
+	Version         string            `json:"version,omitempty"`
+	CurrentVersion  string            `json:"current_version,omitempty"`
+	Device          string            `json:"device,omitempty"`
+	Mountpoint      string            `json:"mountpoint,omitempty"`
+	Filesystem      string            `json:"filesystem,omitempty"`
+	Label           string            `json:"label,omitempty"`
+	Confirm         string            `json:"confirm,omitempty"`
+	SizeMiB         uint64            `json:"size_mib,omitempty"`
+	Interface       string            `json:"interface,omitempty"`
+	Address         string            `json:"address,omitempty"`
+	Gateway         string            `json:"gateway,omitempty"`
+	MTU             int               `json:"mtu,omitempty"`
+	Tunnel          string            `json:"tunnel,omitempty"`
+	ListenPort      int               `json:"listen_port,omitempty"`
+	PrivateKey      string            `json:"private_key,omitempty"`
+	PeerPublicKey   string            `json:"peer_public_key,omitempty"`
+	PresharedKey    string            `json:"preshared_key,omitempty"`
+	AllowedIPs      []string          `json:"allowed_ips,omitempty"`
+	Endpoint        string            `json:"endpoint,omitempty"`
+	Keepalive       int               `json:"keepalive,omitempty"`
+	NetworkMethod   string            `json:"network_method,omitempty"`
+	DNS             []string          `json:"dns,omitempty"`
+	RootPath        string            `json:"root_path,omitempty"`
+	RelativePath    string            `json:"relative_path,omitempty"`
+	SMBWorkgroup    string            `json:"smb_workgroup,omitempty"`
+	SMBUser         string            `json:"smb_user,omitempty"`
+	SMBPassword     string            `json:"smb_password,omitempty"`
+	SMBUsers        []string          `json:"smb_users,omitempty"`
+	SMBShares       []SMBShareRequest `json:"smb_shares,omitempty"`
+}
+
+type SMBShareRequest struct {
+	Name       string   `json:"name"`
+	Path       string   `json:"path"`
+	ReadUsers  []string `json:"read_users,omitempty"`
+	WriteUsers []string `json:"write_users,omitempty"`
 }
 
 type FilesystemStat struct {
@@ -114,6 +126,10 @@ type Response struct {
 	WireGuardTunnels   []WireGuardTunnelStat `json:"wireguard_tunnels,omitempty"`
 	NetworkBackend     string                `json:"network_backend,omitempty"`
 	NetworkProfiles    []NetworkProfileStat  `json:"network_profiles,omitempty"`
+	SMBAvailable       bool                  `json:"smb_available,omitempty"`
+	SMBActive          bool                  `json:"smb_active,omitempty"`
+	SMBError           string                `json:"smb_error,omitempty"`
+	SMBConfiguredUsers []string              `json:"smb_configured_users,omitempty"`
 }
 
 type Result struct {

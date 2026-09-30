@@ -11,10 +11,15 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
   const load = useCallback(async () => {
     const folders = await api.fileFolders();
     if (!canManage) {
-      return {folders, pools: [], users: [], system: undefined};
+      return {folders, pools: [], users: [], system: undefined, smb: undefined};
     }
-    const [pools, users, system] = await Promise.all([api.filePools(), api.users(), api.system()]);
-    return {folders, pools, users, system};
+    const [pools, users, system, smb] = await Promise.all([
+      api.filePools(),
+      api.users(),
+      api.system(),
+      api.smbStatus(),
+    ]);
+    return {folders, pools, users, system, smb};
   }, [canManage]);
   const resource = useResource(load, revision);
 
@@ -42,6 +47,74 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
     total: number;
     resumed: boolean;
   }>();
+  const [smbWorkgroup, setSMBWorkgroup] = useState("WORKGROUP");
+  const [smbUserID, setSMBUserID] = useState("");
+  const [smbPassword, setSMBPasswordText] = useState("");
+
+  useEffect(() => {
+    const smb = resource.data?.smb;
+    if (!smb) return;
+    setSMBWorkgroup((current) => current === "WORKGROUP" ? (smb.workgroup || "WORKGROUP") : current);
+    setSMBUserID((current) => current || smb.users[0]?.user_id || "");
+  }, [resource.data?.smb]);
+
+  async function installSMB() {
+    setBusy("smb-install");
+    setFormError("");
+    setNotice("");
+    try {
+      const result = await api.smbOperation({operation: "install"});
+      setNotice(result.message);
+      resource.reload();
+    } catch (reason) {
+      setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function applySMB() {
+    setBusy("smb-apply");
+    setFormError("");
+    setNotice("");
+    try {
+      const result = await api.smbOperation({
+        operation: "apply",
+        workgroup: smbWorkgroup,
+      });
+      setNotice(result.message);
+      resource.reload();
+    } catch (reason) {
+      setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function submitSMBPassword(event: FormEvent) {
+    event.preventDefault();
+    if (!smbUserID || smbPassword.length < 12) {
+      setFormError(t("smbPasswordRequirement"));
+      return;
+    }
+    setBusy("smb-password");
+    setFormError("");
+    setNotice("");
+    try {
+      const result = await api.smbOperation({
+        operation: "set_password",
+        userId: smbUserID,
+        password: smbPassword,
+      });
+      setSMBPasswordText("");
+      setNotice(result.message);
+      resource.reload();
+    } catch (reason) {
+      setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  }
 
   async function createPool(event: FormEvent) {
     event.preventDefault();
@@ -350,6 +423,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
   const pools = resource.data?.pools || [];
   const users = resource.data?.users || [];
   const mountOptions = nasMountOptions(resource.data?.system?.system.block_tree || []);
+  const smbStatus = resource.data?.smb;
   const userName = new Map(users.map((user) => [user.id, user.display_name || user.username]));
 
   return (
@@ -626,6 +700,134 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                 </div>
               )}
             </div>
+          )}
+        </Panel>
+      )}
+
+      {canManage && smbStatus && (
+        <Panel title={t("smbTitle")} className="wide">
+          <div className="smb-status-grid">
+            <dl className="details">
+              <dt>{t("state")}</dt>
+              <dd>{smbStatus.available ? (smbStatus.active ? t("smbActive") : t("smbInactive")) : t("smbNotInstalled")}</dd>
+              <dt>{t("hostname")}</dt>
+              <dd className="mono">{smbStatus.hostname || "—"}</dd>
+              <dt>{t("smbWorkgroup")}</dt>
+              <dd>{smbStatus.workgroup || "WORKGROUP"}</dd>
+            </dl>
+            {!smbStatus.available ? (
+              <div className="smb-install">
+                <div className="notice">{smbStatus.error || t("smbNotInstalledNotice")}</div>
+                <button
+                  type="button"
+                  className="button primary"
+                  disabled={busy !== ""}
+                  onClick={() => void installSMB()}
+                >
+                  {busy === "smb-install" ? t("working") : t("smbInstall")}
+                </button>
+              </div>
+            ) : (
+              <div className="smb-actions">
+                <label>
+                  {t("smbWorkgroup")}
+                  <input
+                    value={smbWorkgroup}
+                    onChange={(event) => setSMBWorkgroup(event.target.value.toUpperCase())}
+                    maxLength={15}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="button primary"
+                  disabled={busy !== ""}
+                  onClick={() => void applySMB()}
+                >
+                  {busy === "smb-apply" ? t("working") : t("smbApply")}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {smbStatus.available && (
+            <>
+              <h3>{t("smbShares")}</h3>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>{t("fileFolders")}</th>
+                      <th>{t("smbShareName")}</th>
+                      <th>{t("smbWindowsPath")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {smbStatus.shares.map((share) => (
+                      <tr key={share.folder_id}>
+                        <td>{share.folder_name}</td>
+                        <td className="mono">{share.share_name}</td>
+                        <td className="mono">{share.unc}</td>
+                      </tr>
+                    ))}
+                    {smbStatus.shares.length === 0 && (
+                      <tr><td colSpan={3} className="muted">{t("smbNoShares")}</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <h3>{t("smbUsers")}</h3>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>{t("user")}</th>
+                      <th>{t("smbUsername")}</th>
+                      <th>{t("state")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {smbStatus.users.map((user) => (
+                      <tr key={user.user_id}>
+                        <td>{user.display_name || user.username}</td>
+                        <td className="mono">{user.smb_username}</td>
+                        <td>{user.configured ? t("smbPasswordConfigured") : t("smbPasswordMissing")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <form className="smb-password-form" onSubmit={submitSMBPassword}>
+                <label>
+                  {t("user")}
+                  <select value={smbUserID} onChange={(event) => setSMBUserID(event.target.value)} required>
+                    <option value="">{t("fileChooseUser")}</option>
+                    {smbStatus.users.map((user) => (
+                      <option key={user.user_id} value={user.user_id}>
+                        {user.display_name || user.username} · {user.smb_username}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  {t("smbPassword")}
+                  <input
+                    type="password"
+                    minLength={12}
+                    maxLength={256}
+                    value={smbPassword}
+                    onChange={(event) => setSMBPasswordText(event.target.value)}
+                    autoComplete="new-password"
+                    required
+                  />
+                </label>
+                <button className="button secondary" type="submit" disabled={busy !== ""}>
+                  {busy === "smb-password" ? t("working") : t("smbSetPassword")}
+                </button>
+                <p className="muted small">{t("smbPasswordNotice")}</p>
+              </form>
+            </>
           )}
         </Panel>
       )}

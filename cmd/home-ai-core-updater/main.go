@@ -30,7 +30,7 @@ const (
 	serviceName       = "home-ai-core.service"
 	helperServiceName = "home-ai-core-updater.service"
 	serviceUser       = "home-ai-core"
-	maxRequest        = 16 << 10
+	maxRequest        = 256 << 10
 )
 
 var installMu sync.Mutex
@@ -193,6 +193,38 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 			return
 		}
 		logger.Info("storage operation completed", "operation", request.Operation, "device", request.Device)
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{OK: true, Message: message})
+		return
+	}
+
+	if request.Operation == "smb.inspect" {
+		_ = conn.SetDeadline(time.Now().Add(45 * time.Second))
+		ctx, cancel := context.WithTimeout(parent, 40*time.Second)
+		defer cancel()
+		available, active, smbError, configuredUsers := inspectSMB(ctx, request.SMBUsers)
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+			OK:                 true,
+			Message:            "SMB inspected",
+			HelperVersion:      updaterhelper.HelperVersion,
+			ProtocolVersion:    updaterhelper.ProtocolVersion,
+			SMBAvailable:       available,
+			SMBActive:          active,
+			SMBError:           smbError,
+			SMBConfiguredUsers: configuredUsers,
+		})
+		return
+	}
+	if strings.HasPrefix(request.Operation, "smb.") {
+		_ = conn.SetDeadline(time.Now().Add(12 * time.Minute))
+		ctx, cancel := context.WithTimeout(parent, 10*time.Minute)
+		defer cancel()
+		message, err := performSMBOperation(ctx, request, uid, gid)
+		if err != nil {
+			logger.Error("SMB operation failed", "operation", request.Operation, "error", err)
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})
+			return
+		}
+		logger.Info("SMB operation completed", "operation", request.Operation)
 		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{OK: true, Message: message})
 		return
 	}

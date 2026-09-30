@@ -319,3 +319,29 @@ export type FileUploadResult = {
   sha256: string;
 };
 
+export type SMBUser = {
+  user_id: string;
+  username: string;
+  display_name: string;
+  smb_username: string;
+  configured: boolean;
+};
+
+export type SMBShare = {
+  folder_id: string;
+  folder_name: string;
+  kind: "private" | "shared";
+  share_name: string;
+  unc: string;
+};
+
+export type SMBStatus = {
+  available: boolean;
+  active: boolean;
+  error?: string;
+  hostname: string;
+  workgroup: string;
+  users: SMBUser[];
+  shares: SMBShare[];
+};
+

@@ -94,6 +94,8 @@ func New(
 	s.mux.HandleFunc("/api/v1/storage/name", s.requireAuth("storage.manage", s.storageName))
 	s.mux.HandleFunc("GET /api/v1/files/pools", s.requireAuth("files.manage", s.filePools))
 	s.mux.HandleFunc("POST /api/v1/files/pools", s.requireAuth("files.manage", s.filePools))
+	s.mux.HandleFunc("GET /api/v1/files/smb", s.requireAuth("files.manage", s.smbStatus))
+	s.mux.HandleFunc("POST /api/v1/files/smb/operation", s.requireAuth("files.manage", s.smbOperation))
 	s.mux.HandleFunc("GET /api/v1/files/folders", s.requireAuth("security.self.read", s.fileFolders))
 	s.mux.HandleFunc("POST /api/v1/files/folders", s.requireAuth("files.manage", s.fileFolders))
 	s.mux.HandleFunc("GET /api/v1/files/folders/{folderID}/entries", s.requireAuth("security.self.read", s.fileFolderEntries))

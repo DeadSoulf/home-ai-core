@@ -253,10 +253,23 @@ Check
 8. ✅ cancel/restart несовпадающей незавершённой загрузки;
 9. ✅ ADR-0019 и API/Web/filedata tests.
 
+Седьмой вертикальный срез:
+
+1. ✅ explicit Samba installation;
+2. ✅ managed SMB shares только для Home-AI logical folders;
+3. ✅ private folder → владелец + owner;
+4. ✅ shared folder → активные household users;
+5. ✅ owner получает RW ко всем managed shares;
+6. ✅ guest access запрещён, SMB2.10 minimum;
+7. ✅ отдельные SMB credentials без хранения пароля в Core;
+8. ✅ managed /etc/samba/home-ai.conf + backup/include/testparm/reload;
+9. ✅ Web SMB status/users/shares/credentials UI;
+10. ✅ ADR-0020 и helper/API/Web tests.
+
 Следующий подэтап:
 
-1. SMB;
-2. затем Windows file-copy client;
+1. live SMB acceptance на установленном сервере;
+2. Windows file-copy client;
 3. NFS — при необходимости.
 
 ## 4. Следующие продуктовые этапы
@@ -273,7 +286,7 @@ Check
 - ✅ physical directory provisioning + filesystem validation;
 - ✅ file CRUD API foundation (browse/create/upload/download/delete/move/rename);
 - ✅ Web file manager (browser + mutations + recycle bin + resumable upload);
-- 🚧 SMB;
+- ✅ SMB foundation (managed Windows shares; live acceptance pending);
 - NFS при необходимости;
 - quotas/policies;
 - snapshots/backup where supported;
