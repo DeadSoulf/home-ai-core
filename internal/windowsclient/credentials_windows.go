@@ -33,11 +33,11 @@ type credentialW struct {
 }
 
 var (
-	advapi32DLL   = windows.NewLazySystemDLL("advapi32.dll")
-	procCredWrite = advapi32DLL.NewProc("CredWriteW")
-	procCredRead  = advapi32DLL.NewProc("CredReadW")
+	advapi32DLL    = windows.NewLazySystemDLL("advapi32.dll")
+	procCredWrite  = advapi32DLL.NewProc("CredWriteW")
+	procCredRead   = advapi32DLL.NewProc("CredReadW")
 	procCredDelete = advapi32DLL.NewProc("CredDeleteW")
-	procCredFree  = advapi32DLL.NewProc("CredFree")
+	procCredFree   = advapi32DLL.NewProc("CredFree")
 )
 
 func SavePassword(server, username, password string) error {
