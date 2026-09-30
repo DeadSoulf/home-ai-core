@@ -98,7 +98,6 @@ func TestSyncCLIValidation(t *testing.T) {
 	}
 }
 
-
 func TestWatchSyncProfilesRunNowUsesSameSchedulerLoop(t *testing.T) {
 	t.Setenv(passwordEnv, "test-password")
 	root := t.TempDir()
