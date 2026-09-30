@@ -144,10 +144,19 @@ func runSync(args []string) error {
 		}
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer cancel()
-		return watchSyncProfiles(ctx, configPath, profileID, retries, restartStale, poll, nil)
+		return watchSyncProfiles(ctx, configPath, profileID, retries, restartStale, poll, nil, nil)
 	}
 	return nil
 }
+
+type syncWatchStatus struct {
+	State       string
+	RunProfiles int
+	Err         error
+	At          time.Time
+}
+
+type syncWatchStatusFunc func(syncWatchStatus)
 
 func watchSyncProfiles(
 	ctx context.Context,
@@ -157,6 +166,7 @@ func watchSyncProfiles(
 	restartStale bool,
 	poll time.Duration,
 	runNow <-chan struct{},
+	onStatus syncWatchStatusFunc,
 ) error {
 	if retries < 1 {
 		return errors.New("sync watcher retries must be positive")
@@ -168,21 +178,28 @@ func watchSyncProfiles(
 		return err
 	}
 	fmt.Println("Watching scheduled sync profiles. Press Ctrl+C to stop.")
+	reportSyncWatchStatus(onStatus, syncWatchStatus{State: "idle", At: time.Now().UTC()})
 	forceRun := false
 	for {
 		if ctx.Err() != nil {
 			return nil
 		}
-		_, runErr := executeSyncProfiles(ctx, configPath, profileID, !forceRun, retries, restartStale)
+		reportSyncWatchStatus(onStatus, syncWatchStatus{State: "syncing", At: time.Now().UTC()})
+		runProfiles, runErr := executeSyncProfiles(ctx, configPath, profileID, !forceRun, retries, restartStale)
 		forceRun = false
 		if ctx.Err() != nil {
 			return nil
 		}
+		now := time.Now().UTC()
 		if runErr != nil {
 			fmt.Fprintln(os.Stderr, "sync cycle:", runErr)
+			reportSyncWatchStatus(onStatus, syncWatchStatus{State: "error", RunProfiles: runProfiles, Err: runErr, At: now})
+		} else {
+			reportSyncWatchStatus(onStatus, syncWatchStatus{State: "idle", RunProfiles: runProfiles, At: now})
 		}
-		delay, err := nextSyncWatchDelay(configPath, profileID, poll, time.Now().UTC())
+		delay, err := nextSyncWatchDelay(configPath, profileID, poll, now)
 		if err != nil {
+			reportSyncWatchStatus(onStatus, syncWatchStatus{State: "error", Err: err, At: time.Now().UTC()})
 			return err
 		}
 		timer := time.NewTimer(delay)
@@ -200,6 +217,12 @@ func watchSyncProfiles(
 			forceRun = true
 		case <-timer.C:
 		}
+	}
+}
+
+func reportSyncWatchStatus(callback syncWatchStatusFunc, status syncWatchStatus) {
+	if callback != nil {
+		callback(status)
 	}
 }
 
