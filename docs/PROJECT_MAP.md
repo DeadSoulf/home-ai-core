@@ -6,12 +6,12 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.81-dev` — native Windows settings GUI + sync/agent controls\
-**Текущий срез:** Windows client RU/EN localization — PR #52; candidate for `0.1.82-dev`\
-**Следующий engineering milestone:** release RU/EN client, then automatic Windows release discovery/download + SHA-256 verified install handoff\
+**Текущий срез:** `0.1.82-dev` release candidate — RU/EN Windows UI merged; release pending\
+**Следующий engineering milestone:** live bilingual Windows acceptance, then automatic Windows release discovery/download + SHA-256 verified install handoff\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
 
-### Кандидат 0.1.82-dev — русский и английский Windows-клиент
+### Выпуск 0.1.82-dev — русский и английский Windows-клиент
 
 - Один Windows `.exe` поддерживает русский и английский интерфейс без отдельной сборки.
 - При первом запуске русская Windows locale выбирает русский; остальные locale используют английский.
@@ -23,6 +23,9 @@
 - Низкоуровневые server/OS error details остаются verbatim, но показываются внутри локализованного error framing.
 - CLI пока остаётся английским диагностическим интерфейсом.
 - ADR-0029 фиксирует localization boundary.
+- PR #52 прошёл полный `core-ci`, включая native Windows tests и Windows cross-build.
+- Практическая проверка переключения языка на реальном Windows остаётся acceptance step.
+
 ### Выпуск 0.1.81-dev — полноценные настройки Windows-клиента
 
 - Запуск Windows-клиента без аргументов открывает нативное окно настроек; существующий CLI сохраняется.
