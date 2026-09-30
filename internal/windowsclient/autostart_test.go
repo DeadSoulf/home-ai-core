@@ -66,8 +66,8 @@ func TestParseUserAgentCommandRoundTrip(t *testing.T) {
 	for _, invalid := range []string{
 		"",
 		"client.exe agent run --config sync.json",
-		""" + executable + "" sync watch --config "" + config + """,
-		""" + executable + "" agent run --config "" + config + "" extra",
+		"\"" + executable + "\" sync watch --config \"" + config + "\"",
+		"\"" + executable + "\" agent run --config \"" + config + "\" extra",
 	} {
 		if _, _, err := ParseUserAgentCommand(invalid); err == nil {
 			t.Fatalf("accepted invalid Run command %q", invalid)
