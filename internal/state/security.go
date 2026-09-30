@@ -25,8 +25,15 @@ type UserRecord struct {
 }
 
 type UserAccountRecord struct {
-	User  UserRecord
-	Roles []string
+	User                UserRecord
+	Roles               []string
+	Permissions         []string
+	ResourcePermissions []ResourcePermissionRecord
+}
+
+type PermissionRecord struct {
+	Name        string
+	Description string
 }
 
 type ResourcePermissionRecord struct {
@@ -107,6 +114,26 @@ func (s *Store) CreateUser(
 	id, username, displayName, passwordHash, roleID string,
 	now time.Time,
 ) (UserRecord, error) {
+	return s.CreateUserWithAccess(
+		ctx,
+		id,
+		username,
+		displayName,
+		passwordHash,
+		roleID,
+		nil,
+		nil,
+		now,
+	)
+}
+
+func (s *Store) CreateUserWithAccess(
+	ctx context.Context,
+	id, username, displayName, passwordHash, roleID string,
+	permissions []string,
+	resourcePermissions []ResourcePermissionRecord,
+	now time.Time,
+) (UserRecord, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return UserRecord{}, fmt.Errorf("begin user creation: %w", err)
@@ -134,6 +161,22 @@ func (s *Store) CreateUser(
 	}
 	if _, err := tx.ExecContext(ctx, "INSERT INTO user_roles(user_id, role_id) VALUES (?, ?)", id, roleID); err != nil {
 		return UserRecord{}, fmt.Errorf("assign user role: %w", err)
+	}
+	for _, permission := range permissions {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT OR IGNORE INTO user_permissions(user_id, permission_name)
+			VALUES (?, ?)
+		`, id, permission); err != nil {
+			return UserRecord{}, fmt.Errorf("assign user permission %s: %w", permission, err)
+		}
+	}
+	for _, scope := range resourcePermissions {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT OR IGNORE INTO user_resource_permissions(user_id, permission_name, resource_type, resource_id)
+			VALUES (?, ?, ?, ?)
+		`, id, scope.Permission, scope.ResourceType, scope.ResourceID); err != nil {
+			return UserRecord{}, fmt.Errorf("assign user resource permission %s: %w", scope.Permission, err)
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return UserRecord{}, fmt.Errorf("commit user creation: %w", err)
@@ -202,11 +245,16 @@ func (s *Store) ListUsers(ctx context.Context) ([]UserAccountRecord, error) {
 
 	result := make([]UserAccountRecord, 0, len(users))
 	for _, user := range users {
-		roles, err := s.userRoles(ctx, user.ID)
+		roles, permissions, resourcePermissions, err := s.userAccess(ctx, user.ID)
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, UserAccountRecord{User: user, Roles: roles})
+		result = append(result, UserAccountRecord{
+			User:                user,
+			Roles:               roles,
+			Permissions:         permissions,
+			ResourcePermissions: resourcePermissions,
+		})
 	}
 	return result, nil
 }
@@ -361,10 +409,19 @@ func (s *Store) userAccess(ctx context.Context, userID string) ([]string, []stri
 	}
 
 	permissionRows, err := s.db.QueryContext(ctx, `
-		SELECT DISTINCT rp.permission_name FROM role_permissions rp
-		JOIN user_roles ur ON ur.role_id = rp.role_id
-		WHERE ur.user_id = ? ORDER BY rp.permission_name
-	`, userID)
+		SELECT permission_name
+		FROM (
+			SELECT rp.permission_name AS permission_name
+			FROM role_permissions rp
+			JOIN user_roles ur ON ur.role_id = rp.role_id
+			WHERE ur.user_id = ?
+			UNION
+			SELECT up.permission_name AS permission_name
+			FROM user_permissions up
+			WHERE up.user_id = ?
+		)
+		ORDER BY permission_name
+	`, userID, userID)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("read user permissions: %w", err)
 	}
@@ -421,6 +478,159 @@ func (s *Store) userAccess(ctx context.Context, userID string) ([]string, []stri
 	}
 
 	return roles, permissions, resourcePermissions, nil
+}
+
+func (s *Store) ListPermissions(ctx context.Context) ([]PermissionRecord, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT name, description
+		FROM permissions
+		ORDER BY name
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list permissions: %w", err)
+	}
+	defer rows.Close()
+
+	var result []PermissionRecord
+	for rows.Next() {
+		var record PermissionRecord
+		if err := rows.Scan(&record.Name, &record.Description); err != nil {
+			return nil, fmt.Errorf("scan permission: %w", err)
+		}
+		result = append(result, record)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate permissions: %w", err)
+	}
+	return result, nil
+}
+
+func (s *Store) UserAccount(ctx context.Context, userID string) (UserAccountRecord, error) {
+	var user UserRecord
+	var disabled int
+	var createdAt string
+	var lastLoginAt sql.NullString
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id, username, display_name, password_hash, disabled, created_at, last_login_at
+		FROM users
+		WHERE id = ?
+	`, userID).Scan(
+		&user.ID,
+		&user.Username,
+		&user.DisplayName,
+		&user.PasswordHash,
+		&disabled,
+		&createdAt,
+		&lastLoginAt,
+	)
+	if err != nil {
+		return UserAccountRecord{}, err
+	}
+	user.Disabled = disabled == 1
+	user.CreatedAt, err = time.Parse(time.RFC3339Nano, createdAt)
+	if err != nil {
+		return UserAccountRecord{}, fmt.Errorf("parse user created_at: %w", err)
+	}
+	if lastLoginAt.Valid {
+		parsed, parseErr := time.Parse(time.RFC3339Nano, lastLoginAt.String)
+		if parseErr != nil {
+			return UserAccountRecord{}, fmt.Errorf("parse user last_login_at: %w", parseErr)
+		}
+		user.LastLoginAt = &parsed
+	}
+	roles, permissions, resourcePermissions, err := s.userAccess(ctx, userID)
+	if err != nil {
+		return UserAccountRecord{}, err
+	}
+	return UserAccountRecord{
+		User:                user,
+		Roles:               roles,
+		Permissions:         permissions,
+		ResourcePermissions: resourcePermissions,
+	}, nil
+}
+
+func (s *Store) SetUserAccess(
+	ctx context.Context,
+	userID, roleID string,
+	permissions []string,
+	resourcePermissions []ResourcePermissionRecord,
+	disabled bool,
+	now time.Time,
+) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin user access update: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	result, err := tx.ExecContext(ctx, `
+		UPDATE users
+		SET disabled = ?, updated_at = ?
+		WHERE id = ?
+	`, boolInt(disabled), now.UTC().Format(time.RFC3339Nano), userID)
+	if err != nil {
+		return fmt.Errorf("update user account state: %w", err)
+	}
+	if count, _ := result.RowsAffected(); count == 0 {
+		return sql.ErrNoRows
+	}
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM user_roles WHERE user_id = ?", userID); err != nil {
+		return fmt.Errorf("clear user roles: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, "INSERT INTO user_roles(user_id, role_id) VALUES (?, ?)", userID, roleID); err != nil {
+		return fmt.Errorf("assign user role: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM user_permissions WHERE user_id = ?", userID); err != nil {
+		return fmt.Errorf("clear user permissions: %w", err)
+	}
+	for _, permission := range permissions {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT OR IGNORE INTO user_permissions(user_id, permission_name)
+			VALUES (?, ?)
+		`, userID, permission); err != nil {
+			return fmt.Errorf("assign user permission %s: %w", permission, err)
+		}
+	}
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM user_resource_permissions WHERE user_id = ?", userID); err != nil {
+		return fmt.Errorf("clear user resource permissions: %w", err)
+	}
+	for _, scope := range resourcePermissions {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT OR IGNORE INTO user_resource_permissions(user_id, permission_name, resource_type, resource_id)
+			VALUES (?, ?, ?, ?)
+		`, userID, scope.Permission, scope.ResourceType, scope.ResourceID); err != nil {
+			return fmt.Errorf("assign user resource permission %s: %w", scope.Permission, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit user access update: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) CountEnabledUsersWithRole(ctx context.Context, roleID string) (int, error) {
+	var count int
+	if err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM users u
+		JOIN user_roles ur ON ur.user_id = u.id
+		WHERE ur.role_id = ? AND u.disabled = 0
+	`, roleID).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count enabled users with role: %w", err)
+	}
+	return count, nil
+}
+
+func boolInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 func (s *Store) GrantRoleResourcePermission(
