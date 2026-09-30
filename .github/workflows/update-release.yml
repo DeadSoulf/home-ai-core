@@ -77,6 +77,7 @@ jobs:
           EXE="dist/home-ai-windows-client_${VERSION}_amd64.exe"
           GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build \
             -trimpath \
+            -ldflags "-s -w -X github.com/DeadSoulf/home-ai-core/internal/version.Version=$VERSION" \
             -o "$EXE" \
             ./cmd/home-ai-windows-client
           sha256sum "$EXE" > "$EXE.sha256"
