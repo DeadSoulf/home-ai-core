@@ -82,9 +82,11 @@ function flatten(
 export function StorageDevices({
   devices,
   onChanged,
+  canManage = false,
 }: {
   devices: BlockNode[];
   onChanged: () => void;
+  canManage?: boolean;
 }) {
   const {t} = useI18n();
   const [busy, setBusy] = useState("");
@@ -620,7 +622,7 @@ export function StorageDevices({
                     <td className="mono">{node.mountpoints.join(", ") || "—"}</td>
                     <td className="mono">{node.parent_name || "—"}</td>
                     <td>
-                      <div className="storage-tree-actions">
+                      {canManage && <div className="storage-tree-actions">
                         {mounted && mountable && (
                           <button
                             type="button"
@@ -710,11 +712,11 @@ export function StorageDevices({
                           </>
                         )}
                         {!mountable && !renameable && node.type !== "part" && node.type !== "disk" && <span className="muted">—</span>}
-                      </div>
+                      </div>}
                     </td>
                   </tr>
 
-                  {creating && (
+                  {canManage && creating && (
                     <tr className="storage-format-row">
                       <td colSpan={9}>
                         <div className="storage-format">
@@ -769,7 +771,7 @@ export function StorageDevices({
                     </tr>
                   )}
 
-                  {formatting && (
+                  {canManage && formatting && (
                     <tr className="storage-format-row">
                       <td colSpan={9}>
                         <div className="storage-format">

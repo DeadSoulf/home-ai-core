@@ -3,6 +3,7 @@ import { api, APIError, connectRealtime, setCSRFToken, type RealtimeStatus } fro
 import type { Actor } from "./api/types";
 import { Shell } from "./components/Shell";
 import { useI18n } from "./i18n";
+import { accessiblePath, systemSection } from "./navigation";
 import { FirstRunPage, LoginPage } from "./pages/Auth";
 import { AccountPage } from "./pages/Account";
 import { AuditPage } from "./pages/Audit";
@@ -17,7 +18,7 @@ type Phase = "loading" | "setup" | "login" | "app";
 
 function currentPath(): string {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
-  return ["/", "/files", "/system", "/modules", "/jobs", "/audit", "/users"].includes(path) ? path : "/";
+  return ["/", "/files", "/system", "/modules", "/jobs", "/audit", "/users"].includes(path) ? path + (path === "/system" ? window.location.hash : "") : "/";
 }
 
 export default function App() {
@@ -115,6 +116,15 @@ export default function App() {
     };
   }, [phase, actor]);
 
+  useEffect(() => {
+    if (phase !== "app" || !actor) return;
+    const allowedPath = accessiblePath(actor, path);
+    if (allowedPath !== path) {
+      window.history.replaceState({}, "", allowedPath);
+      setPath(allowedPath);
+    }
+  }, [phase, actor, path]);
+
   const authenticated = (nextActor: Actor) => {
     setActor(nextActor);
     setPhase("app");
@@ -131,9 +141,10 @@ export default function App() {
   };
 
   const navigate = (nextPath: string) => {
-    if (nextPath !== path) {
-      window.history.pushState({}, "", nextPath);
-      setPath(nextPath);
+    const allowed = actor ? accessiblePath(actor, nextPath) : "/";
+    if (allowed !== path) {
+      window.history.pushState({}, "", allowed);
+      setPath(allowed);
     }
   };
 
@@ -148,11 +159,12 @@ export default function App() {
   }
 
   const has = (permission: string) => actor.permissions.includes(permission);
-  const dashboardAllowed = has("system.read") && has("modules.read") && has("jobs.read");
+  const dashboardAllowed = has("system.read") || has("modules.read") || has("jobs.read");
   const accountPage = <AccountPage actor={actor} />;
 
+  const allowedPath = accessiblePath(actor, path);
   let page;
-  switch (path) {
+  switch (allowedPath.split("#")[0]) {
     case "/files":
       page = has("security.self.read")
         ? <FilesPage revision={revision} canManage={has("files.manage")} />
@@ -163,6 +175,11 @@ export default function App() {
         ? (
           <SystemPage
             revision={revision}
+            section={systemSection(allowedPath)}
+            onSectionChange={(section) => navigate("/system#" + section)}
+            canReadUpdates={has("updates.read")}
+            canManageUpdates={has("updates.manage")}
+            canManageStorage={has("storage.manage")}
             canReadNetwork={has("network.read")}
             canManageNetwork={has("network.manage")}
           />
@@ -173,7 +190,7 @@ export default function App() {
       page = has("modules.read") ? <ModulesPage revision={revision} /> : accountPage;
       break;
     case "/jobs":
-      page = has("jobs.read") ? <JobsPage revision={revision} /> : accountPage;
+      page = has("jobs.read") ? <JobsPage revision={revision} canManage={has("jobs.cancel")} /> : accountPage;
       break;
     case "/audit":
       page = has("audit.read") ? <AuditPage revision={revision} /> : accountPage;
@@ -184,11 +201,11 @@ export default function App() {
         : accountPage;
       break;
     default:
-      page = dashboardAllowed ? <Dashboard revision={revision} /> : accountPage;
+      page = dashboardAllowed ? <Dashboard actor={actor} revision={revision} onNavigate={navigate} /> : accountPage;
   }
 
   return (
-    <Shell actor={actor} path={path} realtime={realtime} availableUpdate={availableUpdate} onNavigate={navigate} onLogout={logout}>
+    <Shell actor={actor} path={allowedPath} realtime={realtime} availableUpdate={availableUpdate} onNavigate={navigate} onLogout={logout}>
       {page}
     </Shell>
   );

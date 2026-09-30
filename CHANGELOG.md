@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.74-dev
+
+- Grouped Web navigation into Server, Services and Management, with a compact mobile drawer and keyboard support.
+- Split System into Equipment, Storage, Network and Updates while preserving file, user, storage, network and update controls.
+- Simplified Home to essential server status, warnings and recent activity; moved identifiers and diagnostic metadata into expandable details.
+- Show readable operation and security-event labels while retaining progress, failures and troubleshooting details.
+- Filter navigation and management controls by the current user's permissions.
+- Show a downloaded, verified update as complete instead of an active 100% operation.
+
+
 ## Unreleased
 
 ### Repository cleanup and reliability audit

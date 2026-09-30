@@ -19,13 +19,8 @@ export function ModulesPage({revision}: {revision: number}) {
 
   return (
     <div className="page">
-      <PageHeading title={t("modules")} subtitle={t("modulesSubtitle")} />
-
-      <Panel title={t("hostCapabilities")}>
-        <div className="tag-list">
-          {value.capabilities.map((capability) => <span className="tag" key={capability}>{capability}</span>)}
-        </div>
-      </Panel>
+      <PageHeading title={t("modules")} subtitle={t("modulesSubtitleSimple")} />
+      {error && <ErrorState message={error} />}
 
       <div className="card-grid">
         {value.modules.map((module) => (
@@ -33,22 +28,34 @@ export function ModulesPage({revision}: {revision: number}) {
             <div className="module-title">
               <div>
                 <h2>{module.manifest.name}</h2>
-                <span className="mono">{module.manifest.id} · {module.manifest.version}</span>
               </div>
               <Status value={module.status} />
             </div>
             <p>{module.manifest.description || t("noDescription")}</p>
-            <div className="tag-list">
-              {(module.manifest.capabilities?.provides || []).map((capability) => (
-                <span className="tag" key={capability}>{capability}</span>
-              ))}
-            </div>
+            {module.error && <div className="form-error">{module.error}</div>}
+            <details className="technical-details">
+              <summary>{t("technicalDetails")}</summary>
+              <dl className="details">
+                <dt>ID</dt><dd className="mono">{module.manifest.id}</dd>
+                <dt>{t("version")}</dt><dd>{module.manifest.version}</dd>
+                <dt>{t("coreVersion")}</dt><dd>{module.manifest.core}</dd>
+                <dt>{t("hostCapabilities")}</dt><dd className="mono">{(module.manifest.capabilities?.provides || []).join(", ") || "—"}</dd>
+              </dl>
+            </details>
           </article>
         ))}
         {value.modules.length === 0 && (
-          <EmptyState>{t("noModules")}</EmptyState>
+          <EmptyState>{t("noModulesSimple")}</EmptyState>
         )}
       </div>
+      <details className="technical-details">
+        <summary>{t("technicalDetails")}</summary>
+        <Panel title={t("hostCapabilities")}>
+          <div className="tag-list">
+            {value.capabilities.map((capability) => <span className="tag" key={capability}>{capability}</span>)}
+          </div>
+        </Panel>
+      </details>
     </div>
   );
 }
