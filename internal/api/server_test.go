@@ -213,12 +213,12 @@ func (f fakeSecurity) CreateUser(
 		profile = security.ProfileMember
 	}
 	return security.User{
-		ID:          "usr-member",
-		Username:    input.Username,
-		DisplayName: input.DisplayName,
-		Roles:       []string{profile},
-		Profile:     profile,
-		Permissions: append([]string(nil), input.Permissions...),
+		ID:                  "usr-member",
+		Username:            input.Username,
+		DisplayName:         input.DisplayName,
+		Roles:               []string{profile},
+		Profile:             profile,
+		Permissions:         append([]string(nil), input.Permissions...),
 		ResourcePermissions: append([]security.PermissionScope(nil), input.ResourcePermissions...),
 	}, nil
 }
