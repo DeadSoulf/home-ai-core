@@ -6,12 +6,12 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.80-dev` — Windows self-update handoff + tray health/notifications\
-**Текущий срез:** Windows native settings GUI — PR #50; candidate for `0.1.81-dev`\
-**Следующий engineering milestone:** package/release the GUI client, complete live Windows acceptance, then automatic release discovery/download + SHA-256 verified install handoff\
+**Текущий срез:** `0.1.81-dev` release candidate — Windows native settings GUI merged; release pending\
+**Следующий engineering milestone:** live Windows GUI acceptance, then automatic release discovery/download + SHA-256 verified install handoff\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
 
-### Кандидат 0.1.81-dev — полноценные настройки Windows-клиента
+### Выпуск 0.1.81-dev — полноценные настройки Windows-клиента
 
 - Запуск Windows-клиента без аргументов открывает нативное окно настроек; существующий CLI сохраняется.
 - В окне доступны сервер, пользователь, пароль, подключение и discovery доступных writable NAS folders.
@@ -23,7 +23,9 @@
 - Из GUI можно включить/выключить per-user background agent; отображаются autostart и running state.
 - Tray получает **Settings**; double-click также открывает окно настроек.
 - ADR-0028 фиксирует credential boundary и переиспользование существующего sync backend.
-- До выпуска остаются полный CI и практическая проверка GUI на реальном Windows.
+- PR #50 прошёл полный `core-ci`, включая native Windows tests и Windows cross-build.
+- Практическая проверка GUI на реальном Windows остаётся acceptance step.
+
 ### Выпуск 0.1.80-dev
 
 - `client install` и `agent install` умеют обновлять stable per-user binary даже при запущенном tray-agent.
