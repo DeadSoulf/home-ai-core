@@ -212,6 +212,8 @@ var (
 	procSettingsLoadIcon      = settingsUser32.NewProc("LoadIconW")
 	procSettingsLoadCursor    = settingsUser32.NewProc("LoadCursorW")
 	procSettingsGetModule     = settingsKernel32.NewProc("GetModuleHandleW")
+	procSettingsGetConsole    = settingsKernel32.NewProc("GetConsoleWindow")
+	procSettingsConsolePIDs   = settingsKernel32.NewProc("GetConsoleProcessList")
 	procSettingsGetStock      = settingsGDI32.NewProc("GetStockObject")
 	procSettingsBrowseFolder  = settingsShell32.NewProc("SHBrowseForFolderW")
 	procSettingsGetPath       = settingsShell32.NewProc("SHGetPathFromIDListW")
@@ -224,7 +226,23 @@ var activeSettingsUI struct {
 }
 
 func runDefaultCommand() error {
+	hidePrivateConsoleWindow()
 	return runSettingsUI(nil)
+}
+
+func hidePrivateConsoleWindow() {
+	hwnd, _, _ := procSettingsGetConsole.Call()
+	if hwnd == 0 {
+		return
+	}
+	var processes [8]uint32
+	count, _, _ := procSettingsConsolePIDs.Call(
+		uintptr(unsafe.Pointer(&processes[0])),
+		uintptr(len(processes)),
+	)
+	if count == 1 {
+		procSettingsShowWindow.Call(hwnd, 0)
+	}
 }
 
 func runSettingsUI(args []string) error {
