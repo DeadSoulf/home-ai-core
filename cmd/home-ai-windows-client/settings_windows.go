@@ -563,9 +563,9 @@ func (state *windowsSettingsUI) loadInitial() {
 		state.setText(state.usernameEdit, settings.Username)
 	}
 	if err := state.reloadProfiles(""); err != nil {
-		state.setStatus(err.Error())
+		state.setStatus(state.tr("error_prefix") + ": " + err.Error())
 	} else if settingsErr != nil {
-		state.setStatus(settingsErr.Error())
+		state.setStatus(state.tr("error_prefix") + ": " + settingsErr.Error())
 	}
 	if settings.ServerURL == "" && len(state.profiles) > 0 {
 		state.setText(state.serverEdit, state.profiles[0].ServerURL)
@@ -721,7 +721,7 @@ func (state *windowsSettingsUI) finishConnect() {
 	}
 	if result.err != nil {
 		state.setStatus(state.tr("connection_failed") + ": " + result.err.Error())
-		state.showError(result.err.Error())
+		state.showTechnicalError(result.err)
 		return
 	}
 	state.setText(state.serverEdit, result.server)
@@ -772,7 +772,7 @@ func (state *windowsSettingsUI) saveProfile() {
 		profile, err = windowsclient.UpdateSyncProfile(state.configPath, state.selectedProfileID, input)
 	}
 	if err != nil {
-		state.showError(err.Error())
+		state.showTechnicalError(err)
 		return
 	}
 	_ = windowsclient.SaveClientSettings(state.settingsPath, windowsclient.ClientSettings{
@@ -782,7 +782,7 @@ func (state *windowsSettingsUI) saveProfile() {
 		Language:  state.language,
 	})
 	if err := state.reloadProfiles(profile.ID); err != nil {
-		state.showError(err.Error())
+		state.showTechnicalError(err)
 		return
 	}
 	state.setStatus(state.tr("profile_saved"))
@@ -869,11 +869,11 @@ func (state *windowsSettingsUI) setSelectedProfileEnabled(enabled bool) {
 		return
 	}
 	if err := windowsclient.SetSyncProfileEnabled(state.configPath, state.selectedProfileID, enabled); err != nil {
-		state.showError(err.Error())
+		state.showTechnicalError(err)
 		return
 	}
 	if err := state.reloadProfiles(state.selectedProfileID); err != nil {
-		state.showError(err.Error())
+		state.showTechnicalError(err)
 		return
 	}
 	if enabled {
@@ -893,13 +893,13 @@ func (state *windowsSettingsUI) deleteSelectedProfile() {
 		return
 	}
 	if err := windowsclient.RemoveSyncProfile(state.configPath, state.selectedProfileID); err != nil {
-		state.showError(err.Error())
+		state.showTechnicalError(err)
 		return
 	}
 	state.selectedProfileID = ""
 	state.clearProfile()
 	if err := state.reloadProfiles(""); err != nil {
-		state.showError(err.Error())
+		state.showTechnicalError(err)
 		return
 	}
 	state.setStatus(state.tr("profile_deleted"))
@@ -986,7 +986,7 @@ func (state *windowsSettingsUI) setConflictPolicy(policy string) {
 func (state *windowsSettingsUI) syncNow() {
 	sent, err := windowsclient.SignalUserAgentSyncNow()
 	if err != nil {
-		state.showError(err.Error())
+		state.showTechnicalError(err)
 		return
 	}
 	if sent {
@@ -994,7 +994,7 @@ func (state *windowsSettingsUI) syncNow() {
 		return
 	}
 	if err := validateAgentReady(state.configPath); err != nil {
-		state.showError(err.Error())
+		state.showTechnicalError(err)
 		return
 	}
 	state.setStatus(state.tr("syncing"))
@@ -1022,7 +1022,7 @@ func (state *windowsSettingsUI) finishSync() {
 	_ = state.reloadProfiles(state.selectedProfileID)
 	if result.err != nil {
 		state.setStatus(state.tr("sync_failed") + ": " + result.err.Error())
-		state.showError(result.err.Error())
+		state.showTechnicalError(result.err)
 		return
 	}
 	state.setStatus(result.message)
@@ -1104,7 +1104,7 @@ func (state *windowsSettingsUI) finishAgent() {
 	}
 	if result.err != nil {
 		state.setStatus(state.tr("agent_error") + ": " + result.err.Error())
-		state.showError(result.err.Error())
+		state.showTechnicalError(result.err)
 		return
 	}
 	state.setStatus(result.message)
@@ -1156,6 +1156,13 @@ func (state *windowsSettingsUI) setStatus(text string) {
 
 func (state *windowsSettingsUI) showError(text string) {
 	state.messageBox(text, settingsMBOK|settingsMBIconError)
+}
+
+func (state *windowsSettingsUI) showTechnicalError(err error) {
+	if err == nil {
+		return
+	}
+	state.showError(state.tr("error_prefix") + ": " + err.Error())
 }
 
 func (state *windowsSettingsUI) confirm(text string) bool {
