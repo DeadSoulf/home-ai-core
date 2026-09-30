@@ -14,6 +14,8 @@ import type {
   FileEntry,
   FileFolder,
   FileTrashEntry,
+  FileUploadResult,
+  FileUploadSession,
   FilePool,
   WireGuardStatus,
 } from "./types";
@@ -223,6 +225,79 @@ export const api = {
       `/api/v1/files/folders/${encodeURIComponent(folderId)}/directories`,
       {path},
       true,
+    );
+  },
+
+  fileUploads: async (folderId: string) => {
+    const result = await request<{uploads: FileUploadSession[]}>(
+      `/api/v1/files/folders/${encodeURIComponent(folderId)}/uploads`,
+    );
+    return result.uploads;
+  },
+
+  createFileUpload: async (folderId: string, input: {
+    path: string;
+    totalBytes: number;
+    sha256?: string;
+    clientFingerprint?: string;
+  }) => {
+    const result = await postJSON<{upload: FileUploadSession}>(
+      `/api/v1/files/folders/${encodeURIComponent(folderId)}/uploads`,
+      {
+        path: input.path,
+        total_bytes: input.totalBytes,
+        sha256: input.sha256,
+        client_fingerprint: input.clientFingerprint,
+      },
+      true,
+    );
+    return result.upload;
+  },
+
+  fileUpload: async (folderId: string, uploadId: string) => {
+    const result = await request<{upload: FileUploadSession}>(
+      `/api/v1/files/folders/${encodeURIComponent(folderId)}/uploads/${encodeURIComponent(uploadId)}`,
+    );
+    return result.upload;
+  },
+
+  uploadFileChunk: async (
+    folderId: string,
+    uploadId: string,
+    offset: number,
+    chunk: Blob,
+    sha256?: string,
+  ) => {
+    const headers = new Headers({
+      "Content-Type": "application/octet-stream",
+      "Upload-Offset": String(offset),
+    });
+    const token = getCSRFToken();
+    if (token) headers.set("X-CSRF-Token", token);
+    if (sha256) headers.set("X-Chunk-SHA256", sha256);
+    const result = await request<{upload: FileUploadSession}>(
+      `/api/v1/files/folders/${encodeURIComponent(folderId)}/uploads/${encodeURIComponent(uploadId)}/chunk`,
+      {method: "PUT", headers, body: chunk},
+    );
+    return result.upload;
+  },
+
+  completeFileUpload: async (folderId: string, uploadId: string) => {
+    const result = await postJSON<{file: FileUploadResult}>(
+      `/api/v1/files/folders/${encodeURIComponent(folderId)}/uploads/${encodeURIComponent(uploadId)}/complete`,
+      undefined,
+      true,
+    );
+    return result.file;
+  },
+
+  cancelFileUpload: async (folderId: string, uploadId: string) => {
+    const token = getCSRFToken();
+    const headers = new Headers();
+    if (token) headers.set("X-CSRF-Token", token);
+    return request<void>(
+      `/api/v1/files/folders/${encodeURIComponent(folderId)}/uploads/${encodeURIComponent(uploadId)}`,
+      {method: "DELETE", headers},
     );
   },
 
