@@ -447,4 +447,3 @@ func TestOwnerCannotBeDisabledOrDemoted(t *testing.T) {
 		t.Fatalf("UpdateUser() error = %v, want ErrOwnerImmutable", err)
 	}
 }
-
