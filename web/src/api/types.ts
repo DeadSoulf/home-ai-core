@@ -295,3 +295,29 @@ export type FileTrashEntry = {
   deleted_at: string;
 };
 
+export type SystemReadiness = {
+  checked_at: string;
+  network?: {
+    backend: string;
+    profiles: NetworkProfile[];
+    interfaces: SystemResponse["system"]["network_interfaces"];
+    error?: string;
+  };
+  wireguard?: {
+    available: boolean;
+    tunnels: Array<WireGuardTunnel & {enabled?: boolean}>;
+    error?: string;
+  };
+  updater?: {
+    current_version: string;
+    architecture: string;
+    helper_available: boolean;
+    helper_compatible: boolean;
+    helper_version?: string;
+    helper_protocol?: number;
+    helper_error?: string;
+    rollback_available: boolean;
+    rollback_version?: string;
+  };
+};
+
