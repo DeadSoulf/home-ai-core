@@ -19,11 +19,11 @@ import (
 const defaultSMBWorkgroup = "WORKGROUP"
 
 type smbUserResponse struct {
-	UserID       string `json:"user_id"`
-	Username     string `json:"username"`
-	DisplayName  string `json:"display_name"`
-	SMBUsername  string `json:"smb_username"`
-	Configured   bool   `json:"configured"`
+	UserID      string `json:"user_id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+	SMBUsername string `json:"smb_username"`
+	Configured  bool   `json:"configured"`
 }
 
 type smbShareResponse struct {
@@ -35,10 +35,10 @@ type smbShareResponse struct {
 }
 
 type smbModel struct {
-	Users       []security.User
-	UserNames   map[string]string
-	Shares      []smb.Share
-	ShareViews  []smbShareResponse
+	Users      []security.User
+	UserNames  map[string]string
+	Shares     []smb.Share
+	ShareViews []smbShareResponse
 }
 
 func (s *server) smbStatus(
