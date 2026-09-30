@@ -78,6 +78,7 @@ type WireGuardPeerStat struct {
 type WireGuardTunnelStat struct {
 	Name       string              `json:"name"`
 	Active     bool                `json:"active"`
+	Enabled    bool                `json:"enabled"`
 	Address    string              `json:"address,omitempty"`
 	PublicKey  string              `json:"public_key,omitempty"`
 	ListenPort int                 `json:"listen_port,omitempty"`
