@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.81-dev
+
+- Added a native Win32 settings window to the existing Windows client while preserving all CLI commands.
+- Launching the Windows client without arguments now opens settings; Explorer-created private console windows are hidden.
+- Added server/account setup, writable Home-AI folder discovery, a native local-folder picker, sync interval and conflict-policy controls.
+- Added sync profile create/edit/enable/disable/delete; edits preserve profile identity, enabled state and previous sync result metadata.
+- Keep passwords exclusively in Windows Credential Manager; the new client settings JSON stores only the canonical server URL and username.
+- Added GUI controls for manual **Sync now** and background-agent/autostart management; running agents receive sync requests through the existing single scheduler.
+- Added **Settings** to the tray menu and made tray double-click open the settings window.
+- Scope discovered NAS folders to the connected server/account to prevent accidental reuse after changing connection details.
+- Added ADR-0028, settings persistence tests, profile-edit tests, Windows-native tests and full cross-platform CI coverage.
 ## 0.1.80-dev
 
 - Added a bounded Windows self-update handoff so `client install` and `agent install` can replace a stable installed executable while the tray agent is running.
