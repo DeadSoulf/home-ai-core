@@ -380,10 +380,10 @@ Check
 
 1. ✅ explicit Samba installation;
 2. ✅ managed SMB shares только для Home-AI logical folders;
-3. ✅ private folder → владелец + owner;
-4. ✅ shared folder → активные household users;
-5. ✅ owner получает RW ко всем managed shares;
-6. ✅ guest access запрещён, SMB2.10 minimum;
+3. ✅ private folder → владелец + Administrator;
+4. 🚧 shared folder → только пользователи с explicit files.read/files.write grant;
+5. 🚧 Administrator получает RW ко всем managed shares через files.manage;
+6. ✅ анонимный SMB guest access запрещён, SMB2.10 minimum;
 7. ✅ отдельные SMB credentials без хранения пароля в Core;
 8. ✅ managed /etc/samba/home-ai.conf + backup/include/testparm/reload;
 9. ✅ Web SMB status/users/shares/credentials UI;
