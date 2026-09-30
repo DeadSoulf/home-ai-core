@@ -91,6 +91,9 @@ describe("API client", () => {
       username: "alice",
       displayName: "Alice",
       password: "correct horse battery staple",
+      profile: "parent",
+      permissions: ["security.self.read", "system.read"],
+      resourcePermissions: [],
     });
 
     expect(user.roles).toEqual(["member"]);
@@ -99,6 +102,7 @@ describe("API client", () => {
     expect(init?.method).toBe("POST");
     expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-create-user");
     expect(String(init?.body)).toContain('"display_name":"Alice"');
+    expect(String(init?.body)).toContain('"profile":"parent"');
 
     vi.unstubAllGlobals();
   });
