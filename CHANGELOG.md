@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.80-dev
+
+- Added a bounded Windows self-update handoff so `client install` and `agent install` can replace a stable installed executable while the tray agent is running.
+- Added strict parsing of the Home-AI-managed HKCU Run command and restart of the updated agent without accepting arbitrary shell commands.
+- Preserve the existing temp-file, durable write, atomic activation and SHA-256 verification path during executable replacement.
+- Added tray health status showing enabled profile count and the latest `OK` / `FAILED` sync result.
+- Added Windows notifications for failed sync cycles and manual **Sync now** completion while keeping successful scheduled cycles silent.
+- Added ADR-0027, parser/status tests, and a native Windows test that replaces a genuinely locked executable through the tray `WM_CLOSE` handoff.
+
 ## 0.1.79-dev
 
 - Added a stable per-user Windows client install path at `%LOCALAPPDATA%\\HomeAI\\bin\\home-ai-windows-client.exe`.
