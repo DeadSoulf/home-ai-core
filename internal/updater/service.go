@@ -108,6 +108,13 @@ func (s *Service) snapshotState() State {
 	return s.state
 }
 
+func (s *Service) LocalStatus(ctx context.Context) ReleaseStatus {
+	return withHelperStatus(ReleaseStatus{
+		CurrentVersion: s.currentVersion,
+		Architecture:   s.architecture,
+	}, s.helperInfo(ctx))
+}
+
 func (s *Service) Check(ctx context.Context) (ReleaseStatus, error) {
 	return s.check(ctx, false)
 }
