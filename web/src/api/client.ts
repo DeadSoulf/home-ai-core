@@ -408,7 +408,14 @@ export const api = {
     label?: string;
     confirm?: string;
     size_mib?: number;
-  }) => postJSON<{message: string}>("/api/v1/storage/operation", input, true),
+    purpose?: StoragePurpose;
+  }) => postJSON<{
+    message: string;
+    device?: string;
+    purpose?: StoragePurpose;
+    purpose_assigned?: boolean;
+    warning?: string;
+  }>("/api/v1/storage/operation", input, true),
 
   networkProfiles: async () => {
     const result = await request<{network_profiles: NetworkProfileStatus}>("/api/v1/network/profiles");
