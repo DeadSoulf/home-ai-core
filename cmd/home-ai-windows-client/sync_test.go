@@ -126,7 +126,7 @@ func TestWatchSyncProfilesRunNowUsesSameSchedulerLoop(t *testing.T) {
 	runNow <- struct{}{}
 	ctx, cancel := context.WithTimeout(context.Background(), 750*time.Millisecond)
 	defer cancel()
-	if err := watchSyncProfiles(ctx, config, "", 1, false, time.Second, runNow); err != nil {
+	if err := watchSyncProfiles(ctx, config, "", 1, false, time.Second, runNow, nil); err != nil {
 		t.Fatal(err)
 	}
 	profiles, err := windowsclient.LoadSyncProfiles(config)
