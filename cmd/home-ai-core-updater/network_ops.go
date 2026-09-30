@@ -648,7 +648,11 @@ func inspectWireGuard(ctx context.Context) (bool, string, []updaterhelper.WireGu
 
 	result := make([]updaterhelper.WireGuardTunnelStat, 0, len(names))
 	for name, active := range names {
-		item := updaterhelper.WireGuardTunnelStat{Name: name, Active: active}
+		item := updaterhelper.WireGuardTunnelStat{
+			Name:    name,
+			Active:  active,
+			Enabled: wireGuardAutostartEnabled(ctx, name),
+		}
 		if data, err := os.ReadFile(wireGuardConfigPath(name)); err == nil {
 			item.Address, item.ListenPort = wireGuardInterfaceConfig(string(data))
 		}
@@ -659,6 +663,16 @@ func inspectWireGuard(ctx context.Context) (bool, string, []updaterhelper.WireGu
 	}
 	sortWireGuardTunnels(result)
 	return true, "", result
+}
+
+func wireGuardAutostartEnabled(ctx context.Context, name string) bool {
+	return exec.CommandContext(
+		ctx,
+		"systemctl",
+		"is-enabled",
+		"--quiet",
+		"wg-quick@"+name+".service",
+	).Run() == nil
 }
 
 func wireGuardInterfaceConfig(config string) (string, int) {
