@@ -159,7 +159,7 @@ func runAgent(args []string) error {
 				}
 			}()
 		}
-		err = watchSyncProfiles(ctx, configPath, "", retries, restartStale, poll, tray.RunNow)
+		err = watchSyncProfiles(ctx, configPath, "", retries, restartStale, poll, tray.RunNow, tray.ReportCycle)
 		fmt.Printf("%s Home-AI sync agent stopped: %v\n", time.Now().Format(time.RFC3339), err)
 		return err
 	}
