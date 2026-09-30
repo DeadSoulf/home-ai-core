@@ -3,6 +3,7 @@
 package windowsclient
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
