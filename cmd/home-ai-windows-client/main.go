@@ -239,5 +239,6 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  agent status")
 	fmt.Fprintln(os.Stderr, "  agent remove")
 	fmt.Fprintln(os.Stderr, "  agent run [--config FILE] [--poll 30s]")
-	fmt.Fprintln(os.Stderr, "  client install|status")
+	fmt.Fprintln(os.Stderr, "  client install|status|version|check-update")
+	fmt.Fprintln(os.Stderr, "  client update [--restart-agent] [--config FILE]")
 }
