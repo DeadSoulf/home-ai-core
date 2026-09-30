@@ -149,7 +149,6 @@ func AddSyncProfile(filename string, input SyncProfileInput) (SyncProfile, error
 	return profile, nil
 }
 
-
 func UpdateSyncProfile(filename, profileID string, input SyncProfileInput) (SyncProfile, error) {
 	profileID = strings.TrimSpace(profileID)
 	if profileID == "" {
