@@ -4,6 +4,7 @@ package windowsclient
 
 import (
 	"errors"
+	"fmt"
 	"runtime"
 	"syscall"
 	"unsafe"
@@ -165,7 +166,7 @@ func credentialCallError(operation string, err error) error {
 	if err == nil || errors.Is(err, windows.ERROR_SUCCESS) {
 		err = syscall.EINVAL
 	}
-	return errors.New(operation + ": " + err.Error())
+	return fmt.Errorf("%s: %w", operation, err)
 }
 
 func zeroBytes(data []byte) {
