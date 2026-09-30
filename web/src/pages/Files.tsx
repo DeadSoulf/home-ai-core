@@ -49,7 +49,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
   }>();
   const [smbWorkgroup, setSMBWorkgroup] = useState("WORKGROUP");
   const [smbUserID, setSMBUserID] = useState("");
-  const [smbPassword, setSMBPassword] = useState("");
+  const [smbPassword, setSMBPasswordText] = useState("");
 
   useEffect(() => {
     const smb = resource.data?.smb;
@@ -91,7 +91,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
     }
   }
 
-  async function setSMBPassword(event: FormEvent) {
+  async function submitSMBPassword(event: FormEvent) {
     event.preventDefault();
     if (!smbUserID || smbPassword.length < 12) {
       setFormError(t("smbPasswordRequirement"));
@@ -106,7 +106,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
         userId: smbUserID,
         password: smbPassword,
       });
-      setSMBPassword("");
+      setSMBPasswordText("");
       setNotice(result.message);
       resource.reload();
     } catch (reason) {
@@ -798,7 +798,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                 </table>
               </div>
 
-              <form className="smb-password-form" onSubmit={setSMBPassword}>
+              <form className="smb-password-form" onSubmit={submitSMBPassword}>
                 <label>
                   {t("user")}
                   <select value={smbUserID} onChange={(event) => setSMBUserID(event.target.value)} required>
@@ -817,7 +817,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                     minLength={12}
                     maxLength={256}
                     value={smbPassword}
-                    onChange={(event) => setSMBPassword(event.target.value)}
+                    onChange={(event) => setSMBPasswordText(event.target.value)}
                     autoComplete="new-password"
                     required
                   />
