@@ -69,6 +69,7 @@ func New(
 			s.systemRoute(w, r)
 		},
 	))
+	s.mux.HandleFunc("GET /api/v1/system/readiness", s.requireAuth("system.read", s.systemReadiness))
 	s.mux.HandleFunc("/api/v1/events/history", s.requireAuth("events.read", s.eventHistory))
 	s.mux.HandleFunc("/api/v1/events", s.requireAuth(
 		"events.read",
