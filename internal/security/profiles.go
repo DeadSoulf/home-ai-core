@@ -149,11 +149,9 @@ func (s *Service) AccessCatalog(ctx context.Context) (AccessCatalog, error) {
 			}),
 		},
 		{
-			ID:          ProfileFriend,
-			Description: "Trusted visitor account",
-			DefaultPermissions: filterPermissions(available, []string{
-				"system.read",
-			}),
+			ID:                 ProfileFriend,
+			Description:        "Trusted visitor account with explicitly assigned access",
+			DefaultPermissions: []string{},
 		},
 		{
 			ID:                 ProfileGuest,
