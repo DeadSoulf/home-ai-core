@@ -7,7 +7,7 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.75-dev` — persistent Windows copy queue + recursive folder copy\
 **Текущий срез:** `0.1.76-dev` — scheduled Windows push sync с явной конфликтной политикой (`stop` / `skip` / `replace-to-trash`)\
-**Следующий engineering milestone:** Windows background service/tray + secure credential storage\
+**Следующий engineering milestone:** Windows user-session background agent/tray; secure credential storage через Windows Credential Manager уже реализуется отдельным срезом\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
 
@@ -306,7 +306,7 @@ Check
 1. live SMB acceptance на установленном сервере;
 2. 🧪 Windows persistent copy queue + recursive folder copy — опубликовано в `0.1.75-dev`; автоматические тесты прошли, пользовательская проверка на Windows/NAS остаётся;
 3. ✅ scheduled/automatic push sync — persistent profiles, due-run/watch scheduler и explicit conflict policy реализованы в `0.1.76-dev`;
-4. 🚧 Windows background service/tray + secure credential storage;
+4. 🚧 Windows background agent/tray: Credential Manager foundation реализуется; user-session autostart остаётся следующим шагом;
 5. NFS — при необходимости.
 
 Девятый вертикальный срез (`0.1.75-dev`):
@@ -336,7 +336,7 @@ Check
 10. ✅ ADR-0023 + native Windows tests + полный core-ci;
 11. 🧪 пользовательская приёмка scheduled sync на реальном Windows/NAS остаётся незавершённой.
 
-Основной следующий engineering milestone: 🚧 Windows background service/tray + secure credential storage, чтобы `0.1.76-dev` sync мог работать после перезагрузки Windows без хранения пароля в JSON/CLI. Live SMB, обновление/откат и физическая приёмка Windows queue/sync остаются практическими проверками перед отметкой F2 как завершённого.
+Основной следующий engineering milestone: 🚧 Windows user-session background agent/tray. Credential Manager foundation уже реализуется, чтобы sync мог аутентифицироваться после restart процесса без пароля в JSON/CLI; следующим шагом остаётся безопасный autostart после Windows logon. Live SMB, обновление/откат и физическая приёмка Windows queue/sync остаются практическими проверками перед отметкой F2 как завершённого.
 
 ## 4. Следующие продуктовые этапы
 
@@ -460,7 +460,7 @@ AI становится центральным управляющим слоем
 
 - 🧪 persistent local transfer queue и recursive folder copy реализованы в `0.1.75-dev`; остаётся пользовательская проверка на Windows и NAS;
 - ✅ scheduled/automatic push sync реализован в `0.1.76-dev`: persistent profiles, due-run/watch и explicit conflicts (`stop` / `skip` / `replace-to-trash`);
-- 🚧 background service/tray + secure credential storage;
+- 🚧 background agent/tray: Windows Credential Manager foundation в разработке, затем user-session autostart;
 - LAN + remote/WireGuard operation.
 
 Это не Windows system-image backup.
