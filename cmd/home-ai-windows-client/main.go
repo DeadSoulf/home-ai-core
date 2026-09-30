@@ -39,6 +39,8 @@ func run(args []string) error {
 		return runQueue(args[1:])
 	case "sync":
 		return runSync(args[1:])
+	case "credentials":
+		return runCredentials(args[1:])
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -65,9 +67,9 @@ func authenticatedClient(ctx context.Context, flags authFlags) (*windowsclient.C
 	if strings.TrimSpace(flags.username) == "" {
 		return nil, errors.New("--username is required")
 	}
-	password := os.Getenv(passwordEnv)
-	if password == "" {
-		return nil, fmt.Errorf("%s is required", passwordEnv)
+	password, err := resolvePassword(flags)
+	if err != nil {
+		return nil, err
 	}
 
 	client, err := windowsclient.New(flags.server)
@@ -78,6 +80,23 @@ func authenticatedClient(ctx context.Context, flags authFlags) (*windowsclient.C
 		return nil, fmt.Errorf("login: %w", err)
 	}
 	return client, nil
+}
+
+func resolvePassword(flags authFlags) (string, error) {
+	if password := os.Getenv(passwordEnv); password != "" {
+		return password, nil
+	}
+	password, err := windowsclient.LoadPassword(flags.server, flags.username)
+	switch {
+	case err == nil:
+		return password, nil
+	case errors.Is(err, windowsclient.ErrCredentialNotFound):
+		return "", fmt.Errorf("%s is not set and no Windows Credential Manager password exists; run credentials save first", passwordEnv)
+	case errors.Is(err, windowsclient.ErrCredentialStoreUnsupported):
+		return "", fmt.Errorf("%s is required on this platform", passwordEnv)
+	default:
+		return "", fmt.Errorf("load stored Home-AI password: %w", err)
+	}
 }
 
 func runFolders(args []string) error {
@@ -196,7 +215,7 @@ func runUpload(args []string) error {
 func printUsage() {
 	fmt.Fprintln(os.Stderr, "Home-AI Windows File Client")
 	fmt.Fprintln(os.Stderr)
-	fmt.Fprintln(os.Stderr, "Password is read only from HOME_AI_PASSWORD and is not stored by this client.")
+	fmt.Fprintln(os.Stderr, "Authentication uses HOME_AI_PASSWORD first; on Windows it can fall back to Credential Manager.")
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Commands:")
 	fmt.Fprintln(os.Stderr, "  folders --server URL --username USER")
@@ -211,4 +230,5 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  sync run     [--profile ID] [--config FILE]")
 	fmt.Fprintln(os.Stderr, "  sync watch   [--profile ID] [--config FILE]")
 	fmt.Fprintln(os.Stderr, "  sync enable|disable|remove --profile ID [--config FILE]")
+	fmt.Fprintln(os.Stderr, "  credentials save|status|delete --server URL --username USER")
 }
