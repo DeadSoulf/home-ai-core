@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { APIError, api } from "../api/client";
 import type { UpdateStatus, UpdaterState } from "../api/types";
 import { useResource } from "../hooks/useResource";
@@ -7,6 +7,7 @@ import { useI18n } from "../i18n";
 import { PageHeading } from "./Dashboard";
 import { StorageDevices } from "../components/StorageDevices";
 import { NetworkManagement } from "../components/NetworkManagement";
+import type { SystemSection } from "../navigation";
 
 function bytes(value = 0) {
   return new Intl.NumberFormat(undefined, {maximumFractionDigits: 1}).format(value / 1024 ** 3) + " GiB";
@@ -23,12 +24,40 @@ export function SystemPage({
   revision,
   canReadNetwork,
   canManageNetwork,
+  section = "equipment",
+  onSectionChange,
+  canReadUpdates,
+  canManageUpdates,
+  canManageStorage,
 }: {
   revision: number;
   canReadNetwork: boolean;
   canManageNetwork: boolean;
+  section?: SystemSection;
+  onSectionChange: (section: SystemSection) => void;
+  canReadUpdates: boolean;
+  canManageUpdates: boolean;
+  canManageStorage: boolean;
 }) {
   const {t, date} = useI18n();
+  const activeSection = section === "updates" && !canReadUpdates ? "equipment" : section;
+  const mounted = useRef(true);
+  const timers = useRef(new Set<number>());
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      for (const timer of timers.current) window.clearTimeout(timer);
+      timers.current.clear();
+    };
+  }, []);
+  function schedule(callback: () => void, delay: number) {
+    const timer = window.setTimeout(() => {
+      timers.current.delete(timer);
+      if (mounted.current) callback();
+    }, delay);
+    timers.current.add(timer);
+  }
   const load = useCallback(() => api.system(), []);
   const [metricsTick, setMetricsTick] = useState(0);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -47,10 +76,14 @@ export function SystemPage({
   }, []);
 
   useEffect(() => {
-    api.updaterState().then(setUpdaterState).catch(() => undefined);
-  }, []);
+    if (!canReadUpdates) return;
+    let stopped = false;
+    api.updaterState().then((state) => { if (!stopped) setUpdaterState(state); }).catch(() => undefined);
+    return () => { stopped = true; };
+  }, [canReadUpdates]);
 
   async function checkUpdate() {
+    if (!canReadUpdates) return;
     setCheckingUpdate(true);
     setUpdateError("");
     try {
@@ -74,9 +107,10 @@ export function SystemPage({
   }
 
   useEffect(() => {
-    if (!downloadingUpdate) return;
+    if (!canReadUpdates || !downloadingUpdate) return;
     let stopped = false;
     const poll = async () => {
+      if (stopped || !mounted.current) return;
       try {
         const state = await api.updaterState();
         if (stopped) return;
@@ -89,15 +123,16 @@ export function SystemPage({
       } catch {
         // Keep polling while the download request is in flight.
       }
-      if (!stopped) window.setTimeout(poll, 750);
+      if (!stopped) schedule(poll, 750);
     };
     poll();
     return () => {
       stopped = true;
     };
-  }, [downloadingUpdate]);
+  }, [canReadUpdates, downloadingUpdate]);
 
   async function downloadUpdate() {
+    if (!canManageUpdates) return;
     const version = updateInfo?.available_version;
     if (!version) return;
     setDownloadingUpdate(true);
@@ -118,6 +153,7 @@ export function SystemPage({
   }
 
   async function installUpdate() {
+    if (!canManageUpdates) return;
     const version = updaterState?.available_version || updateInfo?.available_version;
     if (!version) return;
 
@@ -138,6 +174,7 @@ export function SystemPage({
   }
 
   async function rollbackUpdate() {
+    if (!canManageUpdates) return;
     const version = updateInfo?.rollback_version;
     if (!version) return;
     if (!window.confirm(t("rollbackConfirmation").replace("{version}", version))) return;
@@ -163,6 +200,7 @@ export function SystemPage({
     const poll = async () => {
       try {
         const system = await api.system();
+        if (!mounted.current) return;
         if (system.version === version) {
           window.location.reload();
           return;
@@ -170,8 +208,9 @@ export function SystemPage({
       } catch {
         // Core is expected to be briefly unavailable during replacement.
       }
+      if (!mounted.current) return;
       if (Date.now() < deadline) {
-        window.setTimeout(poll, 1500);
+        schedule(poll, 1500);
       } else {
         setInstallingUpdate(false);
         setRollingBackUpdate(false);
@@ -179,7 +218,7 @@ export function SystemPage({
         setUpdateError(t("requestFailed"));
       }
     };
-    window.setTimeout(poll, 1000);
+    schedule(poll, 1000);
   }
 
   if (loading && !data) return <LoadingState />;
@@ -188,32 +227,44 @@ export function SystemPage({
 
   return (
     <div className="page">
-      <PageHeading title={t("system")} subtitle={t("systemSubtitle")} />
+      <PageHeading title={t("system")} subtitle={t("serverOverview")} />
+      <nav className="server-sections" aria-label={t("serverSections")}>
+        {(["equipment", "storage", "network", "updates"] as const)
+          .filter((item) => item !== "updates" || canReadUpdates)
+          .map((item) => <button type="button" key={item} className={`button secondary${activeSection === item ? " active" : ""}`}
+            aria-current={activeSection === item ? "page" : undefined} onClick={() => onSectionChange(item)}>{t(item)}</button>)}
+      </nav>
+      {error && <ErrorState message={error} />}
       <div className="two-column">
+        {activeSection === "equipment" && <>
         <Panel title={t("node")}>
           <dl className="details">
             <dt>{t("hostname")}</dt><dd>{value.system.hostname}</dd>
-            <dt>{t("nodeId")}</dt><dd className="mono">{value.system.node_id}</dd>
             <dt>{t("os")}</dt><dd>{value.system.os}</dd>
-            <dt>{t("kernel")}</dt><dd>{value.system.kernel || "—"}</dd>
-            <dt>{t("architecture")}</dt><dd>{value.system.architecture}</dd>
             <dt>{t("coreVersion")}</dt><dd>{value.version}</dd>
           </dl>
+          <details className="technical-details"><summary>{t("hostDetails")}</summary>
+            <dl className="details">
+              <dt>{t("nodeId")}</dt><dd className="mono">{value.system.node_id}</dd>
+              <dt>{t("kernel")}</dt><dd>{value.system.kernel || "—"}</dd>
+              <dt>{t("architecture")}</dt><dd>{value.system.architecture}</dd>
+            </dl>
+          </details>
         </Panel>
 
         <Panel title={t("compute")}>
           <dl className="details">
             <dt>CPU</dt><dd>{value.system.cpu.model || t("unknown")}</dd>
             <dt>{t("logicalCpus")}</dt><dd>{value.system.cpu.logical_cpus}</dd>
-            <dt>CPU load</dt><dd>{value.system.cpu.usage_percent.toFixed(1)}%</dd>
+            <dt>{t("cpuLoad")}</dt><dd>{value.system.cpu.usage_percent.toFixed(1)}%</dd>
             <dt>{t("ram")}</dt><dd>{bytes(value.system.memory.total_bytes)}</dd>
             <dt>{t("availableRam")}</dt><dd>{bytes(value.system.memory.available_bytes)}</dd>
-            <dt>{t("gpuCount")}</dt><dd>{value.system.gpus.length}</dd>
-            <dt>{t("gpu")}</dt><dd>{value.system.gpus.length ? value.system.gpus.map((gpu) => gpu.model || gpu.vendor || gpu.device_id || t("unknown")).join(", ") : "—"}</dd>
           </dl>
         </Panel>
 
-        <Panel
+        </>}
+        {activeSection === "updates" && canReadUpdates && <Panel
+          className="wide"
           title={t("updateStatus")}
           action={
             <button
@@ -229,9 +280,6 @@ export function SystemPage({
           <dl className="details">
             <dt>{t("currentVersion")}</dt><dd className="mono">{updateInfo?.current_version || value.version}</dd>
             <dt>{t("availableVersion")}</dt><dd className="mono">{updateInfo?.available_version || "—"}</dd>
-            <dt>{t("architecture")}</dt><dd>{updateInfo?.architecture || value.system.architecture}</dd>
-            <dt>{t("systemHelper")}</dt><dd className="mono">{updateInfo?.helper_version || "—"}</dd>
-            <dt>{t("helperProtocol")}</dt><dd className="mono">{updateInfo?.helper_protocol || "—"}</dd>
             <dt>{t("size")}</dt><dd>{updateInfo?.bundle_size_bytes ? fileBytes(updateInfo.bundle_size_bytes) : "—"}</dd>
             <dt>{t("rollbackVersion")}</dt><dd className="mono">{updateInfo?.rollback_available ? (updateInfo.rollback_version || "—") : t("notAvailable")}</dd>
             {updateInfo?.published_at && <><dt>{t("published")}</dt><dd>{date(updateInfo.published_at)}</dd></>}
@@ -247,18 +295,23 @@ export function SystemPage({
           {updateInfo?.helper_available && !updateInfo.helper_compatible && (
             <div className="form-error">{t("helperUpgradeRequired")}</div>
           )}
-          {updateInfo?.helper_compatible && (
-            <div className="notice">{t("helperReady")}: {updateInfo.helper_version || "—"} · protocol {updateInfo.helper_protocol || "—"}</div>
-          )}
+          <details className="technical-details"><summary>{t("technicalDetails")}</summary>
+            <dl className="details">
+              <dt>{t("architecture")}</dt><dd>{updateInfo?.architecture || value.system.architecture}</dd>
+              <dt>{t("systemHelper")}</dt><dd>{updateInfo?.helper_version || "—"}</dd>
+              <dt>{t("helperProtocol")}</dt><dd>{updateInfo?.helper_protocol || "—"}</dd>
+              {updaterState && <><dt>{t("state")}</dt><dd>{updaterState.phase}</dd><dt>{t("progress")}</dt><dd>{updaterState.message || "—"}</dd></>}
+            </dl>
+          </details>
           {updaterState &&
-            !["idle", "succeeded", "available", "checking"].includes(updaterState.phase) && (
+            ["downloading", "installing", "rolling_back", "restarting"].includes(updaterState.phase) && (
             <div className="notice">
-              <div><strong>{updaterState.message || updaterState.phase}</strong></div>
+              <div><strong>{updaterState.phase === "downloading" ? t("downloadingUpdate") : updaterState.phase === "installing" ? t("installing") : updaterState.phase === "rolling_back" ? t("rollingBack") : t("working")}</strong></div>
               <div className="progress"><span style={{width: `${Math.min(100, updaterState.progress_percent || 0)}%`}} /></div>
-              <div className="small">{updaterState.progress_percent || 0}% · {updaterState.phase}</div>
+              <div className="small">{updaterState.progress_percent || 0}%</div>
             </div>
           )}
-          {updateInfo?.available && updaterState?.phase !== "ready" && (
+          {canManageUpdates && updateInfo?.available && updaterState?.phase !== "ready" && (
             <div className="update-action-stack">
               <button
                 type="button"
@@ -270,7 +323,7 @@ export function SystemPage({
               </button>
             </div>
           )}
-          {updaterState?.phase === "ready" && (
+          {canManageUpdates && updaterState?.phase === "ready" && (
             <div className="update-action-stack">
               <div className="update-callout current"><strong>{t("updateReady")}</strong></div>
               <button
@@ -284,7 +337,7 @@ export function SystemPage({
               <div className="notice">{t("updateRestartNotice")}</div>
             </div>
           )}
-          {updateInfo?.rollback_available && updateInfo.rollback_version && (
+          {canManageUpdates && updateInfo?.rollback_available && updateInfo.rollback_version && (
             <div className="update-action-stack">
               <button
                 type="button"
@@ -297,45 +350,53 @@ export function SystemPage({
               <div className="notice">{t("rollbackNotice")}</div>
             </div>
           )}
-          {updateError && <div className="form-error">{updateError}</div>}
+          {(updateError || updaterState?.phase === "failed") && <div className="form-error">{updateError || updaterState?.error || t("requestFailed")}</div>}
           {lastChecked && <div className="notice">{t("lastChecked")}: {date(lastChecked)}</div>}
-          {updateInfo?.notes && <pre className="release-notes">{updateInfo.notes}</pre>}
-        </Panel>
+          {updateInfo?.notes && <details className="technical-details"><summary>{t("releaseNotes")}</summary><pre className="release-notes">{updateInfo.notes}</pre></details>}
+        </Panel>}
 
-        <Panel title={t("gpuDevices")} className="wide">
+        {activeSection === "equipment" && <Panel title={t("gpuDevices")} className="wide">
           <div className="table-wrap">
             <table>
-              <thead><tr><th>{t("model")}</th><th>{t("vendor")}</th><th>Load</th><th>{t("pciAddress")}</th><th>{t("deviceId")}</th><th>{t("driver")}</th></tr></thead>
+              <thead><tr><th>{t("model")}</th><th>{t("gpuLoad")}</th><th>{t("driver")}</th><th>{t("hardwareDetails")}</th></tr></thead>
               <tbody>
                 {value.system.gpus.map((gpu) => (
                   <tr key={gpu.pci_address || gpu.card || gpu.device_id}>
                     <td>{gpu.model || t("unknown")}</td>
-                    <td>{gpu.vendor || "—"}</td>
                     <td>{gpu.utilization_percent === undefined ? "—" : gpu.utilization_percent.toFixed(1) + "%"}</td>
-                    <td className="mono">{gpu.pci_address || "—"}</td>
-                    <td className="mono">{gpu.vendor_id && gpu.device_id ? `${gpu.vendor_id}:${gpu.device_id}` : (gpu.device_id || "—")}</td>
-                    <td>{gpu.driver || <span className="status-badge status-failed">{t("driverMissing")}</span>}</td>
+                    <td><span className={`status-badge ${gpu.driver ? "status-success" : "status-failed"}`}>{gpu.driver ? t("driverDetected") : t("driverMissing")}</span></td>
+                    <td><details className="technical-details row-details"><summary>{t("technicalDetails")}</summary>
+                      <dl className="details">
+                        <dt>{t("vendor")}</dt><dd>{gpu.vendor || "—"}</dd>
+                        <dt>{t("driver")}</dt><dd>{gpu.driver || "—"}</dd>
+                        <dt>{t("pciAddress")}</dt><dd className="mono">{gpu.pci_address || "—"}</dd>
+                        <dt>{t("deviceId")}</dt><dd className="mono">{gpu.vendor_id && gpu.device_id ? `${gpu.vendor_id}:${gpu.device_id}` : gpu.device_id || "—"}</dd>
+                      </dl>
+                    </details></td>
                   </tr>
                 ))}
-                {value.system.gpus.length === 0 && <tr><td colSpan={6} className="muted">—</td></tr>}
+                {value.system.gpus.length === 0 && <tr><td colSpan={4} className="muted">{t("noGpuDevices")}</td></tr>}
               </tbody>
             </table>
           </div>
         </Panel>
 
-        <Panel title={t("blockDevices")} className="wide">
+        }
+        {activeSection === "storage" && <Panel title={t("blockDevices")} className="wide">
           <StorageDevices
             devices={value.system.block_tree}
+            canManage={canManageStorage}
             onChanged={() => setMetricsTick((current) => current + 1)}
           />
         </Panel>
 
-        <NetworkManagement
+        }
+        {activeSection === "network" && <NetworkManagement
           interfaces={value.system.network_interfaces}
           canReadNetwork={canReadNetwork}
           canManage={canManageNetwork}
           onChanged={() => setMetricsTick((current) => current + 1)}
-        />
+        />}
       </div>
 
     </div>
