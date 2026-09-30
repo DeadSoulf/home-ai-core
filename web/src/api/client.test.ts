@@ -473,4 +473,69 @@ describe("API client", () => {
     vi.unstubAllGlobals();
   });
 
+
+  it("reads SMB status and sends protected SMB operations", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/v1/files/smb" && !init?.method) {
+        return new Response(JSON.stringify({
+          smb: {
+            available: true,
+            active: true,
+            hostname: "home-ai",
+            workgroup: "WORKGROUP",
+            users: [{
+              user_id: "usr-test",
+              username: "alice",
+              display_name: "Alice",
+              smb_username: "hai_0123456789abcdef0123",
+              configured: false,
+            }],
+            shares: [{
+              folder_id: "nsf-test",
+              folder_name: "Family",
+              kind: "shared",
+              share_name: "HA_Family_12345678",
+              unc: "\\\\home-ai\\HA_Family_12345678",
+            }],
+          },
+        }), {
+          status: 200,
+          headers: {"Content-Type": "application/json"},
+        });
+      }
+      return new Response(JSON.stringify({message: "SMB updated"}), {
+        status: 200,
+        headers: {"Content-Type": "application/json"},
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    });
+
+    const status = await api.smbStatus();
+    expect(status.active).toBe(true);
+    expect(status.shares[0].unc).toContain("HA_Family");
+
+    setCSRFToken("csrf-smb");
+    await api.smbOperation({
+      operation: "set_password",
+      userId: "usr-test",
+      password: "long-smb-password",
+    });
+
+    const [input, init] = fetchMock.mock.calls[1];
+    expect(String(input)).toBe("/api/v1/files/smb/operation");
+    expect(init?.method).toBe("POST");
+    expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-smb");
+    expect(String(init?.body)).toContain('"operation":"set_password"');
+    expect(String(init?.body)).toContain('"user_id":"usr-test"');
+
+    vi.unstubAllGlobals();
+  });
+
 });
