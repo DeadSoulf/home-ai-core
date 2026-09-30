@@ -300,8 +300,8 @@ func ensureSMBInclude() error {
 	if err != nil {
 		return fmt.Errorf("read Samba config: %w", err)
 	}
-	text := string(data)
-	if strings.Contains(text, smbIncludeDirective) {
+	updated, changed := ensureSMBIncludeContent(string(data))
+	if !changed {
 		return nil
 	}
 	info, err := os.Stat(smbMainConfig)
@@ -312,14 +312,30 @@ func ensureSMBInclude() error {
 	if err := os.WriteFile(backup, data, info.Mode().Perm()); err != nil {
 		return fmt.Errorf("backup Samba config: %w", err)
 	}
-	updated := strings.TrimRight(text, "\n") + "\n\n" +
-		smbIncludeBegin + "\n" +
-		smbIncludeDirective + "\n" +
-		smbIncludeEnd + "\n"
 	if err := atomicWriteFile(smbMainConfig, []byte(updated), info.Mode().Perm()); err != nil {
 		return fmt.Errorf("add Home-AI Samba include: %w", err)
 	}
 	return nil
+}
+
+func ensureSMBIncludeContent(content string) (string, bool) {
+	for _, raw := range strings.Split(content, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, ";") {
+			continue
+		}
+		if strings.EqualFold(line, smbIncludeDirective) {
+			return content, false
+		}
+	}
+	trimmed := strings.TrimRight(content, "\n")
+	if trimmed != "" {
+		trimmed += "\n\n"
+	}
+	trimmed += smbIncludeBegin + "\n" +
+		smbIncludeDirective + "\n" +
+		smbIncludeEnd + "\n"
+	return trimmed, true
 }
 
 func validateSMBSharePath(path string, uid, gid int) error {
