@@ -43,6 +43,8 @@ func run(args []string) error {
 		return runCredentials(args[1:])
 	case "agent":
 		return runAgent(args[1:])
+	case "client":
+		return runClient(args[1:])
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -237,4 +239,5 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  agent status")
 	fmt.Fprintln(os.Stderr, "  agent remove")
 	fmt.Fprintln(os.Stderr, "  agent run [--config FILE] [--poll 30s]")
+	fmt.Fprintln(os.Stderr, "  client install|status")
 }

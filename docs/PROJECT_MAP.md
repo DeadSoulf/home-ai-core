@@ -7,7 +7,7 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.78-dev` — Windows background sync agent + HKCU Run autostart\
 **Текущий срез:** `0.1.78-dev` — Windows user-session background sync agent + HKCU Run autostart\
-**Следующий engineering milestone:** tray UI + стабильный per-user install/update path для Windows-клиента\
+**Следующий engineering milestone:** 🚧 tray UI + стабильный per-user install/update path для Windows-клиента — реализация ведётся в следующем срезе\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
 
@@ -330,7 +330,7 @@ Check
 3. ✅ scheduled/automatic push sync — persistent profiles, due-run/watch scheduler и explicit conflict policy реализованы в `0.1.76-dev`;
 4. ✅ Windows Credential Manager authentication — реализовано в `0.1.77-dev`;
 5. ✅ Windows user-session background agent — HKCU Run autostart + single-instance/logging реализованы в `0.1.78-dev`;
-6. 🚧 Windows tray UI + стабильный per-user install/update path;
+6. 🚧 Windows tray UI + стабильный per-user install/update path — stable `%LOCALAPPDATA%\\HomeAI\\bin` install, tray `Sync now/Open log/Open profiles/Exit` в разработке;
 7. NFS — при необходимости.
 
 Девятый вертикальный срез (`0.1.75-dev`):
@@ -388,7 +388,7 @@ Check
 10. ✅ ADR-0025;
 11. 🧪 пользовательская проверка autostart после logout/reboot остаётся незавершённой.
 
-Основной следующий engineering milestone: 🚧 Windows tray UI + стабильный per-user install/update path. Background agent foundation готов в `0.1.78-dev`; live Windows/NAS acceptance, logout/reboot autostart acceptance, SMB и rollback остаются отдельными практическими проверками. Live SMB, обновление/откат и физическая приёмка Windows queue/sync остаются практическими проверками перед отметкой F2 как завершённого.
+Основной следующий engineering milestone: 🚧 Windows tray UI + стабильный per-user install/update path. Реализация начата поверх `0.1.78-dev`: agent install переводится на стабильный `%LOCALAPPDATA%` binary path, tray использует тот же scheduler/single-instance процесс. Live Windows/NAS acceptance, logout/reboot autostart acceptance, SMB и rollback остаются отдельными практическими проверками. Live SMB, обновление/откат и физическая приёмка Windows queue/sync остаются практическими проверками перед отметкой F2 как завершённого.
 
 ## 4. Следующие продуктовые этапы
 

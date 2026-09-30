@@ -160,11 +160,23 @@ Disable autostart with:
 .\home-ai-windows-client_<version>_amd64.exe agent remove
 ```
 
-Keep the executable at the same path after installation. If you move or rename it, run `agent install` again so the Windows Run entry points at the new location.
+`agent install` first copies the client to the stable per-user path `%LOCALAPPDATA%\\HomeAI\\bin\\home-ai-windows-client.exe` and registers that installed copy for autostart. The original downloaded release asset can then be moved or deleted.
+
+You can also install or refresh the per-user copy explicitly:
+
+```powershell
+.\\home-ai-windows-client_<version>_amd64.exe client install
+.\\home-ai-windows-client_<version>_amd64.exe client status
+```
+
+When the background agent is running, the Windows notification-area icon provides **Sync now**, **Open log**, **Open sync profiles**, and **Exit**. **Sync now** signals the existing sequential scheduler rather than starting a second copy process.
+
+If Windows refuses to replace the installed executable because the current agent still has it open, choose **Exit** from the tray and rerun `client install`.
+
 ## Current limitations
 
-- no Windows service/tray startup integration yet;
-- Windows Credential Manager is implemented; user-session autostart/background launcher is still pending;
+- tray UI is intentionally minimal and does not edit sync profiles yet;
+- executable updates are explicit and can require exiting the running tray agent first;
 - no bidirectional sync or local-delete propagation;
 - no sync-history/recycle-bin retention policy;
 - queue history pruning is still deferred.

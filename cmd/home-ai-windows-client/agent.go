@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"time"
@@ -81,13 +83,14 @@ func runAgent(args []string) error {
 		if err != nil {
 			return fmt.Errorf("locate Windows client executable: %w", err)
 		}
-		executable, err = filepath.Abs(executable)
+		installed, err := windowsclient.InstallUserClient(executable)
 		if err != nil {
-			return fmt.Errorf("resolve Windows client executable: %w", err)
+			return fmt.Errorf("install Home-AI Windows client: %w", err)
 		}
-		if err := windowsclient.InstallUserAgentAutostart(executable, configPath); err != nil {
+		if err := windowsclient.InstallUserAgentAutostart(installed, configPath); err != nil {
 			return err
 		}
+		fmt.Printf("Home-AI Windows client installed: %s\n", installed)
 		fmt.Println("Home-AI sync agent autostart enabled for the current Windows user.")
 		fmt.Println("The agent will start after the user logs on.")
 		return nil
@@ -134,16 +137,23 @@ func runAgent(args []string) error {
 		}
 		defer cleanup()
 		fmt.Printf("%s Home-AI sync agent starting\n", time.Now().Format(time.RFC3339))
-		watchArgs := []string{
-			"watch",
-			"--config", configPath,
-			"--poll", poll.String(),
-			"--retries", fmt.Sprintf("%d", retries),
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer cancel()
+		tray, err := startAgentTray(logPath, configPath)
+		if err != nil {
+			return fmt.Errorf("start tray UI: %w", err)
 		}
-		if restartStale {
-			watchArgs = append(watchArgs, "--restart-stale")
+		defer tray.Close()
+		if tray.Exit != nil {
+			go func() {
+				select {
+				case <-tray.Exit:
+					cancel()
+				case <-ctx.Done():
+				}
+			}()
 		}
-		err = runSync(watchArgs)
+		err = watchSyncProfiles(ctx, configPath, "", retries, restartStale, poll, tray.RunNow)
 		fmt.Printf("%s Home-AI sync agent stopped: %v\n", time.Now().Format(time.RFC3339), err)
 		return err
 	}

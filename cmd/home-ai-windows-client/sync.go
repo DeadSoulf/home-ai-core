@@ -142,37 +142,65 @@ func runSync(args []string) error {
 		if poll < time.Second || poll > 5*time.Minute {
 			return errors.New("--poll must be between 1s and 5m")
 		}
-		if err := validateSyncWatchSelection(configPath, profileID); err != nil {
-			return err
-		}
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer cancel()
-		fmt.Println("Watching scheduled sync profiles. Press Ctrl+C to stop.")
-		for {
-			if ctx.Err() != nil {
-				return nil
-			}
-			_, runErr := executeSyncProfiles(ctx, configPath, profileID, true, retries, restartStale)
-			if ctx.Err() != nil {
-				return nil
-			}
-			if runErr != nil {
-				fmt.Fprintln(os.Stderr, "sync cycle:", runErr)
-			}
-			delay, err := nextSyncWatchDelay(configPath, profileID, poll, time.Now().UTC())
-			if err != nil {
-				return err
-			}
-			timer := time.NewTimer(delay)
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return nil
-			case <-timer.C:
-			}
-		}
+		return watchSyncProfiles(ctx, configPath, profileID, retries, restartStale, poll, nil)
 	}
 	return nil
+}
+
+func watchSyncProfiles(
+	ctx context.Context,
+	configPath string,
+	profileID string,
+	retries int,
+	restartStale bool,
+	poll time.Duration,
+	runNow <-chan struct{},
+) error {
+	if retries < 1 {
+		return errors.New("sync watcher retries must be positive")
+	}
+	if poll < time.Second || poll > 5*time.Minute {
+		return errors.New("sync watcher poll must be between 1s and 5m")
+	}
+	if err := validateSyncWatchSelection(configPath, profileID); err != nil {
+		return err
+	}
+	fmt.Println("Watching scheduled sync profiles. Press Ctrl+C to stop.")
+	forceRun := false
+	for {
+		if ctx.Err() != nil {
+			return nil
+		}
+		_, runErr := executeSyncProfiles(ctx, configPath, profileID, !forceRun, retries, restartStale)
+		forceRun = false
+		if ctx.Err() != nil {
+			return nil
+		}
+		if runErr != nil {
+			fmt.Fprintln(os.Stderr, "sync cycle:", runErr)
+		}
+		delay, err := nextSyncWatchDelay(configPath, profileID, poll, time.Now().UTC())
+		if err != nil {
+			return err
+		}
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil
+		case <-runNow:
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			forceRun = true
+		case <-timer.C:
+		}
+	}
 }
 
 func printSyncProfiles(configPath string) error {
