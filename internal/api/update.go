@@ -12,6 +12,7 @@ import (
 )
 
 type UpdaterService interface {
+	LocalStatus(context.Context) updater.ReleaseStatus
 	Check(context.Context) (updater.ReleaseStatus, error)
 	CheckFresh(context.Context) (updater.ReleaseStatus, error)
 	State() updater.State
