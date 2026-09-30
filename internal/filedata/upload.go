@@ -70,6 +70,10 @@ func CreateUpload(
 	if err != nil {
 		return UploadSession{}, err
 	}
+	clientFingerprint = strings.TrimSpace(clientFingerprint)
+	if len(clientFingerprint) > 256 {
+		return UploadSession{}, errors.New("client fingerprint is too long")
+	}
 	relative, _, err = validateUploadTarget(root, relative)
 	if err != nil {
 		return UploadSession{}, err
@@ -95,7 +99,7 @@ func CreateUpload(
 		Path:              filepath.ToSlash(relative),
 		TotalBytes:        totalBytes,
 		ExpectedSHA256:    expectedSHA256,
-		ClientFingerprint: strings.TrimSpace(clientFingerprint),
+		ClientFingerprint: clientFingerprint,
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}
