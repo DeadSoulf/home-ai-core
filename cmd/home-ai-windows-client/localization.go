@@ -1,0 +1,203 @@
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+const (
+	uiLanguageEnglish = "en"
+	uiLanguageRussian = "ru"
+)
+
+var uiText = map[string]map[string]string{
+	uiLanguageEnglish: {
+		"window_title": "Home-AI Windows Client",
+		"language": "Language",
+		"server": "Server",
+		"user": "User",
+		"password": "Password",
+		"password_hint": "blank = stored credential",
+		"connect_save": "Connect & save",
+		"remote_folder": "Remote folder",
+		"local_source": "Local source",
+		"browse": "Browse...",
+		"destination": "Destination",
+		"interval": "Interval",
+		"conflict": "Conflict",
+		"conflict_stop": "Stop",
+		"conflict_skip": "Skip",
+		"conflict_replace": "Trash + replace",
+		"add_profile": "Add profile",
+		"update_profile": "Update profile",
+		"new_clear": "New / clear",
+		"enable": "Enable",
+		"disable": "Disable",
+		"delete": "Delete",
+		"refresh": "Refresh",
+		"sync_profiles": "Sync profiles",
+		"autostart_checking": "Autostart: checking...",
+		"sync_now": "Sync now",
+		"enable_agent": "Enable agent",
+		"disable_agent": "Disable agent",
+		"status": "Status",
+		"ready": "Ready",
+		"connecting": "Connecting to Home-AI...",
+		"connection_failed": "Connection failed",
+		"connected_writable": "Connected. %d writable folder(s) available.",
+		"invalid_interval": "Invalid interval. Use values such as 15m, 1h or 24h.",
+		"required_fields": "Server, user, remote folder and local source are required.",
+		"profile_saved": "Sync profile saved.",
+		"profile_on": "ON",
+		"profile_off": "OFF",
+		"never": "never",
+		"failed": "FAILED",
+		"editing_profile": "Editing profile %s",
+		"new_profile": "New profile.",
+		"select_profile": "Select a sync profile first.",
+		"profile_enabled": "Profile enabled.",
+		"profile_disabled": "Profile disabled.",
+		"delete_confirm": "Delete the selected sync profile?",
+		"profile_deleted": "Profile deleted.",
+		"refreshed": "Refreshed.",
+		"sync_requested": "Sync requested through the running Home-AI agent.",
+		"syncing": "Syncing enabled profiles...",
+		"manual_sync_finished": "Manual sync finished. %d profile(s) processed.",
+		"sync_failed": "Sync failed",
+		"enabling_agent": "Enabling Home-AI background agent...",
+		"agent_enabled": "Background agent enabled and started.",
+		"disabling_agent": "Disabling Home-AI background agent...",
+		"agent_disabled": "Background agent autostart disabled.",
+		"agent_error": "Agent error",
+		"autostart_error": "Autostart status error",
+		"autostart_on": "ON",
+		"autostart_off": "OFF",
+		"agent_running": "running",
+		"agent_stopped": "stopped",
+		"autostart_state": "Autostart: %s  |  Agent: %s",
+		"browse_title": "Select local folder to sync",
+		"browse_no_path": "Windows did not return a filesystem path for the selected folder.",
+		"saved_folder": "Saved folder",
+		"profiles_unavailable": "profiles unavailable",
+		"no_enabled_profiles": "no enabled profiles",
+		"not_synced_yet": "not synced yet",
+		"summary_enabled_new": "%d enabled · not synced yet",
+		"summary_last": "%d enabled · last %s %s",
+		"sync_failed_title": "Home-AI sync failed",
+		"open_log_details": "Open the agent log for details.",
+		"sync_complete_title": "Home-AI sync complete",
+		"profiles_processed": "%d profile(s) processed.",
+		"tray_name": "Home-AI Sync Agent",
+		"settings": "Settings",
+		"open_log": "Open log",
+		"open_sync_profiles": "Open sync profiles",
+		"exit": "Exit",
+		"error_prefix": "Error",
+	},
+	uiLanguageRussian: {
+		"window_title": "Home-AI — Windows клиент",
+		"language": "Язык",
+		"server": "Сервер",
+		"user": "Пользователь",
+		"password": "Пароль",
+		"password_hint": "пусто = сохранённый пароль",
+		"connect_save": "Подключить и сохранить",
+		"remote_folder": "Папка на сервере",
+		"local_source": "Локальная папка",
+		"browse": "Выбрать...",
+		"destination": "Путь назначения",
+		"interval": "Интервал",
+		"conflict": "Конфликт",
+		"conflict_stop": "Остановить",
+		"conflict_skip": "Пропустить",
+		"conflict_replace": "В корзину + заменить",
+		"add_profile": "Добавить профиль",
+		"update_profile": "Сохранить профиль",
+		"new_clear": "Новый / очистить",
+		"enable": "Включить",
+		"disable": "Выключить",
+		"delete": "Удалить",
+		"refresh": "Обновить",
+		"sync_profiles": "Профили синхронизации",
+		"autostart_checking": "Автозапуск: проверка...",
+		"sync_now": "Синхронизировать",
+		"enable_agent": "Включить агент",
+		"disable_agent": "Выключить агент",
+		"status": "Состояние",
+		"ready": "Готово",
+		"connecting": "Подключение к Home-AI...",
+		"connection_failed": "Ошибка подключения",
+		"connected_writable": "Подключено. Доступно папок для записи: %d.",
+		"invalid_interval": "Некорректный интервал. Используйте, например, 15m, 1h или 24h.",
+		"required_fields": "Нужно указать сервер, пользователя, папку на сервере и локальную папку.",
+		"profile_saved": "Профиль синхронизации сохранён.",
+		"profile_on": "ВКЛ",
+		"profile_off": "ВЫКЛ",
+		"never": "ещё не запускался",
+		"failed": "ОШИБКА",
+		"editing_profile": "Редактируется профиль %s",
+		"new_profile": "Новый профиль.",
+		"select_profile": "Сначала выберите профиль синхронизации.",
+		"profile_enabled": "Профиль включён.",
+		"profile_disabled": "Профиль выключен.",
+		"delete_confirm": "Удалить выбранный профиль синхронизации?",
+		"profile_deleted": "Профиль удалён.",
+		"refreshed": "Обновлено.",
+		"sync_requested": "Синхронизация передана запущенному агенту Home-AI.",
+		"syncing": "Синхронизация включённых профилей...",
+		"manual_sync_finished": "Ручная синхронизация завершена. Обработано профилей: %d.",
+		"sync_failed": "Ошибка синхронизации",
+		"enabling_agent": "Включение фонового агента Home-AI...",
+		"agent_enabled": "Фоновый агент включён и запущен.",
+		"disabling_agent": "Выключение фонового агента Home-AI...",
+		"agent_disabled": "Автозапуск фонового агента выключен.",
+		"agent_error": "Ошибка агента",
+		"autostart_error": "Ошибка проверки автозапуска",
+		"autostart_on": "ВКЛ",
+		"autostart_off": "ВЫКЛ",
+		"agent_running": "запущен",
+		"agent_stopped": "остановлен",
+		"autostart_state": "Автозапуск: %s  |  Агент: %s",
+		"browse_title": "Выберите локальную папку для синхронизации",
+		"browse_no_path": "Windows не вернула путь файловой системы для выбранной папки.",
+		"saved_folder": "Сохранённая папка",
+		"profiles_unavailable": "профили недоступны",
+		"no_enabled_profiles": "нет включённых профилей",
+		"not_synced_yet": "синхронизация ещё не запускалась",
+		"summary_enabled_new": "%d включено · синхронизации ещё не было",
+		"summary_last": "%d включено · последний результат %s %s",
+		"sync_failed_title": "Ошибка синхронизации Home-AI",
+		"open_log_details": "Откройте журнал агента для подробностей.",
+		"sync_complete_title": "Синхронизация Home-AI завершена",
+		"profiles_processed": "Обработано профилей: %d.",
+		"tray_name": "Home-AI — Агент синхронизации",
+		"settings": "Настройки",
+		"open_log": "Открыть журнал",
+		"open_sync_profiles": "Открыть профили синхронизации",
+		"exit": "Выход",
+		"error_prefix": "Ошибка",
+	},
+}
+
+func normalizeUILanguage(language string) string {
+	switch strings.ToLower(strings.TrimSpace(language)) {
+	case "ru", "ru-ru":
+		return uiLanguageRussian
+	case "en", "en-us", "en-gb":
+		return uiLanguageEnglish
+	default:
+		return uiLanguageEnglish
+	}
+}
+
+func textForLanguage(language, key string) string {
+	language = normalizeUILanguage(language)
+	if value := uiText[language][key]; value != "" {
+		return value
+	}
+	return uiText[uiLanguageEnglish][key]
+}
+
+func textForLanguagef(language, key string, args ...any) string {
+	return fmt.Sprintf(textForLanguage(language, key), args...)
+}
