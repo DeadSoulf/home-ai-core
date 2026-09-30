@@ -63,6 +63,8 @@ func New(
 	s.mux.HandleFunc("/api/v1/auth/logout", s.requireAuth("", s.logout))
 	s.mux.HandleFunc("GET /api/v1/security/users", s.requireAuth("security.users.read", s.usersCollection))
 	s.mux.HandleFunc("POST /api/v1/security/users", s.requireAuth("security.users.manage", s.usersCollection))
+	s.mux.HandleFunc("PUT /api/v1/security/users/{id}", s.requireAuth("security.users.manage", s.userResource))
+	s.mux.HandleFunc("GET /api/v1/security/access-catalog", s.requireAuth("security.users.manage", s.userAccessCatalog))
 	s.mux.HandleFunc("/api/v1/system", s.requireAuth(
 		"system.read",
 		func(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
