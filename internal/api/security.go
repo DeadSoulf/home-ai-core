@@ -220,6 +220,8 @@ func (s *server) usersCollection(
 		switch {
 		case errors.Is(err, security.ErrUserExists):
 			writeAPIError(w, r, http.StatusConflict, "user_exists", "username already exists", nil)
+		case errors.Is(err, security.ErrAdministratorRequired):
+			writeAPIError(w, r, http.StatusForbidden, "administrator_required", err.Error(), nil)
 		case err != nil:
 			writeAPIError(w, r, http.StatusBadRequest, "user_create_failed", err.Error(), nil)
 		default:
@@ -295,6 +297,8 @@ func (s *server) userAccess(
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		writeAPIError(w, r, http.StatusNotFound, "user_not_found", "user not found", nil)
+	case errors.Is(err, security.ErrAdministratorRequired):
+		writeAPIError(w, r, http.StatusForbidden, "administrator_required", err.Error(), nil)
 	case errors.Is(err, security.ErrLastAdministrator):
 		writeAPIError(w, r, http.StatusConflict, "last_administrator", err.Error(), nil)
 	case err != nil:
