@@ -14,6 +14,14 @@ export type Actor = {
   resource_permissions?: PermissionScope[];
 };
 
+export type UserProfileName =
+  | "administrator"
+  | "parent"
+  | "child"
+  | "friend"
+  | "guest"
+  | "member";
+
 export type UserAccount = {
   id: string;
   username: string;
@@ -22,6 +30,40 @@ export type UserAccount = {
   created_at: string;
   last_login_at?: string;
   roles: string[];
+  profile: UserProfileName;
+  owner: boolean;
+  permissions: string[];
+  resource_permissions?: PermissionScope[];
+};
+
+export type PermissionDefinition = {
+  name: string;
+  description: string;
+};
+
+export type UserProfileTemplate = {
+  name: UserProfileName;
+  description: string;
+  default_permissions: string[];
+  full_access: boolean;
+  legacy?: boolean;
+};
+
+export type AccessResource = {
+  type: "file_folder";
+  id: string;
+  name: string;
+  kind?: string;
+  container?: string;
+  supported_permissions: string[];
+};
+
+export type UserAccessCatalog = {
+  access: {
+    permissions: PermissionDefinition[];
+    profiles: UserProfileTemplate[];
+  };
+  resources: AccessResource[];
 };
 
 export type SetupStatus = {
