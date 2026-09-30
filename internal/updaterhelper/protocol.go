@@ -6,31 +6,31 @@ const ProtocolVersion = 2
 var HelperVersion = "dev"
 
 type Request struct {
-	Operation       string   `json:"operation"`
-	ProtocolVersion int      `json:"protocol_version,omitempty"`
-	Version         string   `json:"version,omitempty"`
-	CurrentVersion  string   `json:"current_version,omitempty"`
-	Device          string   `json:"device,omitempty"`
-	Mountpoint      string   `json:"mountpoint,omitempty"`
-	Filesystem      string   `json:"filesystem,omitempty"`
-	Label           string   `json:"label,omitempty"`
-	Confirm         string   `json:"confirm,omitempty"`
-	SizeMiB         uint64   `json:"size_mib,omitempty"`
-	Interface       string   `json:"interface,omitempty"`
-	Address         string   `json:"address,omitempty"`
-	Gateway         string   `json:"gateway,omitempty"`
-	MTU             int      `json:"mtu,omitempty"`
-	Tunnel          string   `json:"tunnel,omitempty"`
-	ListenPort      int      `json:"listen_port,omitempty"`
-	PrivateKey      string   `json:"private_key,omitempty"`
-	PeerPublicKey   string   `json:"peer_public_key,omitempty"`
-	PresharedKey    string   `json:"preshared_key,omitempty"`
-	AllowedIPs      []string `json:"allowed_ips,omitempty"`
-	Endpoint        string   `json:"endpoint,omitempty"`
-	Keepalive       int      `json:"keepalive,omitempty"`
-	NetworkMethod   string   `json:"network_method,omitempty"`
-	DNS             []string `json:"dns,omitempty"`
-	RootPath        string   `json:"root_path,omitempty"`
+	Operation       string            `json:"operation"`
+	ProtocolVersion int               `json:"protocol_version,omitempty"`
+	Version         string            `json:"version,omitempty"`
+	CurrentVersion  string            `json:"current_version,omitempty"`
+	Device          string            `json:"device,omitempty"`
+	Mountpoint      string            `json:"mountpoint,omitempty"`
+	Filesystem      string            `json:"filesystem,omitempty"`
+	Label           string            `json:"label,omitempty"`
+	Confirm         string            `json:"confirm,omitempty"`
+	SizeMiB         uint64            `json:"size_mib,omitempty"`
+	Interface       string            `json:"interface,omitempty"`
+	Address         string            `json:"address,omitempty"`
+	Gateway         string            `json:"gateway,omitempty"`
+	MTU             int               `json:"mtu,omitempty"`
+	Tunnel          string            `json:"tunnel,omitempty"`
+	ListenPort      int               `json:"listen_port,omitempty"`
+	PrivateKey      string            `json:"private_key,omitempty"`
+	PeerPublicKey   string            `json:"peer_public_key,omitempty"`
+	PresharedKey    string            `json:"preshared_key,omitempty"`
+	AllowedIPs      []string          `json:"allowed_ips,omitempty"`
+	Endpoint        string            `json:"endpoint,omitempty"`
+	Keepalive       int               `json:"keepalive,omitempty"`
+	NetworkMethod   string            `json:"network_method,omitempty"`
+	DNS             []string          `json:"dns,omitempty"`
+	RootPath        string            `json:"root_path,omitempty"`
 	RelativePath    string            `json:"relative_path,omitempty"`
 	SMBWorkgroup    string            `json:"smb_workgroup,omitempty"`
 	SMBUser         string            `json:"smb_user,omitempty"`
