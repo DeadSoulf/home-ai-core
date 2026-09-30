@@ -31,7 +31,19 @@ type Request struct {
 	NetworkMethod   string   `json:"network_method,omitempty"`
 	DNS             []string `json:"dns,omitempty"`
 	RootPath        string   `json:"root_path,omitempty"`
-	RelativePath    string   `json:"relative_path,omitempty"`
+	RelativePath    string            `json:"relative_path,omitempty"`
+	SMBWorkgroup    string            `json:"smb_workgroup,omitempty"`
+	SMBUser         string            `json:"smb_user,omitempty"`
+	SMBPassword     string            `json:"smb_password,omitempty"`
+	SMBUsers        []string          `json:"smb_users,omitempty"`
+	SMBShares       []SMBShareRequest `json:"smb_shares,omitempty"`
+}
+
+type SMBShareRequest struct {
+	Name       string   `json:"name"`
+	Path       string   `json:"path"`
+	ReadUsers  []string `json:"read_users,omitempty"`
+	WriteUsers []string `json:"write_users,omitempty"`
 }
 
 type FilesystemStat struct {
@@ -114,6 +126,10 @@ type Response struct {
 	WireGuardTunnels   []WireGuardTunnelStat `json:"wireguard_tunnels,omitempty"`
 	NetworkBackend     string                `json:"network_backend,omitempty"`
 	NetworkProfiles    []NetworkProfileStat  `json:"network_profiles,omitempty"`
+	SMBAvailable       bool                  `json:"smb_available,omitempty"`
+	SMBActive          bool                  `json:"smb_active,omitempty"`
+	SMBError           string                `json:"smb_error,omitempty"`
+	SMBConfiguredUsers []string              `json:"smb_configured_users,omitempty"`
 }
 
 type Result struct {
