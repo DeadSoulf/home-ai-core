@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -1132,3 +1134,135 @@ func TestFileTrashMutationsRequireWriteScope(t *testing.T) {
 		t.Fatalf("restore without write scope status = %d, want %d", rec.Code, http.StatusForbidden)
 	}
 }
+
+func TestResumableFileUploadAPI(t *testing.T) {
+	poolRoot := t.TempDir()
+	folderRoot := filepath.Join(poolRoot, ".home-ai", "shared", "nsf-visible")
+	if err := os.MkdirAll(folderRoot, 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	sec := defaultFakeSecurity()
+	sec.actor.Permissions = []string{"security.self.read"}
+	sec.actor.ResourcePermissions = []security.PermissionScope{
+		{Permission: "files.read", ResourceType: "file_folder", ResourceID: "nsf-visible"},
+		{Permission: "files.write", ResourceType: "file_folder", ResourceID: "nsf-visible"},
+	}
+	handler := testHandlerWithSecurity(fakeState{
+		nasFolders: []state.NASFolderRecord{{
+			ID:           "nsf-visible",
+			PoolID:       "nsp-main",
+			PoolName:     "Main",
+			PoolRoot:     poolRoot,
+			Name:         "Family",
+			Kind:         "shared",
+			RelativePath: "shared/nsf-visible",
+		}},
+	}, sec)
+
+	payload := []byte("hello world")
+	fullHash := sha256.Sum256(payload)
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/files/folders/nsf-visible/uploads",
+		strings.NewReader(`{"path":"large.bin","total_bytes":11,"sha256":"`+hex.EncodeToString(fullHash[:])+`","client_fingerprint":"large.bin:11:1"}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create upload status = %d: %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		Upload filedata.UploadSession `json:"upload"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+		t.Fatal(err)
+	}
+	if created.Upload.ID == "" || created.Upload.ReceivedBytes != 0 {
+		t.Fatalf("unexpected upload session: %#v", created.Upload)
+	}
+
+	first := []byte("hello ")
+	firstHash := sha256.Sum256(first)
+	req = httptest.NewRequest(
+		http.MethodPut,
+		"/api/v1/files/folders/nsf-visible/uploads/"+created.Upload.ID+"/chunk",
+		strings.NewReader(string(first)),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Upload-Offset", "0")
+	req.Header.Set("X-Chunk-SHA256", hex.EncodeToString(firstHash[:]))
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("first chunk status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/files/folders/nsf-visible/uploads",
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list uploads status = %d: %s", rec.Code, rec.Body.String())
+	}
+	var listed struct {
+		Uploads []filedata.UploadSession `json:"uploads"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &listed); err != nil {
+		t.Fatal(err)
+	}
+	if len(listed.Uploads) != 1 || listed.Uploads[0].ReceivedBytes != int64(len(first)) {
+		t.Fatalf("unexpected upload list: %#v", listed.Uploads)
+	}
+
+	second := []byte("world")
+	secondHash := sha256.Sum256(second)
+	req = httptest.NewRequest(
+		http.MethodPut,
+		"/api/v1/files/folders/nsf-visible/uploads/"+created.Upload.ID+"/chunk",
+		strings.NewReader(string(second)),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Upload-Offset", "6")
+	req.Header.Set("X-Chunk-SHA256", hex.EncodeToString(secondHash[:]))
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("second chunk status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/files/folders/nsf-visible/uploads/"+created.Upload.ID+"/complete",
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("complete upload status = %d: %s", rec.Code, rec.Body.String())
+	}
+	var completed struct {
+		File filedata.UploadResult `json:"file"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &completed); err != nil {
+		t.Fatal(err)
+	}
+	if completed.File.SHA256 != hex.EncodeToString(fullHash[:]) {
+		t.Fatalf("completed SHA-256 = %q", completed.File.SHA256)
+	}
+	data, err := os.ReadFile(filepath.Join(folderRoot, "large.bin"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != string(payload) {
+		t.Fatalf("uploaded data = %q", data)
+	}
+}
+
