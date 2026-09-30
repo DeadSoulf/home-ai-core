@@ -28,13 +28,16 @@ type RequestContext struct {
 }
 
 type User struct {
-	ID          string     `json:"id"`
-	Username    string     `json:"username"`
-	DisplayName string     `json:"display_name"`
-	Disabled    bool       `json:"disabled"`
-	CreatedAt   time.Time  `json:"created_at"`
-	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
-	Roles       []string   `json:"roles"`
+	ID                  string            `json:"id"`
+	Username            string            `json:"username"`
+	DisplayName         string            `json:"display_name"`
+	Disabled            bool              `json:"disabled"`
+	CreatedAt           time.Time         `json:"created_at"`
+	LastLoginAt         *time.Time        `json:"last_login_at,omitempty"`
+	Roles               []string          `json:"roles"`
+	Profile             string            `json:"profile"`
+	Permissions         []string          `json:"permissions"`
+	ResourcePermissions []PermissionScope `json:"resource_permissions,omitempty"`
 }
 
 type PermissionScope struct {
@@ -215,54 +218,15 @@ func (s *Service) CreateUser(
 	username, displayName, password string,
 	meta RequestContext,
 ) (User, error) {
-	username, err := NormalizeUsername(username)
-	if err != nil {
-		return User{}, err
-	}
-	displayName, err = NormalizeDisplayName(displayName, username)
-	if err != nil {
-		return User{}, err
-	}
-	passwordHash, err := HashPassword(password)
-	if err != nil {
-		return User{}, err
-	}
-	userID, err := newID("usr_")
-	if err != nil {
-		return User{}, err
-	}
-
-	record, err := s.store.CreateUser(
+	return s.CreateUserWithAccess(
 		ctx,
-		userID,
+		actor,
 		username,
 		displayName,
-		passwordHash,
-		"role_member",
-		s.now().UTC(),
-	)
-	if errors.Is(err, state.ErrUserExists) {
-		return User{}, ErrUserExists
-	}
-	if err != nil {
-		return User{}, err
-	}
-
-	user := userFromRecord(state.UserAccountRecord{
-		User:  record,
-		Roles: []string{"member"},
-	})
-	s.audit(
-		ctx,
+		password,
+		defaultAccessForProfile(ctx, s, ProfileFriend),
 		meta,
-		actor,
-		"security.user.create",
-		"user",
-		user.ID,
-		"success",
-		map[string]any{"username": user.Username, "roles": user.Roles},
 	)
-	return user, nil
 }
 
 func (s *Service) ListUsers(ctx context.Context) ([]User, error) {
@@ -278,14 +242,25 @@ func (s *Service) ListUsers(ctx context.Context) ([]User, error) {
 }
 
 func userFromRecord(record state.UserAccountRecord) User {
+	resourcePermissions := make([]PermissionScope, 0, len(record.ResourcePermissions))
+	for _, scope := range record.ResourcePermissions {
+		resourcePermissions = append(resourcePermissions, PermissionScope{
+			Permission:   scope.Permission,
+			ResourceType: scope.ResourceType,
+			ResourceID:   scope.ResourceID,
+		})
+	}
 	return User{
-		ID:          record.User.ID,
-		Username:    record.User.Username,
-		DisplayName: record.User.DisplayName,
-		Disabled:    record.User.Disabled,
-		CreatedAt:   record.User.CreatedAt,
-		LastLoginAt: record.User.LastLoginAt,
-		Roles:       record.Roles,
+		ID:                  record.User.ID,
+		Username:            record.User.Username,
+		DisplayName:         record.User.DisplayName,
+		Disabled:            record.User.Disabled,
+		CreatedAt:           record.User.CreatedAt,
+		LastLoginAt:         record.User.LastLoginAt,
+		Roles:               record.Roles,
+		Profile:             profileFromRoles(record.Roles),
+		Permissions:         record.Permissions,
+		ResourcePermissions: resourcePermissions,
 	}
 }
 
