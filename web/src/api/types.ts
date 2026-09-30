@@ -260,6 +260,21 @@ export type NetworkProfileStatus = {
   profiles: NetworkProfile[];
 };
 
+export type StoragePurpose = "files" | "video";
+
+export type StoragePurposeAssignment = {
+  device: string;
+  filesystem_uuid?: string;
+  purpose: StoragePurpose;
+  present: boolean;
+  filesystem?: string;
+  label?: string;
+  mountpoints: string[];
+  size_bytes?: number;
+  free_bytes?: number;
+  free_known: boolean;
+};
+
 export type FilePool = {
   id: string;
   name: string;
