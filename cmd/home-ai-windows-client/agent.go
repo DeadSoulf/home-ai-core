@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DeadSoulf/home-ai-core/internal/version"
 	"github.com/DeadSoulf/home-ai-core/internal/windowsclient"
 )
 
@@ -139,7 +140,7 @@ func runAgent(args []string) error {
 		fmt.Printf("%s Home-AI sync agent starting\n", time.Now().Format(time.RFC3339))
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer cancel()
-		tray, err := startAgentTray(logPath, configPath)
+		tray, err := startAgentTray(logPath, configPath, version.Version)
 		if err != nil {
 			return fmt.Errorf("start tray UI: %w", err)
 		}
@@ -153,11 +154,64 @@ func runAgent(args []string) error {
 				}
 			}()
 		}
-		err = watchSyncProfiles(ctx, configPath, "", retries, restartStale, poll, tray.RunNow)
+		if tray.UpdateNow != nil {
+			go func() {
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-tray.UpdateNow:
+						tray.SetStatus("Checking for updates")
+						updateCtx, updateCancel := context.WithTimeout(ctx, 10*time.Minute)
+						started, nextVersion, updateErr := startClientUpdate(updateCtx, configPath)
+						updateCancel()
+						switch {
+						case updateErr != nil:
+							tray.SetStatus("Update check failed")
+							tray.Notify("Home-AI update failed", trayErrorText(updateErr), true)
+						case !started:
+							tray.SetStatus("Up to date")
+							tray.Notify("Home-AI", "Windows client is up to date.", false)
+						default:
+							tray.SetStatus("Updating to " + nextVersion)
+							tray.Notify("Home-AI update", "Update verified. The sync agent will restart.", false)
+							cancel()
+							return
+						}
+					}
+				}
+			}()
+		}
+		err = watchSyncProfiles(ctx, configPath, "", retries, restartStale, poll, tray.RunNow, func(status syncWatchStatus) {
+			switch status.State {
+			case "syncing":
+				tray.SetStatus("Syncing")
+			case "error":
+				tray.SetStatus("Sync error")
+				tray.Notify("Home-AI sync failed", trayErrorText(status.Err), true)
+			case "idle":
+				if status.RunProfiles > 0 {
+					tray.SetStatus("Last sync OK " + status.At.Local().Format("15:04"))
+				} else {
+					tray.SetStatus("Idle")
+				}
+			}
+		})
 		fmt.Printf("%s Home-AI sync agent stopped: %v\n", time.Now().Format(time.RFC3339), err)
 		return err
 	}
 	return nil
+}
+
+func trayErrorText(err error) string {
+	if err == nil {
+		return "Unknown error"
+	}
+	runes := []rune(strings.TrimSpace(err.Error()))
+	if len(runes) > 220 {
+		runes = append(runes[:217], '.', '.', '.')
+	}
+	return string(runes)
 }
 
 func validateAgentReady(configPath string) error {
