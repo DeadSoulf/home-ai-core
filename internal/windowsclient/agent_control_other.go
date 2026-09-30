@@ -10,7 +10,6 @@ func StartUserAgent(executable, configPath string) error {
 	return ErrUserAutostartUnsupported
 }
 
-
 func UserAgentRunning() bool {
 	return false
 }
