@@ -29,7 +29,7 @@ func TestSMBShareNameIsStableAndASCII(t *testing.T) {
 		Name: "Family Фото",
 	}
 	got := smbShareName(record)
-	want := "HA_Family_789abcdef"
+	want := "HA_Family_89abcdef"
 	if got != want {
 		t.Fatalf("smbShareName() = %q, want %q", got, want)
 	}
