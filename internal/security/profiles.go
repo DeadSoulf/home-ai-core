@@ -43,9 +43,9 @@ type ResourceDefinition struct {
 }
 
 type AccessCatalog struct {
-	Profiles    []ProfileTemplate     `json:"profiles"`
+	Profiles    []ProfileTemplate      `json:"profiles"`
 	Permissions []PermissionDefinition `json:"permissions"`
-	Resources   []ResourceDefinition  `json:"resources"`
+	Resources   []ResourceDefinition   `json:"resources"`
 }
 
 type UserAccessInput struct {
@@ -122,9 +122,9 @@ func (s *Service) AccessCatalog(ctx context.Context) (AccessCatalog, error) {
 
 	profiles := []ProfileTemplate{
 		{
-			ID:          ProfileAdministrator,
-			Description: "Full Home-AI administration",
-			FullAccess:  true,
+			ID:                 ProfileAdministrator,
+			Description:        "Full Home-AI administration",
+			FullAccess:         true,
 			DefaultPermissions: permissionNames(permissionRecords),
 		},
 		{
@@ -459,4 +459,3 @@ func defaultAccessForProfile(ctx context.Context, service *Service, profile stri
 	}
 	return UserAccessInput{Profile: profile}
 }
-
