@@ -7,6 +7,7 @@ import type {
   RegisteredModule,
   SetupStatus,
   SystemResponse,
+  SystemReadiness,
   UpdateStatus,
   UpdaterState,
   UserAccount,
@@ -287,6 +288,11 @@ export const api = {
   },
 
   system: () => request<SystemResponse>("/api/v1/system"),
+
+  systemReadiness: async () => {
+    const result = await request<{readiness: SystemReadiness}>("/api/v1/system/readiness");
+    return result.readiness;
+  },
 
   setDiskName: async (device: string, name: string) =>
     postJSON<{name: string}>("/api/v1/storage/name", {device, name}, true),
