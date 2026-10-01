@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	prepareFilePool   = storage.PrepareNASPool
-	prepareFileFolder = storage.PrepareNASFolder
+	prepareFilePool        = storage.PrepareNASPool
+	prepareFileFolder      = storage.PrepareNASFolder
 	resolveFilePoolStorage = func(nodeID, rootPath string, assignments []state.StoragePurposeRecord) (systeminfo.BlockNode, error) {
 		return filePoolStorageNode(rootPath, assignments, systeminfo.Collect(nodeID).BlockTree)
 	}
@@ -850,7 +850,6 @@ func (s *server) authorizedFileFolder(
 	}
 	return folder, root, true
 }
-
 
 func filePoolStorageNode(
 	rootPath string,
