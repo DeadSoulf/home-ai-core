@@ -49,7 +49,6 @@ func TestMountTargetPresentNormalizesPaths(t *testing.T) {
 	}
 }
 
-
 func TestHostMountCommandArgsTargetsPID1MountNamespace(t *testing.T) {
 	got := strings.Join(hostMountCommandArgs("/usr/bin/mount", "-o", "usrquota", "--", "/dev/sdb1", "/mnt/home-ai-core/sdb1"), " ")
 	want := "--mount=/proc/1/ns/mnt -- /usr/bin/mount -o usrquota -- /dev/sdb1 /mnt/home-ai-core/sdb1"
