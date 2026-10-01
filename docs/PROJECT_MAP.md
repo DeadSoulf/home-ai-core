@@ -53,7 +53,7 @@
 ### Сводка завершённых работ 0.1.109–0.1.112
 
 - ✅ **Core update safety:** negative bundle tests, полный live `update → rollback → re-update`, сохранение login/System/state и повторный нормальный запуск.
-- ✅ **Network persistence:** после reboot сеть подтверждена рабочей на живом сервере; отдельная WireGuard persistence-проверка остаётся открытой.
+- ✅ **Network persistence:** после reboot сеть подтверждена рабочей на живом сервере; WireGuard reboot/autostart/handshake acceptance также подтверждён.
 - ✅ **Security/update signing:** detached Ed25519 verification и fail-closed для stable/RC реализованы; private signing key не хранится в репозитории/на node.
 - ✅ **Storage safety:** destructive storage Web actions получили read-only dry-run/preflight до подтверждённого изменения.
 - ✅ **Windows client:** утверждённый HOME AI dashboard, sidebar navigation, cards, tray popup, сохранённый sync/agent/Credential Manager engine.
