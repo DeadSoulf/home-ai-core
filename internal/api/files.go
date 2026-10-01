@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -949,6 +950,15 @@ func (s *server) filePoolResponse(ctx context.Context, record state.NASPoolRecor
 
 func (s *server) filePoolCapacityFallback(ctx context.Context, record state.NASPoolRecord) (filedata.Capacity, bool) {
 	nodes := systeminfo.Collect(s.nodeID).BlockTree
+	inspection, _ := storage.Inspect(ctx)
+	return filePoolCapacityFromInventory(record, nodes, inspection)
+}
+
+func filePoolCapacityFromInventory(
+	record state.NASPoolRecord,
+	nodes []systeminfo.BlockNode,
+	inspection storage.Inspection,
+) (filedata.Capacity, bool) {
 	assignment := state.StoragePurposeRecord{
 		DevicePath:     record.StorageDevicePath,
 		FilesystemUUID: record.StorageFilesystemUUID,
@@ -962,17 +972,15 @@ func (s *server) filePoolCapacityFallback(ctx context.Context, record state.NASP
 	freeBytes := node.FreeBytes
 	freeKnown := node.FreeKnown
 	if !freeKnown {
-		if inspection, err := storage.Inspect(ctx); err == nil {
-			for _, stat := range inspection.Filesystems {
-				if filepath.Clean(strings.TrimSpace(stat.Device)) != filepath.Clean(strings.TrimSpace(node.Path)) {
-					continue
-				}
-				if stat.FreeKnown {
-					freeBytes = stat.FreeBytes
-					freeKnown = true
-				}
-				break
+		for _, stat := range inspection.Filesystems {
+			if filepath.Clean(strings.TrimSpace(stat.Device)) != filepath.Clean(strings.TrimSpace(node.Path)) {
+				continue
 			}
+			if stat.FreeKnown {
+				freeBytes = stat.FreeBytes
+				freeKnown = true
+			}
+			break
 		}
 	}
 	if !freeKnown {
