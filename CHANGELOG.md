@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.92-dev
+
+- Fix Files section navigation so Folders, Storage and Windows are addressable as stable deep links.
+- Preserve `/files#storage` and `/files#windows` across reloads, browser Back/Forward navigation and direct links.
+- Keep Storage/Windows management sections restricted to actors with `files.manage`, while limited file users stay on Folders.
+- Add navigation regression coverage for Files section routing.
+
 ## 0.1.91-dev
 
 - Complete user identity editing, administrative password reset and self-service password changes; credential changes and account disable revoke previous sessions. Protect the last enabled administrator in the same state transaction.

@@ -3,7 +3,7 @@ import { api, APIError, connectRealtime, setCSRFToken, type RealtimeStatus } fro
 import type { Actor } from "./api/types";
 import { Shell } from "./components/Shell";
 import { useI18n } from "./i18n";
-import { accessiblePath, systemSection } from "./navigation";
+import { accessiblePath, fileSection, systemSection } from "./navigation";
 import { FirstRunPage, LoginPage } from "./pages/Auth";
 import { AccountPage } from "./pages/Account";
 import { AuditPage } from "./pages/Audit";
@@ -18,7 +18,7 @@ type Phase = "loading" | "setup" | "login" | "app";
 
 function currentPath(): string {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
-  return ["/", "/files", "/system", "/modules", "/jobs", "/audit", "/users", "/account"].includes(path) ? path + (path === "/system" ? window.location.hash : "") : "/";
+  return ["/", "/files", "/system", "/modules", "/jobs", "/audit", "/users", "/account"].includes(path) ? path + (path === "/system" || path === "/files" ? window.location.hash : "") : "/";
 }
 
 export default function App() {
@@ -170,7 +170,14 @@ export default function App() {
       break;
     case "/files":
       page = has("security.self.read")
-        ? <FilesPage revision={revision} canManage={has("files.manage")} />
+        ? (
+          <FilesPage
+            revision={revision}
+            canManage={has("files.manage")}
+            section={fileSection(allowedPath)}
+            onSectionChange={(section) => navigate("/files#" + section)}
+          />
+        )
         : accountPage;
       break;
     case "/system":

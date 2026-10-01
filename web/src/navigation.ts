@@ -34,6 +34,14 @@ export function visibleNavigation(actor: Actor): NavigationGroup[] {
 export const systemSections = ["equipment", "storage", "network", "updates"] as const;
 export type SystemSection = typeof systemSections[number];
 
+export const fileSections = ["folders", "storage", "windows"] as const;
+export type FileSection = typeof fileSections[number];
+
+export function fileSection(path: string): FileSection {
+  const value = path.split("#")[1];
+  return fileSections.find((section) => section === value) || "folders";
+}
+
 export function systemSection(path: string): SystemSection {
   const value = path.split("#")[1];
   return systemSections.find((section) => section === value) || "equipment";
@@ -44,8 +52,16 @@ export function accessiblePath(actor: Actor, path: string): string {
   const route = raw.replace(/\/+$/, "") || "/";
   const allowed = route === "/account" || visibleNavigation(actor).some((group) => group.items.some((item) => item.path === route));
   if (!allowed) return "/";
-  if (route !== "/system" || !hash) return route;
-  const section = systemSection(path);
-  if (section === "updates" && !hasPermission(actor, "updates.read")) return route;
-  return route + "#" + section;
+  if (!hash) return route;
+  if (route === "/system") {
+    const section = systemSection(path);
+    if (section === "updates" && !hasPermission(actor, "updates.read")) return route;
+    return route + "#" + section;
+  }
+  if (route === "/files") {
+    const section = fileSection(path);
+    if (section !== "folders" && !hasPermission(actor, "files.manage")) return route;
+    return route + "#" + section;
+  }
+  return route;
 }
