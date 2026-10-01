@@ -182,6 +182,14 @@ Android is planned later. A dedicated Android application is not an immediate pr
 
 ## 8. AI Agent
 
+### Development sequencing
+
+The **AI Agent foundation starts before the full Smart Home/NVR implementations** so the agent, tool contracts and future domain APIs evolve together.
+
+This does not move Smart Home or NVR business logic into AI. Instead, the agent is developed as a first-party module that consumes explicit typed tools exposed by Core/domain modules. Core remains the trusted control plane for identity, permissions, jobs, events and audit.
+
+The active foundation plan is documented in [AI_AGENT_FOUNDATION.md](AI_AGENT_FOUNDATION.md).
+
 The AI Agent is a central product layer, not merely a chat window.
 
 It should understand authorized context from:
