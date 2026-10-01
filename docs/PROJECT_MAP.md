@@ -5,8 +5,8 @@
 > Аудит уже сделанного: [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
-**Последний опубликованный релиз:** `0.1.82-dev` — Russian/English native Windows client UI\
-**Текущий срез:** `0.1.83-dev` release candidate — единые пользователи и настраиваемые права доступа\
+**Последний опубликованный релиз:** `0.1.83-dev` — единые пользователи и настраиваемые права доступа\
+**Текущий срез:** `0.1.83-dev` — published; live unified-users acceptance pending\
 **Следующий engineering milestone:** live acceptance unified users, затем возврат к storage-purpose slice и automatic Windows release discovery/download + SHA-256 verified install handoff\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
