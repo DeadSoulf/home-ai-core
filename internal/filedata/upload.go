@@ -252,17 +252,27 @@ func AppendUploadChunk(
 	}
 
 	hasher := sha256.New()
-	written, copyErr := io.Copy(io.MultiWriter(part, hasher), io.LimitReader(source, limit+1))
+	limited := &io.LimitedReader{R: source, N: limit}
+	written, copyErr := io.Copy(io.MultiWriter(part, hasher), limited)
 	if copyErr != nil {
 		_ = part.Truncate(offset)
 		_ = part.Close()
 		return UploadSession{}, fmt.Errorf("write upload chunk: %w", copyErr)
 	}
-	if written > limit {
-		_ = part.Truncate(offset)
-		_ = part.Sync()
-		_ = part.Close()
-		return UploadSession{}, ErrUploadChunkTooLarge
+	if limited.N == 0 {
+		var probe [1]byte
+		n, readErr := io.ReadFull(source, probe[:])
+		if n > 0 {
+			_ = part.Truncate(offset)
+			_ = part.Sync()
+			_ = part.Close()
+			return UploadSession{}, ErrUploadChunkTooLarge
+		}
+		if readErr != nil && !errors.Is(readErr, io.EOF) && !errors.Is(readErr, io.ErrUnexpectedEOF) {
+			_ = part.Truncate(offset)
+			_ = part.Close()
+			return UploadSession{}, fmt.Errorf("check upload chunk limit: %w", readErr)
+		}
 	}
 	if written == 0 {
 		_ = part.Close()

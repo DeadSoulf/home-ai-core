@@ -216,6 +216,14 @@ describe("API client", () => {
           id: "nsp-1",
           name: "Main",
           root_path: "/srv/home-ai/main",
+          reserve_percent: 5,
+          warning_percent: 10,
+          capacity_known: true,
+          size_bytes: 1000,
+          free_bytes: 700,
+          reserve_bytes: 50,
+          warning_bytes: 100,
+          capacity_state: "ok",
         },
       }), {
         status: 201,
@@ -243,6 +251,14 @@ describe("API client", () => {
     expect(init?.method).toBe("POST");
     expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-files");
     expect(String(init?.body)).toContain('"root_path":"/srv/home-ai/main"');
+
+    await api.updateFilePoolCapacityPolicy("nsp-1", {reservePercent: 7, warningPercent: 15});
+    const [policyInput, policyInit] = fetchMock.mock.calls[2];
+    expect(String(policyInput)).toBe("/api/v1/files/pools/nsp-1/capacity-policy");
+    expect(policyInit?.method).toBe("PATCH");
+    expect(new Headers(policyInit?.headers).get("X-CSRF-Token")).toBe("csrf-files");
+    expect(String(policyInit?.body)).toContain('"reserve_percent":7');
+    expect(String(policyInit?.body)).toContain('"warning_percent":15');
 
     vi.unstubAllGlobals();
   });

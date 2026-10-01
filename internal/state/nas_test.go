@@ -49,6 +49,16 @@ func TestNASFolderGrants(t *testing.T) {
 	if pool.StorageDevicePath != "/dev/sdb1" || pool.StorageFilesystemUUID != "uuid-main" {
 		t.Fatalf("pool storage identity = %q %q", pool.StorageDevicePath, pool.StorageFilesystemUUID)
 	}
+	if pool.ReservePercent != DefaultNASPoolReservePercent || pool.WarningPercent != DefaultNASPoolWarningPercent {
+		t.Fatalf("pool capacity policy = reserve %d warning %d", pool.ReservePercent, pool.WarningPercent)
+	}
+	pool, err = store.UpdateNASPoolCapacityPolicy(ctx, pool.ID, 7, 15, now.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("UpdateNASPoolCapacityPolicy() error = %v", err)
+	}
+	if pool.ReservePercent != 7 || pool.WarningPercent != 15 {
+		t.Fatalf("updated pool capacity policy = reserve %d warning %d", pool.ReservePercent, pool.WarningPercent)
+	}
 
 	privateFolder, err := store.CreateNASFolder(
 		ctx,
@@ -67,6 +77,9 @@ func TestNASFolderGrants(t *testing.T) {
 	}
 	if privateFolder.PoolRoot != "/srv/home-ai/main" {
 		t.Fatalf("private pool root = %q", privateFolder.PoolRoot)
+	}
+	if privateFolder.PoolReservePercent != 7 || privateFolder.PoolWarningPercent != 15 {
+		t.Fatalf("private folder pool policy = reserve %d warning %d", privateFolder.PoolReservePercent, privateFolder.PoolWarningPercent)
 	}
 
 	_, _, privateScopes, err := store.userAccess(ctx, member.ID)
@@ -121,6 +134,30 @@ func TestNASFolderGrants(t *testing.T) {
 		if scope.ResourceType == "file_folder" && scope.ResourceID == privateFolder.ID {
 			t.Fatalf("stale private folder grant after delete: %#v", scope)
 		}
+	}
+}
+
+func TestNASPoolCapacityPolicyValidation(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer store.Close()
+
+	now := time.Now().UTC()
+	pool, err := store.CreateNASPool(ctx, "Main", "/srv/home-ai/main", "/dev/sdb1", "uuid-main", "", now)
+	if err != nil {
+		t.Fatalf("CreateNASPool() error = %v", err)
+	}
+	if _, err := store.UpdateNASPoolCapacityPolicy(ctx, pool.ID, 51, 60, now); err == nil {
+		t.Fatal("reserve above 50 percent was accepted")
+	}
+	if _, err := store.UpdateNASPoolCapacityPolicy(ctx, pool.ID, 20, 10, now); err == nil {
+		t.Fatal("warning below reserve was accepted")
+	}
+	if _, err := store.UpdateNASPoolCapacityPolicy(ctx, pool.ID, 20, 0, now); err != nil {
+		t.Fatalf("disabled warning was rejected: %v", err)
 	}
 }
 

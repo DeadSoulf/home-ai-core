@@ -19,29 +19,38 @@ var (
 	ErrNASFolderNotFound = errors.New("NAS folder not found")
 )
 
+const (
+	DefaultNASPoolReservePercent = 5
+	DefaultNASPoolWarningPercent = 10
+)
+
 type NASPoolRecord struct {
 	ID                    string
 	Name                  string
 	RootPath              string
 	StorageDevicePath     string
 	StorageFilesystemUUID string
+	ReservePercent        int
+	WarningPercent        int
 	CreatedBy             string
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 }
 
 type NASFolderRecord struct {
-	ID           string
-	PoolID       string
-	PoolName     string
-	PoolRoot     string
-	Name         string
-	Kind         string
-	OwnerUserID  string
-	RelativePath string
-	CreatedBy    string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID                 string
+	PoolID             string
+	PoolName           string
+	PoolRoot           string
+	PoolReservePercent int
+	PoolWarningPercent int
+	Name               string
+	Kind               string
+	OwnerUserID        string
+	RelativePath       string
+	CreatedBy          string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 func (s *Store) CreateNASPool(
@@ -89,6 +98,8 @@ func (s *Store) CreateNASPool(
 		RootPath:              rootPath,
 		StorageDevicePath:     storageDevicePath,
 		StorageFilesystemUUID: storageFilesystemUUID,
+		ReservePercent:        DefaultNASPoolReservePercent,
+		WarningPercent:        DefaultNASPoolWarningPercent,
 		CreatedBy:             createdBy,
 		CreatedAt:             now.UTC(),
 		UpdatedAt:             now.UTC(),
@@ -98,6 +109,7 @@ func (s *Store) CreateNASPool(
 func (s *Store) ListNASPools(ctx context.Context) ([]NASPoolRecord, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, name, root_path, storage_device_path, storage_filesystem_uuid,
+		       reserve_percent, warning_percent,
 		       COALESCE(created_by, ''), created_at, updated_at
 		FROM nas_pools
 		ORDER BY name COLLATE NOCASE
@@ -117,6 +129,8 @@ func (s *Store) ListNASPools(ctx context.Context) ([]NASPoolRecord, error) {
 			&record.RootPath,
 			&record.StorageDevicePath,
 			&record.StorageFilesystemUUID,
+			&record.ReservePercent,
+			&record.WarningPercent,
 			&record.CreatedBy,
 			&createdAt,
 			&updatedAt,
@@ -167,11 +181,12 @@ func (s *Store) CreateNASFolder(
 	defer func() { _ = tx.Rollback() }()
 
 	var poolName, poolRoot string
+	var poolReservePercent, poolWarningPercent int
 	if err := tx.QueryRowContext(
 		ctx,
-		"SELECT name, root_path FROM nas_pools WHERE id = ?",
+		"SELECT name, root_path, reserve_percent, warning_percent FROM nas_pools WHERE id = ?",
 		poolID,
-	).Scan(&poolName, &poolRoot); err != nil {
+	).Scan(&poolName, &poolRoot, &poolReservePercent, &poolWarningPercent); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return NASFolderRecord{}, ErrNASPoolNotFound
 		}
@@ -229,17 +244,19 @@ func (s *Store) CreateNASFolder(
 	}
 
 	return NASFolderRecord{
-		ID:           id,
-		PoolID:       poolID,
-		PoolName:     poolName,
-		PoolRoot:     poolRoot,
-		Name:         name,
-		Kind:         kind,
-		OwnerUserID:  ownerUserID,
-		RelativePath: relativePath,
-		CreatedBy:    createdBy,
-		CreatedAt:    now.UTC(),
-		UpdatedAt:    now.UTC(),
+		ID:                 id,
+		PoolID:             poolID,
+		PoolName:           poolName,
+		PoolRoot:           poolRoot,
+		PoolReservePercent: poolReservePercent,
+		PoolWarningPercent: poolWarningPercent,
+		Name:               name,
+		Kind:               kind,
+		OwnerUserID:        ownerUserID,
+		RelativePath:       relativePath,
+		CreatedBy:          createdBy,
+		CreatedAt:          now.UTC(),
+		UpdatedAt:          now.UTC(),
 	}, nil
 }
 
@@ -247,8 +264,8 @@ func (s *Store) NASFolder(ctx context.Context, folderID string) (NASFolderRecord
 	var record NASFolderRecord
 	var createdAt, updatedAt string
 	err := s.db.QueryRowContext(ctx, `
-		SELECT f.id, f.pool_id, p.name, p.root_path, f.name, f.kind,
-		       COALESCE(f.owner_user_id, ''), f.relative_path,
+		SELECT f.id, f.pool_id, p.name, p.root_path, p.reserve_percent, p.warning_percent,
+		       f.name, f.kind, COALESCE(f.owner_user_id, ''), f.relative_path,
 		       COALESCE(f.created_by, ''), f.created_at, f.updated_at
 		FROM nas_folders f
 		JOIN nas_pools p ON p.id = f.pool_id
@@ -258,6 +275,8 @@ func (s *Store) NASFolder(ctx context.Context, folderID string) (NASFolderRecord
 		&record.PoolID,
 		&record.PoolName,
 		&record.PoolRoot,
+		&record.PoolReservePercent,
+		&record.PoolWarningPercent,
 		&record.Name,
 		&record.Kind,
 		&record.OwnerUserID,
@@ -285,8 +304,8 @@ func (s *Store) NASFolder(ctx context.Context, folderID string) (NASFolderRecord
 
 func (s *Store) ListNASFolders(ctx context.Context) ([]NASFolderRecord, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT f.id, f.pool_id, p.name, p.root_path, f.name, f.kind,
-		       COALESCE(f.owner_user_id, ''), f.relative_path,
+		SELECT f.id, f.pool_id, p.name, p.root_path, p.reserve_percent, p.warning_percent,
+		       f.name, f.kind, COALESCE(f.owner_user_id, ''), f.relative_path,
 		       COALESCE(f.created_by, ''), f.created_at, f.updated_at
 		FROM nas_folders f
 		JOIN nas_pools p ON p.id = f.pool_id
@@ -306,6 +325,8 @@ func (s *Store) ListNASFolders(ctx context.Context) ([]NASFolderRecord, error) {
 			&record.PoolID,
 			&record.PoolName,
 			&record.PoolRoot,
+			&record.PoolReservePercent,
+			&record.PoolWarningPercent,
 			&record.Name,
 			&record.Kind,
 			&record.OwnerUserID,
@@ -330,6 +351,73 @@ func (s *Store) ListNASFolders(ctx context.Context) ([]NASFolderRecord, error) {
 		return nil, fmt.Errorf("iterate NAS folders: %w", err)
 	}
 	return result, nil
+}
+
+func (s *Store) NASPool(ctx context.Context, poolID string) (NASPoolRecord, error) {
+	var record NASPoolRecord
+	var createdAt, updatedAt string
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id, name, root_path, storage_device_path, storage_filesystem_uuid,
+		       reserve_percent, warning_percent,
+		       COALESCE(created_by, ''), created_at, updated_at
+		FROM nas_pools
+		WHERE id = ?
+	`, strings.TrimSpace(poolID)).Scan(
+		&record.ID,
+		&record.Name,
+		&record.RootPath,
+		&record.StorageDevicePath,
+		&record.StorageFilesystemUUID,
+		&record.ReservePercent,
+		&record.WarningPercent,
+		&record.CreatedBy,
+		&createdAt,
+		&updatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return NASPoolRecord{}, ErrNASPoolNotFound
+	}
+	if err != nil {
+		return NASPoolRecord{}, fmt.Errorf("read NAS pool: %w", err)
+	}
+	record.CreatedAt, err = time.Parse(time.RFC3339Nano, createdAt)
+	if err != nil {
+		return NASPoolRecord{}, fmt.Errorf("parse NAS pool created_at: %w", err)
+	}
+	record.UpdatedAt, err = time.Parse(time.RFC3339Nano, updatedAt)
+	if err != nil {
+		return NASPoolRecord{}, fmt.Errorf("parse NAS pool updated_at: %w", err)
+	}
+	return record, nil
+}
+
+func (s *Store) UpdateNASPoolCapacityPolicy(
+	ctx context.Context,
+	poolID string,
+	reservePercent, warningPercent int,
+	now time.Time,
+) (NASPoolRecord, error) {
+	if reservePercent < 0 || reservePercent > 50 {
+		return NASPoolRecord{}, errors.New("NAS pool reserve percent must be between 0 and 50")
+	}
+	if warningPercent < 0 || warningPercent > 95 {
+		return NASPoolRecord{}, errors.New("NAS pool warning percent must be between 0 and 95")
+	}
+	if warningPercent != 0 && warningPercent < reservePercent {
+		return NASPoolRecord{}, errors.New("NAS pool warning percent must be zero or at least the reserve percent")
+	}
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE nas_pools
+		SET reserve_percent = ?, warning_percent = ?, updated_at = ?
+		WHERE id = ?
+	`, reservePercent, warningPercent, now.UTC().Format(time.RFC3339Nano), strings.TrimSpace(poolID))
+	if err != nil {
+		return NASPoolRecord{}, fmt.Errorf("update NAS pool capacity policy: %w", err)
+	}
+	if count, _ := result.RowsAffected(); count == 0 {
+		return NASPoolRecord{}, ErrNASPoolNotFound
+	}
+	return s.NASPool(ctx, poolID)
 }
 
 func (s *Store) DeleteNASFolder(ctx context.Context, folderID string) error {

@@ -322,6 +322,14 @@ export type FilePool = {
   root_path: string;
   storage_device?: string;
   storage_filesystem_uuid?: string;
+  reserve_percent: number;
+  warning_percent: number;
+  capacity_known: boolean;
+  size_bytes?: number;
+  free_bytes?: number;
+  reserve_bytes?: number;
+  warning_bytes?: number;
+  capacity_state: "unknown" | "ok" | "warning" | "reserve";
 };
 
 export type FileFolder = {

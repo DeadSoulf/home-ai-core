@@ -13,6 +13,8 @@ import (
 
 const dataRootName = ".home-ai"
 
+var ErrCapacityLimit = errors.New("write exceeds allowed storage capacity")
+
 type Entry struct {
 	Name       string    `json:"name"`
 	Path       string    `json:"path"`
@@ -130,6 +132,10 @@ func CreateDirectory(root, relative string) error {
 }
 
 func Upload(root, relative string, source io.Reader) (int64, error) {
+	return UploadLimited(root, relative, source, -1)
+}
+
+func UploadLimited(root, relative string, source io.Reader, maxBytes int64) (int64, error) {
 	parentRelative, name, err := splitTarget(relative)
 	if err != nil {
 		return 0, err
@@ -166,7 +172,27 @@ func Upload(root, relative string, source io.Reader) (int64, error) {
 		_ = temp.Close()
 		return 0, err
 	}
-	written, copyErr := io.Copy(temp, source)
+
+	var written int64
+	var copyErr error
+	if maxBytes < 0 {
+		written, copyErr = io.Copy(temp, source)
+	} else {
+		limited := &io.LimitedReader{R: source, N: maxBytes}
+		written, copyErr = io.Copy(temp, limited)
+		if copyErr == nil && limited.N == 0 {
+			var probe [1]byte
+			n, readErr := io.ReadFull(source, probe[:])
+			if n > 0 {
+				_ = temp.Close()
+				return written, ErrCapacityLimit
+			}
+			if readErr != nil && !errors.Is(readErr, io.EOF) && !errors.Is(readErr, io.ErrUnexpectedEOF) {
+				_ = temp.Close()
+				return written, fmt.Errorf("check upload capacity: %w", readErr)
+			}
+		}
+	}
 	if copyErr != nil {
 		_ = temp.Close()
 		return written, fmt.Errorf("write upload: %w", copyErr)

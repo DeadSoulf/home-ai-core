@@ -51,6 +51,26 @@ func TestListCreateUploadDownload(t *testing.T) {
 	}
 }
 
+func TestUploadLimitedRejectsBeforeCommit(t *testing.T) {
+	root := t.TempDir()
+	if _, err := UploadLimited(root, "too-large.txt", bytes.NewBufferString("hello"), 4); !errors.Is(err, ErrCapacityLimit) {
+		t.Fatalf("capacity error = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "too-large.txt")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("limited upload committed unexpectedly: %v", err)
+	}
+	if _, err := UploadLimited(root, "exact.txt", bytes.NewBufferString("hello"), 5); err != nil {
+		t.Fatalf("exact-limit upload error = %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "exact.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "hello" {
+		t.Fatalf("exact-limit upload = %q", data)
+	}
+}
+
 func TestTraversalAndSymlinkAreRejected(t *testing.T) {
 	base := t.TempDir()
 	root := filepath.Join(base, "folder")
