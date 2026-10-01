@@ -80,7 +80,7 @@ export type BlockNode = {
   free_known?: boolean;
   unallocated_bytes?: number;
   partition_table?: string;
-  mountpoints: string[];
+  mountpoints?: string[] | null;
   parent_name?: string;
   label?: string;
   uuid?: string;
