@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
@@ -71,6 +72,58 @@ func performNASOperation(
 	default:
 		return "", errors.New("unsupported NAS operation")
 	}
+}
+
+func inspectNASFolderUsage(ctx context.Context, request updaterhelper.Request) (int64, error) {
+	root := filepath.Clean(strings.TrimSpace(request.RootPath))
+	if root == "." || !filepath.IsAbs(root) || root == nasMountRoot || !strings.HasPrefix(root, nasMountRoot+string(filepath.Separator)) {
+		return 0, fmt.Errorf("NAS pool root must be a mounted filesystem under %s", nasMountRoot)
+	}
+	relative, err := validateNASRelativePath(request.RelativePath)
+	if err != nil {
+		return 0, err
+	}
+
+	mountOutput, err := hostMountCommand(ctx, "/usr/bin/findmnt", "-rn", "-T", root, "-o", "TARGET").CombinedOutput()
+	if err != nil {
+		return 0, fmt.Errorf("inspect NAS pool mount: %s", strings.TrimSpace(string(mountOutput)))
+	}
+	if target := filepath.Clean(strings.TrimSpace(string(mountOutput))); target != root {
+		return 0, errors.New("NAS pool root must be the filesystem mount point itself")
+	}
+
+	folder := filepath.Join(root, ".home-ai", relative)
+	output, err := hostMountCommand(
+		ctx,
+		"/usr/bin/du",
+		"-s",
+		"-B1",
+		"--apparent-size",
+		"--one-file-system",
+		"--exclude=.home-ai-upload-*",
+		"--",
+		folder,
+	).CombinedOutput()
+	if err != nil {
+		return 0, fmt.Errorf("inspect NAS folder usage: %s", strings.TrimSpace(string(output)))
+	}
+	used, ok := parseDUUsageOutput(output)
+	if !ok {
+		return 0, errors.New("inspect NAS folder usage: invalid du output")
+	}
+	return used, nil
+}
+
+func parseDUUsageOutput(output []byte) (int64, bool) {
+	fields := strings.Fields(strings.TrimSpace(string(output)))
+	if len(fields) == 0 {
+		return 0, false
+	}
+	value, err := strconv.ParseInt(fields[0], 10, 64)
+	if err != nil || value < 0 {
+		return 0, false
+	}
+	return value, true
 }
 
 func validateNASRoot(ctx context.Context, value string) (string, error) {
