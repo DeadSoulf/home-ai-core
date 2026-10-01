@@ -7,8 +7,8 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последний опубликованный релиз:** `0.1.106-dev` — Files capacity теперь читается напрямую через host `df -B1`\
-**Текущий срез:** `0.1.106-dev` — indirect `lsblk FSAVAIL` заменён основным путём `findmnt → df` в host namespace; inspection cache сбрасывается после storage mutations\
-**Следующий engineering milestone:** подтвердить на живом сервере реальные значения **Свободно / Всего** из host `df`; затем live acceptance SMB/квот, reboot persistence и Windows-клиента\
+**Текущий срез:** `0.1.106-dev` — host `findmnt → df` подтверждён на живом сервере: **Свободно / Всего** в Files storage отображается корректно\
+**Следующий engineering milestone:** live acceptance SMB/квот, reboot persistence и Windows-клиента\
 **Состояние:** основной Files/Storage workflow работает на живом сервере: назначение Files, mount, выбор storage и создание pool подтверждены. F2 NAS остаётся в эксплуатационной приёмке по capacity, SMB, quotas и reboot persistence.\
 **Обновлено:** 2026-10-01
 
@@ -28,7 +28,7 @@
 - **0.1.103-dev** — для Files pool добавлен fallback ёмкости: сначала live `statfs(root_path)`, при недоступности — сохранённый backing device/UUID, block-device size и privileged storage inspection для free space. Тот же fallback используется в reserve enforcement. Пользовательская проверка **«Свободно / Всего»** остаётся открытой.
 - **0.1.104-dev** — если capacity всё равно недоступна на живом сервере, Files UI больше не показывает неоднозначный `—`: в pool capacity и назначенном storage выводится явное **«Объём недоступен»**.
 - **0.1.105-dev** — найден следующий namespace-разрыв: mount уже выполнялся в host namespace, но filesystem inspection (`lsblk FSAVAIL/MOUNTPOINTS`) всё ещё работал внутри sandbox helper-а. Inspection переведён в PID 1 host mount namespace.
-- **0.1.106-dev** — capacity переведена на другой механизм: helper через host `findmnt` определяет реальную точку монтирования и читает `Total/Available` через `df -B1`; `lsblk` и offline inspection остаются fallback. Storage inspection cache теперь сбрасывается сразу после операций с диском.
+- **0.1.106-dev** — capacity переведена на другой механизм: helper через host `findmnt` определяет реальную точку монтирования и читает `Total/Available` через `df -B1`; `lsblk` и offline inspection остаются fallback. Storage inspection cache теперь сбрасывается сразу после операций с диском. На живом сервере пользователь подтвердил корректное отображение **Свободно / Всего**.
 - ✅ Для всей цепочки сохранены CI, Go/Web tests, Linux amd64/arm64 cross-build и versioned release assets.
 
 ### Выпуск 0.1.91-dev — завершение пользователей и управления файлами
@@ -175,7 +175,7 @@
 - ✅ Web-раздел **Файлы** имеет реальные маршруты `/files`, `/files/storage`, `/files/windows`.
 - ✅ Blank storage page из-за `mountpoints:null`, mojibake и race после mount исправлены.
 - 🧪 На живом сервере подтверждены mount и создание Files pool в 0.1.102-dev.
-- 🧪 Capacity не определилась через statfs/lsblk fallback; с 0.1.106 основной путь полностью заменён на host `findmnt → df -B1`. Пользовательская проверка **Свободно / Всего** остаётся открытой.
+- ✅ В 0.1.106 host `findmnt → df -B1` подтверждён на живом сервере: **Свободно / Всего** отображается корректно.
 - 🧪 Live acceptance SMB, quota enforcement, reboot persistence и Windows/NAS остаётся отдельным эксплуатационным этапом.
 - 🚧 Controlled migration для legacy filesystems без готовых quota features остаётся отдельной maintenance-задачей.
 
@@ -934,7 +934,7 @@ AI не может расширять собственные права.
 | `0.1.103-dev` | 🧪 Pool free/total fallback | backing device/UUID + privileged inspection; live UI confirmation pending |
 | `0.1.104-dev` | ✅ Explicit unavailable capacity state | «Объём недоступен» вместо прочерка при неизвестной capacity |
 | `0.1.105-dev` | 🧪 Host-namespace capacity inspection | `lsblk FSAVAIL/MOUNTPOINTS` теперь видит host mount; live confirmation pending |
-| `0.1.106-dev` | 🧪 Direct host df capacity | `findmnt → df -B1` возвращает точные total/free; live confirmation pending |
+| `0.1.106-dev` | ✅ Direct host df capacity | `findmnt → df -B1` подтверждён на живом сервере; total/free отображаются |
 
 ## 10. Правило ведения карты
 
