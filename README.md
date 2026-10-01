@@ -1,113 +1,113 @@
 # Home-AI-Core
 
-Home-AI-Core is the trusted control-plane foundation of **Home-AI** — an autonomous local platform for smart-home automation, cameras/NVR, personal file storage, local AI, voice interaction and future multi-node resource sharing.
+Home-AI-Core — основа управляющего уровня (control plane) **Home-AI** — автономной локальной платформы для умного дома, камер/NVR, персонального файлового хранилища, локального ИИ, голосового взаимодействия и будущего объединения ресурсов нескольких узлов.
 
-The long-term product is designed to keep essential home functions local and operational without mandatory cloud services or subscriptions.
+В долгосрочной перспективе продукт проектируется так, чтобы основные домашние функции оставались локальными и продолжали работать без обязательных облачных сервисов и подписок.
 
-The current project is intentionally building the foundation first: identity, security, jobs, events, modules, system/storage control, updates and the Web UI that future Home-AI domains will use.
+На текущем этапе проект намеренно сначала формирует фундамент: идентификацию, безопасность, задания, события, модули, управление системой и хранилищем, обновления и Web UI, которые в дальнейшем будут использоваться всеми направлениями Home-AI.
 
-## Product direction
+## Направление развития продукта
 
-Home-AI is planned around these primary domains:
+Home-AI планируется развивать вокруг следующих основных направлений:
 
-- native Smart Home runtime and automation engine;
-- local Cameras / NVR with recording, retention and AI vision;
-- File Storage / NAS with private and shared user spaces;
-- local AI Agent with permission- and approval-controlled tools;
-- voice terminals;
-- secure remote access through an owner-controlled tunnel;
-- Windows file-upload client and later Android client;
-- multi-node Home-AI cluster with resource-aware workload placement.
+- встроенная среда Smart Home и движок автоматизации;
+- локальные камеры / NVR с записью, хранением архива и компьютерным зрением на базе ИИ;
+- файловое хранилище / NAS с личными и общими пространствами пользователей;
+- локальный AI Agent с инструментами, доступ к которым контролируется разрешениями и подтверждениями;
+- голосовые терминалы;
+- защищённый удалённый доступ через туннель, контролируемый владельцем;
+- Windows-клиент для загрузки файлов, а позднее — Android-клиент;
+- многоузловой кластер Home-AI с распределением рабочих нагрузок с учётом доступных ресурсов.
 
-Home Assistant is not a required dependency of the target smart-home architecture.
+Home Assistant не является обязательной зависимостью целевой архитектуры умного дома.
 
-Generic container/virtualization management may exist later as optional infrastructure, but it is not the primary product mission.
+Универсальное управление контейнерами и виртуализацией в будущем может появиться как дополнительная инфраструктурная возможность, но это не является основной задачей продукта.
 
-See:
+См. также:
 
-- `docs/PRODUCT_VISION.md` — canonical product goal and requirements;
-- `docs/PROJECT_MAP.md` — current roadmap/status;
-- `docs/CURRENT_STATE_AUDIT.md` — what existing work is kept, repurposed or deprioritized.
+- `docs/PRODUCT_VISION.md` — основная цель продукта и требования;
+- `docs/PROJECT_MAP.md` — текущая дорожная карта и состояние проекта;
+- `docs/CURRENT_STATE_AUDIT.md` — какие существующие наработки сохраняются, переиспользуются или имеют пониженный приоритет.
 
-## Current platform
+## Текущая платформа
 
-The repository currently includes:
+Репозиторий в настоящее время включает:
 
-- Go control-plane daemon and React/TypeScript Web UI;
-- first-run owner bootstrap and authenticated sessions;
-- SQLite state with embedded forward migrations;
-- RBAC, CSRF protection and audit logging;
-- persistent jobs and durable events;
-- realtime WebSocket transport;
-- Module SDK v1, module registry and signed module-repository foundation;
-- CPU, RAM, network, GPU/PCI and block-device inventory;
-- Storage v1 management for non-system disks:
-  - GPT/MBR inventory and unallocated capacity;
-  - partition create/delete/delete-all;
-  - ext4, XFS and FAT formatting;
-  - mount/unmount;
-  - filesystem labels and persistent display names;
-  - LVM inspection/deactivation for destructive operations;
-  - active-swap handling;
-  - SMART health, temperature, power-on time and SSD/NVMe lifetime where supported;
-- Web-driven Core update system:
-  - architecture-specific update bundles;
-  - Core + Web UI + privileged helper in one verified bundle;
-  - SHA-256 and manifest verification;
-  - backup, restart and rollback;
-  - helper protocol/version compatibility;
-  - cached GitHub release discovery with fallback;
-- Debian 13 initial installer for amd64 and arm64.
-- Windows file-copy client with resumable uploads, recursive directory copying and a persistent local transfer queue; see [usage](docs/windows-file-client.md).
+- демон управляющего уровня на Go и Web UI на React/TypeScript;
+- первичную инициализацию владельца при первом запуске и аутентифицированные сессии;
+- хранение состояния в SQLite со встроенными последовательными миграциями;
+- RBAC, защиту от CSRF и журнал аудита;
+- постоянные задания и надёжно сохраняемые события;
+- WebSocket-транспорт в реальном времени;
+- Module SDK v1, реестр модулей и основу подписанного репозитория модулей;
+- инвентаризацию CPU, RAM, сети, GPU/PCI и блочных устройств;
+- управление Storage v1 для несистемных дисков:
+  - инвентаризацию GPT/MBR и нераспределённого пространства;
+  - создание, удаление и удаление всех разделов;
+  - форматирование в ext4, XFS и FAT;
+  - монтирование и размонтирование;
+  - метки файловых систем и постоянные отображаемые имена;
+  - проверку LVM и его деактивацию перед разрушительными операциями;
+  - обработку активного swap;
+  - состояние SMART, температуру, время наработки и ресурс SSD/NVMe там, где это поддерживается;
+- систему обновления Core через Web UI:
+  - пакеты обновлений для конкретных архитектур;
+  - Core + Web UI + привилегированный helper в одном проверяемом пакете;
+  - проверку SHA-256 и манифеста;
+  - резервное копирование, перезапуск и откат;
+  - контроль совместимости протокола и версии helper;
+  - кэшируемое обнаружение релизов GitHub с резервным механизмом;
+- первоначальный установщик для Debian 13 на amd64 и arm64;
+- Windows-клиент копирования файлов с возобновляемой загрузкой, рекурсивным копированием каталогов и постоянной локальной очередью передачи; см. [инструкцию по использованию](docs/windows-file-client.md).
 
-## Installation and updates
+## Установка и обновления
 
-The Debian package is the bootstrap and emergency-recovery installation format.
+Пакет Debian используется для первоначальной установки и аварийного восстановления.
 
-After initial installation, normal Home-AI-Core updates are installed from **System → Updates** in the Web UI. Normal updates do not require rebuilding or installing a new Debian package.
+После первоначальной установки обычные обновления Home-AI-Core устанавливаются через раздел **System → Updates** в Web UI. Для стандартных обновлений не требуется заново собирать или устанавливать Debian-пакет.
 
-The initial installer can be built with GitHub Actions or locally:
+Первоначальный установщик можно собрать с помощью GitHub Actions или локально:
 
 ```sh
 sh ./scripts/build-deb.sh amd64
 ```
 
-Update bundles:
+Пакеты обновлений:
 
 ```sh
 sh ./scripts/build-update-bundle.sh amd64
 sh ./scripts/build-update-bundle.sh arm64
 ```
 
-## Runtime layout
+## Структура среды выполнения
 
-The default Core listener is:
+По умолчанию Core принимает подключения на:
 
 ```text
 127.0.0.1:8080
 ```
 
-The public Core runs as the unprivileged `home-ai-core` account.
+Публичный Core запускается от имени непривилегированной учётной записи `home-ai-core`.
 
-The privileged helper is installed at:
+Привилегированный helper устанавливается по пути:
 
 ```text
 /usr/libexec/home-ai-core/home-ai-core-updater
 ```
 
-and communicates with Core through an authenticated Unix socket.
+и взаимодействует с Core через аутентифицированный Unix-сокет.
 
-## Architecture principle
+## Архитектурный принцип
 
-Core owns shared platform contracts:
+Core отвечает за общие контракты платформы:
 
-- identity/security;
-- permissions/policy;
-- state;
-- jobs/events;
-- audit;
-- module registry;
-- update orchestration;
-- node/system capability discovery.
+- идентификацию и безопасность;
+- разрешения и политики;
+- состояние;
+- задания и события;
+- аудит;
+- реестр модулей;
+- оркестрацию обновлений;
+- обнаружение возможностей узла и системы.
 
-Product domains such as NAS, Smart Home, NVR, AI, Voice, WireGuard and Cluster should be modular and reuse these shared contracts rather than bypassing them.
+Такие продуктовые направления, как NAS, Smart Home, NVR, AI, Voice, WireGuard и Cluster, должны быть модульными и переиспользовать эти общие контракты, а не обходить их.
