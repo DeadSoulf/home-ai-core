@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -10,17 +11,26 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/systeminfo"
 )
 
+type storagePurposeUsageResponse struct {
+	Type     string `json:"type"`
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	RootPath string `json:"root_path,omitempty"`
+}
+
 type storagePurposeResponse struct {
-	DevicePath     string   `json:"device"`
-	FilesystemUUID string   `json:"filesystem_uuid,omitempty"`
-	Purpose        string   `json:"purpose"`
-	Present        bool     `json:"present"`
-	Filesystem     string   `json:"filesystem,omitempty"`
-	Label          string   `json:"label,omitempty"`
-	Mountpoints    []string `json:"mountpoints"`
-	SizeBytes      uint64   `json:"size_bytes,omitempty"`
-	FreeBytes      uint64   `json:"free_bytes,omitempty"`
-	FreeKnown      bool     `json:"free_known"`
+	DevicePath     string                        `json:"device"`
+	FilesystemUUID string                        `json:"filesystem_uuid,omitempty"`
+	Purpose        string                        `json:"purpose"`
+	Present        bool                          `json:"present"`
+	Filesystem     string                        `json:"filesystem,omitempty"`
+	Label          string                        `json:"label,omitempty"`
+	Mountpoints    []string                      `json:"mountpoints"`
+	SizeBytes      uint64                        `json:"size_bytes,omitempty"`
+	FreeBytes      uint64                        `json:"free_bytes,omitempty"`
+	FreeKnown      bool                          `json:"free_known"`
+	InUse          bool                          `json:"in_use"`
+	UsedBy         []storagePurposeUsageResponse `json:"used_by"`
 }
 
 func (s *server) storagePurposes(
@@ -37,9 +47,17 @@ func (s *server) storagePurposes(
 			return
 		}
 		nodes := systeminfo.Collect(s.nodeID).BlockTree
+		pools, err := s.state.ListNASPools(r.Context())
+		if err != nil {
+			writeAPIError(w, r, http.StatusInternalServerError, "storage_usage_unavailable", "storage usage is unavailable", nil)
+			return
+		}
 		assignments := make([]storagePurposeResponse, 0, len(records))
 		for _, record := range records {
-			assignments = append(assignments, storagePurposeResponseFor(record, nodes))
+			response := storagePurposeResponseFor(record, nodes)
+			response.UsedBy = storageUsageForMountpoints(response.Mountpoints, pools)
+			response.InUse = len(response.UsedBy) > 0
+			assignments = append(assignments, response)
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"assignments": assignments})
 
@@ -79,7 +97,35 @@ func (s *server) storagePurposes(
 			return
 		}
 
-		if input.Purpose == "" || input.Purpose == "none" {
+		purpose := ""
+		if input.Purpose != "" && input.Purpose != "none" {
+			var err error
+			purpose, err = state.NormalizeStoragePurpose(input.Purpose)
+			if err != nil {
+				writeAPIError(w, r, http.StatusBadRequest, "invalid_storage_purpose", err.Error(), nil)
+				return
+			}
+		}
+
+		pools, err := s.state.ListNASPools(r.Context())
+		if err != nil {
+			writeAPIError(w, r, http.StatusInternalServerError, "storage_usage_unavailable", "storage usage is unavailable", nil)
+			return
+		}
+		usage := storageUsageForNode(node, pools)
+		if len(usage) > 0 && purpose != state.StoragePurposeFiles {
+			writeAPIError(
+				w,
+				r,
+				http.StatusConflict,
+				"storage_in_use",
+				"storage is used by a Home-AI file pool and cannot be reassigned or cleared",
+				map[string]any{"used_by": usage},
+			)
+			return
+		}
+
+		if purpose == "" {
 			if err := s.state.ClearStoragePurpose(r.Context(), node.Path, node.UUID); err != nil {
 				writeAPIError(w, r, http.StatusInternalServerError, "storage_purpose_clear_failed", err.Error(), nil)
 				return
@@ -104,11 +150,6 @@ func (s *server) storagePurposes(
 			return
 		}
 
-		purpose, err := state.NormalizeStoragePurpose(input.Purpose)
-		if err != nil {
-			writeAPIError(w, r, http.StatusBadRequest, "invalid_storage_purpose", err.Error(), nil)
-			return
-		}
 		record, err := s.state.SetStoragePurpose(
 			r.Context(),
 			node.Path,
@@ -153,6 +194,7 @@ func storagePurposeResponseFor(record state.StoragePurposeRecord, nodes []system
 		FilesystemUUID: record.FilesystemUUID,
 		Purpose:        record.Purpose,
 		Mountpoints:    []string{},
+		UsedBy:         []storagePurposeUsageResponse{},
 	}
 	node, ok := blockNodeForStoragePurpose(nodes, record)
 	if !ok {
@@ -224,4 +266,62 @@ func collectPartitionNodes(node systeminfo.BlockNode, result map[string]systemin
 	for _, child := range node.Children {
 		collectPartitionNodes(child, result)
 	}
+}
+
+
+func storageUsageForNode(node systeminfo.BlockNode, pools []state.NASPoolRecord) []storagePurposeUsageResponse {
+	mountpoints := make([]string, 0)
+	collectStorageMountpoints(node, &mountpoints)
+	return storageUsageForMountpoints(mountpoints, pools)
+}
+
+func collectStorageMountpoints(node systeminfo.BlockNode, result *[]string) {
+	for _, mountpoint := range node.Mountpoints {
+		mountpoint = strings.TrimSpace(mountpoint)
+		if mountpoint != "" {
+			*result = append(*result, mountpoint)
+		}
+	}
+	for _, child := range node.Children {
+		collectStorageMountpoints(child, result)
+	}
+}
+
+func storageUsageForMountpoints(mountpoints []string, pools []state.NASPoolRecord) []storagePurposeUsageResponse {
+	if len(mountpoints) == 0 || len(pools) == 0 {
+		return []storagePurposeUsageResponse{}
+	}
+	result := make([]storagePurposeUsageResponse, 0)
+	seen := map[string]bool{}
+	for _, pool := range pools {
+		if seen[pool.ID] {
+			continue
+		}
+		for _, mountpoint := range mountpoints {
+			if pathUsesStorageMount(pool.RootPath, mountpoint) {
+				result = append(result, storagePurposeUsageResponse{
+					Type:     "file_pool",
+					ID:       pool.ID,
+					Name:     pool.Name,
+					RootPath: pool.RootPath,
+				})
+				seen[pool.ID] = true
+				break
+			}
+		}
+	}
+	return result
+}
+
+func pathUsesStorageMount(rootPath, mountpoint string) bool {
+	rootPath = filepath.Clean(strings.TrimSpace(rootPath))
+	mountpoint = filepath.Clean(strings.TrimSpace(mountpoint))
+	if rootPath == "." || mountpoint == "." || mountpoint == string(filepath.Separator) {
+		return rootPath == mountpoint
+	}
+	relative, err := filepath.Rel(mountpoint, rootPath)
+	if err != nil {
+		return false
+	}
+	return relative == "." || (relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)))
 }
