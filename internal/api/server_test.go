@@ -80,16 +80,18 @@ func (f fakeState) ListStoragePurposes(context.Context) ([]state.StoragePurposeR
 
 func (f fakeState) CreateNASPool(
 	_ context.Context,
-	name, rootPath, createdBy string,
+	name, rootPath, storageDevicePath, storageFilesystemUUID, createdBy string,
 	now time.Time,
 ) (state.NASPoolRecord, error) {
 	return state.NASPoolRecord{
-		ID:        "nsp-test",
-		Name:      name,
-		RootPath:  rootPath,
-		CreatedBy: createdBy,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:                    "nsp-test",
+		Name:                  name,
+		RootPath:              rootPath,
+		StorageDevicePath:     storageDevicePath,
+		StorageFilesystemUUID: storageFilesystemUUID,
+		CreatedBy:             createdBy,
+		CreatedAt:             now,
+		UpdatedAt:             now,
 	}, nil
 }
 
