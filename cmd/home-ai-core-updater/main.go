@@ -187,6 +187,17 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{OK: true, QuotaLimitBytes: quota.BlockHardLimit * 1024, QuotaUsedBytes: quota.CurrentSpace})
 		return
 	}
+	if request.Operation == "storage.nas.usage.inspect" {
+		ctx, cancel := context.WithTimeout(parent, 40*time.Second)
+		defer cancel()
+		used, err := inspectNASFolderUsage(ctx, request)
+		if err != nil {
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})
+			return
+		}
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{OK: true, UsageUsedBytes: used})
+		return
+	}
 	if strings.HasPrefix(request.Operation, "storage.nas.") {
 		_ = conn.SetDeadline(time.Now().Add(45 * time.Second))
 		ctx, cancel := context.WithTimeout(parent, 40*time.Second)

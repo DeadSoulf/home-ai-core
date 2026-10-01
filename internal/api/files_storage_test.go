@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"testing"
 
 	"github.com/DeadSoulf/home-ai-core/internal/state"
@@ -138,5 +139,31 @@ func TestFilePoolCapacityFallbackRequiresKnownFreeSpace(t *testing.T) {
 
 	if capacity, ok := filePoolCapacityFromInventory(record, nodes, storage.Inspection{}); ok {
 		t.Fatalf("unexpected capacity fallback success: %#v", capacity)
+	}
+}
+
+func TestFolderUsageFallsBackToPrivilegedHelper(t *testing.T) {
+	previous := inspectNASFolderUsage
+	inspectNASFolderUsage = func(_ context.Context, root, relative string) (storage.NASUsage, error) {
+		if root != "/mnt/home-ai-core/test" {
+			t.Fatalf("root = %q", root)
+		}
+		if relative != "shared/nsf_0123456789abcdef" {
+			t.Fatalf("relative = %q", relative)
+		}
+		return storage.NASUsage{UsedBytes: 42_000, ReservedBytes: 0}, nil
+	}
+	defer func() { inspectNASFolderUsage = previous }()
+
+	s := &server{}
+	usage, err := s.folderUsage(context.Background(), state.NASFolderRecord{
+		PoolRoot:     "/mnt/home-ai-core/test",
+		RelativePath: "shared/nsf_0123456789abcdef",
+	})
+	if err != nil {
+		t.Fatalf("folderUsage() error = %v", err)
+	}
+	if usage.UsedBytes != 42_000 || usage.ReservedBytes != 0 {
+		t.Fatalf("usage = %#v", usage)
 	}
 }

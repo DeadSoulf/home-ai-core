@@ -46,3 +46,19 @@ func TestValidNASID(t *testing.T) {
 		t.Fatal("empty NAS ID suffix accepted")
 	}
 }
+
+func TestParseDUUsageOutput(t *testing.T) {
+	used, ok := parseDUUsageOutput([]byte("123456\t/mnt/home-ai-core/sdb1/.home-ai/shared/nsf_test\n"))
+	if !ok {
+		t.Fatal("expected du output to parse")
+	}
+	if used != 123456 {
+		t.Fatalf("used = %d, want 123456", used)
+	}
+}
+
+func TestParseDUUsageOutputRejectsInvalidData(t *testing.T) {
+	if used, ok := parseDUUsageOutput([]byte("invalid output")); ok {
+		t.Fatalf("unexpected parsed usage: %d", used)
+	}
+}

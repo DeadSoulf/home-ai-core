@@ -11,6 +11,11 @@ import (
 
 type QuotaStatus struct{ LimitBytes, UsedBytes uint64 }
 
+type NASUsage struct {
+	UsedBytes     int64
+	ReservedBytes int64
+}
+
 func quotaHelper(ctx context.Context, request updaterhelper.Request) (updaterhelper.Response, error) {
 	request.ProtocolVersion = updaterhelper.ProtocolVersion
 	conn, err := (&net.Dialer{}).DialContext(ctx, "unix", helperSocketPath)
@@ -43,4 +48,16 @@ func ApplyNASQuota(ctx context.Context, root, relative string, project uint32, q
 func InspectNASQuota(ctx context.Context, root string, project uint32) (QuotaStatus, error) {
 	response, err := quotaHelper(ctx, updaterhelper.Request{Operation: "storage.nas.quota.inspect", RootPath: root, ProjectID: project})
 	return QuotaStatus{LimitBytes: response.QuotaLimitBytes, UsedBytes: response.QuotaUsedBytes}, err
+}
+
+func InspectNASUsage(ctx context.Context, root, relative string) (NASUsage, error) {
+	response, err := quotaHelper(ctx, updaterhelper.Request{
+		Operation:    "storage.nas.usage.inspect",
+		RootPath:     root,
+		RelativePath: relative,
+	})
+	if err != nil {
+		return NASUsage{}, err
+	}
+	return NASUsage{UsedBytes: response.UsageUsedBytes, ReservedBytes: response.UsageReservedBytes}, nil
 }

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.108-dev
+
+- Fix Files folder **Used / limit** staying unavailable even when pool capacity is already known.
+- Keep the existing in-process logical usage calculation as the preferred path.
+- When Core cannot read a managed folder from its service sandbox, fall back to the privileged helper and calculate the folder's apparent file size with host-namespace `du -B1`.
+- Exclude active Home-AI upload temporary files from the host `du` fallback so incomplete upload parts are not counted as normal folder contents.
+- Reuse the same folder-usage fallback for folder quota checks and private-user quota totals.
+- Bump the storage-helper protocol for the new read-only folder-usage operation.
+- Add regression coverage for host `du` parsing and the API fallback path.
+
 ## 0.1.107-dev
 
 - Rework the native Windows client into a lighter cloud-drive-style interface with **Overview**, **Connection**, **Synchronization**, **Backups** and **Settings** sections.
