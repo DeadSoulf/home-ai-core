@@ -24,6 +24,10 @@ The Files page uses only `files` assignments as candidate capacity for new file 
 
 Partition deletion clears the related assignment. Formatting preserves the purpose and refreshes the stored filesystem UUID after the new filesystem appears.
 
+A new NAS file pool can only be created on the exact mounted filesystem that has an explicit `files` purpose. Core resolves that mount back to its physical block node before provisioning the pool and persists both the current device path and filesystem UUID on the pool record. UUID is the primary long-lived identity; device path is a fallback when a filesystem has no UUID.
+
+This pool-to-storage binding is also used by destructive-operation guards. A bound storage device remains recognized as in use even if it is later unmounted or its Linux device path changes. Pools created before the binding migration keep the earlier mount-path fallback until they are recreated or migrated by a later maintenance flow.
+
 ## Consequences
 
 Physical capacity routing becomes explicit and reusable by future modules. NAS pool semantics remain focused on logical file data and permissions instead of becoming a generic media-purpose registry.
