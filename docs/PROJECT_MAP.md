@@ -5,8 +5,8 @@
 > Аудит уже сделанного: [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
-**Последний опубликованный релиз:** `0.1.84-dev` — автоматическое проверяемое обновление Windows-клиента\
-**Текущий срез:** `0.1.85-dev` — release candidate; disk purpose safety + persistent NAS pool storage identity\
+**Последний опубликованный релиз:** `0.1.85-dev` — защита дисков и устойчивая привязка NAS pool к filesystem\
+**Текущий срез:** `0.1.85-dev` — published; live disk/pool binding acceptance pending\
 **Следующий engineering milestone:** live acceptance disk purpose/pool binding; затем F2 quotas/policies, reserve free space и capacity warnings\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-10-01
@@ -22,7 +22,8 @@
 - UUID является основной устойчивой identity; device path используется как fallback.
 - Защита продолжает узнавать pool после размонтирования или смены `/dev/...` имени.
 - Старые pools без сохранённой identity продолжают работать через mount-path fallback.
-- PR #60 и #61 прошли полный CI; практическая проверка на установленном сервере остаётся acceptance step.
+- PR #60 и #61 прошли полный CI; release workflow опубликовал `v0.1.85-dev` с amd64/arm64 Core bundles и Windows `.exe` + SHA-256.
+- Практическая проверка на установленном сервере остаётся acceptance step.
 
 ### Выпуск 0.1.84-dev — автоматическое обновление Windows-клиента
 
