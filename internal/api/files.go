@@ -1038,7 +1038,7 @@ func capacityPercentBytes(total uint64, percent int) uint64 {
 	return (total/100)*value + ((total%100)*value)/100
 }
 
-func filePoolWriteAllowance(
+func (s *server) filePoolWriteAllowance(
 	w http.ResponseWriter,
 	r *http.Request,
 	folder state.NASFolderRecord,
@@ -1075,7 +1075,7 @@ func filePoolWriteAllowance(
 	return int64(available), true
 }
 
-func writeFilePoolReserveError(
+func (s *server) writeFilePoolReserveError(
 	w http.ResponseWriter,
 	r *http.Request,
 	folder state.NASFolderRecord,
