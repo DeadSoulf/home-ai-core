@@ -15,6 +15,7 @@ type Request struct {
 	Filesystem      string            `json:"filesystem,omitempty"`
 	Label           string            `json:"label,omitempty"`
 	Confirm         string            `json:"confirm,omitempty"`
+	DryRun          bool              `json:"dry_run,omitempty"`
 	SizeMiB         uint64            `json:"size_mib,omitempty"`
 	Interface       string            `json:"interface,omitempty"`
 	Address         string            `json:"address,omitempty"`
