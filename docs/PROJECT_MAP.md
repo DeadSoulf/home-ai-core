@@ -12,6 +12,14 @@
 **Состояние:** Files/Storage workflow и отображение capacity подтверждены на живом сервере в `0.1.106-dev`; SMB/quotas/reboot persistence остаются в эксплуатационной приёмке. Windows-клиент `0.1.107-dev` прошёл native Windows tests и полный `core-ci`; новый UI требует пользовательской проверки на реальном Windows.\
 **Обновлено:** 2026-10-01
 
+### Кандидат 0.1.108-dev — отображение занятого места папок
+
+- ✅ Для **Занято / лимит** сохраняется текущий точный `UsageOf()` внутри Core как основной путь.
+- ✅ Если Core не может прочитать managed folder из service sandbox, privileged helper считает apparent-size конкретной папки через host `du -B1`.
+- ✅ Temporary upload parts `.home-ai-upload-*` исключаются из host-`du` fallback.
+- ✅ Fallback используется не только в таблице папок, но и для folder quota checks и private-user quota totals.
+- 🧪 Требуется live-проверка папки **Фото**: ожидается реальное значение, например `0 Б / Без лимита` для пустой папки, вместо **Объём недоступен**.
+
 ### Кандидат 0.1.107-dev — лёгкий Windows-клиент HOME AI
 
 - ✅ Старое перегруженное Win32-окно разделено на **Обзор / Подключение / Синхронизация / Резервные копии / Настройки** без изменения существующего sync engine и формата профилей.
@@ -949,6 +957,7 @@ AI не может расширять собственные права.
 | `0.1.105-dev` | 🧪 Host-namespace capacity inspection | `lsblk FSAVAIL/MOUNTPOINTS` теперь видит host mount; live confirmation pending |
 | `0.1.106-dev` | ✅ Direct host df capacity | `findmnt → df -B1` подтверждён на живом сервере; total/free отображаются |
 | `0.1.107-dev` | 🧪 Windows client light UI | Обзор/Подключение/Синхронизация/Резервные копии/Настройки, Tab navigation, HOME AI icon/tray; live Windows acceptance pending |
+| `0.1.108-dev` | 🧪 Folder usage host du | fallback для **Занято / лимит** через privileged host `du`; live confirmation pending |
 
 ## 10. Правило ведения карты
 
