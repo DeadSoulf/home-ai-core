@@ -1,6 +1,6 @@
 package updaterhelper
 
-const ProtocolVersion = 3
+const ProtocolVersion = 4
 
 // HelperVersion is injected at build time. "dev" is used for local builds.
 var HelperVersion = "dev"
