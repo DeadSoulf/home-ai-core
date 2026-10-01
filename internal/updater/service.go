@@ -4,7 +4,10 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -13,6 +16,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"encoding/pem"
 	"runtime"
 	"strconv"
 	"strings"
@@ -28,12 +32,14 @@ const (
 	releaseDownloadURL  = "https://github.com/DeadSoulf/home-ai-core/releases/download"
 	maxReleaseBytes     = 1 << 20
 	maxChecksumBytes    = 4096
+	maxSignatureBytes   = 4096
 	maxBundleBytes      = 512 << 20
 	maxExtractedBytes   = 768 << 20
 	maxBundleFiles      = 20000
 	defaultUserAgent    = "Home-AI-Core"
 	updateCheckCacheTTL = 10 * time.Minute
 	bundleHTTPTimeout   = 2 * time.Minute
+	trustedUpdatePublicKeyPath = "/etc/home-ai-core/update-trusted.pub"
 )
 
 var downloadRetryDelays = []time.Duration{
@@ -68,8 +74,9 @@ type ReleaseStatus struct {
 
 type candidate struct {
 	ReleaseStatus
-	BundleURL   string
-	ChecksumURL string
+	BundleURL    string
+	ChecksumURL  string
+	SignatureURL string
 }
 
 type Service struct {
@@ -332,14 +339,24 @@ func (s *Service) Download(ctx context.Context, version string) (State, error) {
 		CurrentVersion:   s.currentVersion,
 		AvailableVersion: item.AvailableVersion,
 		ProgressPercent:  5,
-		Message:          "Reading update checksum",
+		Message:          "Reading signed update metadata",
 		UpdatedAt:        time.Now().UTC(),
 		PublishedAt:      item.PublishedAt,
 		BundleSizeBytes:  item.BundleSizeBytes,
 	})
 
-	expectedHash, err := s.fetchChecksum(ctx, item.ChecksumURL, item.BundleFile)
+	expectedHash, checksumData, err := s.fetchChecksum(ctx, item.ChecksumURL, item.BundleFile)
 	if err != nil {
+		s.failState(err)
+		return s.State(), err
+	}
+	if item.SignatureURL != "" {
+		if err := s.verifyChecksumSignatureFromURL(ctx, item.SignatureURL, checksumData); err != nil {
+			s.failState(err)
+			return s.State(), err
+		}
+	} else if requiresSignedUpdate(version) {
+		err := errors.New("stable update is missing required detached signature")
 		s.failState(err)
 		return s.State(), err
 	}
@@ -491,7 +508,8 @@ func (s *Service) findCandidate(ctx context.Context, requestedVersion string) (c
 
 		bundleName := fmt.Sprintf("home-ai-core-update_%s_%s.tar.gz", version, s.architecture)
 		checksumName := bundleName + ".sha256"
-		var bundle, checksum *githubAsset
+		signatureName := checksumName + ".sig"
+		var bundle, checksum, signature *githubAsset
 		for i := range release.Assets {
 			asset := &release.Assets[i]
 			switch asset.Name {
@@ -499,9 +517,18 @@ func (s *Service) findCandidate(ctx context.Context, requestedVersion string) (c
 				bundle = asset
 			case checksumName:
 				checksum = asset
+			case signatureName:
+				signature = asset
 			}
 		}
 		if bundle == nil || checksum == nil || bundle.BrowserDownloadURL == "" || checksum.BrowserDownloadURL == "" {
+			continue
+		}
+		signatureURL := ""
+		if signature != nil {
+			signatureURL = signature.BrowserDownloadURL
+		}
+		if requiresSignedUpdate(version) && signatureURL == "" {
 			continue
 		}
 		if bundle.Size <= 0 || bundle.Size > maxBundleBytes {
@@ -524,8 +551,9 @@ func (s *Service) findCandidate(ctx context.Context, requestedVersion string) (c
 				PublishedAt:      &published,
 				Notes:            notes,
 			},
-			BundleURL:   bundle.BrowserDownloadURL,
-			ChecksumURL: checksum.BrowserDownloadURL,
+			BundleURL:    bundle.BrowserDownloadURL,
+			ChecksumURL:  checksum.BrowserDownloadURL,
+			SignatureURL: signatureURL,
 		}
 		if requestedVersion != "" {
 			return item, nil
@@ -576,6 +604,7 @@ func (s *Service) findCandidateFromPublishedVersion(ctx context.Context, request
 	base := fmt.Sprintf("%s/v%s/", releaseDownloadURL, version)
 	bundleURL := base + bundleName
 	checksumURL := base + checksumName
+	signatureURL := checksumURL + ".sig"
 
 	published, err := s.releaseAssetExists(ctx, checksumURL)
 	if err != nil {
@@ -586,6 +615,16 @@ func (s *Service) findCandidateFromPublishedVersion(ctx context.Context, request
 		// release assets. Treat that window as "no update yet", not a failure.
 		return candidate{}, ErrNoUpdate
 	}
+	signaturePublished, signatureErr := s.releaseAssetExists(ctx, signatureURL)
+	if signatureErr != nil && requiresSignedUpdate(version) {
+		return candidate{}, signatureErr
+	}
+	if requiresSignedUpdate(version) && !signaturePublished {
+		return candidate{}, ErrNoUpdate
+	}
+	if !signaturePublished {
+		signatureURL = ""
+	}
 
 	return candidate{
 		ReleaseStatus: ReleaseStatus{
@@ -595,8 +634,9 @@ func (s *Service) findCandidateFromPublishedVersion(ctx context.Context, request
 			Architecture:     s.architecture,
 			BundleFile:       bundleName,
 		},
-		BundleURL:   bundleURL,
-		ChecksumURL: checksumURL,
+		BundleURL:    bundleURL,
+		ChecksumURL:  checksumURL,
+		SignatureURL: signatureURL,
 	}, nil
 }
 
@@ -661,36 +701,98 @@ func (s *Service) fetchReleases(ctx context.Context) ([]githubRelease, error) {
 	return releases, nil
 }
 
-func (s *Service) fetchChecksum(ctx context.Context, url, expectedFile string) (string, error) {
+func (s *Service) fetchChecksum(ctx context.Context, url, expectedFile string) (string, []byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	req.Header.Set("User-Agent", defaultUserAgent+"/"+s.currentVersion)
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("download checksum: %w", err)
+		return "", nil, fmt.Errorf("download checksum: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("download checksum: HTTP %d", resp.StatusCode)
+		return "", nil, fmt.Errorf("download checksum: HTTP %d", resp.StatusCode)
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxChecksumBytes))
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	fields := strings.Fields(string(data))
 	if len(fields) < 2 || strings.TrimPrefix(fields[1], "*") != expectedFile {
-		return "", errors.New("invalid update checksum file")
+		return "", nil, errors.New("invalid update checksum file")
 	}
 	hash := strings.ToLower(fields[0])
 	if len(hash) != sha256.Size*2 {
-		return "", errors.New("invalid update checksum")
+		return "", nil, errors.New("invalid update checksum")
 	}
 	if _, err := hex.DecodeString(hash); err != nil {
-		return "", errors.New("invalid update checksum")
+		return "", nil, errors.New("invalid update checksum")
 	}
-	return hash, nil
+	return hash, data, nil
+}
+
+func requiresSignedUpdate(version string) bool {
+	version = strings.ToLower(strings.TrimSpace(version))
+	return version != "" && !strings.Contains(version, "-dev")
+}
+
+func verifyChecksumSignature(checksumData, signatureData, publicKeyPEM []byte) error {
+	block, _ := pem.Decode(publicKeyPEM)
+	if block == nil {
+		return errors.New("trusted update public key is not valid PEM")
+	}
+	parsed, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return fmt.Errorf("parse trusted update public key: %w", err)
+	}
+	publicKey, ok := parsed.(ed25519.PublicKey)
+	if !ok {
+		return errors.New("trusted update public key is not Ed25519")
+	}
+	signature, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(signatureData)))
+	if err != nil {
+		return errors.New("update signature is not valid base64")
+	}
+	if len(signature) != ed25519.SignatureSize {
+		return errors.New("update signature has invalid length")
+	}
+	if !ed25519.Verify(publicKey, checksumData, signature) {
+		return errors.New("update detached signature verification failed")
+	}
+	return nil
+}
+
+func (s *Service) verifyChecksumSignatureFromURL(ctx context.Context, url string, checksumData []byte) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", defaultUserAgent+"/"+s.currentVersion)
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("download update signature: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download update signature: HTTP %d", resp.StatusCode)
+	}
+	signatureData, err := io.ReadAll(io.LimitReader(resp.Body, maxSignatureBytes+1))
+	if err != nil {
+		return fmt.Errorf("read update signature: %w", err)
+	}
+	if len(signatureData) > maxSignatureBytes {
+		return errors.New("update signature exceeds maximum allowed size")
+	}
+	publicKeyPEM, err := os.ReadFile(trustedUpdatePublicKeyPath)
+	if err != nil {
+		return fmt.Errorf("read trusted update public key: %w", err)
+	}
+	if err := verifyChecksumSignature(checksumData, signatureData, publicKeyPEM); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *Service) downloadArchive(ctx context.Context, url, target string, expectedSize int64, expectedHash string) error {
