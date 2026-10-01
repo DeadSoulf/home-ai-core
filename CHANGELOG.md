@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.104-dev
+
+- Replace ambiguous dashes in Files storage capacity fields with an explicit unavailable-capacity label.
+- Russian UI now shows «Объём недоступен» when pool or assigned-storage capacity is unknown.
+- Keep known capacity values unchanged as Free / Total for pools and free-space values for assigned storage.
+
 ## 0.1.103-dev
 
 - Fix empty “Free / Total” capacity for Files storage pools when the unprivileged core process cannot read capacity with statfs.
