@@ -736,19 +736,8 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 }
 
 func filesystemMountDiagnostic(ctx context.Context, device, filesystem string) string {
-	var command string
-	var args []string
-	switch strings.ToLower(strings.TrimSpace(filesystem)) {
-	case "ext2", "ext3", "ext4":
-		command = "/usr/sbin/e2fsck"
-		args = []string{"-n", device}
-	case "xfs":
-		command = "/usr/sbin/xfs_repair"
-		args = []string{"-n", device}
-	case "vfat", "fat", "fat32":
-		command = "/usr/sbin/fsck.fat"
-		args = []string{"-n", "-v", device}
-	default:
+	command, args := filesystemDiagnosticCommand(device, filesystem)
+	if command == "" {
 		return ""
 	}
 	if _, err := os.Stat(command); err != nil {
@@ -762,11 +751,29 @@ func filesystemMountDiagnostic(ctx context.Context, device, filesystem string) s
 	if message == "" {
 		return "filesystem check returned no details"
 	}
+	return compactFilesystemDiagnostic(message)
+}
+
+func filesystemDiagnosticCommand(device, filesystem string) (string, []string) {
+	switch strings.ToLower(strings.TrimSpace(filesystem)) {
+	case "ext2", "ext3", "ext4":
+		return "/usr/sbin/e2fsck", []string{"-n", device}
+	case "xfs":
+		return "/usr/sbin/xfs_repair", []string{"-n", device}
+	case "vfat", "fat", "fat32":
+		return "/usr/sbin/fsck.fat", []string{"-n", "-v", device}
+	default:
+		return "", nil
+	}
+}
+
+func compactFilesystemDiagnostic(message string) string {
+	message = strings.Join(strings.Fields(message), " ")
 	const maxDiagnosticBytes = 3500
 	if len(message) > maxDiagnosticBytes {
-		message = message[:maxDiagnosticBytes] + "…"
+		return message[:maxDiagnosticBytes] + "…"
 	}
-	return strings.Join(strings.Fields(message), " ")
+	return message
 }
 
 func requireDiskType(ctx context.Context, device string) error {
