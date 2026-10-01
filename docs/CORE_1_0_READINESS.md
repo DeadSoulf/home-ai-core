@@ -50,7 +50,7 @@ The following are **post-foundation release/operations gates**, not reasons to r
 
 - provision the real offline-managed Ed25519 release key and install the pinned public trust root before stable/commercial release;
 - run long-duration updater interruption/recovery testing;
-- complete live storage dry-run/preflight acceptance on the target server; `0.1.114-dev` adds a standalone read-only Web preflight action so this can be tested without performing the destructive operation;
+- [x] complete live storage dry-run/preflight acceptance on the target server; `0.1.114-dev` standalone read-only Web preflight was confirmed working by the user on 2026-10-01;
 - finish product-specific Windows/NAS acceptance.
 
 Items such as NAS/SMB acceptance, Windows client UX, Smart Home, NVR, AI and cluster functionality remain product/domain work and do not reopen the Core foundation unless they expose a shared-contract defect.

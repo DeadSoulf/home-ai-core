@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.115-dev
+
+- Start the **AI Agent Foundation** as a first-party `ai.agent` module so agent contracts can evolve together with NAS, Smart Home and NVR.
+- Register the built-in AI Agent module at Core startup and expose `ai.agent` / `ai.tools` capabilities through the existing module registry.
+- Add a typed AI Tool Registry with stable tool/module IDs, JSON input metadata, required Core permissions, optional exact resource scopes and `read / change / sensitive` side-effect classes.
+- Re-check effective permissions immediately before every tool execution; scoped tools use the existing exact resource-grant contract.
+- Require explicit approval before any `change` or `sensitive` tool can execute.
+- Add a model-provider interface plus deterministic provider for contract/regression testing without introducing a cloud or model-vendor dependency.
+- Add tests for module-manifest validation, authorized/denied/scoped tool execution, approval enforcement and provider cancellation.
+- Add [AI Agent Foundation](docs/AI_AGENT_FOUNDATION.md) and ADR-0036; keep generic shell/root access explicitly out of the agent contract.
+- Record successful live standalone Storage Preflight acceptance for `0.1.114-dev`.
+
 ## 0.1.114-dev
 
 - Add a standalone **Safety check / Проверить безопасность** action to the physical-disk page.

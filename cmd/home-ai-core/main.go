@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/DeadSoulf/home-ai-core/internal/aiagent"
 	"github.com/DeadSoulf/home-ai-core/internal/api"
 	"github.com/DeadSoulf/home-ai-core/internal/config"
 	"github.com/DeadSoulf/home-ai-core/internal/events"
@@ -74,6 +75,10 @@ func main() {
 	eventService := events.New(nodeID, store, realtimeHub)
 	jobService := jobs.New(nodeID, store, eventService, 2)
 	moduleRegistry := modules.NewRegistry(store)
+	if err := moduleRegistry.Register(startupCtx, aiagent.NewModule()); err != nil {
+		logger.Error("failed to register AI Agent module", "error", err)
+		os.Exit(1)
+	}
 	updaterService := updater.New(version.Version, cfg.StateDir)
 	jobCtx, jobCancel := context.WithCancel(context.Background())
 	defer jobCancel()

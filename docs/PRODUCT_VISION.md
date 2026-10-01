@@ -1,8 +1,8 @@
 # Home-AI — Product Vision
 
 **Status:** canonical product direction  
-**Updated:** 2026-09-29  
-**Current implementation baseline:** Home-AI-Core `0.1.58-dev`
+**Updated:** 2026-10-01  
+**Current implementation baseline:** Home-AI-Core `0.1.114-dev`; AI Agent Foundation implementation started for `0.1.115-dev`
 
 ## 1. Mission
 
@@ -181,6 +181,14 @@ The Windows client should eventually support:
 Android is planned later. A dedicated Android application is not an immediate priority.
 
 ## 8. AI Agent
+
+### Development sequencing
+
+The **AI Agent foundation starts before the full Smart Home/NVR implementations** so the agent, tool contracts and future domain APIs evolve together.
+
+This does not move Smart Home or NVR business logic into AI. Instead, the agent is developed as a first-party module that consumes explicit typed tools exposed by Core/domain modules. Core remains the trusted control plane for identity, permissions, jobs, events and audit.
+
+The active foundation plan is documented in [AI_AGENT_FOUNDATION.md](AI_AGENT_FOUNDATION.md).
 
 The AI Agent is a central product layer, not merely a chat window.
 
