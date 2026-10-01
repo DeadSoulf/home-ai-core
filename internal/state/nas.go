@@ -59,6 +59,9 @@ func (s *Store) CreateNASPool(
 	if rootPath == "." || !filepath.IsAbs(rootPath) {
 		return NASPoolRecord{}, errors.New("NAS pool root path must be absolute")
 	}
+	if storageDevicePath == "" {
+		return NASPoolRecord{}, errors.New("NAS pool storage device path is required")
+	}
 
 	id, err := newStateID("nsp_")
 	if err != nil {
