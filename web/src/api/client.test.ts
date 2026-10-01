@@ -579,4 +579,38 @@ describe("API client", () => {
     vi.unstubAllGlobals();
   });
 
+
+  it("streams a local AI conversation with CSRF protection", async () => {
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    });
+    const stream = [
+      'event: delta\ndata: {"content":"Hello "}\n\n',
+      'event: delta\ndata: {"content":"Home-AI"}\n\n',
+      'event: done\ndata: {"session":{"id":"ais-1","provider":"ollama","model":"home-model","title":"Hello","created_at":"2026-10-01T00:00:00Z","updated_at":"2026-10-01T00:00:01Z","messages":[]}}\n\n',
+    ].join("");
+    const fetchMock = vi.fn(async () => new Response(stream, {
+      status: 200,
+      headers: {"Content-Type": "text/event-stream"},
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    setCSRFToken("csrf-ai");
+
+    let content = "";
+    const session = await api.streamAIMessage("ais-1", "hello", (delta) => { content += delta; });
+    expect(content).toBe("Hello Home-AI");
+    expect(session.id).toBe("ais-1");
+
+    const [input, init] = fetchMock.mock.calls[0];
+    expect(String(input)).toBe("/api/v1/ai/sessions/ais-1/messages");
+    expect(init?.method).toBe("POST");
+    expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-ai");
+    expect(String(init?.body)).toContain('"content":"hello"');
+
+    vi.unstubAllGlobals();
+  });
+
 });
