@@ -25,6 +25,11 @@ type quotaMountInfo struct {
 	Options    string
 }
 
+func quotaToolsAvailable() bool {
+	_, err := exec.LookPath("setquota")
+	return err == nil
+}
+
 func inspectSMBHardQuota(
 	ctx context.Context,
 	shares []updaterhelper.SMBShareRequest,
@@ -176,7 +181,7 @@ func findmntValue(ctx context.Context, root, field string) (string, error) {
 }
 
 func quotaMountReady(ctx context.Context, info quotaMountInfo) error {
-	if _, err := exec.LookPath("setquota"); err != nil {
+	if !quotaToolsAvailable() {
 		return errors.New("quota tools are unavailable; install the quota package")
 	}
 	switch info.Filesystem {
