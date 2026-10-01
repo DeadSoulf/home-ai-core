@@ -49,6 +49,8 @@ const strings = {
     aiGenerationStopped: "Generation stopped.",
 
     auditUserCreate: "Create user",
+    auditAIChat: "AI conversation",
+    auditAITool: "AI tool",
     auditRollback: "Roll back update",
     auditStorageChange: "Disk operation",
     auditNetworkChange: "Network change",
@@ -416,6 +418,8 @@ const strings = {
     aiGenerationStopped: "Генерация остановлена.",
 
     auditUserCreate: "Создание пользователя",
+    auditAIChat: "Диалог ИИ",
+    auditAITool: "Инструмент ИИ",
     auditRollback: "Откат обновления",
     auditStorageChange: "Операция с диском",
     auditNetworkChange: "Изменение сети",
