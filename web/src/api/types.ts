@@ -320,6 +320,8 @@ export type FilePool = {
   id: string;
   name: string;
   root_path: string;
+  storage_device?: string;
+  storage_filesystem_uuid?: string;
 };
 
 export type FileFolder = {
