@@ -247,7 +247,6 @@ func storagePurposeRecordForNode(records []state.StoragePurposeRecord, node syst
 	return state.StoragePurposeRecord{}, false
 }
 
-
 func storageExecutionMode(operation string, dryRun bool) (string, bool) {
 	if operation == "preflight" {
 		return "partition.delete_all", true
