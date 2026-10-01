@@ -917,6 +917,52 @@ func TestStoragePurposeUsageResponseMarksAssignedStorageBusy(t *testing.T) {
 	}
 }
 
+func TestFilePoolStorageNodeRequiresFilesAssignment(t *testing.T) {
+	nodes := []systeminfo.BlockNode{{
+		Path:        "/dev/sdb1",
+		Type:        "part",
+		UUID:        "uuid-files",
+		Filesystem:  "ext4",
+		Mountpoints: []string{"/mnt/home-ai-core/files"},
+	}}
+	filesAssignment := []state.StoragePurposeRecord{{
+		DevicePath:     "/dev/sdb1",
+		FilesystemUUID: "uuid-files",
+		Purpose:        state.StoragePurposeFiles,
+	}}
+	node, err := filePoolStorageNode("/mnt/home-ai-core/files", filesAssignment, nodes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node.Path != "/dev/sdb1" || node.UUID != "uuid-files" {
+		t.Fatalf("unexpected backing storage: %#v", node)
+	}
+
+	videoAssignment := append([]state.StoragePurposeRecord(nil), filesAssignment...)
+	videoAssignment[0].Purpose = state.StoragePurposeVideo
+	if _, err := filePoolStorageNode("/mnt/home-ai-core/files", videoAssignment, nodes); err == nil {
+		t.Fatal("video storage was accepted for a file pool")
+	}
+}
+
+func TestFilePoolStorageNodeRequiresExactMountpoint(t *testing.T) {
+	nodes := []systeminfo.BlockNode{{
+		Path:        "/dev/sdb1",
+		Type:        "part",
+		UUID:        "uuid-files",
+		Filesystem:  "ext4",
+		Mountpoints: []string{"/mnt/home-ai-core/files"},
+	}}
+	assignments := []state.StoragePurposeRecord{{
+		DevicePath:     "/dev/sdb1",
+		FilesystemUUID: "uuid-files",
+		Purpose:        state.StoragePurposeFiles,
+	}}
+	if _, err := filePoolStorageNode("/mnt/home-ai-core/files/subdir", assignments, nodes); err == nil {
+		t.Fatal("subdirectory was accepted as the physical file-pool root")
+	}
+}
+
 func TestFilePoolCreateRequiresManage(t *testing.T) {
 	sec := defaultFakeSecurity()
 	sec.actor.Permissions = []string{"security.self.read"}
@@ -941,11 +987,22 @@ func stubNASProvisioning(t *testing.T) {
 	t.Helper()
 	originalPool := prepareFilePool
 	originalFolder := prepareFileFolder
+	originalResolver := resolveFilePoolStorage
 	prepareFilePool = func(context.Context, string) error { return nil }
 	prepareFileFolder = func(context.Context, string, string) error { return nil }
+	resolveFilePoolStorage = func(_ string, rootPath string, _ []state.StoragePurposeRecord) (systeminfo.BlockNode, error) {
+		return systeminfo.BlockNode{
+			Path:        "/dev/sdb1",
+			Type:        "part",
+			UUID:        "uuid-files",
+			Filesystem:  "ext4",
+			Mountpoints: []string{rootPath},
+		}, nil
+	}
 	t.Cleanup(func() {
 		prepareFilePool = originalPool
 		prepareFileFolder = originalFolder
+		resolveFilePoolStorage = originalResolver
 	})
 }
 
