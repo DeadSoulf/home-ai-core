@@ -45,12 +45,12 @@ type NASFolderRecord struct {
 	PoolReservePercent int
 	PoolWarningPercent int
 	Name               string
-	Kind         string
-	OwnerUserID  string
-	RelativePath string
-	CreatedBy    string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	Kind               string
+	OwnerUserID        string
+	RelativePath       string
+	CreatedBy          string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 func (s *Store) CreateNASPool(
@@ -244,19 +244,19 @@ func (s *Store) CreateNASFolder(
 	}
 
 	return NASFolderRecord{
-		ID:           id,
-		PoolID:       poolID,
+		ID:                 id,
+		PoolID:             poolID,
 		PoolName:           poolName,
 		PoolRoot:           poolRoot,
 		PoolReservePercent: poolReservePercent,
 		PoolWarningPercent: poolWarningPercent,
 		Name:               name,
-		Kind:         kind,
-		OwnerUserID:  ownerUserID,
-		RelativePath: relativePath,
-		CreatedBy:    createdBy,
-		CreatedAt:    now.UTC(),
-		UpdatedAt:    now.UTC(),
+		Kind:               kind,
+		OwnerUserID:        ownerUserID,
+		RelativePath:       relativePath,
+		CreatedBy:          createdBy,
+		CreatedAt:          now.UTC(),
+		UpdatedAt:          now.UTC(),
 	}, nil
 }
 
