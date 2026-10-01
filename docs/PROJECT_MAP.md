@@ -7,13 +7,13 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.115-dev` — первый опубликованный **AI Agent Foundation** с `ai.agent`, Tool Registry и provider contract\
-**Текущий срез:** `0.1.116-dev` — кандидат compact Figma Windows UI; опубликованный `0.1.115-dev` AI Agent Foundation остаётся основой текущего AI milestone\
+**Последний опубликованный релиз:** `0.1.116-dev` — compact Figma Windows UI: меньшее окно, logo-style sidebar, gradient hero и compact cards\
+**Текущий срез:** `0.1.116-dev` опубликован; compact Figma Windows UI ожидает live visual/DPI acceptance, а AI Agent Foundation остаётся основным engineering milestone\
 **Следующий engineering milestone:** read-only Core tools, audit integration и AI API foundation для AI Agent; параллельно live acceptance compact Windows UI `0.1.116-dev`. Затем local model provider + streaming Web chat; stable signing-key provisioning и long-duration updater tests остаются release/operations gates\
-**Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Storage preflight `0.1.114-dev` live-подтверждён; AI Agent Foundation `0.1.115-dev` опубликован. Windows candidate `0.1.116-dev` переносит утверждённый Figma layout в native Win32 без изменения sync/agent/update engine; automated CI зелёный до финального rebase, live visual/DPI acceptance ещё не выполнена.\
+**Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Storage preflight `0.1.114-dev` live-подтверждён; AI Agent Foundation `0.1.115-dev` опубликован. Compact Windows UI `0.1.116-dev` также опубликован: PR/main `core-ci` и release workflow зелёные, Windows `.exe`, Core bundles и Debian `.deb` amd64/arm64 опубликованы с SHA-256; live visual/DPI acceptance ещё не выполнена.\
 **Обновлено:** 2026-10-01
 
-### Кандидат 0.1.116-dev — compact Figma Windows client
+### Выпуск 0.1.116-dev — compact Figma Windows client
 
 - ✅ Источник визуальной спецификации: Figma `HOME AI Windows Client — Compact Main Window`, file `14TuUh70V7yoRTBg06QyeH`, node `2:2`.
 - ✅ Native окно уменьшено с `1180×760` до `976×635`; рабочая client-area рассчитана под Figma content `960×596` с сохранением стандартного Windows title bar.
@@ -25,7 +25,8 @@
 - ✅ Сохранены RU/EN, Tab/Shift+Tab/Ctrl+Tab, arrow navigation, Credential Manager, profiles, queue/copy, background agent, tray, updater и Debian release path.
 - ✅ Используется существующий embedded HOME AI brand icon; временные Figma asset URLs в код не добавлялись.
 - ✅ Regression checks фиксируют compact geometry `976×635`, sidebar `196` и RU folder-count formatting.
-- ✅ Native Windows tests, Windows cross-build, Debian installer checks и полный `core-ci` прошли на code slice; после rebase на опубликованный `0.1.115-dev` проверки запускаются повторно.
+- ✅ После rebase на опубликованный `0.1.115-dev` PR и `main` прошли native Windows tests, Windows cross-build, Debian installer checks и полный `core-ci`.
+- ✅ Release workflow опубликовал `v0.1.116-dev` с Windows `.exe`, Core update bundles amd64/arm64 и Debian `.deb` amd64/arm64 + SHA-256.
 - 🧪 Требуется live screenshot/acceptance на реальном Windows: размер окна, DPI/scaling, sidebar/logo palette, hero gradient, cards и все вкладки.
 ### Выпуск 0.1.115-dev — AI Agent Foundation
 
@@ -1129,7 +1130,7 @@ AI не может расширять собственные права.
 | `0.1.113-dev` | 🧪 Windows UI polish | опубликовано: RU localization, owner-draw buttons, fixed status check, compact cards, silent startup connection refresh; automated CI/release зелёные, repeat live acceptance pending |
 | `0.1.114-dev` | ✅ Standalone storage preflight | опубликовано и live-подтверждено: Safety check + forced server-side dry-run + audit/test |
 | `0.1.115-dev` | ✅ AI Agent Foundation v1 contracts | опубликовано: first-party `ai.agent`, Tool Registry, provider contract, permission/scope/approval boundaries + tests; API/audit/read tools next |
-| `0.1.116-dev` | 🧪 Compact Figma Windows UI | Figma concept перенесён в native window `976×635`: dark logo-style sidebar, gradient hero, compact cards/pages; final CI + live acceptance pending |
+| `0.1.116-dev` | 🧪 Compact Figma Windows UI | опубликовано: native window `976×635`, dark logo-style sidebar, gradient hero, compact cards/pages; automated CI/release зелёные, live acceptance pending |
 
 ## 10. Правило ведения карты
 
