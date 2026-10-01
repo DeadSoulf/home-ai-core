@@ -971,7 +971,7 @@ export function FilesPage({
                       <td>
                         {pool.capacity_known
                           ? `${formatFileSize(pool.free_bytes || 0)} / ${formatFileSize(pool.size_bytes || 0)}`
-                          : "—"}
+                          : t("filePoolCapacityUnknown")}
                       </td>
                       <td>
                         <span className={stateClass}>{stateLabel}</span>
@@ -1064,7 +1064,7 @@ export function FilesPage({
                       <td>{storage.label || "—"}</td>
                       <td>{storage.filesystem || "—"}</td>
                       <td className="mono">{mountpoints.join(", ") || "—"}</td>
-                      <td>{storage.free_known ? formatFileSize(storage.free_bytes || 0) : "—"}</td>
+                      <td>{storage.free_known ? formatFileSize(storage.free_bytes || 0) : t("filePoolCapacityUnknown")}</td>
                       <td>
                         {!storage.present
                           ? t("fileStorageMissing")
