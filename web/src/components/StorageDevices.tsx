@@ -358,12 +358,13 @@ export function StorageDevices({
     setError("");
     setMessage("");
     try {
-      if (node.mountpoints.length > 0) {
-        await api.storageOperation({
-          operation: "unmount",
-          device: node.path,
-        });
-      }
+      await api.storageOperation({
+        operation: "format",
+        device: node.path,
+        filesystem,
+        label: label.trim(),
+        dry_run: true,
+      });
       const result = await api.storageOperation({
         operation: "format",
         device: node.path,
@@ -419,6 +420,13 @@ export function StorageDevices({
     setMessage("");
     setPartitionProgress({device: node.path, text: t("partitionCreating")});
     try {
+      await api.storageOperation({
+        operation: "partition.create",
+        device: node.path,
+        size_mib: sizeMiB || undefined,
+        purpose: partitionPurpose,
+        dry_run: true,
+      });
       const result = await api.storageOperation({
         operation: "partition.create",
         device: node.path,
@@ -466,6 +474,11 @@ export function StorageDevices({
     setMessage("");
     setPartitionProgress({device: node.path, text: t("partitionsDeletingAll")});
     try {
+      await api.storageOperation({
+        operation: "partition.delete_all",
+        device: node.path,
+        dry_run: true,
+      });
       const result = await api.storageOperation({
         operation: "partition.delete_all",
         device: node.path,
@@ -504,6 +517,11 @@ export function StorageDevices({
     setMessage("");
     setPartitionProgress({device: node.path, text: t("partitionDeleting")});
     try {
+      await api.storageOperation({
+        operation: "partition.delete",
+        device: node.path,
+        dry_run: true,
+      });
       const result = await api.storageOperation({
         operation: "partition.delete",
         device: node.path,
