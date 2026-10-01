@@ -1,6 +1,6 @@
 # AI Agent Foundation
 
-**Status:** first contract slice published  
+**Status:** read-tool/API slice published  
 **Started:** 2026-10-01  
 **First implementation slice:** `0.1.115-dev` published
 
@@ -125,6 +125,8 @@ Published in `v0.1.115-dev` after full Core/Web, Windows and Debian CI/release c
 - ✅ authenticated AI status/tools/execute API foundation with permission filtering and bounded execution.
 
 ### 0.1.117-dev — Read-only Core tools + API
+
+Published in `v0.1.117-dev` after successful PR/main Core/Web, Windows and Debian CI plus release workflow.
 
 - ✅ `core.system.status` returns current Core/schema/system/hardware status;
 - ✅ `core.jobs.list` exposes bounded recent job summaries without raw input/result payloads;
