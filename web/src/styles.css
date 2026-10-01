@@ -37,6 +37,7 @@ button { cursor: pointer; }
 .nav-item:hover { background: #1d242e; color: #fff; }
 .nav-item.active { color: #fff; background: #24314a; }
 .sidebar-footer { margin-top: auto; display: grid; gap: 12px; }
+.product-copyright { color: #667386; font-size: 11px; text-align: center; }
 .connection-state { color: #8d9aad; font-size: 12px; display: flex; align-items: center; gap: 7px; }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #788291; }
 .status-dot.connected { background: #42c98b; }
@@ -275,6 +276,7 @@ tbody tr:last-child td { border-bottom: 0; }
   box-shadow: 0 10px 30px #3157bd35;
 }
 .auth-form .button.primary:hover { background: linear-gradient(135deg, #5684ff, #6a95ff); }
+.auth-copyright { margin-top: 28px; color: #667386; font-size: 11px; text-align: center; }
 .form-error, .error-state { border: 1px solid #61303a; background: #351c22; color: #ffb2b2; border-radius: 9px; padding: 10px 12px; }
 .notice { margin-bottom: 18px; border: 1px solid #59491e; background: #302915; color: #e8ce86; border-radius: 9px; padding: 11px 12px; line-height: 1.5; font-size: 12px; }
 .loading-state, .empty-state { color: #8d9aad; padding: 28px; border: 1px dashed #303946; border-radius: 12px; }
