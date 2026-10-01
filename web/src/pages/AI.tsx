@@ -17,7 +17,7 @@ export function AIPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
-  const abortRef = useRef<AbortController>();
+  const abortRef = useRef<AbortController | null>(null);
 
   const refreshSessions = async () => {
     const items = await api.aiSessions();
@@ -125,7 +125,7 @@ export function AIPage() {
         // Keep the visible partial response if the refresh also fails.
       }
     } finally {
-      abortRef.current = undefined;
+      abortRef.current = null;
       setSending(false);
     }
   };
