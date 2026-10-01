@@ -1055,8 +1055,10 @@ func stubNASProvisioning(t *testing.T) {
 	originalPool := prepareFilePool
 	originalFolder := prepareFileFolder
 	originalResolver := resolveFilePoolStorage
+	originalCapacityPolicy := applyFilePoolCapacityPolicy
 	prepareFilePool = func(context.Context, string) error { return nil }
 	prepareFileFolder = func(context.Context, string, string) error { return nil }
+	applyFilePoolCapacityPolicy = func(context.Context, string, int) error { return nil }
 	resolveFilePoolStorage = func(_ string, rootPath string, _ []state.StoragePurposeRecord) (systeminfo.BlockNode, error) {
 		return systeminfo.BlockNode{
 			Path:        "/dev/sdb1",
@@ -1070,6 +1072,7 @@ func stubNASProvisioning(t *testing.T) {
 		prepareFilePool = originalPool
 		prepareFileFolder = originalFolder
 		resolveFilePoolStorage = originalResolver
+		applyFilePoolCapacityPolicy = originalCapacityPolicy
 	})
 }
 
@@ -1093,6 +1096,7 @@ func TestFilePoolCreate(t *testing.T) {
 }
 
 func TestFilePoolCapacityPolicyUpdate(t *testing.T) {
+	stubNASProvisioning(t)
 	poolRoot := t.TempDir()
 	originalCapacity := readFilePoolCapacity
 	readFilePoolCapacity = func(string) (filedata.Capacity, error) {

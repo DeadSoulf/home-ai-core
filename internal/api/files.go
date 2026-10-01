@@ -23,7 +23,8 @@ var (
 	resolveFilePoolStorage = func(nodeID, rootPath string, assignments []state.StoragePurposeRecord) (systeminfo.BlockNode, error) {
 		return filePoolStorageNode(rootPath, assignments, systeminfo.Collect(nodeID).BlockTree)
 	}
-	readFilePoolCapacity = filedata.ReadCapacity
+	readFilePoolCapacity        = filedata.ReadCapacity
+	applyFilePoolCapacityPolicy = storage.ApplyNASCapacityPolicy
 )
 
 type filePoolResponse struct {
@@ -1025,6 +1026,17 @@ func (s *server) filePoolCapacityPolicy(
 	case err != nil:
 		writeAPIError(w, r, http.StatusBadRequest, "file_pool_policy_update_failed", err.Error(), nil)
 	default:
+		hardQuotaError := ""
+		if syncErr := applyFilePoolCapacityPolicy(r.Context(), record.RootPath, record.ReservePercent); syncErr != nil {
+			hardQuotaError = syncErr.Error()
+			s.logger.Warn(
+				"NAS hard quota policy is not synchronized",
+				"pool_id", record.ID,
+				"root_path", record.RootPath,
+				"reserve_percent", record.ReservePercent,
+				"error", syncErr,
+			)
+		}
 		s.security.RecordAudit(
 			r.Context(),
 			s.securityRequestContext(r),
@@ -1034,8 +1046,9 @@ func (s *server) filePoolCapacityPolicy(
 			record.ID,
 			"success",
 			map[string]any{
-				"reserve_percent": record.ReservePercent,
-				"warning_percent": record.WarningPercent,
+				"reserve_percent":  record.ReservePercent,
+				"warning_percent":  record.WarningPercent,
+				"hard_quota_error": hardQuotaError,
 			},
 		)
 		s.realtime.Publish(

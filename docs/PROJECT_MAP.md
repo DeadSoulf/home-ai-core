@@ -6,8 +6,8 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.86-dev` — NAS free-space reserve и capacity warnings\
-**Текущий срез:** `0.1.86-dev` — published; live capacity-reserve acceptance pending\
-**Следующий engineering milestone:** live acceptance capacity reserve; затем hard SMB/filesystem enforcement и per-folder/per-user quotas\
+**Текущий срез:** post-`0.1.86-dev` — kernel-enforced SMB reserve in development\
+**Следующий engineering milestone:** finish SMB hard reserve; затем controlled legacy quota migration и per-folder/per-user quotas\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-10-01
 
@@ -84,8 +84,12 @@
 - 🚧 Миграция `016_nas_pool_capacity_policy.sql`: каждый NAS pool получает hard reserve 5% и warning 10% по умолчанию; администратор может менять пороги в **Файлы**.
 - 🚧 Ёмкость pool читается через live Linux `statfs`; Web показывает free/total и состояния OK / warning / reserve reached.
 - 🚧 Direct и resumable uploads через Core/Windows client проверяют reserve на сервере; при нарушении возвращается HTTP 507 `file_pool_reserve_reached`.
-- 🚧 SMB пока пишет напрямую в filesystem и не покрыт hard reserve; следующий слой — filesystem/Samba quota enforcement.
-- 🚧 ADR-0033 фиксирует capacity-policy boundary; per-folder/per-user quotas остаются следующим уровнем.
+- 🚧 Direct SMB writes получают kernel hard quota на service UID `home-ai-core`, потому что managed Samba shares уже используют `force user = home-ai-core`.
+- 🚧 Hard limit рассчитывается из текущего Home-AI usage + только свободного места выше pool reserve, поэтому существующие данные вне `.home-ai` учитываются.
+- 🚧 Новые ext4 создаются с embedded user quota и монтируются с `usrquota`; XFS монтируется с `uquota`.
+- 🚧 `smb.apply` fail-closed: конфигурация Samba не активируется, если non-zero reserve нельзя закрепить kernel quota.
+- 🚧 Legacy ext4/XFS автоматически не remount/reformat: Web показывает hard-quota readiness и причину controlled migration.
+- 🚧 ADR-0033 фиксирует capacity-policy boundary; ADR-0034 — kernel SMB enforcement. Per-folder/per-user quotas остаются следующим уровнем.
 ### Выпуск 0.1.82-dev — русский и английский Windows-клиент
 
 - Один Windows `.exe` поддерживает русский и английский интерфейс без отдельной сборки.

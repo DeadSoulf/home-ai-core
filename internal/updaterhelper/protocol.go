@@ -1,6 +1,6 @@
 package updaterhelper
 
-const ProtocolVersion = 2
+const ProtocolVersion = 3
 
 // HelperVersion is injected at build time. "dev" is used for local builds.
 var HelperVersion = "dev"
@@ -32,6 +32,7 @@ type Request struct {
 	DNS             []string          `json:"dns,omitempty"`
 	RootPath        string            `json:"root_path,omitempty"`
 	RelativePath    string            `json:"relative_path,omitempty"`
+	ReservePercent  int               `json:"reserve_percent,omitempty"`
 	SMBWorkgroup    string            `json:"smb_workgroup,omitempty"`
 	SMBUser         string            `json:"smb_user,omitempty"`
 	SMBPassword     string            `json:"smb_password,omitempty"`
@@ -40,10 +41,12 @@ type Request struct {
 }
 
 type SMBShareRequest struct {
-	Name       string   `json:"name"`
-	Path       string   `json:"path"`
-	ReadUsers  []string `json:"read_users,omitempty"`
-	WriteUsers []string `json:"write_users,omitempty"`
+	Name           string   `json:"name"`
+	Path           string   `json:"path"`
+	PoolRoot       string   `json:"pool_root,omitempty"`
+	ReservePercent int      `json:"reserve_percent,omitempty"`
+	ReadUsers      []string `json:"read_users,omitempty"`
+	WriteUsers     []string `json:"write_users,omitempty"`
 }
 
 type FilesystemStat struct {
@@ -130,6 +133,8 @@ type Response struct {
 	SMBActive          bool                  `json:"smb_active,omitempty"`
 	SMBError           string                `json:"smb_error,omitempty"`
 	SMBConfiguredUsers []string              `json:"smb_configured_users,omitempty"`
+	SMBHardQuotaReady  bool                  `json:"smb_hard_quota_ready"`
+	SMBHardQuotaError  string                `json:"smb_hard_quota_error,omitempty"`
 }
 
 type Result struct {

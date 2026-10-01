@@ -500,6 +500,7 @@ describe("API client", () => {
             active: true,
             hostname: "home-ai",
             workgroup: "WORKGROUP",
+            hard_quota_ready: true,
             users: [{
               user_id: "usr-test",
               username: "alice",
@@ -535,6 +536,7 @@ describe("API client", () => {
 
     const status = await api.smbStatus();
     expect(status.active).toBe(true);
+    expect(status.hard_quota_ready).toBe(true);
     expect(status.shares[0].unc).toContain("HA_Family");
 
     setCSRFToken("csrf-smb");

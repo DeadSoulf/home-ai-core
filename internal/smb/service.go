@@ -14,10 +14,12 @@ import (
 const helperSocketPath = "/run/home-ai-core-updater.sock"
 
 type Share struct {
-	Name       string
-	Path       string
-	ReadUsers  []string
-	WriteUsers []string
+	Name           string
+	Path           string
+	PoolRoot       string
+	ReservePercent int
+	ReadUsers      []string
+	WriteUsers     []string
 }
 
 type Status struct {
@@ -25,13 +27,16 @@ type Status struct {
 	Active          bool     `json:"active"`
 	Error           string   `json:"error,omitempty"`
 	ConfiguredUsers []string `json:"configured_users"`
+	HardQuotaReady  bool     `json:"hard_quota_ready"`
+	HardQuotaError  string   `json:"hard_quota_error,omitempty"`
 }
 
-func Inspect(ctx context.Context, users []string) (Status, error) {
+func Inspect(ctx context.Context, users []string, shares []Share) (Status, error) {
 	response, err := callHelper(ctx, updaterhelper.Request{
 		Operation:       "smb.inspect",
 		ProtocolVersion: updaterhelper.ProtocolVersion,
 		SMBUsers:        trimStrings(users),
+		SMBShares:       helperShares(shares),
 	})
 	if err != nil {
 		return Status{}, err
@@ -41,6 +46,8 @@ func Inspect(ctx context.Context, users []string) (Status, error) {
 		Active:          response.SMBActive,
 		Error:           response.SMBError,
 		ConfiguredUsers: append([]string(nil), response.SMBConfiguredUsers...),
+		HardQuotaReady:  response.SMBHardQuotaReady,
+		HardQuotaError:  response.SMBHardQuotaError,
 	}, nil
 }
 
@@ -57,20 +64,26 @@ func SetPassword(ctx context.Context, username, password string) (string, error)
 }
 
 func Apply(ctx context.Context, workgroup string, shares []Share) (string, error) {
-	requestShares := make([]updaterhelper.SMBShareRequest, 0, len(shares))
-	for _, share := range shares {
-		requestShares = append(requestShares, updaterhelper.SMBShareRequest{
-			Name:       strings.TrimSpace(share.Name),
-			Path:       strings.TrimSpace(share.Path),
-			ReadUsers:  trimStrings(share.ReadUsers),
-			WriteUsers: trimStrings(share.WriteUsers),
-		})
-	}
 	return execute(ctx, updaterhelper.Request{
 		Operation:    "smb.apply",
 		SMBWorkgroup: strings.TrimSpace(workgroup),
-		SMBShares:    requestShares,
+		SMBShares:    helperShares(shares),
 	})
+}
+
+func helperShares(shares []Share) []updaterhelper.SMBShareRequest {
+	requestShares := make([]updaterhelper.SMBShareRequest, 0, len(shares))
+	for _, share := range shares {
+		requestShares = append(requestShares, updaterhelper.SMBShareRequest{
+			Name:           strings.TrimSpace(share.Name),
+			Path:           strings.TrimSpace(share.Path),
+			PoolRoot:       strings.TrimSpace(share.PoolRoot),
+			ReservePercent: share.ReservePercent,
+			ReadUsers:      trimStrings(share.ReadUsers),
+			WriteUsers:     trimStrings(share.WriteUsers),
+		})
+	}
+	return requestShares
 }
 
 func execute(ctx context.Context, request updaterhelper.Request) (string, error) {
