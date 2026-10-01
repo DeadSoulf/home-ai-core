@@ -67,11 +67,11 @@ func sambaToolsAvailable() bool {
 }
 
 func installSamba(ctx context.Context) (string, error) {
-	if sambaToolsAvailable() {
+	if sambaToolsAvailable() && quotaToolsAvailable() {
 		if err := enableSMBService(ctx); err != nil {
 			return "", err
 		}
-		return "Samba is already installed", nil
+		return "Samba and quota tools are already installed", nil
 	}
 	if !packageInstallMu.TryLock() {
 		return "", errors.New("package installation is already in progress")
@@ -87,7 +87,7 @@ func installSamba(ctx context.Context) (string, error) {
 		return "", errors.New("systemd-run is unavailable")
 	}
 
-	for _, args := range [][]string{{"update"}, {"install", "-y", "samba"}} {
+	for _, args := range [][]string{{"update"}, {"install", "-y", "samba", "quota"}} {
 		commandArgs := transientPackageCommand(apt, args...)
 		cmd := exec.CommandContext(ctx, systemdRun, commandArgs...)
 		output, err := cmd.CombinedOutput()
@@ -99,13 +99,13 @@ func installSamba(ctx context.Context) (string, error) {
 			return "", fmt.Errorf("install Samba: %s", message)
 		}
 	}
-	if !sambaToolsAvailable() {
-		return "", errors.New("Samba installation completed but required tools are unavailable")
+	if !sambaToolsAvailable() || !quotaToolsAvailable() {
+		return "", errors.New("Samba installation completed but required Samba/quota tools are unavailable")
 	}
 	if err := enableSMBService(ctx); err != nil {
 		return "", err
 	}
-	return "Samba installed", nil
+	return "Samba and quota tools installed", nil
 }
 
 func enableSMBService(ctx context.Context) error {
@@ -177,6 +177,13 @@ func applySMBConfig(
 	for _, share := range shares {
 		share.Name = strings.TrimSpace(share.Name)
 		share.Path = filepath.Clean(strings.TrimSpace(share.Path))
+		share.PoolRoot = filepath.Clean(strings.TrimSpace(share.PoolRoot))
+		if share.ReservePercent < 0 || share.ReservePercent > 50 {
+			return "", fmt.Errorf("share %s has invalid reserve percentage", share.Name)
+		}
+		if share.PoolRoot == "." || !filepath.IsAbs(share.PoolRoot) {
+			return "", fmt.Errorf("share %s has invalid NAS pool root", share.Name)
+		}
 		if !validSMBShareName(share.Name) {
 			return "", fmt.Errorf("invalid SMB share name %q", share.Name)
 		}
@@ -203,6 +210,9 @@ func applySMBConfig(
 	sort.Slice(normalized, func(i, j int) bool {
 		return strings.ToLower(normalized[i].Name) < strings.ToLower(normalized[j].Name)
 	})
+	if err := enforceSMBHardQuota(ctx, normalized, uid); err != nil {
+		return "", fmt.Errorf("prepare SMB hard quota: %w", err)
+	}
 
 	content := renderSMBConfig(workgroup, normalized)
 	if err := validateManagedSMBConfig(ctx, content); err != nil {
