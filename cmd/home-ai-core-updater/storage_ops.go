@@ -452,11 +452,11 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		mountedWithQuota := false
 		if quotaOptions != "" {
 			mountArgs := []string{"-o", quotaOptions, "--", device, target}
-			output, mountErr := exec.CommandContext(ctx, "/usr/bin/mount", mountArgs...).CombinedOutput()
+			output, mountErr := hostMountCommand(ctx, "/usr/bin/mount", mountArgs...).CombinedOutput()
 			if mountErr == nil {
 				mountedWithQuota = true
 			} else {
-				plainOutput, plainErr := exec.CommandContext(ctx, "/usr/bin/mount", "--", device, target).CombinedOutput()
+				plainOutput, plainErr := hostMountCommand(ctx, "/usr/bin/mount", "--", device, target).CombinedOutput()
 				if plainErr != nil {
 					quotaMessage := strings.TrimSpace(string(output))
 					plainMessage := strings.TrimSpace(string(plainOutput))
@@ -474,7 +474,7 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 				}
 			}
 		} else {
-			if output, err := exec.CommandContext(ctx, "/usr/bin/mount", "--", device, target).CombinedOutput(); err != nil {
+			if output, err := hostMountCommand(ctx, "/usr/bin/mount", "--", device, target).CombinedOutput(); err != nil {
 				message := strings.TrimSpace(string(output))
 				if message == "" {
 					message = err.Error()
@@ -1214,10 +1214,21 @@ func validateBlockDevice(value string) (string, error) {
 	return device, nil
 }
 
+func hostMountCommand(ctx context.Context, command string, args ...string) *exec.Cmd {
+	nsenterArgs := []string{"--mount=/proc/1/ns/mnt", "--", command}
+	nsenterArgs = append(nsenterArgs, args...)
+	return exec.CommandContext(ctx, "/usr/bin/nsenter", nsenterArgs...)
+}
+
+func hostMountCommandArgs(command string, args ...string) []string {
+	result := []string{"--mount=/proc/1/ns/mnt", "--", command}
+	return append(result, args...)
+}
+
 func unmountTargets(ctx context.Context, device string, targets []string) error {
 	for i := len(targets) - 1; i >= 0; i-- {
 		target := targets[i]
-		if out, err := exec.CommandContext(ctx, "/usr/bin/umount", "--", target).CombinedOutput(); err != nil {
+		if out, err := hostMountCommand(ctx, "/usr/bin/umount", "--", target).CombinedOutput(); err != nil {
 			message := strings.TrimSpace(string(out))
 			if message == "" {
 				message = err.Error()
@@ -1236,7 +1247,7 @@ func unmountTargets(ctx context.Context, device string, targets []string) error 
 }
 
 func mountedTargets(ctx context.Context, device string) ([]string, error) {
-	output, err := exec.CommandContext(ctx, "/usr/bin/findmnt", "-rn", "-S", device, "-o", "TARGET").CombinedOutput()
+	output, err := hostMountCommand(ctx, "/usr/bin/findmnt", "-rn", "-S", device, "-o", "TARGET").CombinedOutput()
 	if err != nil {
 		// findmnt exits non-zero when the source has no mounts.
 		if len(strings.TrimSpace(string(output))) == 0 {
