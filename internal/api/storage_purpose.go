@@ -55,7 +55,7 @@ func (s *server) storagePurposes(
 		assignments := make([]storagePurposeResponse, 0, len(records))
 		for _, record := range records {
 			response := storagePurposeResponseFor(record, nodes)
-			response.UsedBy = storageUsageForMountpoints(response.Mountpoints, pools)
+			response.UsedBy = storageUsageForPurposeRecord(record, nodes, pools)
 			response.InUse = len(response.UsedBy) > 0
 			assignments = append(assignments, response)
 		}
@@ -268,46 +268,94 @@ func collectPartitionNodes(node systeminfo.BlockNode, result map[string]systemin
 	}
 }
 
-func storageUsageForNode(node systeminfo.BlockNode, pools []state.NASPoolRecord) []storagePurposeUsageResponse {
-	mountpoints := make([]string, 0)
-	collectStorageMountpoints(node, &mountpoints)
-	return storageUsageForMountpoints(mountpoints, pools)
+func storageUsageForPurposeRecord(
+	record state.StoragePurposeRecord,
+	nodes []systeminfo.BlockNode,
+	pools []state.NASPoolRecord,
+) []storagePurposeUsageResponse {
+	if node, ok := blockNodeForStoragePurpose(nodes, record); ok {
+		return storageUsageForNode(node, pools)
+	}
+	paths := map[string]bool{}
+	uuids := map[string]bool{}
+	if record.DevicePath != "" {
+		paths[record.DevicePath] = true
+	}
+	if record.FilesystemUUID != "" {
+		uuids[record.FilesystemUUID] = true
+	}
+	return storageUsageForIdentity(nil, paths, uuids, pools)
 }
 
-func collectStorageMountpoints(node systeminfo.BlockNode, result *[]string) {
+func storageUsageForNode(node systeminfo.BlockNode, pools []state.NASPoolRecord) []storagePurposeUsageResponse {
+	mountpoints := make([]string, 0)
+	paths := map[string]bool{}
+	uuids := map[string]bool{}
+	collectStorageIdentity(node, &mountpoints, paths, uuids)
+	return storageUsageForIdentity(mountpoints, paths, uuids, pools)
+}
+
+func collectStorageIdentity(
+	node systeminfo.BlockNode,
+	mountpoints *[]string,
+	paths map[string]bool,
+	uuids map[string]bool,
+) {
+	if node.Path != "" {
+		paths[node.Path] = true
+	}
+	if node.UUID != "" {
+		uuids[node.UUID] = true
+	}
 	for _, mountpoint := range node.Mountpoints {
 		mountpoint = strings.TrimSpace(mountpoint)
 		if mountpoint != "" {
-			*result = append(*result, mountpoint)
+			*mountpoints = append(*mountpoints, mountpoint)
 		}
 	}
 	for _, child := range node.Children {
-		collectStorageMountpoints(child, result)
+		collectStorageIdentity(child, mountpoints, paths, uuids)
 	}
 }
 
 func storageUsageForMountpoints(mountpoints []string, pools []state.NASPoolRecord) []storagePurposeUsageResponse {
-	if len(mountpoints) == 0 || len(pools) == 0 {
+	return storageUsageForIdentity(mountpoints, nil, nil, pools)
+}
+
+func storageUsageForIdentity(
+	mountpoints []string,
+	paths map[string]bool,
+	uuids map[string]bool,
+	pools []state.NASPoolRecord,
+) []storagePurposeUsageResponse {
+	if len(pools) == 0 {
 		return []storagePurposeUsageResponse{}
 	}
 	result := make([]storagePurposeUsageResponse, 0)
-	seen := map[string]bool{}
 	for _, pool := range pools {
-		if seen[pool.ID] {
-			continue
-		}
-		for _, mountpoint := range mountpoints {
-			if pathUsesStorageMount(pool.RootPath, mountpoint) {
-				result = append(result, storagePurposeUsageResponse{
-					Type:     "file_pool",
-					ID:       pool.ID,
-					Name:     pool.Name,
-					RootPath: pool.RootPath,
-				})
-				seen[pool.ID] = true
-				break
+		matched := false
+		switch {
+		case pool.StorageFilesystemUUID != "":
+			matched = uuids[pool.StorageFilesystemUUID]
+		case pool.StorageDevicePath != "":
+			matched = paths[pool.StorageDevicePath]
+		default:
+			for _, mountpoint := range mountpoints {
+				if pathUsesStorageMount(pool.RootPath, mountpoint) {
+					matched = true
+					break
+				}
 			}
 		}
+		if !matched {
+			continue
+		}
+		result = append(result, storagePurposeUsageResponse{
+			Type:     "file_pool",
+			ID:       pool.ID,
+			Name:     pool.Name,
+			RootPath: pool.RootPath,
+		})
 	}
 	return result
 }
