@@ -24,6 +24,7 @@ The package installs:
 /lib/systemd/system/home-ai-core-updater.service
 /usr/lib/sysusers.d/home-ai-core.conf
 /etc/home-ai-core/home-ai-core.env
+/usr/share/doc/home-ai-core/copyright
 ```
 
 Persistent state lives under:
