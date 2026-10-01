@@ -429,7 +429,20 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		if err := os.Chmod(target, 0o755); err != nil {
 			return "", fmt.Errorf("set mount point permissions: %w", err)
 		}
-		if output, err := exec.CommandContext(ctx, "/usr/bin/mount", "--", device, target).CombinedOutput(); err != nil {
+		filesystemOutput, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-ndo", "FSTYPE", device).CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("inspect filesystem before mount: %s", strings.TrimSpace(string(filesystemOutput)))
+		}
+		filesystem := strings.ToLower(strings.TrimSpace(string(filesystemOutput)))
+		mountArgs := []string{}
+		switch filesystem {
+		case "ext4":
+			mountArgs = append(mountArgs, "-o", "usrquota")
+		case "xfs":
+			mountArgs = append(mountArgs, "-o", "uquota")
+		}
+		mountArgs = append(mountArgs, "--", device, target)
+		if output, err := exec.CommandContext(ctx, "/usr/bin/mount", mountArgs...).CombinedOutput(); err != nil {
 			return "", fmt.Errorf("mount device: %s", strings.TrimSpace(string(output)))
 		}
 		targets, err = mountedTargets(ctx, device)
@@ -633,7 +646,7 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		switch strings.ToLower(strings.TrimSpace(request.Filesystem)) {
 		case "ext4":
 			command = "/usr/sbin/mkfs.ext4"
-			args = []string{"-F"}
+			args = []string{"-F", "-m", "0", "-O", "quota", "-E", "quotatype=usrquota"}
 			if label != "" {
 				args = append(args, "-L", label)
 			}
