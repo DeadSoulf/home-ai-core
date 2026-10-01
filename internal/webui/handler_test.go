@@ -27,7 +27,7 @@ func TestServesSPAAndAssetsWithoutInterceptingAPI(t *testing.T) {
 	})
 	handler := New(api, dir)
 
-	for _, path := range []string{"/", "/system", "/modules"} {
+	for _, path := range []string{"/", "/system", "/modules", "/files/storage", "/files/windows"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)

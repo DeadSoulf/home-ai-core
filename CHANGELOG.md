@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.93-dev
+
+- Replace Files hash-only navigation with stable direct routes: `/files/storage` and `/files/windows`.
+- Keep legacy `/files#storage` and `/files#windows` links compatible by canonicalizing them to the new routes.
+- Keep the Files sidebar entry active on nested routes and preserve access checks for management-only sections.
+- Add Web navigation, SPA handler and integration smoke coverage for direct `/files/storage` loading.
+
 ## 0.1.92-dev
 
 - Fix Files section navigation so Folders, Storage and Windows are addressable as stable deep links.
