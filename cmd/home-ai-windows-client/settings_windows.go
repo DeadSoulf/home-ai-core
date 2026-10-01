@@ -148,6 +148,7 @@ type settingsConnectResult struct {
 	server  string
 	user    string
 	folders []windowsclient.Folder
+	silent  bool
 	err     error
 }
 
@@ -196,6 +197,7 @@ type windowsSettingsUI struct {
 	connected              bool
 	visual                 settingsVisualResources
 	visualRoles            map[windows.Handle]settingsVisualRole
+	buttonRoles            map[windows.Handle]settingsButtonRole
 
 	folders           []windowsclient.Folder
 	folderIDs         []string
@@ -351,6 +353,7 @@ func runSettingsUI(args []string) error {
 		language:     preferredUILanguageForSettingsPath(settingsPath),
 		localized:    make(map[string]windows.Handle),
 		visualRoles:  make(map[windows.Handle]settingsVisualRole),
+		buttonRoles:  make(map[windows.Handle]settingsButtonRole),
 		windowIcon:   windows.Handle(icon),
 	}
 	activeSettingsUI.Lock()
@@ -465,6 +468,10 @@ func settingsWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) ui
 		if state != nil {
 			return state.handleStaticColor(wParam, lParam)
 		}
+	case settingsWMDrawItem:
+		if state != nil {
+			return state.drawButton(lParam)
+		}
 	case settingsWMCommand:
 		if state != nil {
 			id := uint16(wParam & 0xffff)
@@ -546,6 +553,9 @@ func (state *windowsSettingsUI) loadInitial() {
 	}
 	state.refreshAgentStatus()
 	state.refreshOverview()
+	if strings.TrimSpace(state.text(state.serverEdit)) != "" && strings.TrimSpace(state.text(state.usernameEdit)) != "" {
+		state.beginInitialRefresh()
+	}
 }
 
 func (state *windowsSettingsUI) handleCommand(id, notify uint16) {
@@ -613,16 +623,28 @@ func (state *windowsSettingsUI) handleCommand(id, notify uint16) {
 }
 
 func (state *windowsSettingsUI) beginConnect() {
+	state.startConnect(false)
+}
+
+func (state *windowsSettingsUI) beginInitialRefresh() {
+	state.startConnect(true)
+}
+
+func (state *windowsSettingsUI) startConnect(silent bool) {
 	server := strings.TrimSpace(state.text(state.serverEdit))
 	user := strings.TrimSpace(state.text(state.usernameEdit))
 	password := state.text(state.passwordEdit)
 	if server == "" || user == "" {
-		state.showError(state.tr("account_required"))
+		if !silent {
+			state.showError(state.tr("account_required"))
+		}
 		return
 	}
-	state.setStatus(state.tr("connecting"))
+	if !silent {
+		state.setStatus(state.tr("connecting"))
+	}
 	go func() {
-		result := &settingsConnectResult{}
+		result := &settingsConnectResult{silent: silent}
 		canonicalServer, err := windowsclient.NormalizeServerURL(server)
 		if err != nil {
 			result.err = err
@@ -698,9 +720,13 @@ func (state *windowsSettingsUI) finishConnect() {
 	}
 	if result.err != nil {
 		state.connected = false
-		state.setStatus(state.tr("connection_failed") + ": " + result.err.Error())
+		if !result.silent {
+			state.setStatus(state.tr("connection_failed") + ": " + result.err.Error())
+		}
 		state.refreshOverview()
-		state.showTechnicalError(result.err)
+		if !result.silent {
+			state.showTechnicalError(result.err)
+		}
 		return
 	}
 	state.connected = true
@@ -718,7 +744,9 @@ func (state *windowsSettingsUI) finishConnect() {
 			writable++
 		}
 	}
-	state.setStatus(state.trf("connected_writable", writable))
+	if !result.silent {
+		state.setStatus(state.trf("connected_writable", writable))
+	}
 	state.refreshOverview()
 }
 

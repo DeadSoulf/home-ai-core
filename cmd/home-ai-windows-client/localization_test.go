@@ -16,3 +16,16 @@ func TestWindowsClientTranslations(t *testing.T) {
 		t.Fatalf("unsupported locale fallback = %q", got)
 	}
 }
+
+func TestWindowsClientTranslationKeyParity(t *testing.T) {
+	for key := range uiText[uiLanguageEnglish] {
+		if _, ok := uiText[uiLanguageRussian][key]; !ok {
+			t.Errorf("Russian translation missing for %q", key)
+		}
+	}
+	for key := range uiText[uiLanguageRussian] {
+		if _, ok := uiText[uiLanguageEnglish][key]; !ok {
+			t.Errorf("English translation missing for %q", key)
+		}
+	}
+}
