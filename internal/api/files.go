@@ -969,25 +969,30 @@ func filePoolCapacityFromInventory(
 		return filedata.Capacity{}, false
 	}
 
+	totalBytes := node.SizeBytes
+	totalKnown := totalBytes > 0
 	freeBytes := node.FreeBytes
 	freeKnown := node.FreeKnown
-	if !freeKnown {
-		for _, stat := range inspection.Filesystems {
-			if filepath.Clean(strings.TrimSpace(stat.Device)) != filepath.Clean(strings.TrimSpace(node.Path)) {
-				continue
-			}
-			if stat.FreeKnown {
-				freeBytes = stat.FreeBytes
-				freeKnown = true
-			}
-			break
+
+	for _, stat := range inspection.Filesystems {
+		if filepath.Clean(strings.TrimSpace(stat.Device)) != filepath.Clean(strings.TrimSpace(node.Path)) {
+			continue
 		}
+		if stat.TotalKnown && stat.TotalBytes > 0 {
+			totalBytes = stat.TotalBytes
+			totalKnown = true
+		}
+		if stat.FreeKnown {
+			freeBytes = stat.FreeBytes
+			freeKnown = true
+		}
+		break
 	}
-	if !freeKnown {
+	if !totalKnown || !freeKnown {
 		return filedata.Capacity{}, false
 	}
 	return filedata.Capacity{
-		TotalBytes: node.SizeBytes,
+		TotalBytes: totalBytes,
 		FreeBytes:  freeBytes,
 	}, true
 }

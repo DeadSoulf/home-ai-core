@@ -23,6 +23,7 @@ type inspectLsblkNode struct {
 	Path        string             `json:"path"`
 	Type        string             `json:"type"`
 	Filesystem  string             `json:"fstype"`
+	SizeBytes   *uint64            `json:"size"`
 	FreeBytes   *uint64            `json:"fsavail"`
 	Mountpoints []*string          `json:"mountpoints"`
 	Children    []inspectLsblkNode `json:"children"`
@@ -34,7 +35,7 @@ func inspectFilesystemStats(ctx context.Context) ([]updaterhelper.FilesystemStat
 		"/usr/bin/lsblk",
 		"--json",
 		"--bytes",
-		"--output", "PATH,TYPE,FSTYPE,FSAVAIL,MOUNTPOINTS",
+		"--output", "PATH,TYPE,FSTYPE,SIZE,FSAVAIL,MOUNTPOINTS",
 	).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("inspect filesystems: %s", strings.TrimSpace(string(output)))
@@ -53,12 +54,24 @@ func inspectFilesystemStats(ctx context.Context) ([]updaterhelper.FilesystemStat
 				Device:     node.Path,
 				Filesystem: filesystem,
 			}
-			if node.FreeBytes != nil {
-				stat.FreeBytes = *node.FreeBytes
-				stat.FreeKnown = true
-			} else if free, ok := offlineFilesystemFreeBytesPrivileged(ctx, node.Path, filesystem); ok {
+			if total, free, mountpoint, ok := mountedFilesystemCapacity(ctx, node.Path); ok {
+				stat.Mountpoint = mountpoint
+				stat.TotalBytes = total
+				stat.TotalKnown = true
 				stat.FreeBytes = free
 				stat.FreeKnown = true
+			} else {
+				if node.SizeBytes != nil && *node.SizeBytes > 0 {
+					stat.TotalBytes = *node.SizeBytes
+					stat.TotalKnown = true
+				}
+				if node.FreeBytes != nil {
+					stat.FreeBytes = *node.FreeBytes
+					stat.FreeKnown = true
+				} else if free, ok := offlineFilesystemFreeBytesPrivileged(ctx, node.Path, filesystem); ok {
+					stat.FreeBytes = free
+					stat.FreeKnown = true
+				}
 			}
 			stats = append(stats, stat)
 		}
@@ -70,6 +83,52 @@ func inspectFilesystemStats(ctx context.Context) ([]updaterhelper.FilesystemStat
 		visit(node)
 	}
 	return stats, nil
+}
+
+func mountedFilesystemCapacity(ctx context.Context, device string) (uint64, uint64, string, bool) {
+	targets, err := mountedTargets(ctx, device)
+	if err != nil || len(targets) == 0 {
+		return 0, 0, "", false
+	}
+	target := targets[0]
+	for _, candidate := range targets {
+		if strings.HasPrefix(candidate, "/mnt/home-ai-core/") {
+			target = candidate
+			break
+		}
+	}
+	output, err := hostMountCommand(
+		ctx,
+		"/usr/bin/df",
+		"-B1",
+		"--output=size,avail",
+		"--",
+		target,
+	).CombinedOutput()
+	if err != nil {
+		return 0, 0, "", false
+	}
+	total, free, ok := parseDFCapacityOutput(output)
+	if !ok {
+		return 0, 0, "", false
+	}
+	return total, free, target, true
+}
+
+func parseDFCapacityOutput(output []byte) (uint64, uint64, bool) {
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	for index := len(lines) - 1; index >= 0; index-- {
+		fields := strings.Fields(lines[index])
+		if len(fields) < 2 {
+			continue
+		}
+		total, totalErr := strconv.ParseUint(fields[len(fields)-2], 10, 64)
+		free, freeErr := strconv.ParseUint(fields[len(fields)-1], 10, 64)
+		if totalErr == nil && freeErr == nil && total > 0 {
+			return total, free, true
+		}
+	}
+	return 0, 0, false
 }
 
 func offlineFilesystemFreeBytesPrivileged(ctx context.Context, device, filesystem string) (uint64, bool) {

@@ -54,6 +54,9 @@ type SMBShareRequest struct {
 type FilesystemStat struct {
 	Device     string `json:"device"`
 	Filesystem string `json:"filesystem,omitempty"`
+	Mountpoint string `json:"mountpoint,omitempty"`
+	TotalBytes uint64 `json:"total_bytes,omitempty"`
+	TotalKnown bool   `json:"total_known"`
 	FreeBytes  uint64 `json:"free_bytes,omitempty"`
 	FreeKnown  bool   `json:"free_known"`
 }

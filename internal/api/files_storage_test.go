@@ -82,6 +82,44 @@ func TestFilePoolCapacityFallsBackToBackingStorageInventory(t *testing.T) {
 	}
 }
 
+func TestFilePoolCapacityPrefersHelperFilesystemTotals(t *testing.T) {
+	record := state.NASPoolRecord{
+		StorageDevicePath:     "/dev/sdb1",
+		StorageFilesystemUUID: "fs-test-uuid",
+	}
+	nodes := []systeminfo.BlockNode{
+		{
+			Path:       "/dev/sdb1",
+			Type:       "part",
+			Filesystem: "ext4",
+			UUID:       "fs-test-uuid",
+			SizeBytes:  1_000,
+			FreeBytes:  100,
+			FreeKnown:  true,
+		},
+	}
+	inspection := storage.Inspection{
+		Filesystems: []updaterhelper.FilesystemStat{
+			{
+				Device:     "/dev/sdb1",
+				Filesystem: "ext4",
+				TotalBytes: 960,
+				TotalKnown: true,
+				FreeBytes:  640,
+				FreeKnown:  true,
+			},
+		},
+	}
+
+	capacity, ok := filePoolCapacityFromInventory(record, nodes, inspection)
+	if !ok {
+		t.Fatal("expected helper filesystem capacity to be used")
+	}
+	if capacity.TotalBytes != 960 || capacity.FreeBytes != 640 {
+		t.Fatalf("capacity = %#v, want total=960 free=640", capacity)
+	}
+}
+
 func TestFilePoolCapacityFallbackRequiresKnownFreeSpace(t *testing.T) {
 	record := state.NASPoolRecord{
 		StorageDevicePath:     "/dev/sdb1",
