@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -12,11 +13,11 @@ import (
 
 func runClient(args []string) error {
 	if len(args) == 0 {
-		return errors.New("client requires install or status")
+		return errors.New("client requires install, status or update")
 	}
 	command := args[0]
 	switch command {
-	case "install", "status":
+	case "install", "status", "update":
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -59,6 +60,23 @@ func runClient(args []string) error {
 		} else {
 			fmt.Printf("Home-AI Windows client is already current: %s\n", result.Path)
 		}
+		return nil
+	case "update":
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+		defer cancel()
+		release, err := windowsclient.DiscoverLatestWindowsClientRelease(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("discover latest Home-AI Windows client release: %w", err)
+		}
+		path, digest, err := windowsclient.DownloadWindowsClientRelease(ctx, nil, release)
+		if err != nil {
+			return fmt.Errorf("download Home-AI Windows client %s: %w", release.Version, err)
+		}
+		fmt.Printf("Verified Home-AI Windows client %s (SHA-256 %s).\n", release.Version, digest)
+		if err := windowsclient.StartVerifiedClientInstall(path); err != nil {
+			return err
+		}
+		fmt.Println("Verified update installer started. This process will exit so the installed client can be replaced safely.")
 		return nil
 	case "status":
 		path, installed, err := windowsclient.UserClientInstallStatus()
