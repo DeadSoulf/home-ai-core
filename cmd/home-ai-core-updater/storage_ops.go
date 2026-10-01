@@ -465,6 +465,9 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 	if err != nil {
 		return "", err
 	}
+	if request.DryRun {
+		return planStorageOperation(ctx, request, device)
+	}
 
 	switch request.Operation {
 	case "storage.mount":
@@ -785,6 +788,317 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 	default:
 		return "", errors.New("unsupported storage operation")
 	}
+}
+
+
+type destructiveUsagePlan struct {
+	Mounts       []string
+	ActiveSwaps  []string
+	VolumeGroups []string
+}
+
+func planStorageOperation(ctx context.Context, request updaterhelper.Request, device string) (string, error) {
+	switch request.Operation {
+	case "storage.mount":
+		target := strings.TrimSpace(request.Mountpoint)
+		if target == "" {
+			target = filepath.Join("/mnt/home-ai-core", filepath.Base(device))
+		}
+		target = filepath.Clean(target)
+		targets, err := mountedTargets(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		if mountTargetPresent(targets, target) {
+			return "dry-run OK: device is already mounted at the requested mount point; no changes made", nil
+		}
+		if len(targets) != 0 {
+			return "", fmt.Errorf("device is already mounted at %s", strings.Join(targets, ", "))
+		}
+		if target != "/mnt/home-ai-core" && !strings.HasPrefix(target, "/mnt/home-ai-core/") {
+			return "", errors.New("mount point must be under /mnt/home-ai-core")
+		}
+		return fmt.Sprintf("dry-run OK: would mount %s at %s; no changes made", device, target), nil
+
+	case "storage.unmount":
+		targets, err := mountedTargets(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		if len(targets) == 0 {
+			return "", errors.New("device is not mounted")
+		}
+		for _, target := range targets {
+			if target == "/" {
+				return "", errors.New("refusing to unmount the root filesystem")
+			}
+		}
+		return fmt.Sprintf("dry-run OK: would unmount %s from %s; no changes made", device, strings.Join(targets, ", ")), nil
+
+	case "storage.partition.create":
+		if err := requireDiskType(ctx, device); err != nil {
+			return "", err
+		}
+		protected, err := samePhysicalDiskAsRoot(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		if protected {
+			return "", errors.New("refusing to change the partition table on the system disk")
+		}
+		if mounted, err := diskHasMountedDescendants(ctx, device); err != nil {
+			return "", err
+		} else if mounted {
+			return "", errors.New("all filesystems on the disk must be unmounted before changing partitions")
+		}
+		if request.SizeMiB > 0 && request.SizeMiB < 16 {
+			return "", errors.New("partition size must be at least 16 MiB")
+		}
+		if request.SizeMiB > 0 && request.SizeMiB > 1024*1024*1024 {
+			return "", errors.New("partition size is too large")
+		}
+		if request.SizeMiB > 0 {
+			remaining, err := remainingDiskBytes(ctx, device)
+			if err != nil {
+				return "", err
+			}
+			const alignmentReserve = uint64(4 * 1024 * 1024)
+			requested := request.SizeMiB * 1024 * 1024
+			if remaining <= alignmentReserve || requested > remaining-alignmentReserve {
+				return "", errors.New("requested partition size exceeds available unallocated space")
+			}
+		}
+		size := "all remaining space"
+		if request.SizeMiB > 0 {
+			size = fmt.Sprintf("%d MiB", request.SizeMiB)
+		}
+		return fmt.Sprintf("dry-run OK: system disk check passed; would create a %s partition on %s; no changes made", size, device), nil
+
+	case "storage.partition.delete":
+		if err := requirePartitionType(ctx, device); err != nil {
+			return "", err
+		}
+		protected, err := samePhysicalDiskAsRoot(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		if protected {
+			return "", errors.New("refusing to delete a partition on the system disk")
+		}
+		usage, err := inspectDestructiveUsage(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		return summarizeDestructivePlan("delete partition", device, usage), nil
+
+	case "storage.partition.delete_all":
+		if err := requireDiskType(ctx, device); err != nil {
+			return "", err
+		}
+		protected, err := samePhysicalDiskAsRoot(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		if protected {
+			return "", errors.New("refusing to delete partitions on the system disk")
+		}
+		usage, err := inspectDestructiveUsage(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		return summarizeDestructivePlan("delete all partitions", device, usage), nil
+
+	case "storage.label.rename":
+		targets, err := mountedTargets(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		if len(targets) != 0 {
+			return "", errors.New("device must be unmounted before renaming")
+		}
+		protected, err := samePhysicalDiskAsRoot(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		if protected {
+			return "", errors.New("refusing to rename a filesystem on the system disk")
+		}
+		label := strings.TrimSpace(request.Label)
+		if label == "" {
+			return "", errors.New("filesystem label cannot be empty")
+		}
+		fstypeOutput, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-ndo", "FSTYPE", device).CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("inspect filesystem type: %s", strings.TrimSpace(string(fstypeOutput)))
+		}
+		fstype := strings.ToLower(strings.TrimSpace(string(fstypeOutput)))
+		if !validFilesystemLabelForType(label, fstype) {
+			return "", errors.New("invalid filesystem label for filesystem type")
+		}
+		return fmt.Sprintf("dry-run OK: would rename filesystem label on %s to %q; no changes made", device, label), nil
+
+	case "storage.format":
+		protected, err := samePhysicalDiskAsRoot(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		if protected {
+			return "", errors.New("refusing to format a device on the system disk")
+		}
+		usage, err := inspectDestructiveUsage(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		label := strings.TrimSpace(request.Label)
+		if !validFilesystemLabel(label) {
+			return "", errors.New("invalid filesystem label")
+		}
+		filesystem := strings.ToLower(strings.TrimSpace(request.Filesystem))
+		var command string
+		switch filesystem {
+		case "ext4":
+			command = "/usr/sbin/mkfs.ext4"
+		case "xfs":
+			command = "/usr/sbin/mkfs.xfs"
+		case "vfat":
+			command = "/usr/sbin/mkfs.vfat"
+		default:
+			return "", errors.New("unsupported filesystem; use ext4, xfs or vfat")
+		}
+		if _, err := os.Stat(command); err != nil {
+			return "", fmt.Errorf("filesystem tool is unavailable: %s", command)
+		}
+		message := summarizeDestructivePlan("format as "+filesystem, device, usage)
+		if label != "" {
+			message += fmt.Sprintf("; label=%q", label)
+		}
+		return message, nil
+	default:
+		return "", errors.New("unsupported storage dry-run operation")
+	}
+}
+
+func summarizeDestructivePlan(action, device string, usage destructiveUsagePlan) string {
+	parts := []string{
+		fmt.Sprintf("dry-run OK: system disk check passed; would %s on %s", action, device),
+	}
+	if len(usage.Mounts) > 0 {
+		parts = append(parts, "would unmount "+strings.Join(usage.Mounts, ", "))
+	}
+	if len(usage.ActiveSwaps) > 0 {
+		parts = append(parts, "would disable swap "+strings.Join(usage.ActiveSwaps, ", "))
+	}
+	if len(usage.VolumeGroups) > 0 {
+		parts = append(parts, "would deactivate LVM "+strings.Join(usage.VolumeGroups, ", "))
+	}
+	parts = append(parts, "no changes made")
+	return strings.Join(parts, "; ")
+}
+
+func inspectDestructiveUsage(ctx context.Context, device string) (destructiveUsagePlan, error) {
+	activeSwaps, err := activeSwapDevices()
+	if err != nil {
+		return destructiveUsagePlan{}, err
+	}
+	output, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-nrpo", "NAME,FSTYPE", device).CombinedOutput()
+	if err != nil {
+		return destructiveUsagePlan{}, fmt.Errorf("inspect device usage: %s", strings.TrimSpace(string(output)))
+	}
+
+	plan := destructiveUsagePlan{}
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		name := fields[0]
+		fstype := ""
+		if len(fields) > 1 {
+			fstype = fields[1]
+		}
+		if fstype == "swap" && devicePathInSet(name, activeSwaps) {
+			plan.ActiveSwaps = append(plan.ActiveSwaps, name)
+			continue
+		}
+		targets, err := mountedTargets(ctx, name)
+		if err != nil {
+			return destructiveUsagePlan{}, err
+		}
+		for _, target := range targets {
+			if target == "/" {
+				return destructiveUsagePlan{}, errors.New("refusing to unmount the root filesystem")
+			}
+			plan.Mounts = append(plan.Mounts, name+"@"+target)
+		}
+	}
+	plan.VolumeGroups, err = inspectLVMGroupsOnDisk(ctx, device)
+	if err != nil {
+		return destructiveUsagePlan{}, err
+	}
+	return plan, nil
+}
+
+func inspectLVMGroupsOnDisk(ctx context.Context, device string) ([]string, error) {
+	if _, err := os.Stat("/usr/sbin/pvs"); err != nil {
+		return nil, nil
+	}
+	targetDisk, err := topPhysicalDisk(ctx, device)
+	if err != nil {
+		return nil, err
+	}
+	output, err := exec.CommandContext(
+		ctx,
+		"/usr/sbin/pvs",
+		"--noheadings",
+		"--separator", "|",
+		"-o", "pv_name,vg_name",
+	).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("inspect LVM physical volumes: %s", strings.TrimSpace(string(output)))
+	}
+	type pvVG struct {
+		pv string
+		vg string
+	}
+	var mappings []pvVG
+	targetVGs := map[string]bool{}
+	for _, line := range strings.Split(string(output), "\n") {
+		parts := strings.Split(line, "|")
+		if len(parts) < 2 {
+			continue
+		}
+		pv := strings.TrimSpace(parts[0])
+		vg := strings.TrimSpace(parts[1])
+		if pv == "" || vg == "" || !strings.HasPrefix(pv, "/dev/") {
+			continue
+		}
+		mappings = append(mappings, pvVG{pv: pv, vg: vg})
+		disk, err := topPhysicalDisk(ctx, pv)
+		if err != nil {
+			continue
+		}
+		if disk == targetDisk {
+			targetVGs[vg] = true
+		}
+	}
+	var groups []string
+	for vg := range targetVGs {
+		for _, mapping := range mappings {
+			if mapping.vg != vg {
+				continue
+			}
+			disk, err := topPhysicalDisk(ctx, mapping.pv)
+			if err != nil {
+				return nil, fmt.Errorf("resolve LVM physical volume %s: %w", mapping.pv, err)
+			}
+			if disk != targetDisk {
+				return nil, fmt.Errorf("refusing destructive operation because LVM volume group %s also uses another physical disk", vg)
+			}
+		}
+		groups = append(groups, vg)
+	}
+	sort.Strings(groups)
+	return groups, nil
 }
 
 func waitForMountedTarget(ctx context.Context, device, target string) error {
