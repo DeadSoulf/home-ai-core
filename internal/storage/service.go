@@ -14,16 +14,16 @@ import (
 const helperSocketPath = "/run/home-ai-core-updater.sock"
 
 type Request struct {
-	Operation    string
-	Device       string
-	Mountpoint   string
-	Filesystem   string
-	Label        string
-	Confirm      string
-	SizeMiB      uint64
-	RootPath     string
-	RelativePath    string
-	ReservePercent  int
+	Operation      string
+	Device         string
+	Mountpoint     string
+	Filesystem     string
+	Label          string
+	Confirm        string
+	SizeMiB        uint64
+	RootPath       string
+	RelativePath   string
+	ReservePercent int
 }
 
 func ensureCompatibleHelper(ctx context.Context) error {
@@ -116,9 +116,9 @@ func PrepareNASFolder(ctx context.Context, rootPath, relativePath string) error 
 
 func ApplyNASCapacityPolicy(ctx context.Context, rootPath string, reservePercent int) error {
 	_, err := Execute(ctx, Request{
-		Operation:       "nas.capacity_policy",
-		RootPath:        rootPath,
-		ReservePercent:  reservePercent,
+		Operation:      "nas.capacity_policy",
+		RootPath:       rootPath,
+		ReservePercent: reservePercent,
 	})
 	return err
 }
