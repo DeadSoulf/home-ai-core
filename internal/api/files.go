@@ -23,7 +23,7 @@ var (
 	resolveFilePoolStorage = func(nodeID, rootPath string, assignments []state.StoragePurposeRecord) (systeminfo.BlockNode, error) {
 		return filePoolStorageNode(rootPath, assignments, systeminfo.Collect(nodeID).BlockTree)
 	}
-	readFilePoolCapacity         = filedata.ReadCapacity
+	readFilePoolCapacity        = filedata.ReadCapacity
 	applyFilePoolCapacityPolicy = storage.ApplyNASCapacityPolicy
 )
 
@@ -1046,7 +1046,7 @@ func (s *server) filePoolCapacityPolicy(
 			record.ID,
 			"success",
 			map[string]any{
-				"reserve_percent": record.ReservePercent,
+				"reserve_percent":  record.ReservePercent,
 				"warning_percent":  record.WarningPercent,
 				"hard_quota_error": hardQuotaError,
 			},
