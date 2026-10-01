@@ -5,8 +5,8 @@
 > Аудит уже сделанного: [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
-**Последний опубликованный релиз:** `0.1.88-dev` — disk-first Web storage workflow\
-**Текущий срез:** `0.1.89-dev` — release candidate; compact selected-disk storage table\
+**Последний опубликованный релиз:** `0.1.89-dev` — compact selected-disk storage table\
+**Текущий срез:** `0.1.89-dev` — published; live compact storage UI and SMB/quota acceptance pending\
 **Следующий engineering milestone:** live acceptance нового storage UI и SMB/quota; затем controlled legacy quota migration и per-folder/per-user quotas\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-10-01
@@ -19,7 +19,8 @@
 - Заголовки колонок могут переноситься на несколько строк, не растягивая всю таблицу.
 - Уменьшены padding, размеры compact-кнопок и selector назначения.
 - Ключ сохранённых ширин колонок переведён на v2, чтобы старые широкие значения localStorage не перекрывали новый default.
-- Release candidate: требуется полный CI и live UI acceptance.
+- PR #69 прошёл полный CI; release workflow опубликовал `v0.1.89-dev` с amd64/arm64 Core bundles и Windows `.exe` + SHA-256.
+- Практическая проверка компактной таблицы на установленном сервере остаётся acceptance step.
 
 ### Выпуск 0.1.88-dev — новый интерфейс управления дисками
 
