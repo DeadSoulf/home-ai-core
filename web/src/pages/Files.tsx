@@ -19,7 +19,7 @@ export function FilesPage({
   section: FileSection;
   onSectionChange: (section: FileSection) => void;
 }) {
-  const {t, date} = useI18n();
+  const {t, date, locale} = useI18n();
   const load = useCallback(async () => {
     const folders = await api.fileFolders();
     if (!canManage) {
@@ -38,6 +38,7 @@ export function FilesPage({
   const [settingsFolderID, setSettingsFolderID] = useState("");
   const [poolName, setPoolName] = useState("");
   const [poolRoot, setPoolRoot] = useState("");
+  const [mountedStorageOverrides, setMountedStorageOverrides] = useState<Record<string, string>>({});
   const [folderPoolID, setFolderPoolID] = useState("");
   const [folderName, setFolderName] = useState("");
   const [folderKind, setFolderKind] = useState<"private" | "shared">("private");
@@ -135,15 +136,17 @@ export function FilesPage({
     setFormError("");
     setNotice("");
     try {
-      await api.storageOperation({operation: "mount", device: storage.device});
+      const result = await api.storageOperation({operation: "mount", device: storage.device});
       const deviceName = storage.device.split("/").filter(Boolean).pop() || "";
-      if (deviceName) {
-        setPoolRoot(`/mnt/home-ai-core/${deviceName}`);
+      const mountpoint = result.mountpoint || (deviceName ? `/mnt/home-ai-core/${deviceName}` : "");
+      if (mountpoint) {
+        setMountedStorageOverrides((current) => ({...current, [storage.device]: mountpoint}));
+        setPoolRoot(mountpoint);
       }
       setNotice(t("fileStorageMounted"));
       resource.reload();
     } catch (reason) {
-      setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
+      setFormError(localizeFileStorageError(reason, locale, t("requestFailed"), t("fileStorageMountFailed"), t("fileStorageMountedElsewhere"), t("fileStorageFilesystemError")));
     } finally {
       setBusy("");
     }
@@ -475,7 +478,13 @@ export function FilesPage({
   const pools = resource.data?.pools || [];
   const users = resource.data?.users || [];
   const fileStorage = (resource.data?.storagePurposes || []).filter((item) => item.purpose === "files");
-  const mountOptions = fileStorageMountOptions(fileStorage);
+  const effectiveFileStorage = fileStorage.map((storage) => {
+    const override = mountedStorageOverrides[storage.device];
+    const mountpoints = storage.mountpoints || [];
+    if (!override || mountpoints.includes(override)) return storage;
+    return {...storage, mountpoints: [...mountpoints, override]};
+  });
+  const mountOptions = fileStorageMountOptions(effectiveFileStorage);
   const poolRoots = new Set(pools.map((pool) => pool.root_path));
   const smbStatus = resource.data?.smb;
   const userName = new Map(users.map((user) => [user.id, user.display_name || user.username]));
@@ -1040,7 +1049,7 @@ export function FilesPage({
                 </tr>
               </thead>
               <tbody>
-                {fileStorage.map((storage) => {
+                {effectiveFileStorage.map((storage) => {
                   const mountpoints = storage.mountpoints || [];
                   const usableMounts = mountpoints.filter((path) => path.startsWith("/mnt/home-ai-core/"));
                   const alreadyPool = storage.in_use || usableMounts.some((path) => poolRoots.has(path));
@@ -1077,7 +1086,7 @@ export function FilesPage({
                     </tr>
                   );
                 })}
-                {fileStorage.length === 0 && (
+                {effectiveFileStorage.length === 0 && (
                   <tr>
                     <td colSpan={7} className="muted">{t("fileNoAssignedStorage")}</td>
                   </tr>
@@ -1119,7 +1128,7 @@ export function FilesPage({
               </label>
               {mountOptions.length === 0 && (
                 <div className="notice">
-                  {fileStorage.length === 0 ? t("fileNoAssignedStorage") : t("fileAssignedStorageNeedsMount")}
+                  {effectiveFileStorage.length === 0 ? t("fileNoAssignedStorage") : t("fileAssignedStorageNeedsMount")}
                 </div>
               )}
               <p className="muted small">{t("filePoolFoundationNotice")}</p>
@@ -1205,6 +1214,41 @@ type NASMountOption = {
   filesystem?: string;
   device?: string;
 };
+
+function localizeFileStorageError(
+  reason: unknown,
+  locale: "ru" | "en",
+  fallback: string,
+  mountFailed: string,
+  mountedElsewhere: string,
+  filesystemError: string,
+): string {
+  if (!(reason instanceof Error)) return fallback;
+  const message = reason.message || "";
+  if (locale !== "ru") return message || fallback;
+
+  if (message.includes("device is already mounted at")) {
+    const location = message.split("device is already mounted at")[1]?.trim();
+    return location ? `${mountedElsewhere} ${location}` : mountedElsewhere;
+  }
+  if (message.includes("filesystem diagnostic:")) {
+    return filesystemError;
+  }
+  if (
+    message.includes("mount device") ||
+    message.includes("wrong fs type") ||
+    message.includes("bad superblock")
+  ) {
+    return mountFailed;
+  }
+  if (message.includes("system storage helper is outdated")) {
+    return "Системный модуль управления хранилищем устарел. Установите последнюю версию Home-AI-Core.";
+  }
+  if (message.includes("storage helper")) {
+    return "Не удалось связаться с системным модулем управления хранилищем.";
+  }
+  return message || fallback;
+}
 
 function fileStorageMountOptions(assignments: StoragePurposeAssignment[]): NASMountOption[] {
   const byPath = new Map<string, NASMountOption>();
