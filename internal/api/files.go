@@ -30,6 +30,7 @@ var (
 	}
 	readFilePoolCapacity        = filedata.ReadCapacity
 	applyFilePoolCapacityPolicy = storage.ApplyNASCapacityPolicy
+	inspectNASFolderUsage       = storage.InspectNASUsage
 )
 
 type filePoolResponse struct {
