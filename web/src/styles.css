@@ -926,3 +926,207 @@ button:focus-visible, summary:focus-visible { outline: 2px solid #8bb0ff; outlin
   .page-heading p { font-size: 13px; line-height: 1.6; }
   .server-sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+
+/* Storage: disk-first overview with contextual operations. */
+.storage-disks { display: grid; gap: 14px; min-width: 0; }
+.storage-disks > .form-error { white-space: pre-line; }
+.storage-disk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 14px;
+}
+.storage-disk-card {
+  appearance: none;
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  text-align: left;
+  border: 1px solid #2d3745;
+  background: #121923;
+  color: #e9eff7;
+  border-radius: 13px;
+  padding: 16px;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease;
+}
+.storage-disk-card:hover {
+  border-color: #4b5f78;
+  background: #151f2b;
+  transform: translateY(-1px);
+}
+.storage-disk-card.selected {
+  border-color: #5c85ff;
+  box-shadow: 0 0 0 2px #4f7cff25;
+}
+.storage-disk-card:focus-visible { outline: 2px solid #8bb0ff; outline-offset: 3px; }
+.storage-disk-card-head,
+.storage-disk-card-foot,
+.storage-disk-capacity-row,
+.storage-drawer-title-row,
+.storage-drawer-section-head,
+.storage-partition-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.storage-disk-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 38px;
+  border: 1px solid #34445a;
+  border-radius: 10px;
+  background: #182437;
+  color: #8bb0ff;
+  font-size: 18px;
+}
+.storage-disk-badges { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
+.storage-disk-name { display: block; font-size: 16px; line-height: 1.25; font-weight: 700; overflow-wrap: anywhere; }
+.storage-disk-model { display: block; min-height: 16px; color: #8391a4; font-size: 11px; overflow-wrap: anywhere; }
+.storage-disk-capacity-row > span { display: grid; gap: 3px; }
+.storage-disk-capacity-row > span:last-child { text-align: right; }
+.storage-disk-capacity-row small { color: #7f8b9d; font-size: 10px; font-weight: 500; }
+.storage-disk-capacity-row strong { color: #e6edf6; font-size: 12px; font-weight: 650; }
+.storage-disk-usage {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #0c1219;
+  border: 1px solid #26303c;
+}
+.storage-disk-usage > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #5c85ff;
+}
+.storage-disk-card-foot {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  color: #738095;
+  font-size: 10px;
+}
+.storage-disk-card-foot span + span::before { content: "•"; margin-right: 8px; color: #465365; }
+
+.storage-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  border: 0;
+  background: #05080db8;
+  cursor: default;
+}
+.storage-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  width: min(620px, calc(100vw - 48px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  border-left: 1px solid #303a49;
+  background: #0f151d;
+  box-shadow: -18px 0 50px #0008;
+}
+.storage-drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid #293341;
+  background: #121923;
+}
+.storage-drawer-title-row { justify-content: flex-start; flex-wrap: wrap; }
+.storage-drawer-title-row h3 { margin: 0; color: #f2f6fb; font-size: 20px; line-height: 1.2; }
+.storage-drawer-path { margin-top: 5px; color: #758397; font-size: 11px; }
+.storage-drawer-close {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border: 1px solid #34404f;
+  border-radius: 9px;
+  background: #151d27;
+  color: #b9c5d4;
+  font-size: 24px;
+  line-height: 1;
+}
+.storage-drawer-close:hover { background: #202a37; color: #fff; }
+.storage-drawer-scroll { min-height: 0; overflow: auto; padding: 18px 20px 28px; }
+.storage-drawer-section { display: grid; gap: 12px; }
+.storage-drawer-section + .storage-drawer-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #28323f;
+}
+.storage-drawer-section h4 { margin: 0; color: #dfe7f1; font-size: 13px; }
+.storage-disk-details,
+.storage-partition-meta {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+.storage-disk-details > div,
+.storage-partition-meta > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  border: 1px solid #293442;
+  border-radius: 9px;
+  background: #121923;
+  padding: 10px 11px;
+}
+.storage-disk-details dt,
+.storage-partition-meta dt { color: #738196; font-size: 10px; }
+.storage-disk-details dd,
+.storage-partition-meta dd { margin: 0; color: #dce5ef; font-size: 12px; overflow-wrap: anywhere; }
+.storage-drawer-actions,
+.storage-partition-actions { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
+.storage-drawer-actions .button { min-width: 0; }
+.storage-drawer-form { margin-top: 2px; }
+
+.storage-partition-list { display: grid; gap: 10px; }
+.storage-partition-card {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  border: 1px solid #2c3745;
+  border-radius: 11px;
+  background: #121923;
+  padding: 12px;
+}
+.storage-partition-head { align-items: flex-start; }
+.storage-partition-head > div:first-child { min-width: 0; display: grid; gap: 3px; }
+.storage-partition-head strong { color: #edf3fa; font-size: 13px; overflow-wrap: anywhere; }
+.storage-partition-head .mono { color: #748297; font-size: 10px; overflow-wrap: anywhere; }
+.storage-partition-meta { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.storage-partition-meta > div { border: 0; background: #0e151e; padding: 8px 9px; }
+.storage-partition-actions .storage-purpose-control { margin-right: auto; }
+.storage-protection { margin: 0; }
+
+@media (max-width: 760px) {
+  .storage-disk-grid { grid-template-columns: 1fr; }
+  .storage-drawer { width: 100vw; border-left: 0; }
+  .storage-drawer-backdrop { display: none; }
+  .storage-drawer-head { padding: 15px 16px; }
+  .storage-drawer-scroll { padding: 16px; }
+  .storage-disk-details,
+  .storage-partition-meta { grid-template-columns: 1fr 1fr; }
+  .storage-partition-card { margin-left: 0 !important; }
+}
+@media (max-width: 460px) {
+  .storage-disk-details,
+  .storage-partition-meta { grid-template-columns: 1fr; }
+  .storage-drawer-actions,
+  .storage-partition-actions { align-items: stretch; flex-direction: column; }
+  .storage-drawer-actions .button,
+  .storage-partition-actions .button,
+  .storage-partition-actions .storage-purpose-control { width: 100%; }
+  .storage-purpose-control { justify-content: space-between; }
+}
