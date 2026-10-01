@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.107-dev
+
+- Fix Files folder “Used / limit” showing unavailable even when pool capacity is known.
+- Keep the existing in-process logical usage calculation as the preferred path.
+- When Core cannot read a managed folder from its service sandbox, fall back to the privileged helper and calculate the folder's apparent file size with host-namespace `du -B1`.
+- Exclude active Home-AI upload temporary files from the host `du` fallback so incomplete upload parts are not double-counted as normal folder contents.
+- Reuse the same folder-usage fallback for folder quota checks and private-user quota totals.
+- Add regression coverage for host `du` parsing and the API fallback path.
+
 ## 0.1.106-dev
 
 - Replace indirect Files capacity discovery with host-level `df -B1` for mounted filesystems.
