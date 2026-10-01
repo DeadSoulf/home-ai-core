@@ -42,6 +42,8 @@ type Service struct {
 	jobs        JobReader
 	modules     ModuleReader
 	audit       AuditRecorder
+	sessions    ConversationStore
+	provider    StreamingProvider
 	toolTimeout time.Duration
 	initErr     error
 }
@@ -52,12 +54,32 @@ type Status struct {
 	Version            string `json:"version"`
 	ToolCount          int    `json:"tool_count"`
 	ProviderConfigured bool   `json:"provider_configured"`
+	ProviderID         string `json:"provider_id,omitempty"`
 }
 
 func NewService(nodeID string, stateReader StateReader, jobReader JobReader, moduleReader ModuleReader, auditRecorder AuditRecorder) *Service {
-	s := &Service{nodeID: nodeID, registry: NewToolRegistry(), state: stateReader, jobs: jobReader, modules: moduleReader, audit: auditRecorder, toolTimeout: defaultToolTimeout}
-	s.initErr = s.registerCoreReadTools()
+	var sessions ConversationStore
+	if value, ok := stateReader.(ConversationStore); ok {
+		sessions = value
+	}
+	provider, providerErr := NewOllamaProvider("")
+	s := &Service{
+		nodeID:      nodeID,
+		registry:    NewToolRegistry(),
+		state:       stateReader,
+		jobs:        jobReader,
+		modules:     moduleReader,
+		audit:       auditRecorder,
+		sessions:    sessions,
+		provider:    provider,
+		toolTimeout: defaultToolTimeout,
+	}
+	s.initErr = errors.Join(providerErr, s.registerCoreReadTools())
 	return s
+}
+
+func (s *Service) SetProvider(provider StreamingProvider) {
+	s.provider = provider
 }
 
 func (s *Service) Status() Status {
@@ -65,7 +87,12 @@ func (s *Service) Status() Status {
 	if s.initErr != nil {
 		stateName = "error"
 	}
-	return Status{ModuleID: "ai.agent", State: stateName, Version: version.Version, ToolCount: len(s.registry.List()), ProviderConfigured: false}
+	status := Status{ModuleID: "ai.agent", State: stateName, Version: version.Version, ToolCount: len(s.registry.List())}
+	if s.provider != nil {
+		status.ProviderConfigured = true
+		status.ProviderID = s.provider.ID()
+	}
+	return status
 }
 
 func (s *Service) AvailableTools(principal Principal) []ToolDescriptor {
