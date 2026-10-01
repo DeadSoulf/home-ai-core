@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.105-dev
+
+- Fix Files storage capacity inspection after host-namespace mounting.
+- Run the helper's `lsblk PATH,TYPE,FSTYPE,FSAVAIL,MOUNTPOINTS` inspection in PID 1's host mount namespace, matching the namespace used for mount/umount/findmnt.
+- This lets `FSAVAIL` observe the real mounted `/mnt/home-ai-core/...` filesystem instead of the helper service's sandbox view.
+- Keep offline filesystem free-space inspection as a fallback when `FSAVAIL` is unavailable.
+
 ## 0.1.104-dev
 
 - Replace ambiguous dashes in Files storage capacity fields with an explicit unavailable-capacity label.
