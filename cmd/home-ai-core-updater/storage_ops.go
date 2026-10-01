@@ -434,20 +434,45 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 			return "", fmt.Errorf("inspect filesystem before mount: %s", strings.TrimSpace(string(filesystemOutput)))
 		}
 		filesystem := strings.ToLower(strings.TrimSpace(string(filesystemOutput)))
-		mountArgs := []string{}
+		quotaOptions := ""
 		switch filesystem {
 		case "ext4":
-			options := "usrquota"
+			quotaOptions = "usrquota"
 			if features, err := exec.CommandContext(ctx, "/usr/sbin/dumpe2fs", "-h", device).CombinedOutput(); err == nil && strings.Contains(string(features), "Project quota inode:") {
-				options += ",prjquota"
+				quotaOptions += ",prjquota"
 			}
-			mountArgs = append(mountArgs, "-o", options)
 		case "xfs":
-			mountArgs = append(mountArgs, "-o", "uquota,prjquota")
+			quotaOptions = "uquota,prjquota"
 		}
-		mountArgs = append(mountArgs, "--", device, target)
-		if output, err := exec.CommandContext(ctx, "/usr/bin/mount", mountArgs...).CombinedOutput(); err != nil {
-			return "", fmt.Errorf("mount device: %s", strings.TrimSpace(string(output)))
+
+		mountedWithQuota := false
+		if quotaOptions != "" {
+			mountArgs := []string{"-o", quotaOptions, "--", device, target}
+			output, mountErr := exec.CommandContext(ctx, "/usr/bin/mount", mountArgs...).CombinedOutput()
+			if mountErr == nil {
+				mountedWithQuota = true
+			} else {
+				plainOutput, plainErr := exec.CommandContext(ctx, "/usr/bin/mount", "--", device, target).CombinedOutput()
+				if plainErr != nil {
+					quotaMessage := strings.TrimSpace(string(output))
+					plainMessage := strings.TrimSpace(string(plainOutput))
+					if quotaMessage == "" {
+						quotaMessage = mountErr.Error()
+					}
+					if plainMessage == "" {
+						plainMessage = plainErr.Error()
+					}
+					return "", fmt.Errorf("mount device with quota options: %s; retry without quota options: %s", quotaMessage, plainMessage)
+				}
+			}
+		} else {
+			if output, err := exec.CommandContext(ctx, "/usr/bin/mount", "--", device, target).CombinedOutput(); err != nil {
+				message := strings.TrimSpace(string(output))
+				if message == "" {
+					message = err.Error()
+				}
+				return "", fmt.Errorf("mount device: %s", message)
+			}
 		}
 		targets, err = mountedTargets(ctx, device)
 		if err != nil {
@@ -462,6 +487,9 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		}
 		if !mounted {
 			return "", errors.New("mount completed but verification did not find the requested mount")
+		}
+		if quotaOptions != "" && !mountedWithQuota {
+			return "device mounted without quota mount options", nil
 		}
 		return "device mounted", nil
 
