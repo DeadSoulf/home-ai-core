@@ -1215,9 +1215,7 @@ func validateBlockDevice(value string) (string, error) {
 }
 
 func hostMountCommand(ctx context.Context, command string, args ...string) *exec.Cmd {
-	nsenterArgs := []string{"--mount=/proc/1/ns/mnt", "--", command}
-	nsenterArgs = append(nsenterArgs, args...)
-	return exec.CommandContext(ctx, "/usr/bin/nsenter", nsenterArgs...)
+	return exec.CommandContext(ctx, "/usr/bin/nsenter", hostMountCommandArgs(command, args...)...)
 }
 
 func hostMountCommandArgs(command string, args ...string) []string {
