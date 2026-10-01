@@ -408,18 +408,21 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 
 	switch request.Operation {
 	case "storage.mount":
-		targets, err := mountedTargets(ctx, device)
-		if err != nil {
-			return "", err
-		}
-		if len(targets) != 0 {
-			return "", errors.New("device is already mounted")
-		}
 		target := strings.TrimSpace(request.Mountpoint)
 		if target == "" {
 			target = filepath.Join("/mnt/home-ai-core", filepath.Base(device))
 		}
 		target = filepath.Clean(target)
+		targets, err := mountedTargets(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		if mountTargetPresent(targets, target) {
+			return "device already mounted at requested mount point", nil
+		}
+		if len(targets) != 0 {
+			return "", fmt.Errorf("device is already mounted at %s", strings.Join(targets, ", "))
+		}
 		if target != "/mnt/home-ai-core" && !strings.HasPrefix(target, "/mnt/home-ai-core/") {
 			return "", errors.New("mount point must be under /mnt/home-ai-core")
 		}
@@ -733,6 +736,16 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 	default:
 		return "", errors.New("unsupported storage operation")
 	}
+}
+
+func mountTargetPresent(targets []string, target string) bool {
+	target = filepath.Clean(strings.TrimSpace(target))
+	for _, mounted := range targets {
+		if filepath.Clean(strings.TrimSpace(mounted)) == target {
+			return true
+		}
+	}
+	return false
 }
 
 func filesystemMountDiagnostic(ctx context.Context, device, filesystem string) string {
