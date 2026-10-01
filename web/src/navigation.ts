@@ -38,8 +38,15 @@ export const fileSections = ["folders", "storage", "windows"] as const;
 export type FileSection = typeof fileSections[number];
 
 export function fileSection(path: string): FileSection {
-  const value = path.split("#")[1];
+  const [raw, hash] = path.split("#");
+  const route = raw.replace(/\/+$/, "") || "/";
+  const nested = route.startsWith("/files/") ? route.slice("/files/".length) : "";
+  const value = nested || hash;
   return fileSections.find((section) => section === value) || "folders";
+}
+
+export function fileSectionPath(section: FileSection): string {
+  return section === "folders" ? "/files" : "/files/" + section;
 }
 
 export function systemSection(path: string): SystemSection {
@@ -50,17 +57,22 @@ export function systemSection(path: string): SystemSection {
 export function accessiblePath(actor: Actor, path: string): string {
   const [raw, hash] = path.split("#");
   const route = raw.replace(/\/+$/, "") || "/";
-  const allowed = route === "/account" || visibleNavigation(actor).some((group) => group.items.some((item) => item.path === route));
+  const fileRoute = route === "/files" || route.startsWith("/files/");
+  const navigationRoute = fileRoute ? "/files" : route;
+  const allowed = navigationRoute === "/account" ||
+    visibleNavigation(actor).some((group) => group.items.some((item) => item.path === navigationRoute));
   if (!allowed) return "/";
+
+  if (fileRoute) {
+    const section = fileSection(path);
+    if (section !== "folders" && !hasPermission(actor, "files.manage")) return "/files";
+    return fileSectionPath(section);
+  }
+
   if (!hash) return route;
   if (route === "/system") {
     const section = systemSection(path);
     if (section === "updates" && !hasPermission(actor, "updates.read")) return route;
-    return route + "#" + section;
-  }
-  if (route === "/files") {
-    const section = fileSection(path);
-    if (section !== "folders" && !hasPermission(actor, "files.manage")) return route;
     return route + "#" + section;
   }
   return route;
