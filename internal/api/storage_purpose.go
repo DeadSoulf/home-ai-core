@@ -268,7 +268,6 @@ func collectPartitionNodes(node systeminfo.BlockNode, result map[string]systemin
 	}
 }
 
-
 func storageUsageForNode(node systeminfo.BlockNode, pools []state.NASPoolRecord) []storagePurposeUsageResponse {
 	mountpoints := make([]string, 0)
 	collectStorageMountpoints(node, &mountpoints)
