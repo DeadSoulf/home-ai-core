@@ -17,30 +17,30 @@ type StorageColumn =
   | "actions";
 
 const defaultColumnWidths: Record<StorageColumn, number> = {
-  name: 290,
-  type: 95,
-  filesystem: 135,
-  partitionTable: 125,
-  size: 115,
-  free: 145,
-  mount: 190,
-  parent: 115,
-  actions: 330,
-};
-
-const minimumColumnWidths: Record<StorageColumn, number> = {
-  name: 150,
-  type: 70,
-  filesystem: 90,
-  partitionTable: 90,
-  size: 85,
-  free: 100,
-  mount: 120,
-  parent: 85,
+  name: 210,
+  type: 72,
+  filesystem: 100,
+  partitionTable: 105,
+  size: 90,
+  free: 105,
+  mount: 145,
+  parent: 90,
   actions: 180,
 };
 
-const storageColumnWidthKey = "home-ai-core.storage.column-widths";
+const minimumColumnWidths: Record<StorageColumn, number> = {
+  name: 140,
+  type: 60,
+  filesystem: 75,
+  partitionTable: 88,
+  size: 72,
+  free: 82,
+  mount: 105,
+  parent: 68,
+  actions: 132,
+};
+
+const storageColumnWidthKey = "home-ai-core.storage.column-widths.v2";
 
 function initialColumnWidths(): Record<StorageColumn, number> {
   try {

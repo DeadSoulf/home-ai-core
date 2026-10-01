@@ -6,10 +6,20 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.88-dev` — disk-first Web storage workflow\
-**Текущий срез:** `0.1.88-dev` — published; live storage UI and SMB/quota acceptance pending\
+**Текущий срез:** `0.1.89-dev` — release candidate; compact selected-disk storage table\
 **Следующий engineering milestone:** live acceptance нового storage UI и SMB/quota; затем controlled legacy quota migration и per-folder/per-user quotas\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-10-01
+
+### Выпуск 0.1.89-dev — компактная таблица диска
+
+- Таблица разделов/LVM внутри выбранного физического диска стала заметно компактнее.
+- Суммарная default width уменьшена примерно с 1540 px до 1100 px.
+- Колонка **Действия** уменьшена с 330 px до 180 px; остальные колонки также сжаты.
+- Заголовки колонок могут переноситься на несколько строк, не растягивая всю таблицу.
+- Уменьшены padding, размеры compact-кнопок и selector назначения.
+- Ключ сохранённых ширин колонок переведён на v2, чтобы старые широкие значения localStorage не перекрывали новый default.
+- Release candidate: требуется полный CI и live UI acceptance.
 
 ### Выпуск 0.1.88-dev — новый интерфейс управления дисками
 
