@@ -5,9 +5,20 @@ import { FolderSettings } from "../components/FolderSettings";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
 import { useResource } from "../hooks/useResource";
 import { useI18n } from "../i18n";
+import type { FileSection } from "../navigation";
 import { PageHeading } from "./Dashboard";
 
-export function FilesPage({revision, canManage}: {revision: number; canManage: boolean}) {
+export function FilesPage({
+  revision,
+  canManage,
+  section,
+  onSectionChange,
+}: {
+  revision: number;
+  canManage: boolean;
+  section: FileSection;
+  onSectionChange: (section: FileSection) => void;
+}) {
   const {t, date} = useI18n();
   const load = useCallback(async () => {
     const folders = await api.fileFolders();
@@ -24,7 +35,6 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
   }, [canManage]);
   const resource = useResource(load, revision);
 
-  const [section, setSection] = useState<"folders" | "storage" | "windows">("folders");
   const [settingsFolderID, setSettingsFolderID] = useState("");
   const [poolName, setPoolName] = useState("");
   const [poolRoot, setPoolRoot] = useState("");
@@ -460,7 +470,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
       {canManage && <nav className="file-section-tabs" aria-label={t("files")}>
         {(["folders", "storage", "windows"] as const).map((item) => <button key={item} type="button"
           className={`button ${section === item ? "primary" : "secondary"}`} aria-current={section === item ? "page" : undefined}
-          onClick={() => setSection(item)}>{t(item === "folders" ? "fileFolders" : item === "storage" ? "fileStorageSettings" : "fileWindowsSettings")}</button>)}
+          onClick={() => onSectionChange(item)}>{t(item === "folders" ? "fileFolders" : item === "storage" ? "fileStorageSettings" : "fileWindowsSettings")}</button>)}
       </nav>}
       {settingsFolderID && section === "folders" && <FolderSettings folderID={settingsFolderID} users={users}
         onClose={() => setSettingsFolderID("")} onSaved={() => resource.reload()}/>}
