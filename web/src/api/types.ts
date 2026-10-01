@@ -421,3 +421,39 @@ export type SMBStatus = {
   hard_quota_error?: string;
 };
 
+
+
+export type AIModel = {
+  id: string;
+  name: string;
+  size_bytes?: number;
+  family?: string;
+  details?: string;
+};
+
+export type AIMessage = {
+  id: string;
+  session_id: string;
+  role: "system" | "user" | "assistant" | "tool";
+  content: string;
+  created_at: string;
+};
+
+export type AISession = {
+  id: string;
+  provider: string;
+  model: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  messages?: AIMessage[];
+};
+
+export type AIStatus = {
+  module_id: string;
+  state: string;
+  version: string;
+  tool_count: number;
+  provider_configured: boolean;
+  provider_id?: string;
+};
