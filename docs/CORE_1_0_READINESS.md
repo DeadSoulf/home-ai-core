@@ -17,11 +17,11 @@ These checks require an installed HOME AI server and may interrupt connectivity.
 
 ### Update / rollback / re-update
 
-- [ ] Install a newer dev update from Web.
-- [ ] Confirm the new Core version and Web UI start.
-- [ ] Roll back from Web.
-- [ ] Confirm the previous Core version starts.
-- [ ] Confirm login, System page and the existing SQLite state database still work.
+- [x] Install a newer dev update from Web.
+- [x] Confirm the new Core version and Web UI start.
+- [x] Roll back from Web.
+- [x] Confirm the previous Core version starts.
+- [x] Confirm login, System page and the existing SQLite state database still work.
 - [ ] Reinstall the newer version and confirm normal operation.
 
 ### Network persistence
