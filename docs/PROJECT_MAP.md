@@ -6,9 +6,9 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
-**Последний опубликованный релиз:** `0.1.106-dev` — Files capacity теперь читается напрямую через host `df -B1`\
-**Текущий срез:** `0.1.106-dev` — host `findmnt → df` подтверждён на живом сервере: **Свободно / Всего** в Files storage отображается корректно\
-**Следующий engineering milestone:** live acceptance SMB/квот, reboot persistence и Windows-клиента\
+**Последний опубликованный релиз:** `0.1.107-dev` — fallback занятого места папки через host `du`\
+**Текущий срез:** `0.1.107-dev` — pool capacity через host `findmnt → df` подтверждена; folder usage получает отдельный fallback через privileged host `du`\
+**Следующий engineering milestone:** подтвердить **Занято / лимит** на живой папке; затем live acceptance SMB/квот, reboot persistence и Windows-клиента\
 **Состояние:** основной Files/Storage workflow работает на живом сервере: назначение Files, mount, выбор storage и создание pool подтверждены. F2 NAS остаётся в эксплуатационной приёмке по capacity, SMB, quotas и reboot persistence.\
 **Обновлено:** 2026-10-01
 
@@ -29,6 +29,7 @@
 - **0.1.104-dev** — если capacity всё равно недоступна на живом сервере, Files UI больше не показывает неоднозначный `—`: в pool capacity и назначенном storage выводится явное **«Объём недоступен»**.
 - **0.1.105-dev** — найден следующий namespace-разрыв: mount уже выполнялся в host namespace, но filesystem inspection (`lsblk FSAVAIL/MOUNTPOINTS`) всё ещё работал внутри sandbox helper-а. Inspection переведён в PID 1 host mount namespace.
 - **0.1.106-dev** — capacity переведена на другой механизм: helper через host `findmnt` определяет реальную точку монтирования и читает `Total/Available` через `df -B1`; `lsblk` и offline inspection остаются fallback. Storage inspection cache теперь сбрасывается сразу после операций с диском. На живом сервере пользователь подтвердил корректное отображение **Свободно / Всего**.
+- **0.1.107-dev** — для папок добавлен отдельный usage fallback: если Core не может выполнить `UsageOf()` из sandbox, privileged helper считает apparent-size конкретной managed folder через host `du -B1`. Тот же fallback используется при folder/user quota checks.
 - ✅ Для всей цепочки сохранены CI, Go/Web tests, Linux amd64/arm64 cross-build и versioned release assets.
 
 ### Выпуск 0.1.91-dev — завершение пользователей и управления файлами
@@ -176,6 +177,7 @@
 - ✅ Blank storage page из-за `mountpoints:null`, mojibake и race после mount исправлены.
 - 🧪 На живом сервере подтверждены mount и создание Files pool в 0.1.102-dev.
 - ✅ В 0.1.106 host `findmnt → df -B1` подтверждён на живом сервере: **Свободно / Всего** отображается корректно.
+- 🧪 В 0.1.107 добавлен host `du` fallback для **Занято / лимит** у папок; пользовательская проверка остаётся открытой.
 - 🧪 Live acceptance SMB, quota enforcement, reboot persistence и Windows/NAS остаётся отдельным эксплуатационным этапом.
 - 🚧 Controlled migration для legacy filesystems без готовых quota features остаётся отдельной maintenance-задачей.
 
@@ -935,6 +937,7 @@ AI не может расширять собственные права.
 | `0.1.104-dev` | ✅ Explicit unavailable capacity state | «Объём недоступен» вместо прочерка при неизвестной capacity |
 | `0.1.105-dev` | 🧪 Host-namespace capacity inspection | `lsblk FSAVAIL/MOUNTPOINTS` теперь видит host mount; live confirmation pending |
 | `0.1.106-dev` | ✅ Direct host df capacity | `findmnt → df -B1` подтверждён на живом сервере; total/free отображаются |
+| `0.1.107-dev` | 🧪 Folder usage host du | fallback для **Занято / лимит** через privileged host `du`; live confirmation pending |
 
 ## 10. Правило ведения карты
 
