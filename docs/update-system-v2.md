@@ -15,6 +15,7 @@ For each architecture GitHub publishes:
 ```text
 home-ai-core-update_<version>_<arch>.tar.gz
 home-ai-core-update_<version>_<arch>.tar.gz.sha256
+home-ai-core-update_<version>_<arch>.tar.gz.sha256.sig
 ```
 
 Bundle layout:
@@ -52,14 +53,18 @@ Release discovery normally uses the GitHub Releases API. Successful results are 
 
 Core verifies:
 
-1. archive SHA-256
-2. bounded archive size
-3. safe extraction paths
-4. manifest schema/product/version/architecture
-5. helper protocol metadata
-6. exact file sizes
-7. SHA-256 of every extracted file
-8. absence of unexpected files
+1. detached Ed25519 signature of the exact checksum file when a signature is present;
+2. a detached signature is mandatory for every non-`-dev` release;
+3. archive SHA-256 from that checksum file;
+4. bounded archive size;
+5. safe extraction paths;
+6. manifest schema/product/version/architecture;
+7. helper protocol metadata;
+8. exact file sizes;
+9. SHA-256 of every extracted file;
+10. absence of unexpected files.
+
+The trusted Ed25519 public key is read from `/etc/home-ai-core/update-trusted.pub`. The signing private key is never stored on a Home-AI node or in the repository. GitHub Actions reads it only from the `HOME_AI_UPDATE_SIGNING_KEY` Actions secret.
 
 A verified bundle enters `ready`.
 
@@ -140,4 +145,6 @@ Implemented:
 - GitHub API fallback discovery
 - Web notification for a genuinely newer release
 
-Remaining production hardening includes signed stable-channel manifests and formal long-duration failure testing.
+Detached Ed25519 verification is implemented for Core update checksum metadata. Development releases may remain unsigned while the project signing key is being provisioned; non-development releases fail closed if the signature asset is missing. Operational key provisioning/rotation and formal long-duration failure testing remain production tasks.
+
+See `docs/update-signing.md` for the key-generation and deployment contract.

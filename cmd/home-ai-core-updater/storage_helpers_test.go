@@ -94,3 +94,23 @@ func TestParseDFCapacityOutputRejectsInvalidData(t *testing.T) {
 		t.Fatalf("unexpected parsed capacity: %d/%d", total, free)
 	}
 }
+
+func TestSummarizeDestructivePlanIncludesReadOnlyActions(t *testing.T) {
+	got := summarizeDestructivePlan("format as ext4", "/dev/sdb1", destructiveUsagePlan{
+		Mounts:       []string{"/dev/sdb1@/mnt/home-ai-core/sdb1"},
+		ActiveSwaps:  []string{"/dev/sdb2"},
+		VolumeGroups: []string{"vg-data"},
+	})
+	for _, want := range []string{
+		"dry-run OK",
+		"system disk check passed",
+		"would unmount /dev/sdb1@/mnt/home-ai-core/sdb1",
+		"would disable swap /dev/sdb2",
+		"would deactivate LVM vg-data",
+		"no changes made",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("plan %q does not contain %q", got, want)
+		}
+	}
+}

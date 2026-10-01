@@ -20,6 +20,7 @@ type Request struct {
 	Filesystem     string
 	Label          string
 	Confirm        string
+	DryRun         bool
 	SizeMiB        uint64
 	RootPath       string
 	RelativePath   string
@@ -74,6 +75,7 @@ func Execute(ctx context.Context, input Request) (string, error) {
 		Filesystem:      strings.TrimSpace(input.Filesystem),
 		Label:           strings.TrimSpace(input.Label),
 		Confirm:         strings.TrimSpace(input.Confirm),
+		DryRun:          input.DryRun,
 		SizeMiB:         input.SizeMiB,
 		RootPath:        strings.TrimSpace(input.RootPath),
 		RelativePath:    strings.TrimSpace(input.RelativePath),
@@ -93,7 +95,9 @@ func Execute(ctx context.Context, input Request) (string, error) {
 		}
 		return "", errors.New(response.Error)
 	}
-	InvalidateInspectionCache()
+	if !input.DryRun {
+		InvalidateInspectionCache()
+	}
 	return response.Message, nil
 }
 
