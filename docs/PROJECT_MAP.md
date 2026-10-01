@@ -6,10 +6,24 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.85-dev` — защита дисков и устойчивая привязка NAS pool к filesystem\
-**Текущий срез:** post-`0.1.85-dev` — NAS free-space reserve and capacity warnings in development\
-**Следующий engineering milestone:** finish pool capacity policy; затем hard SMB/filesystem enforcement и per-folder/per-user quotas\
+**Текущий срез:** `0.1.86-dev` — release candidate; NAS free-space reserve + capacity warnings\
+**Следующий engineering milestone:** live acceptance capacity reserve; затем hard SMB/filesystem enforcement и per-folder/per-user quotas\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-10-01
+
+### Выпуск 0.1.86-dev — резерв свободного места NAS
+
+- Миграция `016_nas_pool_capacity_policy.sql` добавляет pool-wide hard reserve и warning threshold.
+- Значения по умолчанию: **5% жёсткий резерв / 10% предупреждение**.
+- Ёмкость читается live через Linux `statfs`, а раздел **Файлы** показывает free/total и состояние pool.
+- Администратор может менять reserve (0–50%) и warning (0–95%; 0 отключает предупреждение).
+- Direct uploads не могут временным файлом пересечь reserve.
+- Resumable upload проверяется при создании и повторно перед каждым chunk.
+- При нарушении резерва Core возвращает HTTP 507 `file_pool_reserve_reached`; Windows-клиент получает ту же серверную защиту.
+- Move / корзина / restore остаются разрешены как same-filesystem rename.
+- SMB hard reserve пока не заявляется: Samba пишет напрямую, поэтому следующий слой — filesystem/Samba quota enforcement.
+- ADR-0033 и PR #63 прошли полный CI.
+- Практическая проверка на установленном сервере остаётся acceptance step.
 
 ### Выпуск 0.1.85-dev — защита дисков и привязка NAS pool к filesystem
 
