@@ -30,6 +30,8 @@ const auditLabels: Record<string, StringKey> = {
   "files.smb.install": "smbInstall",
   "files.smb.apply": "smbApply",
   "files.smb.set_password": "smbSetPassword",
+  "ai.chat.message": "auditAIChat",
+  "ai.tool.execute": "auditAITool",
 };
 
 export function auditLabelKey(action: string): StringKey {
