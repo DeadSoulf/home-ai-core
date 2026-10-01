@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Actor } from "./api/types";
 import { Shell } from "./components/Shell";
 import { I18nProvider } from "./i18n";
-import { accessiblePath, hasPermission, systemSection, visibleNavigation } from "./navigation";
+import { accessiblePath, fileSection, hasPermission, systemSection, visibleNavigation } from "./navigation";
 
 function actor(permissions: string[], roles = ["owner"]): Actor {
   return {type: "user", id: "usr-test", username: "reader", roles, permissions};
@@ -22,6 +22,17 @@ describe("navigation access", () => {
     expect(accessiblePath(actor(["updates.read"]), "/system#updates")).toBe("/");
     expect(accessiblePath(reader, "/system#unknown")).toBe("/system#equipment");
   });
+  it("preserves Files deep links for managers and keeps limited users on folders", () => {
+    const manager = actor([...allReads, "files.manage"]);
+    for (const section of ["folders", "storage", "windows"]) {
+      expect(accessiblePath(manager, "/files#" + section)).toBe("/files#" + section);
+      expect(fileSection("/files#" + section)).toBe(section);
+    }
+    expect(accessiblePath(actor(["security.self.read"]), "/files#storage")).toBe("/files");
+    expect(accessiblePath(actor(["files.manage"]), "/files#storage")).toBe("/");
+    expect(accessiblePath(manager, "/files#unknown")).toBe("/files#folders");
+  });
+
   it("keeps existing URLs accessible for an actor with the corresponding read permissions", () => {
     const reader = actor(allReads);
     for (const path of ["/", "/system", "/modules", "/files", "/jobs", "/audit", "/users"]) {
