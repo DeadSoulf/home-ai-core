@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Actor } from "./api/types";
 import { Shell } from "./components/Shell";
 import { I18nProvider } from "./i18n";
-import { accessiblePath, fileSection, hasPermission, systemSection, visibleNavigation } from "./navigation";
+import { accessiblePath, fileSection, fileSectionPath, hasPermission, systemSection, visibleNavigation } from "./navigation";
 
 function actor(permissions: string[], roles = ["owner"]): Actor {
   return {type: "user", id: "usr-test", username: "reader", roles, permissions};
@@ -22,15 +22,24 @@ describe("navigation access", () => {
     expect(accessiblePath(actor(["updates.read"]), "/system#updates")).toBe("/");
     expect(accessiblePath(reader, "/system#unknown")).toBe("/system#equipment");
   });
-  it("preserves Files deep links for managers and keeps limited users on folders", () => {
+  it("uses stable Files routes and keeps legacy hash links compatible", () => {
     const manager = actor([...allReads, "files.manage"]);
-    for (const section of ["folders", "storage", "windows"]) {
-      expect(accessiblePath(manager, "/files#" + section)).toBe("/files#" + section);
-      expect(fileSection("/files#" + section)).toBe(section);
+    expect(fileSectionPath("folders")).toBe("/files");
+    expect(fileSectionPath("storage")).toBe("/files/storage");
+    expect(fileSectionPath("windows")).toBe("/files/windows");
+
+    for (const section of ["folders", "storage", "windows"] as const) {
+      const path = fileSectionPath(section);
+      expect(accessiblePath(manager, path)).toBe(path);
+      expect(fileSection(path)).toBe(section);
+      expect(accessiblePath(manager, "/files#" + section)).toBe(path);
     }
+
+    expect(accessiblePath(actor(["security.self.read"]), "/files/storage")).toBe("/files");
     expect(accessiblePath(actor(["security.self.read"]), "/files#storage")).toBe("/files");
-    expect(accessiblePath(actor(["files.manage"]), "/files#storage")).toBe("/");
-    expect(accessiblePath(manager, "/files#unknown")).toBe("/files#folders");
+    expect(accessiblePath(actor(["files.manage"]), "/files/storage")).toBe("/");
+    expect(accessiblePath(manager, "/files/unknown")).toBe("/files");
+    expect(accessiblePath(manager, "/files#unknown")).toBe("/files");
   });
 
   it("keeps existing URLs accessible for an actor with the corresponding read permissions", () => {
@@ -102,6 +111,12 @@ describe("navigation rendering", () => {
     expect(nav).toContain("Security");
     expect(nav.match(/aria-current="page"/g)).toHaveLength(1);
     expect(nav).toMatch(/<button\b[^>]*aria-current="page"[^>]*><span>Security<\/span><\/button>/);
+  });
+
+  it("keeps Files highlighted on nested section routes", () => {
+    const nav = renderNavigation(actor([...allReads, "files.manage"]), "/files/storage");
+    expect(nav.match(/aria-current="page"/g)).toHaveLength(1);
+    expect(nav).toMatch(/<button\b[^>]*aria-current="page"[^>]*><span>Files<\/span><\/button>/);
   });
 
   it("omits inaccessible entries and their empty group headings", () => {
