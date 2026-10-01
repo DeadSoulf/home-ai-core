@@ -27,8 +27,17 @@ type ToolCall struct {
 }
 
 type ModelRequest struct {
+	Model    string           `json:"model,omitempty"`
 	Messages []Message        `json:"messages"`
 	Tools    []ToolDescriptor `json:"tools,omitempty"`
+}
+
+type ModelInfo struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Size    int64  `json:"size_bytes,omitempty"`
+	Family  string `json:"family,omitempty"`
+	Details string `json:"details,omitempty"`
 }
 
 type ModelResponse struct {
@@ -39,6 +48,12 @@ type ModelResponse struct {
 type Provider interface {
 	ID() string
 	Generate(context.Context, ModelRequest) (ModelResponse, error)
+}
+
+type StreamingProvider interface {
+	Provider
+	Models(context.Context) ([]ModelInfo, error)
+	Stream(context.Context, ModelRequest, func(string) error) (ModelResponse, error)
 }
 
 type DeterministicProvider struct {
