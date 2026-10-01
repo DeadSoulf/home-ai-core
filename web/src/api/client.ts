@@ -494,6 +494,7 @@ export const api = {
     filesystem?: "ext4" | "xfs" | "vfat";
     label?: string;
     confirm?: string;
+    dry_run?: boolean;
     size_mib?: number;
     purpose?: StoragePurpose;
   }) => postJSON<{
@@ -503,6 +504,7 @@ export const api = {
     purpose?: StoragePurpose;
     purpose_assigned?: boolean;
     warning?: string;
+    dry_run?: boolean;
   }>("/api/v1/storage/operation", input, true),
 
   networkProfiles: async () => {
