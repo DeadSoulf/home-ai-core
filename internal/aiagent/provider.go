@@ -2,6 +2,7 @@ package aiagent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 )
 
@@ -22,7 +23,7 @@ type Message struct {
 type ToolCall struct {
 	ID      string `json:"id"`
 	ToolID  string `json:"tool_id"`
-	Input   []byte `json:"input,omitempty"`
+	Input   json.RawMessage `json:"input,omitempty"`
 }
 
 type ModelRequest struct {
