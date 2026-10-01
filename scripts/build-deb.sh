@@ -24,7 +24,7 @@ command -v dpkg-deb >/dev/null 2>&1 || { echo "dpkg-deb is required" >&2; exit 2
 
 rm -rf "$STAGE"
 mkdir -p "$STAGE/DEBIAN" "$STAGE/usr/bin" "$STAGE/usr/libexec/home-ai-core" "$STAGE/usr/share/home-ai-core/web" \
-  "$STAGE/lib/systemd/system" "$STAGE/usr/lib/sysusers.d" "$STAGE/etc/home-ai-core" "$OUT_DIR"
+  "$STAGE/usr/share/doc/home-ai-core" "$STAGE/lib/systemd/system" "$STAGE/usr/lib/sysusers.d" "$STAGE/etc/home-ai-core" "$OUT_DIR"
 
 if [ "${HOME_AI_SKIP_WEB_BUILD:-0}" != "1" ]; then
   cd "$ROOT/web"
@@ -52,6 +52,7 @@ install -m 0644 "$ROOT/packaging/debian/home-ai-core.service" "$STAGE/lib/system
 install -m 0644 "$ROOT/packaging/debian/home-ai-core-updater.service" "$STAGE/lib/systemd/system/home-ai-core-updater.service"
 install -m 0644 "$ROOT/packaging/debian/home-ai-core.sysusers" "$STAGE/usr/lib/sysusers.d/home-ai-core.conf"
 install -m 0640 "$ROOT/packaging/debian/home-ai-core.env.example" "$STAGE/etc/home-ai-core/home-ai-core.env"
+install -m 0644 "$ROOT/packaging/debian/copyright" "$STAGE/usr/share/doc/home-ai-core/copyright"
 
 cat >"$STAGE/DEBIAN/control" <<EOF
 Package: home-ai-core
