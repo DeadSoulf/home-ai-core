@@ -6,22 +6,23 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
-**Последний опубликованный релиз:** `0.1.110-dev` — Apache-2.0, Ed25519 update trust code и read-only storage preflight\
-**Текущий срез:** `0.1.111-dev` — утверждённый визуальный Windows-клиент HOME AI + автоматический initial Debian installer в каждом versioned release\
+**Последний опубликованный релиз:** `0.1.111-dev` — утверждённый HOME AI Windows dashboard + versioned initial Debian installers amd64/arm64\
+**Текущий срез:** `0.1.111-dev` опубликован; следующий шаг — live acceptance нового Windows UI/tray и первоначальной Debian installation\
 **Следующий engineering milestone:** live acceptance Windows UI/tray `0.1.111-dev` и первоначальной установки опубликованного Debian `.deb`; Core-задачи storage preflight, WireGuard reboot persistence и signing-key provisioning остаются параллельными открытыми acceptance/gates\
-**Состояние:** Core security/storage состояние `0.1.110-dev` сохранено без отката. Windows visual redesign и Debian installer lifecycle для `0.1.111-dev` прошли full CI до version bump: native Windows tests, Windows cross-build и сборка/inspection `.deb` для amd64/arm64 зелёные; live Windows/Debian acceptance ещё не выполнена.\
+**Состояние:** Core security/storage состояние `0.1.110-dev` сохранено без отката. `0.1.111-dev` прошёл PR и main full CI и release workflow: native Windows tests, Windows cross-build, Debian amd64/arm64 build/inspection зелёные; GitHub Release содержит Core bundles, Windows `.exe` и оба initial `.deb` с SHA-256. Live Windows/Debian acceptance ещё не выполнена.\
 **Обновлено:** 2026-10-01
 
-### Кандидат 0.1.111-dev — Windows visual UI + initial Debian installer
+### Выпуск 0.1.111-dev — Windows visual UI + initial Debian installer
 
 - ✅ Windows-клиент перенесён на утверждённый HOME AI dashboard: светлый Windows 11-style фон, боковое меню, крупный статус, rounded cards, блоки **Последние действия / Резервные копии / Место на HOME AI**.
 - ✅ Карточки используют реальные данные существующего sync engine: состояние профилей, последний/следующий запуск, локальную HOME AI папку, agent/autostart и доступные server-side usage/quota значения.
 - ✅ Обычный левый клик по tray открывает компактный HOME AI status popup с текущим состоянием, последними sync-операциями и быстрыми действиями; правый клик сохраняет context menu.
 - ✅ Сохранены Tab/Shift+Tab/Ctrl+Tab navigation, Credential Manager, sync profiles, queue/copy, single-instance background agent, Explorer-open и client update path.
-- ✅ Добавлены native Windows tests visual resources/dashboard/tray snapshot; native Windows tests, Windows cross-build и полный `core-ci` прошли до version bump.
+- ✅ Добавлены native Windows tests visual resources/dashboard/tray snapshot; PR и `main` прошли native Windows tests, Windows cross-build и полный `core-ci`.
 - ✅ Initial Debian installer больше не является только ручным workflow: обычный `core-ci` собирает и инспектирует amd64/arm64 `.deb`.
 - ✅ Каждый push нового `VERSION` теперь собирает amd64/arm64 initial Debian `.deb`, создаёт SHA-256 и передаёт их в общий GitHub Release вместе с Core update bundles и Windows `.exe`.
 - ✅ Сохранён release signing из `0.1.110-dev`: Debian job добавлен поверх актуального workflow без удаления **Sign Core update checksums** / Ed25519 trust path.
+- ✅ Release workflow опубликовал `v0.1.111-dev`: Core update bundles amd64/arm64, Windows `.exe`, `home-ai-core_0.1.111.dev_amd64.deb`, `home-ai-core_0.1.111.dev_arm64.deb` и соответствующие SHA-256.
 - 🧪 Требуется визуальная проверка на реальном Windows: геометрия карточек, DPI/scaling, RU/EN тексты, Tab navigation и tray popup.
 - 🧪 Требуется первоначальная установка опубликованного `.deb` на чистом/тестовом Debian и проверка systemd Core + updater после установки.
 - 🚧 Точное расписание по дням/часам и отдельный Explorer virtual-drive/provider этим срезом не заявляются; текущий scheduler остаётся interval-based.
@@ -1002,7 +1003,7 @@ AI не может расширять собственные права.
 | `0.1.108-dev` | 🧪 Folder usage host du | fallback для **Занято / лимит** через privileged host `du`; live confirmation pending |
 | `0.1.109-dev` | 🧪 Core 1.0 readiness | полный update → rollback → re-update и active-network reboot acceptance пройдены; WireGuard и remaining readiness gates остаются |
 | `0.1.110-dev` | 🧪 Security/repository hardening | опубликовано: Apache-2.0, Ed25519 Core update verification, storage dry-run/preflight; live acceptance и signing-key provisioning pending |
-| `0.1.111-dev` | 🧪 Windows visual UI + Debian installer | утверждённый dashboard/tray UI; CI собирает initial `.deb` amd64/arm64 и release публикует `.deb + SHA-256`; live Windows/Debian acceptance pending |
+| `0.1.111-dev` | 🧪 Windows visual UI + Debian installer | опубликовано: dashboard/tray UI, Windows `.exe`, initial `.deb` amd64/arm64 + SHA-256; automated CI зелёный, live Windows/Debian acceptance pending |
 
 ## 10. Правило ведения карты
 
