@@ -219,7 +219,7 @@ func (s *server) folderUsage(ctx context.Context, folder state.NASFolderRecord) 
 	if usage, err := filedata.UsageOf(root); err == nil {
 		return usage, nil
 	}
-	usage, err := storage.InspectNASUsage(ctx, folder.PoolRoot, folder.RelativePath)
+	usage, err := inspectNASFolderUsage(ctx, folder.PoolRoot, folder.RelativePath)
 	if err != nil {
 		return filedata.Usage{}, err
 	}
