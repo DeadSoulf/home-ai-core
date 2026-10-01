@@ -462,6 +462,10 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 					if plainMessage == "" {
 						plainMessage = plainErr.Error()
 					}
+					diagnostic := filesystemMountDiagnostic(ctx, device, filesystem)
+					if diagnostic != "" {
+						return "", fmt.Errorf("mount device with quota options: %s; retry without quota options: %s; filesystem diagnostic: %s", quotaMessage, plainMessage, diagnostic)
+					}
 					return "", fmt.Errorf("mount device with quota options: %s; retry without quota options: %s", quotaMessage, plainMessage)
 				}
 			}
@@ -729,6 +733,40 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 	default:
 		return "", errors.New("unsupported storage operation")
 	}
+}
+
+func filesystemMountDiagnostic(ctx context.Context, device, filesystem string) string {
+	var command string
+	var args []string
+	switch strings.ToLower(strings.TrimSpace(filesystem)) {
+	case "ext2", "ext3", "ext4":
+		command = "/usr/sbin/e2fsck"
+		args = []string{"-n", device}
+	case "xfs":
+		command = "/usr/sbin/xfs_repair"
+		args = []string{"-n", device}
+	case "vfat", "fat", "fat32":
+		command = "/usr/sbin/fsck.fat"
+		args = []string{"-n", "-v", device}
+	default:
+		return ""
+	}
+	if _, err := os.Stat(command); err != nil {
+		return "diagnostic tool is unavailable"
+	}
+	output, err := exec.CommandContext(ctx, command, args...).CombinedOutput()
+	message := strings.TrimSpace(string(output))
+	if message == "" && err != nil {
+		message = err.Error()
+	}
+	if message == "" {
+		return "filesystem check returned no details"
+	}
+	const maxDiagnosticBytes = 3500
+	if len(message) > maxDiagnosticBytes {
+		message = message[:maxDiagnosticBytes] + "…"
+	}
+	return strings.Join(strings.Fields(message), " ")
 }
 
 func requireDiskType(ctx context.Context, device string) error {
