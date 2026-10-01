@@ -90,8 +90,11 @@ func New(
 	s.mux.HandleFunc("/api/v1/modules/capabilities", s.requireAuth("modules.read", s.moduleCapabilities))
 	s.mux.HandleFunc("/api/v1/modules/", s.requireAuth("modules.read", s.moduleResource))
 	s.mux.HandleFunc("/api/v1/ai/status", s.requireAuth("", s.aiStatus))
+	s.mux.HandleFunc("/api/v1/ai/models", s.requireAuth("", s.aiModels))
 	s.mux.HandleFunc("/api/v1/ai/tools", s.requireAuth("", s.aiTools))
 	s.mux.HandleFunc("/api/v1/ai/tools/", s.requireAuth("", s.aiToolResource))
+	s.mux.HandleFunc("/api/v1/ai/sessions", s.requireAuth("", s.aiSessions))
+	s.mux.HandleFunc("/api/v1/ai/sessions/", s.requireAuth("", s.aiSessionResource))
 	s.mux.HandleFunc("/api/v1/update", s.requireAuth("updates.read", func(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
 		s.updateStatus(w, r)
 	}))
