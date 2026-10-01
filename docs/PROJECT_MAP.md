@@ -6,10 +6,23 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.84-dev` — автоматическое проверяемое обновление Windows-клиента\
-**Текущий срез:** `0.1.84-dev` — published; live Windows update acceptance pending\
-**Следующий engineering milestone:** live acceptance unified users, storage-purpose и Windows update; затем F2 quotas/policies и дальнейшая стабилизация NAS\
+**Текущий срез:** `0.1.85-dev` — release candidate; disk purpose safety + persistent NAS pool storage identity\
+**Следующий engineering milestone:** live acceptance disk purpose/pool binding; затем F2 quotas/policies, reserve free space и capacity warnings\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-10-01
+
+### Выпуск 0.1.85-dev — защита дисков и привязка NAS pool к filesystem
+
+- Storage purpose API показывает `in_use` и `used_by` для физических storage.
+- Занятый Files storage нельзя через Home-AI переназначить, снять purpose, размонтировать, форматировать или удалить.
+- **Система → Хранилище** показывает, что раздел используется файловым хранилищем, и блокирует опасные действия.
+- Usage-lock учитывает дочерние LVM volumes и backing storage tree.
+- Миграция `015_nas_pool_storage_identity.sql` добавляет в NAS pool backing device path и filesystem UUID.
+- Новый NAS pool создаётся только на точном mounted filesystem с purpose=`files`.
+- UUID является основной устойчивой identity; device path используется как fallback.
+- Защита продолжает узнавать pool после размонтирования или смены `/dev/...` имени.
+- Старые pools без сохранённой identity продолжают работать через mount-path fallback.
+- PR #60 и #61 прошли полный CI; практическая проверка на установленном сервере остаётся acceptance step.
 
 ### Выпуск 0.1.84-dev — автоматическое обновление Windows-клиента
 
