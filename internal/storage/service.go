@@ -22,7 +22,8 @@ type Request struct {
 	Confirm      string
 	SizeMiB      uint64
 	RootPath     string
-	RelativePath string
+	RelativePath    string
+	ReservePercent  int
 }
 
 func ensureCompatibleHelper(ctx context.Context) error {
@@ -50,7 +51,7 @@ func Execute(ctx context.Context, input Request) (string, error) {
 	operation := strings.TrimSpace(input.Operation)
 	switch operation {
 	case "mount", "unmount", "format", "partition.create", "partition.delete", "partition.delete_all", "label.rename",
-		"nas.prepare_pool", "nas.prepare_folder":
+		"nas.prepare_pool", "nas.prepare_folder", "nas.capacity_policy":
 	default:
 		return "", errors.New("unsupported storage operation")
 	}
@@ -76,6 +77,7 @@ func Execute(ctx context.Context, input Request) (string, error) {
 		SizeMiB:         input.SizeMiB,
 		RootPath:        strings.TrimSpace(input.RootPath),
 		RelativePath:    strings.TrimSpace(input.RelativePath),
+		ReservePercent:  input.ReservePercent,
 	}
 	if err := json.NewEncoder(conn).Encode(request); err != nil {
 		return "", err
@@ -108,6 +110,15 @@ func PrepareNASFolder(ctx context.Context, rootPath, relativePath string) error 
 		Operation:    "nas.prepare_folder",
 		RootPath:     rootPath,
 		RelativePath: relativePath,
+	})
+	return err
+}
+
+func ApplyNASCapacityPolicy(ctx context.Context, rootPath string, reservePercent int) error {
+	_, err := Execute(ctx, Request{
+		Operation:       "nas.capacity_policy",
+		RootPath:        rootPath,
+		ReservePercent:  reservePercent,
 	})
 	return err
 }
