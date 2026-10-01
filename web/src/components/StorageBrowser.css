@@ -235,3 +235,20 @@
     justify-content: flex-start;
   }
 }
+
+
+.storage-disk-summary-actions {
+  grid-column: 1 / -1;
+  border-top: 1px solid #252d38;
+  padding-top: 14px;
+}
+
+.storage-disk-summary-actions .storage-tree-wrap {
+  gap: 10px;
+}
+
+@media (max-width: 760px) {
+  .storage-disk-summary-actions {
+    grid-column: 1;
+  }
+}
