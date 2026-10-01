@@ -6,10 +6,20 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.89-dev` — compact selected-disk storage table\
-**Текущий срез:** `0.1.89-dev` — published; live compact storage UI and SMB/quota acceptance pending\
+**Текущий срез:** `0.1.90-dev` — release candidate; relocated disk and partition actions\
 **Следующий engineering milestone:** live acceptance нового storage UI и SMB/quota; затем controlled legacy quota migration и per-folder/per-user quotas\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-10-01
+
+### Выпуск 0.1.90-dev — действия вне таблицы
+
+- Действия физического диска перенесены из правой колонки в верхнюю карточку выбранного диска.
+- Колонка **Действия** удалена из таблицы разделов/LVM выбранного диска.
+- Для раздела/LVM добавлена раскрываемая панель управления непосредственно под его строкой.
+- В панели собраны mount/unmount, изменение метки, назначение files/video и destructive actions.
+- System-disk protection и usage-lock для занятого Files storage продолжают использовать прежние серверные проверки.
+- Storage API не менялся; переработан только Web layout поверх существующей safety-логики.
+- Release candidate: требуется полный CI и live UI acceptance.
 
 ### Выпуск 0.1.89-dev — компактная таблица диска
 
