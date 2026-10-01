@@ -32,6 +32,7 @@ type Request struct {
 	DNS             []string          `json:"dns,omitempty"`
 	RootPath        string            `json:"root_path,omitempty"`
 	RelativePath    string            `json:"relative_path,omitempty"`
+	ReservePercent  int               `json:"reserve_percent,omitempty"`
 	SMBWorkgroup    string            `json:"smb_workgroup,omitempty"`
 	SMBUser         string            `json:"smb_user,omitempty"`
 	SMBPassword     string            `json:"smb_password,omitempty"`
