@@ -6,7 +6,7 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
-**Последний опубликованный релиз:** `0.1.107-dev` — лёгкий Windows-клиент HOME AI: новый cloud-drive-style UI, клавиатурная навигация, фирменный icon/tray и Explorer-open\
+**Последний опубликованный релиз:** `0.1.108-dev` — Files folder **Занято / лимит** получил privileged host `du` fallback для service-sandbox случаев\
 **Текущий срез:** `0.1.109-dev` — **Core 1.0 readiness**: негативные тесты update bundle + единый readiness gate без расширения scope ядра\
 **Следующий engineering milestone:** live acceptance **update → rollback → re-update**, DHCP/static reboot persistence и WireGuard reboot persistence; затем stable-channel signing\
 **Состояние:** фундамент Core функционально готов для продуктовых модулей; `0.1.109-dev` формализует критерий **CORE FOUNDATION COMPLETE** и усиливает update failure coverage. Files folder usage `0.1.108-dev`, SMB/квоты и Windows UI остаются отдельной продуктовой acceptance, а не новым scope ядра.\
