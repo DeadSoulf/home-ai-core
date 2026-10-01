@@ -80,16 +80,18 @@ func (f fakeState) ListStoragePurposes(context.Context) ([]state.StoragePurposeR
 
 func (f fakeState) CreateNASPool(
 	_ context.Context,
-	name, rootPath, createdBy string,
+	name, rootPath, storageDevicePath, storageFilesystemUUID, createdBy string,
 	now time.Time,
 ) (state.NASPoolRecord, error) {
 	return state.NASPoolRecord{
-		ID:        "nsp-test",
-		Name:      name,
-		RootPath:  rootPath,
-		CreatedBy: createdBy,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:                    "nsp-test",
+		Name:                  name,
+		RootPath:              rootPath,
+		StorageDevicePath:     storageDevicePath,
+		StorageFilesystemUUID: storageFilesystemUUID,
+		CreatedBy:             createdBy,
+		CreatedAt:             now,
+		UpdatedAt:             now,
 	}, nil
 }
 
@@ -879,6 +881,43 @@ func TestStorageUsageMatchesPoolBelowMountAndDescendants(t *testing.T) {
 	}
 }
 
+func TestStorageUsageMatchesPersistedUUIDWhenUnmounted(t *testing.T) {
+	node := systeminfo.BlockNode{
+		Path: "/dev/sdb1",
+		Type: "part",
+		UUID: "uuid-files",
+	}
+	pools := []state.NASPoolRecord{{
+		ID:                    "nsp-main",
+		Name:                  "Main",
+		RootPath:              "/mnt/home-ai-core/files",
+		StorageDevicePath:     "/dev/sdb1",
+		StorageFilesystemUUID: "uuid-files",
+	}}
+	usage := storageUsageForNode(node, pools)
+	if len(usage) != 1 || usage[0].ID != "nsp-main" {
+		t.Fatalf("usage = %#v", usage)
+	}
+}
+
+func TestStorageUsageUUIDTakesPrecedenceOverDevicePath(t *testing.T) {
+	node := systeminfo.BlockNode{
+		Path: "/dev/sdb1",
+		Type: "part",
+		UUID: "uuid-new",
+	}
+	pools := []state.NASPoolRecord{{
+		ID:                    "nsp-old",
+		Name:                  "Old",
+		RootPath:              "/mnt/home-ai-core/files",
+		StorageDevicePath:     "/dev/sdb1",
+		StorageFilesystemUUID: "uuid-old",
+	}}
+	if usage := storageUsageForNode(node, pools); len(usage) != 0 {
+		t.Fatalf("stale pool identity matched reformatted storage: %#v", usage)
+	}
+}
+
 func TestStorageUsageDoesNotMatchSiblingPrefix(t *testing.T) {
 	usage := storageUsageForMountpoints(
 		[]string{"/mnt/home-ai-core/data"},
@@ -915,6 +954,52 @@ func TestStoragePurposeUsageResponseMarksAssignedStorageBusy(t *testing.T) {
 	}
 }
 
+func TestFilePoolStorageNodeRequiresFilesAssignment(t *testing.T) {
+	nodes := []systeminfo.BlockNode{{
+		Path:        "/dev/sdb1",
+		Type:        "part",
+		UUID:        "uuid-files",
+		Filesystem:  "ext4",
+		Mountpoints: []string{"/mnt/home-ai-core/files"},
+	}}
+	filesAssignment := []state.StoragePurposeRecord{{
+		DevicePath:     "/dev/sdb1",
+		FilesystemUUID: "uuid-files",
+		Purpose:        state.StoragePurposeFiles,
+	}}
+	node, err := filePoolStorageNode("/mnt/home-ai-core/files", filesAssignment, nodes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node.Path != "/dev/sdb1" || node.UUID != "uuid-files" {
+		t.Fatalf("unexpected backing storage: %#v", node)
+	}
+
+	videoAssignment := append([]state.StoragePurposeRecord(nil), filesAssignment...)
+	videoAssignment[0].Purpose = state.StoragePurposeVideo
+	if _, err := filePoolStorageNode("/mnt/home-ai-core/files", videoAssignment, nodes); err == nil {
+		t.Fatal("video storage was accepted for a file pool")
+	}
+}
+
+func TestFilePoolStorageNodeRequiresExactMountpoint(t *testing.T) {
+	nodes := []systeminfo.BlockNode{{
+		Path:        "/dev/sdb1",
+		Type:        "part",
+		UUID:        "uuid-files",
+		Filesystem:  "ext4",
+		Mountpoints: []string{"/mnt/home-ai-core/files"},
+	}}
+	assignments := []state.StoragePurposeRecord{{
+		DevicePath:     "/dev/sdb1",
+		FilesystemUUID: "uuid-files",
+		Purpose:        state.StoragePurposeFiles,
+	}}
+	if _, err := filePoolStorageNode("/mnt/home-ai-core/files/subdir", assignments, nodes); err == nil {
+		t.Fatal("subdirectory was accepted as the physical file-pool root")
+	}
+}
+
 func TestFilePoolCreateRequiresManage(t *testing.T) {
 	sec := defaultFakeSecurity()
 	sec.actor.Permissions = []string{"security.self.read"}
@@ -939,11 +1024,22 @@ func stubNASProvisioning(t *testing.T) {
 	t.Helper()
 	originalPool := prepareFilePool
 	originalFolder := prepareFileFolder
+	originalResolver := resolveFilePoolStorage
 	prepareFilePool = func(context.Context, string) error { return nil }
 	prepareFileFolder = func(context.Context, string, string) error { return nil }
+	resolveFilePoolStorage = func(_ string, rootPath string, _ []state.StoragePurposeRecord) (systeminfo.BlockNode, error) {
+		return systeminfo.BlockNode{
+			Path:        "/dev/sdb1",
+			Type:        "part",
+			UUID:        "uuid-files",
+			Filesystem:  "ext4",
+			Mountpoints: []string{rootPath},
+		}, nil
+	}
 	t.Cleanup(func() {
 		prepareFilePool = originalPool
 		prepareFileFolder = originalFolder
+		resolveFilePoolStorage = originalResolver
 	})
 }
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -12,17 +13,23 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
 	"github.com/DeadSoulf/home-ai-core/internal/storage"
+	"github.com/DeadSoulf/home-ai-core/internal/systeminfo"
 )
 
 var (
-	prepareFilePool   = storage.PrepareNASPool
-	prepareFileFolder = storage.PrepareNASFolder
+	prepareFilePool        = storage.PrepareNASPool
+	prepareFileFolder      = storage.PrepareNASFolder
+	resolveFilePoolStorage = func(nodeID, rootPath string, assignments []state.StoragePurposeRecord) (systeminfo.BlockNode, error) {
+		return filePoolStorageNode(rootPath, assignments, systeminfo.Collect(nodeID).BlockTree)
+	}
 )
 
 type filePoolResponse struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	RootPath string `json:"root_path"`
+	ID                    string `json:"id"`
+	Name                  string `json:"name"`
+	RootPath              string `json:"root_path"`
+	StorageDevicePath     string `json:"storage_device,omitempty"`
+	StorageFilesystemUUID string `json:"storage_filesystem_uuid,omitempty"`
 }
 
 type fileFolderResponse struct {
@@ -53,9 +60,11 @@ func (s *server) filePools(
 		pools := make([]filePoolResponse, 0, len(records))
 		for _, record := range records {
 			pools = append(pools, filePoolResponse{
-				ID:       record.ID,
-				Name:     record.Name,
-				RootPath: record.RootPath,
+				ID:                    record.ID,
+				Name:                  record.Name,
+				RootPath:              record.RootPath,
+				StorageDevicePath:     record.StorageDevicePath,
+				StorageFilesystemUUID: record.StorageFilesystemUUID,
 			})
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"pools": pools})
@@ -72,6 +81,17 @@ func (s *server) filePools(
 			writeAPIError(w, r, http.StatusBadRequest, "invalid_file_pool", err.Error(), nil)
 			return
 		}
+		input.RootPath = filepath.Clean(strings.TrimSpace(input.RootPath))
+		assignments, err := s.state.ListStoragePurposes(r.Context())
+		if err != nil {
+			writeAPIError(w, r, http.StatusInternalServerError, "storage_purposes_unavailable", "storage purposes are unavailable", nil)
+			return
+		}
+		backingStorage, err := resolveFilePoolStorage(s.nodeID, input.RootPath, assignments)
+		if err != nil {
+			writeAPIError(w, r, http.StatusBadRequest, "file_pool_storage_not_assigned", err.Error(), nil)
+			return
+		}
 		if err := prepareFilePool(r.Context(), input.RootPath); err != nil {
 			writeAPIError(w, r, http.StatusBadGateway, "file_pool_prepare_failed", err.Error(), nil)
 			return
@@ -80,6 +100,8 @@ func (s *server) filePools(
 			r.Context(),
 			input.Name,
 			input.RootPath,
+			backingStorage.Path,
+			backingStorage.UUID,
 			actor.ID,
 			time.Now().UTC(),
 		)
@@ -97,13 +119,20 @@ func (s *server) filePools(
 				"file_pool",
 				record.ID,
 				"success",
-				map[string]any{"name": record.Name, "root_path": record.RootPath},
+				map[string]any{
+					"name":                    record.Name,
+					"root_path":               record.RootPath,
+					"storage_device":          record.StorageDevicePath,
+					"storage_filesystem_uuid": record.StorageFilesystemUUID,
+				},
 			)
 			s.realtime.Publish("files.pool.created", map[string]any{"pool_id": record.ID}, requestIDFromContext(r.Context()))
 			writeJSON(w, http.StatusCreated, map[string]any{"pool": filePoolResponse{
-				ID:       record.ID,
-				Name:     record.Name,
-				RootPath: record.RootPath,
+				ID:                    record.ID,
+				Name:                  record.Name,
+				RootPath:              record.RootPath,
+				StorageDevicePath:     record.StorageDevicePath,
+				StorageFilesystemUUID: record.StorageFilesystemUUID,
 			}})
 		}
 	default:
@@ -820,4 +849,30 @@ func (s *server) authorizedFileFolder(
 		return state.NASFolderRecord{}, "", false
 	}
 	return folder, root, true
+}
+
+func filePoolStorageNode(
+	rootPath string,
+	assignments []state.StoragePurposeRecord,
+	nodes []systeminfo.BlockNode,
+) (systeminfo.BlockNode, error) {
+	rootPath = filepath.Clean(strings.TrimSpace(rootPath))
+	if rootPath == "." || !filepath.IsAbs(rootPath) {
+		return systeminfo.BlockNode{}, errors.New("file pool root path must be an absolute mounted path")
+	}
+	for _, assignment := range assignments {
+		if assignment.Purpose != state.StoragePurposeFiles {
+			continue
+		}
+		node, ok := blockNodeForStoragePurpose(nodes, assignment)
+		if !ok || node.System || node.Filesystem == "" {
+			continue
+		}
+		for _, mountpoint := range node.Mountpoints {
+			if filepath.Clean(strings.TrimSpace(mountpoint)) == rootPath {
+				return node, nil
+			}
+		}
+	}
+	return systeminfo.BlockNode{}, errors.New("file pool root must be a mounted storage device explicitly assigned to Files")
 }

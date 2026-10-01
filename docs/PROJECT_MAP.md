@@ -52,6 +52,7 @@
 - 🚧 Только `files` storage предлагается при создании нового NAS pool; `video` storage зарезервирован для будущего NVR/media data plane.
 - 🚧 ADR-0030 фиксирует physical-purpose boundary и отделяет назначение ёмкости от логических NAS folders.
 - 🚧 Занятый NAS pool физический storage получает usage-lock: нельзя снять/сменить purpose, размонтировать, форматировать или удалить backing partition/disk; Web показывает причину блокировки.
+- 🚧 Новые NAS pools сохраняют backing device path + filesystem UUID; создание pool разрешено только на точном mounted storage с purpose=`files`, а usage-lock продолжает работать после размонтирования/смены `/dev/...` имени.
 ### Выпуск 0.1.82-dev — русский и английский Windows-клиент
 
 - Один Windows `.exe` поддерживает русский и английский интерфейс без отдельной сборки.

@@ -298,7 +298,7 @@ func TestUnifiedUserAccessCanBeCustomized(t *testing.T) {
 	}
 
 	now := service.now().UTC()
-	pool, err := store.CreateNASPool(ctx, "Main", "/srv/home-ai/main", admin.Actor.ID, now)
+	pool, err := store.CreateNASPool(ctx, "Main", "/srv/home-ai/main", "/dev/sdb1", "uuid-main", admin.Actor.ID, now)
 	if err != nil {
 		t.Fatalf("CreateNASPool() error = %v", err)
 	}

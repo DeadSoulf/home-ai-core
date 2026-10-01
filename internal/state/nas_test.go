@@ -39,12 +39,15 @@ func TestNASFolderGrants(t *testing.T) {
 		t.Fatalf("CreateUser() error = %v", err)
 	}
 
-	pool, err := store.CreateNASPool(ctx, "Main Storage", "/srv/home-ai/main", owner.ID, now)
+	pool, err := store.CreateNASPool(ctx, "Main Storage", "/srv/home-ai/main", "/dev/sdb1", "uuid-main", owner.ID, now)
 	if err != nil {
 		t.Fatalf("CreateNASPool() error = %v", err)
 	}
 	if pool.RootPath != "/srv/home-ai/main" {
 		t.Fatalf("pool root = %q", pool.RootPath)
+	}
+	if pool.StorageDevicePath != "/dev/sdb1" || pool.StorageFilesystemUUID != "uuid-main" {
+		t.Fatalf("pool storage identity = %q %q", pool.StorageDevicePath, pool.StorageFilesystemUUID)
 	}
 
 	privateFolder, err := store.CreateNASFolder(
@@ -130,7 +133,7 @@ func TestNASPoolValidation(t *testing.T) {
 	defer store.Close()
 
 	now := time.Now().UTC()
-	if _, err := store.CreateNASPool(ctx, "Main", "relative/path", "", now); err == nil {
+	if _, err := store.CreateNASPool(ctx, "Main", "relative/path", "/dev/sdb1", "uuid-main", "", now); err == nil {
 		t.Fatal("relative NAS root path was accepted")
 	}
 }

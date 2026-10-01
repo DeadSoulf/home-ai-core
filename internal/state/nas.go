@@ -20,12 +20,14 @@ var (
 )
 
 type NASPoolRecord struct {
-	ID        string
-	Name      string
-	RootPath  string
-	CreatedBy string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID                    string
+	Name                  string
+	RootPath              string
+	StorageDevicePath     string
+	StorageFilesystemUUID string
+	CreatedBy             string
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 type NASFolderRecord struct {
@@ -44,16 +46,21 @@ type NASFolderRecord struct {
 
 func (s *Store) CreateNASPool(
 	ctx context.Context,
-	name, rootPath, createdBy string,
+	name, rootPath, storageDevicePath, storageFilesystemUUID, createdBy string,
 	now time.Time,
 ) (NASPoolRecord, error) {
 	name = strings.TrimSpace(name)
 	rootPath = filepath.Clean(strings.TrimSpace(rootPath))
+	storageDevicePath = strings.TrimSpace(storageDevicePath)
+	storageFilesystemUUID = strings.TrimSpace(storageFilesystemUUID)
 	if name == "" {
 		return NASPoolRecord{}, errors.New("NAS pool name is required")
 	}
 	if rootPath == "." || !filepath.IsAbs(rootPath) {
 		return NASPoolRecord{}, errors.New("NAS pool root path must be absolute")
+	}
+	if storageDevicePath == "" {
+		return NASPoolRecord{}, errors.New("NAS pool storage device path is required")
 	}
 
 	id, err := newStateID("nsp_")
@@ -63,9 +70,12 @@ func (s *Store) CreateNASPool(
 	timestamp := now.UTC().Format(time.RFC3339Nano)
 
 	_, err = s.db.ExecContext(ctx, `
-		INSERT INTO nas_pools(id, name, root_path, created_by, created_at, updated_at)
-		VALUES (?, ?, ?, NULLIF(?, ''), ?, ?)
-	`, id, name, rootPath, createdBy, timestamp, timestamp)
+		INSERT INTO nas_pools(
+			id, name, root_path, storage_device_path, storage_filesystem_uuid,
+			created_by, created_at, updated_at
+		)
+		VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?)
+	`, id, name, rootPath, storageDevicePath, storageFilesystemUUID, createdBy, timestamp, timestamp)
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "unique") {
 			return NASPoolRecord{}, ErrNASPoolExists
@@ -74,18 +84,21 @@ func (s *Store) CreateNASPool(
 	}
 
 	return NASPoolRecord{
-		ID:        id,
-		Name:      name,
-		RootPath:  rootPath,
-		CreatedBy: createdBy,
-		CreatedAt: now.UTC(),
-		UpdatedAt: now.UTC(),
+		ID:                    id,
+		Name:                  name,
+		RootPath:              rootPath,
+		StorageDevicePath:     storageDevicePath,
+		StorageFilesystemUUID: storageFilesystemUUID,
+		CreatedBy:             createdBy,
+		CreatedAt:             now.UTC(),
+		UpdatedAt:             now.UTC(),
 	}, nil
 }
 
 func (s *Store) ListNASPools(ctx context.Context) ([]NASPoolRecord, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, name, root_path, COALESCE(created_by, ''), created_at, updated_at
+		SELECT id, name, root_path, storage_device_path, storage_filesystem_uuid,
+		       COALESCE(created_by, ''), created_at, updated_at
 		FROM nas_pools
 		ORDER BY name COLLATE NOCASE
 	`)
@@ -102,6 +115,8 @@ func (s *Store) ListNASPools(ctx context.Context) ([]NASPoolRecord, error) {
 			&record.ID,
 			&record.Name,
 			&record.RootPath,
+			&record.StorageDevicePath,
+			&record.StorageFilesystemUUID,
 			&record.CreatedBy,
 			&createdAt,
 			&updatedAt,
