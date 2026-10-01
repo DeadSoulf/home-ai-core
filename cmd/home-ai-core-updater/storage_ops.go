@@ -791,7 +791,6 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 	}
 }
 
-
 type destructiveUsagePlan struct {
 	Mounts       []string
 	ActiveSwaps  []string
