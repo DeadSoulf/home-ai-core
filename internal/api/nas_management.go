@@ -245,7 +245,7 @@ func folderView(folder state.NASFolderRecord, actor security.Actor) fileFolderRe
 }
 
 func (s *server) fileWriteAllowance(w http.ResponseWriter, r *http.Request, folder state.NASFolderRecord, uploadID string) (int64, bool) {
-	allowance, ok := filePoolWriteAllowance(w, r, folder)
+	allowance, ok := s.filePoolWriteAllowance(w, r, folder)
 	if !ok {
 		return 0, false
 	}
@@ -316,7 +316,7 @@ func (s *server) writeFileLimitError(w http.ResponseWriter, r *http.Request, fol
 		}
 	}
 	if !limited {
-		writeFilePoolReserveError(w, r, folder)
+		s.writeFilePoolReserveError(w, r, folder)
 		return
 	}
 	writeAPIError(w, r, http.StatusInsufficientStorage, "file_quota_or_reserve_reached", "folder/user quota or pool reserve reached", map[string]any{"folder_id": folder.ID, "pool_id": folder.PoolID})
