@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.87-dev
+
+- Added kernel-enforced free-space reserve protection for direct SMB writes on quota-ready Home-AI storage.
+- Extended privileged helper protocol v3 so managed Samba shares carry their NAS pool root and reserve policy.
+- Reused the existing `force user = home-ai-core` Samba boundary so filesystem user quotas cover every managed SMB write.
+- Compute the service-UID hard limit from current Home-AI usage plus only live free space above the configured pool reserve, accounting for pre-existing data outside `.home-ai`.
+- Verify quota usage and hard limits through `repquota` and apply changes through `setquota`.
+- Make `smb.apply` fail closed before Samba configuration activation when a non-zero reserve cannot be kernel-enforced.
+- Synchronize kernel quota best-effort whenever an administrator changes a pool reserve and expose explicit SMB hard-quota readiness/error state in the Files UI.
+- Install Linux quota tools alongside Samba.
+- Prepare newly created ext4 storage with embedded user quotas and no separate ext4 root reserve; mount ext4 with `usrquota` and XFS with `uquota`.
+- Keep legacy ext4/XFS conversion non-destructive: existing filesystems are not automatically reformatted or live-remounted when quota accounting is unavailable.
+- Added ADR-0034 plus quota calculation, parser and SMB metadata tests; PR #65 passed the full CI suite.
+
 ## 0.1.86-dev
 
 - Added per-NAS-pool free-space capacity policies with migration 016.

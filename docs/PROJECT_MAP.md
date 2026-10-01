@@ -6,10 +6,25 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.86-dev` — NAS free-space reserve и capacity warnings\
-**Текущий срез:** post-`0.1.86-dev` — kernel-enforced SMB reserve in development\
-**Следующий engineering milestone:** finish SMB hard reserve; затем controlled legacy quota migration и per-folder/per-user quotas\
+**Текущий срез:** `0.1.87-dev` — release candidate; kernel-enforced SMB reserve\
+**Следующий engineering milestone:** live SMB/quota acceptance; затем controlled legacy quota migration и per-folder/per-user quotas\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-10-01
+
+### Выпуск 0.1.87-dev — kernel hard reserve для SMB
+
+- Managed Samba shares уже используют `force user = home-ai-core`; этот UID становится kernel quota boundary для прямых SMB-записей.
+- Helper protocol v3 передаёт pool root и reserve policy в privileged helper.
+- Hard limit рассчитывается как текущее quota-usage Home-AI + только свободное место выше configured reserve.
+- Существующие данные вне `.home-ai` учитываются через live free-space, поэтому Home-AI не предполагает, что владеет всем диском.
+- `setquota` применяет block hard limit, `repquota` проверяет фактическое usage/limit после записи.
+- `smb.apply` fail-closed для non-zero reserve: Samba config не активируется, если kernel protection не готов.
+- Изменение reserve пытается немедленно синхронизировать quota; Web отдельно показывает **Kernel enforced / Not ready** и конкретную причину.
+- Samba installation устанавливает также пакет `quota`.
+- Новые ext4 создаются с embedded user quota и `-m 0`, ext4 mounts получают `usrquota`, XFS — `uquota`.
+- Legacy ext4/XFS автоматически не переформатируются и не live-remount: для них нужен controlled maintenance path.
+- ADR-0034 и PR #65 прошли полный CI.
+- Практическая проверка SMB quota на установленном сервере остаётся acceptance step.
 
 ### Выпуск 0.1.86-dev — резерв свободного места NAS
 
