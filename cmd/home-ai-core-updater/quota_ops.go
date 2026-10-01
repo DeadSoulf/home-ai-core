@@ -90,19 +90,22 @@ func enforceSMBHardQuota(
 }
 
 func enforceNASUserQuota(ctx context.Context, root string, reservePercent, uid int) error {
-	if reservePercent == 0 {
-		return nil
-	}
 	info, err := inspectQuotaMount(ctx, root)
 	if err != nil {
 		return err
 	}
 	if err := quotaMountReady(ctx, info); err != nil {
+		if reservePercent == 0 {
+			return nil
+		}
 		return err
 	}
-	limitKiB, err := quotaHardLimitKiB(info.RootPath, reservePercent)
-	if err != nil {
-		return err
+	var limitKiB uint64
+	if reservePercent > 0 {
+		limitKiB, err = quotaHardLimitKiB(info.RootPath, reservePercent)
+		if err != nil {
+			return err
+		}
 	}
 	setquota, err := exec.LookPath("setquota")
 	if err != nil {
