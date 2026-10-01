@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.100-dev
+
+- Fix file-pool creation immediately after mounting storage when `lsblk` has not yet refreshed its MOUNTPOINTS field.
+- Validate the selected pool root directly against the mounted filesystem device ID and its assigned block device, while still accepting the normal `lsblk` mountpoint path.
+- Require the selected root to be the actual mount boundary, not an arbitrary subdirectory on the filesystem.
+- Keep the requirement that backing storage is explicitly assigned to Files.
+- Localize the file-pool backing-storage validation error in the Russian Web UI.
+
 ## 0.1.99-dev
 
 - Make storage mounting idempotent: mounting a device that is already mounted at the requested Home-AI path now returns success instead of `device is already mounted`.

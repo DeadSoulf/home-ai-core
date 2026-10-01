@@ -164,7 +164,12 @@ export function FilesPage({
       setNotice(t("filePoolCreated"));
       resource.reload();
     } catch (reason) {
-      setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
+      const message = reason instanceof Error ? reason.message : "";
+      if (locale === "ru" && message.includes("file pool root must be a mounted storage device explicitly assigned to Files")) {
+        setFormError(t("filePoolStorageNotReady"));
+      } else {
+        setFormError(message || t("requestFailed"));
+      }
     } finally {
       setBusy("");
     }
