@@ -7,11 +7,25 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последний опубликованный релиз:** `0.1.112-dev` — единый copyright/author attribution **TexNik** для репозитория, Web UI, Windows-клиента и Debian packages\
-**Текущий срез:** `0.1.112-dev` опубликован; attribution **TexNik** присутствует в NOTICE/LICENSE/README, Web UI, Windows-клиенте и Debian packages\
-**Следующий engineering milestone:** live acceptance Windows UI/tray `0.1.111-dev` и первоначальной установки опубликованного Debian `.deb`; Core-задачи storage preflight, WireGuard reboot persistence и signing-key provisioning остаются параллельными открытыми acceptance/gates\
-**Состояние:** `0.1.112-dev` прошёл полный CI и release workflow; опубликованы Core bundles, Windows `.exe` и Debian `.deb` amd64/arm64 с SHA-256. Runtime behavior не менялся. Live Windows/Debian acceptance функционала `0.1.111-dev` остаётся открытой.\
+**Текущий срез:** `0.1.113-dev` — исправление Windows dashboard по live-скриншоту пользователя: локализация, типографика, кнопки, status icon и startup connection refresh\
+**Следующий engineering milestone:** повторная live acceptance Windows UI/tray `0.1.113-dev` на реальном Windows; отдельно остаётся первоначальная установка Debian `.deb`, storage preflight, WireGuard reboot persistence и signing-key provisioning\
+**Состояние:** пользовательский скриншот `0.1.111-dev` подтвердил работу нового layout, но выявил смешанную RU/EN локализацию, тяжёлые classic buttons, clipped status check, крупные переносы текста и отсутствие автоматического connection refresh. Эти дефекты исправлены в кандидате `0.1.113-dev`; автоматические Windows/full CI checks зелёные, повторная live-проверка ещё не выполнена.\
 **Обновлено:** 2026-10-01
 
+### Кандидат 0.1.113-dev — Windows dashboard polish после live acceptance
+
+- ✅ Live-скриншот `0.1.111-dev` использован как фактическая acceptance-проверка: layout запускается, но визуально не принят из-за локализации/типографики/controls.
+- ✅ Восстановлен полный русский словарь dashboard: **Последние действия / Резервные копии / Место на HOME AI / Объём недоступен** и остальные новые строки больше не fallback на English.
+- ✅ Добавлен regression test равенства RU/EN translation keys.
+- ✅ Overview action buttons и sidebar переведены на owner-draw rounded controls; сохранён keyboard focus и navigation.
+- ✅ Зелёный status circle + белая галочка рисуются напрямую GDI и больше не перекрываются STATIC control.
+- ✅ Уменьшены dashboard fonts и card copy; server URL показывается компактным host label, **Последняя синхронизация** использует короткое **Ещё не было**.
+- ✅ Пустой **Последние действия** показывается одной строкой вместо трёх повторов; техническая нижняя строка **Состояние / Готово** скрыта на Overview.
+- ✅ При старте клиент тихо проверяет сохранённые server/user credentials из Windows Credential Manager; успешный login обновляет Connection и storage usage без ручного нажатия **Подключить**.
+- ✅ Состояния storage разделены: нет подтверждённого подключения vs сервер подключён, но usage не предоставлен.
+- ✅ Сохранено `© 2026 TexNik` из `0.1.112-dev`; Core/Windows sync engine/Debian release path не откатывались.
+- ✅ После rebase на актуальный `main` native Windows tests, Windows cross-build, Debian installer checks и полный `core-ci` зелёные до version/docs bump.
+- 🧪 Требуется повторный скриншот/проверка `0.1.113-dev` на реальном Windows: RU UI, DPI/scaling, rounded buttons, sidebar, check mark, connection/storage cards и tray.
 ### Выпуск 0.1.112-dev — copyright / author attribution TexNik
 
 - ✅ Добавлен корневой `NOTICE` с `Copyright 2026 TexNik`.
@@ -717,7 +731,7 @@ Check
 9. ✅ ADR-0026 + native Windows tests + полный core-ci;
 10. 🧪 реальная Windows acceptance установки, tray и обновления установленного binary остаётся незавершённой.
 
-Текущий Windows engineering slice: `0.1.111-dev` реализует утверждённый HOME AI visual dashboard и компактный tray popup поверх прежнего проверенного sync/agent/update engine. Автоматическое обновление, Credential Manager, user-session agent, queue/copy и keyboard navigation сохранены; live visual/DPI/tray acceptance остаётся открытой.
+Текущий Windows engineering slice: `0.1.113-dev` исправляет визуальные дефекты, обнаруженные по live-скриншоту `0.1.111-dev`: RU/EN fallback, classic controls, clipped check, oversized card copy и отсутствие startup refresh. Sync/agent/update engine остаётся прежним; повторная live Windows acceptance открыта.
 
 Четырнадцатый вертикальный срез (`0.1.91-dev`) — пользователи, папки и квоты:
 
@@ -1015,6 +1029,7 @@ AI не может расширять собственные права.
 | `0.1.110-dev` | 🧪 Security/repository hardening | опубликовано: Apache-2.0, Ed25519 Core update verification, storage dry-run/preflight; live acceptance и signing-key provisioning pending |
 | `0.1.111-dev` | 🧪 Windows visual UI + Debian installer | опубликовано: dashboard/tray UI, Windows `.exe`, initial `.deb` amd64/arm64 + SHA-256; automated CI зелёный, live Windows/Debian acceptance pending |
 | `0.1.112-dev` | ✅ TexNik copyright attribution | опубликовано: NOTICE/LICENSE/README/Web/Windows/Debian attribution; runtime behavior unchanged; полный CI/release зелёный |
+| `0.1.113-dev` | 🧪 Windows UI polish | live screenshot issues fixed: RU localization, owner-draw buttons, status check, compact cards, silent startup connection refresh; repeat live acceptance pending |
 
 ## 10. Правило ведения карты
 
