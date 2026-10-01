@@ -206,12 +206,10 @@ func (s *server) fileUserQuotas(w http.ResponseWriter, r *http.Request, actor se
 }
 
 func (s *server) folderUsage(ctx context.Context, folder state.NASFolderRecord) (filedata.Usage, error) {
-	root, err := filedata.FolderRoot(folder.PoolRoot, folder.RelativePath)
-	if err != nil {
-		return filedata.Usage{}, err
-	}
-	if usage, err := filedata.UsageOf(root); err == nil {
-		return usage, nil
+	if root, err := filedata.FolderRoot(folder.PoolRoot, folder.RelativePath); err == nil {
+		if usage, err := filedata.UsageOf(root); err == nil {
+			return usage, nil
+		}
 	}
 	usage, err := inspectNASFolderUsage(ctx, folder.PoolRoot, folder.RelativePath)
 	if err != nil {
