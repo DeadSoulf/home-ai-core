@@ -48,3 +48,19 @@ func TestMountTargetPresentNormalizesPaths(t *testing.T) {
 		t.Fatal("unexpected mount target match")
 	}
 }
+
+func TestHostMountCommandArgsTargetsPID1MountNamespace(t *testing.T) {
+	got := strings.Join(hostMountCommandArgs("/usr/bin/mount", "-o", "usrquota", "--", "/dev/sdb1", "/mnt/home-ai-core/sdb1"), " ")
+	want := "--mount=/proc/1/ns/mnt -- /usr/bin/mount -o usrquota -- /dev/sdb1 /mnt/home-ai-core/sdb1"
+	if got != want {
+		t.Fatalf("hostMountCommandArgs() = %q, want %q", got, want)
+	}
+}
+
+func TestHostFindmntCommandArgsTargetsPID1MountNamespace(t *testing.T) {
+	got := strings.Join(hostMountCommandArgs("/usr/bin/findmnt", "-rn", "-S", "/dev/sdb1", "-o", "TARGET"), " ")
+	want := "--mount=/proc/1/ns/mnt -- /usr/bin/findmnt -rn -S /dev/sdb1 -o TARGET"
+	if got != want {
+		t.Fatalf("host findmnt args = %q, want %q", got, want)
+	}
+}

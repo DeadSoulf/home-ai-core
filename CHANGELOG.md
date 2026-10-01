@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.102-dev
+
+- Fix the root cause of storage mounts being visible to the privileged updater helper but not to Home-AI-Core.
+- Execute mount, unmount and findmnt operations in PID 1's host mount namespace with `nsenter` instead of inside the helper service's systemd sandbox.
+- Keep the updater helper's existing systemd hardening while allowing storage mounts to become host mounts that propagate into the Home-AI-Core service namespace.
+- Preserve quota-enabled mount attempts, plain-mount fallback, mount verification and filesystem diagnostics.
+- Add regression tests for host mount-namespace command construction.
+
 ## 0.1.101-dev
 
 - Fix file-pool creation when the Files storage mount is real but the previous stat-based device check cannot correlate it with the assigned block device.
