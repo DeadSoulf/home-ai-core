@@ -133,18 +133,18 @@ func (f fakeState) CreateNASFolder(
 	now time.Time,
 ) (state.NASFolderRecord, error) {
 	return state.NASFolderRecord{
-		ID:           "nsf-test",
-		PoolID:       poolID,
+		ID:                 "nsf-test",
+		PoolID:             poolID,
 		PoolName:           "Main",
 		PoolReservePercent: state.DefaultNASPoolReservePercent,
 		PoolWarningPercent: state.DefaultNASPoolWarningPercent,
 		Name:               name,
-		Kind:         kind,
-		OwnerUserID:  ownerUserID,
-		RelativePath: "shared/nsf-test",
-		CreatedBy:    createdBy,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		Kind:               kind,
+		OwnerUserID:        ownerUserID,
+		RelativePath:       "shared/nsf-test",
+		CreatedBy:          createdBy,
+		CreatedAt:          now,
+		UpdatedAt:          now,
 	}, nil
 }
 
