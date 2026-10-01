@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.109-dev
+
+- Start the explicit **Core 1.0 readiness** hardening milestone without expanding the product scope.
+- Add negative update-bundle regression tests for tampered payloads, unexpected archive files and path traversal, alongside a valid-bundle acceptance case.
+- Add a single readiness checklist separating automated engineering gates from live rollback/network/WireGuard checks that require an installed server.
+- Keep live reboot/rollback checks and stable-channel signing open; this release does not claim them as passed.
+
 ## 0.1.108-dev
 
 - Fix Files folder **Used / limit** staying unavailable even when pool capacity is already known.

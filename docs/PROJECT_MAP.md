@@ -6,11 +6,19 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
-**Последний опубликованный релиз:** `0.1.107-dev` — лёгкий Windows-клиент HOME AI: новый cloud-drive-style UI, клавиатурная навигация, фирменный icon/tray и Explorer-open\
-**Текущий срез:** `0.1.108-dev` — исправление **Занято / лимит** для Files folders через privileged host `du` fallback\
-**Следующий engineering milestone:** подтвердить реальное **Занято / лимит** на папке **Фото**; параллельно остаётся live acceptance Windows-клиента `0.1.107-dev`, SMB/квот и reboot persistence\
-**Состояние:** Files/Storage pool capacity подтверждена на живом сервере в `0.1.106-dev`; Windows UI опубликован в `0.1.107-dev`; в `0.1.108-dev` закрывается отдельный folder-usage path, который ранее показывал «Объём недоступен».\
+**Последний опубликованный релиз:** `0.1.108-dev` — Files folder **Занято / лимит** получил privileged host `du` fallback для service-sandbox случаев\
+**Текущий срез:** `0.1.109-dev` — **Core 1.0 readiness**: негативные тесты update bundle + единый readiness gate без расширения scope ядра\
+**Следующий engineering milestone:** live acceptance **update → rollback → re-update**, DHCP/static reboot persistence и WireGuard reboot persistence; затем stable-channel signing\
+**Состояние:** фундамент Core функционально готов для продуктовых модулей; `0.1.109-dev` формализует критерий **CORE FOUNDATION COMPLETE** и усиливает update failure coverage. Files folder usage `0.1.108-dev`, SMB/квоты и Windows UI остаются отдельной продуктовой acceptance, а не новым scope ядра.\
 **Обновлено:** 2026-10-01
+
+### Кандидат 0.1.109-dev — Core 1.0 readiness
+
+- ✅ Добавлен единый [Core 1.0 readiness gate](CORE_1_0_READINESS.md), который отделяет автоматические engineering checks от живых disruptive acceptance-проверок.
+- ✅ Update hardening получил негативные regression tests: tampered payload, unexpected archive file и path traversal должны fail-closed; valid bundle остаётся положительным control case.
+- ✅ Критерий завершения Core теперь формальный: live rollback/re-update, DHCP/static persistence, WireGuard persistence и stable signing должны быть закрыты до статуса **CORE FOUNDATION COMPLETE**.
+- 🧪 Live rollback/network/WireGuard checks не заявляются как пройденные: они требуют установленного сервера и могут прерывать сервис/сеть.
+- 🚧 Stable-channel Ed25519 signing/trust root остаётся следующим code-hardening срезом; production/stable выпуск без этого не заявляется.
 
 ### Кандидат 0.1.108-dev — отображение занятого места папок
 
@@ -484,10 +492,12 @@ Check
    - Web access editor + RU/EN UI;
    - следующий шаг после CI: live acceptance на сервере.
 
-Отдельно проверить в эксплуатации:
+Отдельный **Core 1.0 readiness** gate ведётся в [CORE_1_0_READINESS.md](CORE_1_0_READINESS.md):
 
+- ✅ negative update-bundle tests для tamper/unexpected-file/path-traversal;
 - 🧪 rollback и повторное обновление на установленном сервере;
 - 🧪 DHCP/static/WireGuard reboot acceptance из [CORE_ACCEPTANCE.md](CORE_ACCEPTANCE.md);
+- 🚧 stable-channel signing + pinned trust root до stable/commercial release;
 - ⏭ targeted tests для privileged routing/validation при следующем package-level refactor.
 
 ### 🚧 Этап F2 — File Storage / NAS
@@ -959,6 +969,7 @@ AI не может расширять собственные права.
 | `0.1.106-dev` | ✅ Direct host df capacity | `findmnt → df -B1` подтверждён на живом сервере; total/free отображаются |
 | `0.1.107-dev` | 🧪 Windows client light UI | Обзор/Подключение/Синхронизация/Резервные копии/Настройки, Tab navigation, HOME AI icon/tray; live Windows acceptance pending |
 | `0.1.108-dev` | 🧪 Folder usage host du | fallback для **Занято / лимит** через privileged host `du`; live confirmation pending |
+| `0.1.109-dev` | 🚧 Core 1.0 readiness | negative updater bundle tests + единый completion gate; live rollback/network/WireGuard acceptance и stable signing остаются |
 
 ## 10. Правило ведения карты
 

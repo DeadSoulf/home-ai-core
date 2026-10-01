@@ -1,5 +1,7 @@
 # Core Acceptance Checklist
 
+> This file is the live-server acceptance subset of [Core 1.0 readiness](CORE_1_0_READINESS.md). Automated CI gates and the final completion rule are tracked there.
+
 This checklist tracks live checks that require an installed Home-AI server. CI cannot replace these tests.
 
 ## Update / rollback
