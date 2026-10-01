@@ -5,8 +5,8 @@
 > Аудит уже сделанного: [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
-**Последний опубликованный релиз:** `0.1.89-dev` — compact selected-disk storage table\
-**Текущий срез:** `0.1.90-dev` — release candidate; relocated disk and partition actions\
+**Последний опубликованный релиз:** `0.1.90-dev` — relocated disk and partition actions\
+**Текущий срез:** `0.1.90-dev` — published; live storage UI and SMB/quota acceptance pending\
 **Следующий engineering milestone:** live acceptance нового storage UI и SMB/quota; затем controlled legacy quota migration и per-folder/per-user quotas\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-10-01
@@ -19,7 +19,8 @@
 - В панели собраны mount/unmount, изменение метки, назначение files/video и destructive actions.
 - System-disk protection и usage-lock для занятого Files storage продолжают использовать прежние серверные проверки.
 - Storage API не менялся; переработан только Web layout поверх существующей safety-логики.
-- Release candidate: требуется полный CI и live UI acceptance.
+- PR #70 прошёл полный CI; release workflow опубликовал `v0.1.90-dev` с amd64/arm64 Core bundles и Windows `.exe` + SHA-256.
+- Практическая проверка нового расположения действий на установленном сервере остаётся acceptance step.
 
 ### Выпуск 0.1.89-dev — компактная таблица диска
 
