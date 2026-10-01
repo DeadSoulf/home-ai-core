@@ -1,8 +1,13 @@
 package updater
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -74,5 +79,43 @@ func TestDownloadArchiveDoesNotRetryPermanentHTTPError(t *testing.T) {
 	}
 	if got := requests.Load(); got != 1 {
 		t.Fatalf("requests = %d, want 1", got)
+	}
+}
+
+
+func TestRequiresSignedUpdate(t *testing.T) {
+	if requiresSignedUpdate("0.2.0-dev") {
+		t.Fatal("development release unexpectedly requires a signature")
+	}
+	if !requiresSignedUpdate("0.2.0") {
+		t.Fatal("stable release must require a signature")
+	}
+	if !requiresSignedUpdate("0.2.0-rc.1") {
+		t.Fatal("release candidate must require a signature")
+	}
+}
+
+func TestVerifyChecksumSignature(t *testing.T) {
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checksum := []byte("0123456789abcdef  home-ai-core-update_0.2.0_amd64.tar.gz\n")
+	signature := ed25519.Sign(privateKey, checksum)
+	der, err := x509.MarshalPKIXPublicKey(publicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publicPEM := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der})
+	signatureText := []byte(base64.StdEncoding.EncodeToString(signature) + "\n")
+
+	if err := verifyChecksumSignature(checksum, signatureText, publicPEM); err != nil {
+		t.Fatalf("verifyChecksumSignature() error = %v", err)
+	}
+
+	tampered := append([]byte(nil), checksum...)
+	tampered[0] = 'f'
+	if err := verifyChecksumSignature(tampered, signatureText, publicPEM); err == nil {
+		t.Fatal("tampered checksum unexpectedly verified")
 	}
 }
