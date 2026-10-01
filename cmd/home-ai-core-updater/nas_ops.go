@@ -39,6 +39,15 @@ func performNASOperation(
 		}
 		return "NAS pool prepared", nil
 
+	case "storage.nas.capacity_policy":
+		if request.ReservePercent < 0 || request.ReservePercent > 50 {
+			return "", errors.New("NAS reserve percent must be between 0 and 50")
+		}
+		if err := enforceNASUserQuota(ctx, root, request.ReservePercent, uid); err != nil {
+			return "", err
+		}
+		return "NAS hard quota synchronized", nil
+
 	case "storage.nas.prepare_folder":
 		relative, err := validateNASRelativePath(request.RelativePath)
 		if err != nil {
