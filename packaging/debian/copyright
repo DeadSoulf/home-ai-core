@@ -1,0 +1,9 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Home-AI-Core
+Source: https://github.com/DeadSoulf/home-ai-core
+
+Files: *
+Copyright: 2026 TexNik
+License: Apache-2.0
+ See /usr/share/common-licenses/Apache-2.0 on Debian systems or the LICENSE
+ file distributed with the Home-AI-Core source tree.
