@@ -89,14 +89,42 @@ func (f fakeState) CreateNASPool(
 		RootPath:              rootPath,
 		StorageDevicePath:     storageDevicePath,
 		StorageFilesystemUUID: storageFilesystemUUID,
+		ReservePercent:        state.DefaultNASPoolReservePercent,
+		WarningPercent:        state.DefaultNASPoolWarningPercent,
 		CreatedBy:             createdBy,
 		CreatedAt:             now,
 		UpdatedAt:             now,
 	}, nil
 }
 
+func (f fakeState) NASPool(_ context.Context, poolID string) (state.NASPoolRecord, error) {
+	for _, pool := range f.nasPools {
+		if pool.ID == poolID {
+			return pool, nil
+		}
+	}
+	return state.NASPoolRecord{}, state.ErrNASPoolNotFound
+}
+
 func (f fakeState) ListNASPools(context.Context) ([]state.NASPoolRecord, error) {
 	return f.nasPools, nil
+}
+
+func (f fakeState) UpdateNASPoolCapacityPolicy(
+	_ context.Context,
+	poolID string,
+	reservePercent, warningPercent int,
+	now time.Time,
+) (state.NASPoolRecord, error) {
+	for _, pool := range f.nasPools {
+		if pool.ID == poolID {
+			pool.ReservePercent = reservePercent
+			pool.WarningPercent = warningPercent
+			pool.UpdatedAt = now
+			return pool, nil
+		}
+	}
+	return state.NASPoolRecord{}, state.ErrNASPoolNotFound
 }
 
 func (f fakeState) CreateNASFolder(
@@ -107,8 +135,10 @@ func (f fakeState) CreateNASFolder(
 	return state.NASFolderRecord{
 		ID:           "nsf-test",
 		PoolID:       poolID,
-		PoolName:     "Main",
-		Name:         name,
+		PoolName:           "Main",
+		PoolReservePercent: state.DefaultNASPoolReservePercent,
+		PoolWarningPercent: state.DefaultNASPoolWarningPercent,
+		Name:               name,
 		Kind:         kind,
 		OwnerUserID:  ownerUserID,
 		RelativePath: "shared/nsf-test",
