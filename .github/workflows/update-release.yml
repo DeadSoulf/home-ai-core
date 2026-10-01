@@ -83,7 +83,7 @@ jobs:
         run: |
           set -euo pipefail
           sh ./scripts/build-deb.sh "${{ matrix.arch }}"
-          DEB="$(find build/packages -maxdepth 1 -type f -name "home-ai-core_*.deb" -print -quit)"
+          DEB="$(find build/packages -maxdepth 1 -type f -name "home-ai-core_*_${{ matrix.arch }}.deb" -print -quit)"
           test -n "$DEB"
           dpkg-deb --info "$DEB" >/dev/null
           CONTENTS="$(mktemp)"
@@ -164,6 +164,42 @@ jobs:
         with:
           name: windows-client
           path: dist
+
+      - name: Sign Core update checksums
+        env:
+          HOME_AI_UPDATE_SIGNING_KEY: ${{ secrets.HOME_AI_UPDATE_SIGNING_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '\r\n' < VERSION)"
+          KEY_FILE="$RUNNER_TEMP/home-ai-update-signing-key.pem"
+
+          if [[ -z "${HOME_AI_UPDATE_SIGNING_KEY:-}" ]]; then
+            if [[ "$VERSION" != *-dev* ]]; then
+              echo "HOME_AI_UPDATE_SIGNING_KEY is required for non-development releases" >&2
+              exit 1
+            fi
+            echo "No update signing key configured; development bundles remain unsigned"
+            exit 0
+          fi
+
+          printf '%s\n' "$HOME_AI_UPDATE_SIGNING_KEY" > "$KEY_FILE"
+          chmod 0600 "$KEY_FILE"
+          trap 'rm -f "$KEY_FILE" "$RUNNER_TEMP"/*.sig.bin' EXIT
+
+          found=0
+          for checksum in dist/home-ai-core-update_*.tar.gz.sha256; do
+            [[ -f "$checksum" ]] || continue
+            found=1
+            raw="$RUNNER_TEMP/$(basename "$checksum").sig.bin"
+            openssl pkeyutl -sign -rawin -inkey "$KEY_FILE" -in "$checksum" -out "$raw"
+            base64 -w 0 "$raw" > "$checksum.sig"
+            printf '\n' >> "$checksum.sig"
+          done
+          if [[ "$found" -ne 1 ]]; then
+            echo "No Core update checksum files found to sign" >&2
+            exit 1
+          fi
 
       - name: Publish release
         env:
