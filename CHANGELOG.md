@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.89-dev
+
+- Made the selected-disk partition/LVM table substantially more compact.
+- Reduced the default table width from roughly 1540 px to roughly 1100 px.
+- Reduced the Actions column from 330 px to 180 px and tightened the remaining storage columns.
+- Reduced table cell, button and purpose-selector spacing while preserving all existing controls.
+- Allow long table headings to wrap instead of forcing the whole storage table wider.
+- Versioned the saved column-width preference so existing browsers receive the new compact defaults.
+
 ## 0.1.88-dev
 
 - Reworked **System → Storage** into a disk-first workflow: the overview now shows only physical disks and their high-level state.
