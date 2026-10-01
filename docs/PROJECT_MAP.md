@@ -6,13 +6,13 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
-**Последний опубликованный релиз:** `0.1.109-dev` — **Core 1.0 readiness**: negative updater bundle tests + единый completion gate\
-**Текущий срез:** `0.1.110-dev` — security/repository hardening: Apache-2.0, signed Core updates и read-only storage preflight\
+**Последний опубликованный релиз:** `0.1.110-dev` — Apache-2.0, Ed25519 update trust code и read-only storage preflight\
+**Текущий срез:** эксплуатационная приёмка `0.1.110-dev` + provisioning release-signing key\
 **Следующий engineering milestone:** live acceptance storage preflight на реальном сервере и WireGuard reboot persistence; параллельно завершить operational setup signing key для `0.1.110-dev`\
-**Состояние:** полный live цикл `update → rollback → re-update` для `0.1.109-dev` пройден; сеть после reboot также подтверждена рабочей пользователем. Точный активный режим DHCP/static в этом прогоне не записан. `0.1.110-dev` продолжает code-hardening stable signing и destructive-storage safety без расширения scope ядра.\
+**Состояние:** полный live цикл `update → rollback → re-update` для `0.1.109-dev` пройден; сеть после reboot также подтверждена рабочей пользователем. PR #95 и полный `core-ci` успешны, `v0.1.110-dev` опубликован. Dev release пока unsigned, потому что `HOME_AI_UPDATE_SIGNING_KEY` не настроен; stable/RC release без подписи теперь fail-closed.\
 **Обновлено:** 2026-10-01
 
-### Кандидат 0.1.110-dev — security / repository hardening
+### Выпуск 0.1.110-dev — security / repository hardening
 
 - ✅ Добавлена лицензия Apache-2.0 для публичного репозитория.
 - ✅ Core updater получил detached Ed25519 verification checksum metadata; stable/RC release без подписи больше не принимается.
@@ -22,8 +22,9 @@
 - ✅ Добавлен read-only storage dry-run/preflight для mount/unmount/partition/format/label paths; destructive preflight отдельно проверяет system disk, mounts, active swap, LVM и доступность filesystem tools.
 - ✅ Web перед format/create/delete/delete-all сначала выполняет dry-run и только после успешного preflight запускает подтверждённую операцию.
 - ✅ Старые PR #34, #55 и #67 проверены против актуального `main` и закрыты как superseded; PR #91 уже слит.
-- 🧪 Требуется полный CI и live acceptance storage preflight на реальном сервере.
-- 🔐 Для фактической подписи релизов нужно один раз создать dedicated Ed25519 key pair, загрузить private PEM в GitHub Actions secret и установить public key на узлы. Stable/RC без этого fail-closed.
+- ✅ PR #95 прошёл полный `core-ci`; release workflow опубликовал `v0.1.110-dev` с Core amd64/arm64 bundles и Windows `.exe`.
+- 🧪 Требуется live acceptance storage preflight на реальном сервере.
+- 🔐 Проверено фактически: `HOME_AI_UPDATE_SIGNING_KEY` сейчас не настроен, поэтому `0.1.110-dev` опубликован unsigned без `.sig` assets. Для включения подписей нужно один раз создать dedicated Ed25519 key pair, загрузить private PEM в GitHub Actions secret и установить public key на узлы. Stable/RC без этого fail-closed.
 
 ### Выпуск 0.1.109-dev — Core 1.0 readiness
 
@@ -35,7 +36,7 @@
 - ✅ Сеть после reboot подтверждена рабочей; конкретный активный режим DHCP/static в этом прогоне не зафиксирован и не выводится предположением.
 - 🧪 WireGuard reboot persistence остаётся отдельной открытой live-проверкой.
 - ✅ PR #92 прошёл полный `core-ci`; release workflow опубликовал `v0.1.109-dev` с Core amd64/arm64 bundles и Windows `.exe` + SHA-256.
-- 🚧 Stable-channel Ed25519 signing/trust root остаётся следующим code-hardening срезом; production/stable выпуск без этого не заявляется.
+- ✅ Stable-channel Ed25519 verification/fail-closed код реализован в `0.1.110-dev`; до production/stable остаётся operational provisioning dedicated signing key + trust root.
 
 ### Кандидат 0.1.108-dev — отображение занятого места папок
 
@@ -987,7 +988,7 @@ AI не может расширять собственные права.
 | `0.1.107-dev` | 🧪 Windows client light UI | Обзор/Подключение/Синхронизация/Резервные копии/Настройки, Tab navigation, HOME AI icon/tray; live Windows acceptance pending |
 | `0.1.108-dev` | 🧪 Folder usage host du | fallback для **Занято / лимит** через privileged host `du`; live confirmation pending |
 | `0.1.109-dev` | 🧪 Core 1.0 readiness | полный update → rollback → re-update и active-network reboot acceptance пройдены; WireGuard и remaining readiness gates остаются |
-| `0.1.110-dev` | 🚧 Security/repository hardening | Apache-2.0, Ed25519 Core update verification, storage dry-run/preflight; CI/live acceptance pending |
+| `0.1.110-dev` | 🧪 Security/repository hardening | опубликовано: Apache-2.0, Ed25519 Core update verification, storage dry-run/preflight; live acceptance и signing-key provisioning pending |
 
 ## 10. Правило ведения карты
 
