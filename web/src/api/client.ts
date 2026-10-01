@@ -257,7 +257,7 @@ export const api = {
     input: {reservePercent: number; warningPercent: number},
   ) => {
     const headers = new Headers({"Content-Type": "application/json"});
-    const token = csrfToken();
+    const token = getCSRFToken();
     if (token) headers.set("X-CSRF-Token", token);
     const result = await request<{pool: FilePool}>(
       `/api/v1/files/pools/${encodeURIComponent(poolId)}/capacity-policy`,
