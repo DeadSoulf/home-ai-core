@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.113-dev
+
+- Fix the live-accepted Windows dashboard after the 0.1.111 screenshot exposed mixed Russian/English labels, oversized card copy, classic heavy buttons and a clipped status check.
+- Restore the complete Russian dashboard dictionary and add an RU/EN translation-key parity regression test so dashboard labels cannot silently fall back to English again.
+- Replace the Overview and sidebar buttons with owner-drawn rounded controls, keep keyboard focus rendering, and preserve Tab / Shift+Tab / Ctrl+Tab plus arrow-key sidebar navigation.
+- Draw the green synchronization status circle and white check directly with GDI so no child control covers or clips the indicator.
+- Reduce dashboard typography, shorten card values, compact the displayed server host, hide the technical Status/Ready strip on Overview and show the empty recent-activity state only once.
+- Silently validate the saved HOME AI connection on startup through Credential Manager; successful refresh populates server folder usage and changes the connection card from configured to connected without requiring an extra click.
+- Distinguish an unconfirmed connection from a connected server that cannot report folder usage.
+- Preserve the 0.1.112 TexNik attribution and all existing sync, queue/copy, background-agent, updater and Debian-installer behavior.
+- Native Windows tests, Windows cross-build, Debian installer checks and the full pull-request CI pass on the current main base; real visual/DPI/tray acceptance of this polish remains pending.
+
 ## 0.1.112-dev
 
 - Add project-wide copyright/author attribution for **TexNik**.
