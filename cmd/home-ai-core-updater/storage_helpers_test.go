@@ -11,7 +11,6 @@ func TestLVMMapperNameEscapesHyphens(t *testing.T) {
 	}
 }
 
-
 func TestFilesystemDiagnosticCommandForExt4IsReadOnly(t *testing.T) {
 	command, args := filesystemDiagnosticCommand("/dev/sdb1", "ext4")
 	if command != "/usr/sbin/e2fsck" {
