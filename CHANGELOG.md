@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.116-dev
+
+- Add the first callable **AI Agent read-tool layer** on top of the `0.1.115-dev` contracts.
+- Register `core.system.status`, `core.jobs.list` and `core.modules.list` as typed read-only AI tools.
+- Re-check the current actor's effective Core permissions for every tool execution and expose only permitted tools from the AI API.
+- Keep recent-job AI output intentionally redacted from raw job input/result payloads while preserving status, progress and error summaries.
+- Add authenticated `/api/v1/ai/status`, `/api/v1/ai/tools` and `/api/v1/ai/tools/<tool>/execute` endpoints.
+- Require normal cookie-session CSRF protection for AI tool POST requests.
+- Bound every AI tool execution with a server-side timeout.
+- Audit successful, denied and failed AI tool executions as `ai.tool.execute` without storing raw tool input in audit metadata.
+- Add regression coverage for permission-filtered tool discovery, successful execution, fail-closed denial, audit recording and job-payload redaction.
+- Keep model/provider chat disabled in this slice; the next step is local provider integration and streaming Web chat.
+
 ## 0.1.115-dev
 
 - Start the **AI Agent Foundation** as a first-party `ai.agent` module so agent contracts can evolve together with NAS, Smart Home and NVR.
