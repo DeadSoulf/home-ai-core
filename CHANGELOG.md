@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.88-dev
+
+- Reworked **System → Storage** into a disk-first workflow: the overview now shows only physical disks and their high-level state.
+- Selecting a physical disk opens a focused disk page while preserving the existing partition/LVM management controls underneath.
+- Removed destructive storage actions from the all-disks overview so formatting, deletion, mounting and purpose changes are scoped to one selected disk.
+- Added a responsive disk summary with model, transport, capacity, partition table, unallocated space and SMART state.
+- Reused the existing storage operation APIs and usage-lock protections without changing the server-side storage safety model.
+
 ## 0.1.87-dev
 
 - Added kernel-enforced free-space reserve protection for direct SMB writes on quota-ready Home-AI storage.
