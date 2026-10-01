@@ -24,6 +24,9 @@ import type {
   StoragePurposeAssignment,
   SMBStatus,
   WireGuardStatus,
+  AIModel,
+  AISession,
+  AIStatus,
 } from "./types";
 
 type APIErrorBody = {
@@ -131,8 +134,96 @@ async function postJSON<T>(path: string, body?: unknown, csrf = false): Promise<
   });
 }
 
+async function streamAISessionMessage(
+  sessionId: string,
+  content: string,
+  onDelta: (content: string) => void,
+): Promise<AISession> {
+  const headers = new Headers({"Content-Type": "application/json", "Accept": "text/event-stream"});
+  const token = getCSRFToken();
+  if (token) headers.set("X-CSRF-Token", token);
+  const response = await fetch(`/api/v1/ai/sessions/${encodeURIComponent(sessionId)}/messages`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({content}),
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    let body: unknown = {};
+    const contentType = response.headers.get("Content-Type") || "";
+    if (contentType.includes("application/json")) body = await response.json();
+    throw new APIError(response.status, body as APIErrorBody);
+  }
+  if (!response.body) throw new Error("AI stream is unavailable");
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let completed: AISession | undefined;
+
+  const consume = (frame: string) => {
+    let event = "message";
+    let data = "";
+    for (const rawLine of frame.replaceAll("\r", "").split("\n")) {
+      if (rawLine.startsWith("event:")) event = rawLine.slice(6).trim();
+      if (rawLine.startsWith("data:")) data += rawLine.slice(5).trim();
+    }
+    if (!data) return;
+    const payload = JSON.parse(data) as {content?: string; code?: string; message?: string; session?: AISession};
+    if (event === "delta" && payload.content) onDelta(payload.content);
+    if (event === "error") throw new Error(payload.message || payload.code || "AI chat failed");
+    if (event === "done" && payload.session) completed = payload.session;
+  };
+
+  while (true) {
+    const {done, value} = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), {stream: !done});
+    let split = buffer.indexOf("\n\n");
+    while (split >= 0) {
+      const frame = buffer.slice(0, split);
+      buffer = buffer.slice(split + 2);
+      if (frame.trim()) consume(frame);
+      split = buffer.indexOf("\n\n");
+    }
+    if (done) break;
+  }
+  if (buffer.trim()) consume(buffer);
+  if (!completed) throw new Error("AI stream ended before completion");
+  return completed;
+}
+
 export const api = {
   setupStatus: () => request<SetupStatus>("/api/v1/security/setup-status"),
+
+  aiStatus: async () => {
+    const result = await request<{ai: AIStatus}>("/api/v1/ai/status");
+    return result.ai;
+  },
+
+  aiModels: async () => {
+    const result = await request<{provider: string; models: AIModel[]}>("/api/v1/ai/models");
+    return result;
+  },
+
+  aiSessions: async () => {
+    const result = await request<{sessions: AISession[]}>("/api/v1/ai/sessions");
+    return result.sessions;
+  },
+
+  createAISession: async (model: string) => {
+    const result = await postJSON<{session: AISession}>("/api/v1/ai/sessions", {model}, true);
+    return result.session;
+  },
+
+  aiSession: async (sessionId: string) => {
+    const result = await request<{session: AISession}>(`/api/v1/ai/sessions/${encodeURIComponent(sessionId)}`);
+    return result.session;
+  },
+
+  streamAIMessage: streamAISessionMessage,
+
 
   bootstrap: async (input: {
     bootstrapToken: string;
