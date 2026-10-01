@@ -1092,6 +1092,39 @@ func TestFilePoolCreate(t *testing.T) {
 	}
 }
 
+func TestFilePoolCapacityPolicyUpdate(t *testing.T) {
+	poolRoot := t.TempDir()
+	originalCapacity := readFilePoolCapacity
+	readFilePoolCapacity = func(string) (filedata.Capacity, error) {
+		return filedata.Capacity{TotalBytes: 1000, FreeBytes: 700}, nil
+	}
+	t.Cleanup(func() { readFilePoolCapacity = originalCapacity })
+
+	handler := testHandler(fakeState{nasPools: []state.NASPoolRecord{{
+		ID:             "nsp-main",
+		Name:           "Main",
+		RootPath:       poolRoot,
+		ReservePercent: 5,
+		WarningPercent: 10,
+	}}})
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/v1/files/pools/nsp-main/capacity-policy",
+		strings.NewReader(`{"reserve_percent":7,"warning_percent":15}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("policy status = %d, want %d: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"reserve_percent":7`) ||
+		!strings.Contains(rec.Body.String(), `"warning_percent":15`) {
+		t.Fatalf("policy response = %s", rec.Body.String())
+	}
+}
+
 func TestSharedFileFolderCreate(t *testing.T) {
 	stubNASProvisioning(t)
 	handler := testHandler(fakeState{})
@@ -1174,6 +1207,105 @@ func TestFileContentScopedReadWrite(t *testing.T) {
 	}
 	if rec.Body.String() != "uploaded" {
 		t.Fatalf("download body = %q", rec.Body.String())
+	}
+}
+
+func TestFilePoolCapacityResponseStates(t *testing.T) {
+	original := readFilePoolCapacity
+	t.Cleanup(func() { readFilePoolCapacity = original })
+
+	readFilePoolCapacity = func(string) (filedata.Capacity, error) {
+		return filedata.Capacity{TotalBytes: 1000, FreeBytes: 80}, nil
+	}
+	record := state.NASPoolRecord{
+		ID:             "nsp-main",
+		Name:           "Main",
+		RootPath:       "/srv/home-ai/main",
+		ReservePercent: 5,
+		WarningPercent: 10,
+	}
+	response := filePoolResponseFor(record)
+	if response.CapacityState != "warning" || response.ReserveBytes != 50 || response.WarningBytes != 100 {
+		t.Fatalf("warning response = %#v", response)
+	}
+
+	readFilePoolCapacity = func(string) (filedata.Capacity, error) {
+		return filedata.Capacity{TotalBytes: 1000, FreeBytes: 50}, nil
+	}
+	response = filePoolResponseFor(record)
+	if response.CapacityState != "reserve" {
+		t.Fatalf("reserve response = %#v", response)
+	}
+}
+
+func TestFileUploadsRespectPoolReserve(t *testing.T) {
+	poolRoot := t.TempDir()
+	folderRoot := filepath.Join(poolRoot, ".home-ai", "shared", "nsf-visible")
+	if err := os.MkdirAll(folderRoot, 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	originalCapacity := readFilePoolCapacity
+	readFilePoolCapacity = func(string) (filedata.Capacity, error) {
+		return filedata.Capacity{TotalBytes: 100, FreeBytes: 6}, nil
+	}
+	t.Cleanup(func() { readFilePoolCapacity = originalCapacity })
+
+	sec := defaultFakeSecurity()
+	sec.actor.Permissions = []string{"security.self.read"}
+	sec.actor.ResourcePermissions = []security.PermissionScope{
+		{Permission: "files.read", ResourceType: "file_folder", ResourceID: "nsf-visible"},
+		{Permission: "files.write", ResourceType: "file_folder", ResourceID: "nsf-visible"},
+	}
+	folder := state.NASFolderRecord{
+		ID:                 "nsf-visible",
+		PoolID:             "nsp-main",
+		PoolName:           "Main",
+		PoolRoot:           poolRoot,
+		PoolReservePercent: 5,
+		PoolWarningPercent: 10,
+		Name:               "Family",
+		Kind:               "shared",
+		RelativePath:       "shared/nsf-visible",
+	}
+	handler := testHandlerWithSecurity(fakeState{nasFolders: []state.NASFolderRecord{folder}}, sec)
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/api/v1/files/folders/nsf-visible/content?path=blocked.txt",
+		strings.NewReader("xx"),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusInsufficientStorage {
+		t.Fatalf("direct upload status = %d, want %d: %s", rec.Code, http.StatusInsufficientStorage, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "file_pool_reserve_reached") {
+		t.Fatalf("direct upload error = %s", rec.Body.String())
+	}
+	if _, err := os.Stat(filepath.Join(folderRoot, "blocked.txt")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("blocked upload committed unexpectedly: %v", err)
+	}
+
+	req = httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/files/folders/nsf-visible/uploads",
+		strings.NewReader(`{"path":"large.bin","total_bytes":2}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusInsufficientStorage {
+		t.Fatalf("resumable create status = %d, want %d: %s", rec.Code, http.StatusInsufficientStorage, rec.Body.String())
+	}
+	uploads, err := filedata.ListUploads(folderRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(uploads) != 0 {
+		t.Fatalf("blocked resumable sessions = %#v", uploads)
 	}
 }
 
