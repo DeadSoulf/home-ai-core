@@ -33,7 +33,7 @@ const (
 	maxBundleFiles      = 20000
 	defaultUserAgent    = "Home-AI-Core"
 	updateCheckCacheTTL = 10 * time.Minute
-	bundleHTTPTimeout    = 2 * time.Minute
+	bundleHTTPTimeout   = 2 * time.Minute
 )
 
 var downloadRetryDelays = []time.Duration{
