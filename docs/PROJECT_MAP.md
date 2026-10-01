@@ -6,7 +6,7 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
-**Последний опубликованный релиз:** `0.1.107-dev` — лёгкий Windows-клиент HOME AI поверх подтверждённого Files/Storage `0.1.106-dev`\
+**Последний опубликованный релиз:** `0.1.107-dev` — лёгкий Windows-клиент HOME AI: новый cloud-drive-style UI, клавиатурная навигация, фирменный icon/tray и Explorer-open\
 **Текущий срез:** `0.1.108-dev` — исправление **Занято / лимит** для Files folders через privileged host `du` fallback\
 **Следующий engineering milestone:** подтвердить реальное **Занято / лимит** на папке **Фото**; параллельно остаётся live acceptance Windows-клиента `0.1.107-dev`, SMB/квот и reboot persistence\
 **Состояние:** Files/Storage pool capacity подтверждена на живом сервере в `0.1.106-dev`; Windows UI опубликован в `0.1.107-dev`; в `0.1.108-dev` закрывается отдельный folder-usage path, который ранее показывал «Объём недоступен».\
@@ -18,9 +18,10 @@
 - ✅ Если Core не может прочитать managed folder из service sandbox, privileged helper считает apparent-size конкретной папки через host `du -B1`.
 - ✅ Temporary upload parts `.home-ai-upload-*` исключаются из host-`du` fallback.
 - ✅ Fallback используется не только в таблице папок, но и для folder quota checks и private-user quota totals.
+- ✅ Новая read-only helper operation защищена повышением storage-helper protocol version.
 - 🧪 Требуется live-проверка папки **Фото**: ожидается реальное значение, например `0 Б / Без лимита` для пустой папки, вместо **Объём недоступен**.
 
-### Кандидат 0.1.107-dev — лёгкий Windows-клиент HOME AI
+### Выпуск 0.1.107-dev — лёгкий Windows-клиент HOME AI
 
 - ✅ Старое перегруженное Win32-окно разделено на **Обзор / Подключение / Синхронизация / Резервные копии / Настройки** без изменения существующего sync engine и формата профилей.
 - ✅ **Tab / Shift+Tab** переведены на штатную Win32 dialog navigation через `IsDialogMessageW`; **Ctrl+Tab / Ctrl+Shift+Tab** переключают разделы, а боковая radio-navigation поддерживает клавиши со стрелками.
@@ -28,7 +29,7 @@
 - ✅ Tray упрощён: обычный левый клик открывает меню, доступны **Синхронизировать**, **Открыть локальную папку**, **Настройки**, **Журнал**, **Выход**.
 - ✅ На **Обзоре** показываются только основные пользовательские состояния: подключение, число активных папок, фоновая синхронизация, следующий запуск и последний успешный результат.
 - ✅ Сохранены Credential Manager, background agent, sync profiles, manual sync, queue/copy engine, stable install/update path и существующая conflict policy.
-- ✅ PR #88 после rebase на актуальный `main` прошёл native Windows tests, Windows cross-build и полный `core-ci` на финальном кодовом состоянии.
+- ✅ PR #88 после rebase на актуальный `main` прошёл native Windows tests, Windows cross-build и полный `core-ci`; release workflow опубликовал `v0.1.107-dev` с Core amd64/arm64 bundles и Windows `.exe` + SHA-256.
 - 🧪 Реальная Windows acceptance нового вида, клавиатурной навигации, фирменного icon/tray и Explorer-open остаётся пользовательской проверкой.
 - 🚧 Scheduler в этом срезе остаётся interval-based; точное расписание **дни + время** — следующий Windows-срез.
 - 🚧 HOME AI пока открывает существующую локальную синхронизируемую папку в Проводнике; отдельный виртуальный диск/provider в Explorer этим релизом не заявляется.
