@@ -587,7 +587,7 @@ const strings = {
     filePoolCapacityOK: "Норма",
     filePoolCapacityWarning: "Мало свободного места",
     filePoolCapacityReserve: "Достигнут резерв",
-    filePoolCapacityUnknown: "Ёмкость недоступна",
+    filePoolCapacityUnknown: "Объём недоступен",
     filePoolReserveDetails: "Жёсткий резерв: {reserve}. Порог предупреждения: {warning}.",
     filePoolCapacityNotice: "Новые записи через API Home-AI и Windows-клиент блокируются до того, как свободное место опустится ниже жёсткого резерва. Порог предупреждения только информирует.",
     filePoolSMBReserveNotice: "Резерв хранилища защищён ядром. Лимиты папок и пользователя дополнительно требуют файловых квот; до их настройки эти папки доступны по SMB только для чтения.",

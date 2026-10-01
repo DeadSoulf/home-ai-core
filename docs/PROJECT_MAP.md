@@ -6,9 +6,9 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
-**Последний опубликованный релиз:** `0.1.103-dev` — fallback ёмкости Files pool для «Свободно / Всего» и reserve logic\
-**Текущий срез:** `0.1.103-dev` — опубликован; mount и создание pool подтверждены на живом сервере, отображение free/total после нового fallback ожидает пользовательской проверки\
-**Следующий engineering milestone:** подтвердить free/total и reserve на реальном Files pool; затем продолжить live acceptance папок, SMB/квот, reboot persistence и Windows-клиента\
+**Последний опубликованный релиз:** `0.1.104-dev` — явное «Объём недоступен» вместо прочерка, когда capacity неизвестна\
+**Текущий срез:** `0.1.104-dev` — mount и создание pool подтверждены на живом сервере; если capacity получить нельзя, UI теперь показывает явный статус вместо пустого значения\
+**Следующий engineering milestone:** продолжить выяснение причины недоступной capacity на конкретном сервере без блокировки Files workflow; затем live acceptance SMB/квот, reboot persistence и Windows-клиента\
 **Состояние:** основной Files/Storage workflow работает на живом сервере: назначение Files, mount, выбор storage и создание pool подтверждены. F2 NAS остаётся в эксплуатационной приёмке по capacity, SMB, quotas и reboot persistence.\
 **Обновлено:** 2026-10-01
 
@@ -26,6 +26,7 @@
 - **0.1.101-dev** — проверка mount backing переведена на Linux `/proc/self/mountinfo` с major:minor device ID вместо зависимости только от `lsblk`/stat heuristics.
 - **0.1.102-dev** — исправлен корень mount-проблемы: privileged updater helper работал в отдельном systemd mount namespace. `mount`, `umount`, `findmnt` теперь выполняются через PID 1 host mount namespace с `nsenter`. На живом сервере пользователь подтвердил успешное создание Files storage pool.
 - **0.1.103-dev** — для Files pool добавлен fallback ёмкости: сначала live `statfs(root_path)`, при недоступности — сохранённый backing device/UUID, block-device size и privileged storage inspection для free space. Тот же fallback используется в reserve enforcement. Пользовательская проверка **«Свободно / Всего»** остаётся открытой.
+- **0.1.104-dev** — если capacity всё равно недоступна на живом сервере, Files UI больше не показывает неоднозначный `—`: в pool capacity и назначенном storage выводится явное **«Объём недоступен»**.
 - ✅ Для всей цепочки сохранены CI, Go/Web tests, Linux amd64/arm64 cross-build и versioned release assets.
 
 ### Выпуск 0.1.91-dev — завершение пользователей и управления файлами
@@ -170,7 +171,7 @@
 - ✅ Web-раздел **Файлы** имеет реальные маршруты `/files`, `/files/storage`, `/files/windows`.
 - ✅ Blank storage page из-за `mountpoints:null`, mojibake и race после mount исправлены.
 - 🧪 На живом сервере подтверждены mount и создание Files pool в 0.1.102-dev.
-- 🧪 В 0.1.103-dev требуется подтвердить показ **Свободно / Всего** и reserve state на созданном pool.
+- 🧪 На живом сервере capacity для созданного pool пока не определяется даже после fallback 0.1.103-dev; с 0.1.104-dev UI явно показывает **«Объём недоступен»** вместо прочерка.
 - 🧪 Live acceptance SMB, quota enforcement, reboot persistence и Windows/NAS остаётся отдельным эксплуатационным этапом.
 - 🚧 Controlled migration для legacy filesystems без готовых quota features остаётся отдельной maintenance-задачей.
 
@@ -910,6 +911,7 @@ AI не может расширять собственные права.
 | `0.1.101-dev` | ✅ mountinfo validation | `/proc/self/mountinfo` + major:minor |
 | `0.1.102-dev` | ✅ Host mount namespace | mount/umount/findmnt через PID 1; создание Files pool подтверждено пользователем |
 | `0.1.103-dev` | 🧪 Pool free/total fallback | backing device/UUID + privileged inspection; live UI confirmation pending |
+| `0.1.104-dev` | ✅ Explicit unavailable capacity state | «Объём недоступен» вместо прочерка при неизвестной capacity |
 
 ## 10. Правило ведения карты
 
