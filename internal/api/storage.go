@@ -69,7 +69,7 @@ func (s *server) storageOperation(
 	var beforeTree []systeminfo.BlockNode
 	var beforePurposes []state.StoragePurposeRecord
 	switch input.Operation {
-	case "unmount", "partition.create", "partition.delete", "partition.delete_all", "format":
+	case "unmount", "partition.create", "partition.delete", "partition.delete_all", "format", "preflight":
 		beforeTree = systeminfo.Collect(s.nodeID).BlockTree
 	}
 	if input.Operation == "format" {
@@ -77,7 +77,7 @@ func (s *server) storageOperation(
 	}
 
 	switch input.Operation {
-	case "unmount", "format", "partition.delete", "partition.delete_all":
+	case "unmount", "format", "partition.delete", "partition.delete_all", "preflight":
 		node, ok := blockNodeByPath(beforeTree, input.Device)
 		if ok {
 			pools, listErr := s.state.ListNASPools(r.Context())
@@ -100,14 +100,15 @@ func (s *server) storageOperation(
 		}
 	}
 
+	executeOperation, executeDryRun := storageExecutionMode(input.Operation, input.DryRun)
 	message, err := storage.Execute(r.Context(), storage.Request{
-		Operation:  input.Operation,
+		Operation:  executeOperation,
 		Device:     input.Device,
 		Mountpoint: input.Mountpoint,
 		Filesystem: input.Filesystem,
 		Label:      input.Label,
 		Confirm:    input.Confirm,
-		DryRun:     input.DryRun,
+		DryRun:     executeDryRun,
 		SizeMiB:    input.SizeMiB,
 	})
 	if err != nil {
@@ -115,7 +116,7 @@ func (s *server) storageOperation(
 		writeAPIError(w, r, http.StatusBadGateway, "storage_operation_failed", err.Error(), nil)
 		return
 	}
-	if input.DryRun {
+	if executeDryRun {
 		s.security.RecordAudit(
 			r.Context(),
 			s.securityRequestContext(r),
@@ -244,4 +245,12 @@ func storagePurposeRecordForNode(records []state.StoragePurposeRecord, node syst
 		}
 	}
 	return state.StoragePurposeRecord{}, false
+}
+
+
+func storageExecutionMode(operation string, dryRun bool) (string, bool) {
+	if operation == "preflight" {
+		return "partition.delete_all", true
+	}
+	return operation, dryRun
 }
