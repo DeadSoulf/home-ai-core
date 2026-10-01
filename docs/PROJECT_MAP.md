@@ -5,8 +5,8 @@
 > Аудит уже сделанного: [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
-**Последний опубликованный релиз:** `0.1.85-dev` — защита дисков и устойчивая привязка NAS pool к filesystem\
-**Текущий срез:** `0.1.86-dev` — release candidate; NAS free-space reserve + capacity warnings\
+**Последний опубликованный релиз:** `0.1.86-dev` — NAS free-space reserve и capacity warnings\
+**Текущий срез:** `0.1.86-dev` — published; live capacity-reserve acceptance pending\
 **Следующий engineering milestone:** live acceptance capacity reserve; затем hard SMB/filesystem enforcement и per-folder/per-user quotas\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-10-01
@@ -22,7 +22,7 @@
 - При нарушении резерва Core возвращает HTTP 507 `file_pool_reserve_reached`; Windows-клиент получает ту же серверную защиту.
 - Move / корзина / restore остаются разрешены как same-filesystem rename.
 - SMB hard reserve пока не заявляется: Samba пишет напрямую, поэтому следующий слой — filesystem/Samba quota enforcement.
-- ADR-0033 и PR #63 прошли полный CI.
+- ADR-0033 и PR #63 прошли полный CI; release workflow опубликовал `v0.1.86-dev` с amd64/arm64 Core bundles и Windows `.exe` + SHA-256.
 - Практическая проверка на установленном сервере остаётся acceptance step.
 
 ### Выпуск 0.1.85-dev — защита дисков и привязка NAS pool к filesystem
