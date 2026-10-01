@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
@@ -408,18 +409,21 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 
 	switch request.Operation {
 	case "storage.mount":
-		targets, err := mountedTargets(ctx, device)
-		if err != nil {
-			return "", err
-		}
-		if len(targets) != 0 {
-			return "", errors.New("device is already mounted")
-		}
 		target := strings.TrimSpace(request.Mountpoint)
 		if target == "" {
 			target = filepath.Join("/mnt/home-ai-core", filepath.Base(device))
 		}
 		target = filepath.Clean(target)
+		targets, err := mountedTargets(ctx, device)
+		if err != nil {
+			return "", err
+		}
+		if mountTargetPresent(targets, target) {
+			return "device already mounted at requested mount point", nil
+		}
+		if len(targets) != 0 {
+			return "", fmt.Errorf("device is already mounted at %s", strings.Join(targets, ", "))
+		}
 		if target != "/mnt/home-ai-core" && !strings.HasPrefix(target, "/mnt/home-ai-core/") {
 			return "", errors.New("mount point must be under /mnt/home-ai-core")
 		}
@@ -478,19 +482,8 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 				return "", fmt.Errorf("mount device: %s", message)
 			}
 		}
-		targets, err = mountedTargets(ctx, device)
-		if err != nil {
-			return "", fmt.Errorf("verify mount: %w", err)
-		}
-		mounted := false
-		for _, mountedTarget := range targets {
-			if mountedTarget == target {
-				mounted = true
-				break
-			}
-		}
-		if !mounted {
-			return "", errors.New("mount completed but verification did not find the requested mount")
+		if err := waitForMountedTarget(ctx, device, target); err != nil {
+			return "", err
 		}
 		if quotaOptions != "" && !mountedWithQuota {
 			return "device mounted without quota mount options", nil
@@ -733,6 +726,42 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 	default:
 		return "", errors.New("unsupported storage operation")
 	}
+}
+
+func waitForMountedTarget(ctx context.Context, device, target string) error {
+	const attempts = 6
+	for attempt := 0; attempt < attempts; attempt++ {
+		targets, err := mountedTargets(ctx, device)
+		if err != nil {
+			return fmt.Errorf("verify mount: %w", err)
+		}
+		if mountTargetPresent(targets, target) {
+			return nil
+		}
+		if attempt == attempts-1 {
+			break
+		}
+		timer := time.NewTimer(150 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return fmt.Errorf("verify mount: %w", ctx.Err())
+		case <-timer.C:
+		}
+	}
+	return errors.New("mount completed but verification did not find the requested mount point")
+}
+
+func mountTargetPresent(targets []string, target string) bool {
+	target = filepath.Clean(strings.TrimSpace(target))
+	for _, mounted := range targets {
+		if filepath.Clean(strings.TrimSpace(mounted)) == target {
+			return true
+		}
+	}
+	return false
 }
 
 func filesystemMountDiagnostic(ctx context.Context, device, filesystem string) string {

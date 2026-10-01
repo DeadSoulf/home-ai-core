@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.99-dev
+
+- Make storage mounting idempotent: mounting a device that is already mounted at the requested Home-AI path now returns success instead of `device is already mounted`.
+- Wait briefly for `findmnt` to observe a successful mount before reporting a verification failure, avoiding false errors immediately after the kernel mounts the filesystem.
+- Return the canonical mountpoint from the storage operation API and reflect it immediately in Files → Storage, including the pool selector.
+- Keep the mounted path visible even if the first storage inventory refresh lags behind the successful mount response.
+- Localize common Files storage mount errors for the Russian Web UI instead of exposing raw English helper messages as the primary error.
+
 ## 0.1.98-dev
 
 - Add read-only filesystem diagnostics when both quota-enabled and plain storage mounts fail.

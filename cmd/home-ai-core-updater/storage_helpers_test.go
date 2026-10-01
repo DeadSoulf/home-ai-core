@@ -39,3 +39,12 @@ func TestCompactFilesystemDiagnosticNormalizesAndBoundsOutput(t *testing.T) {
 		t.Fatalf("bounded diagnostic length = %d, suffix=%q", len(long), long[len(long)-3:])
 	}
 }
+
+func TestMountTargetPresentNormalizesPaths(t *testing.T) {
+	if !mountTargetPresent([]string{"/mnt/home-ai-core/sdb1"}, "/mnt/home-ai-core/sdb1/") {
+		t.Fatal("expected normalized mount target to match")
+	}
+	if mountTargetPresent([]string{"/mnt/other"}, "/mnt/home-ai-core/sdb1") {
+		t.Fatal("unexpected mount target match")
+	}
+}
