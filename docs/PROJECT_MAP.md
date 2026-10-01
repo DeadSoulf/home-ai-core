@@ -7,13 +7,13 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.114-dev` — standalone read-only Storage Preflight / **Проверить безопасность** для физических дисков\
-**Текущий срез:** `0.1.115-dev` — **AI Agent Foundation**: first-party `ai.agent`, typed Tool Registry, provider contract, permission/scope/approval boundaries и regression tests\
+**Последний опубликованный релиз:** `0.1.115-dev` — первый опубликованный **AI Agent Foundation** с `ai.agent`, Tool Registry и provider contract\
+**Текущий срез:** `0.1.115-dev` опубликован: **AI Agent Foundation** зарегистрирован в Core и даёт базовые tool/provider/permission/approval contracts\
 **Следующий engineering milestone:** завершить первый `0.1.115-dev` AI foundation slice — read-only Core tools, audit integration и AI API foundation; затем подключить локальный model provider и Web chat. Windows UI/tray acceptance продолжается параллельно; stable signing-key provisioning и long-duration updater tests остаются release/operations gates\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Storage preflight `0.1.114-dev` live-подтверждён. AI Agent Foundation уже начат в `0.1.115-dev` как модуль поверх существующих Core identity/permissions/jobs/events/audit contracts; Windows polish acceptance остаётся параллельной product-проверкой.\
 **Обновлено:** 2026-10-01
 
-### Кандидат 0.1.115-dev — AI Agent Foundation
+### Выпуск 0.1.115-dev — AI Agent Foundation
 
 - ✅ Добавлен first-party module `ai.agent`, регистрируемый Core при старте.
 - ✅ Module Registry теперь объявляет capabilities `ai.agent` и `ai.tools`.
@@ -28,6 +28,8 @@
 - 🚧 Следующий кусок этого же foundation: read-only Core tools (system/jobs/modules), Audit и AI API.
 - 🚧 После API — local provider adapter + streaming Web chat.
 - 📄 План: [AI_AGENT_FOUNDATION.md](AI_AGENT_FOUNDATION.md).
+- ✅ PR #108 прошёл полный `core-ci`; main CI и release workflow также зелёные.
+- ✅ GitHub Release `v0.1.115-dev` опубликован с Core amd64/arm64, Windows `.exe`, Debian `.deb` amd64/arm64 и SHA-256.
 
 ### Выпуск 0.1.114-dev — standalone Storage Preflight
 
@@ -1112,7 +1114,7 @@ AI не может расширять собственные права.
 | `0.1.112-dev` | ✅ TexNik copyright attribution | опубликовано: NOTICE/LICENSE/README/Web/Windows/Debian attribution; runtime behavior unchanged; полный CI/release зелёный |
 | `0.1.113-dev` | 🧪 Windows UI polish | опубликовано: RU localization, owner-draw buttons, fixed status check, compact cards, silent startup connection refresh; automated CI/release зелёные, repeat live acceptance pending |
 | `0.1.114-dev` | ✅ Standalone storage preflight | опубликовано и live-подтверждено: Safety check + forced server-side dry-run + audit/test |
-| `0.1.115-dev` | 🚧 AI Agent Foundation | first-party `ai.agent`, Tool Registry, provider contract, permission/scope/approval boundaries + tests; API/audit/read tools next |
+| `0.1.115-dev` | ✅ AI Agent Foundation v1 contracts | опубликовано: first-party `ai.agent`, Tool Registry, provider contract, permission/scope/approval boundaries + tests; API/audit/read tools next |
 
 ## 10. Правило ведения карты
 
