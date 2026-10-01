@@ -383,6 +383,71 @@ tbody tr:last-child td { border-bottom: 0; }
 .storage-inline-label { color: #8d9aad; font-size: 10px; }
 .storage-system-row { background: #2b261833; }
 .storage-tree-actions { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+
+.storage-disk-action-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.storage-disk-create-form {
+  margin-top: 2px;
+}
+
+.storage-partitions-view .storage-tree-table {
+  min-width: 0;
+}
+
+.storage-partitions-view .table-wrap {
+  overflow-x: auto;
+}
+
+.storage-inline-actions-row td {
+  padding: 0;
+  background: #121821;
+  border-bottom: 1px solid #28313d;
+}
+
+.storage-inline-actions-panel {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 11px 36px;
+  border-left: 2px solid #33496d;
+}
+
+.storage-inline-actions-main,
+.storage-inline-actions-danger {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.storage-inline-actions-danger {
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.storage-inline-actions-panel .storage-purpose-control {
+  margin-left: 4px;
+}
+
+@media (max-width: 900px) {
+  .storage-inline-actions-panel {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-left: 12px;
+  }
+
+  .storage-inline-actions-danger {
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+}
+
 .storage-purpose-control {
   display: inline-flex;
   align-items: center;

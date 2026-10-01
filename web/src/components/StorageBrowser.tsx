@@ -177,6 +177,14 @@ export function StorageBrowser({
             <span><small>{t("lifeRemaining")}</small><strong>{selectedDisk.life_remaining_percent}%</strong></span>
           )}
         </div>
+        <div className="storage-disk-summary-actions">
+          <StorageDevices
+            devices={[selectedDisk]}
+            canManage={canManage}
+            onChanged={onChanged}
+            mode="diskActions"
+          />
+        </div>
       </div>
 
       <div className="storage-disk-manager">
@@ -184,6 +192,7 @@ export function StorageBrowser({
           devices={[selectedDisk]}
           canManage={canManage}
           onChanged={onChanged}
+          mode="partitions"
           expandedByDefault
           showDiskToolbar={false}
         />
