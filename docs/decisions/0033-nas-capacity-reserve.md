@@ -35,7 +35,7 @@ Moves, recycle-bin moves, restores and renames stay allowed because they are sam
 
 Direct SMB writes currently bypass Core's upload API. The Web UI explicitly states that the pool reserve is not yet a hard filesystem quota for those writes.
 
-A later slice must provide filesystem/Samba-level enforcement (for example a compatible filesystem quota/project-quota design) before Home-AI claims that the reserve is hard across SMB as well.
+ADR-0034 implements the follow-up boundary with kernel user-quota enforcement for quota-ready ext4/XFS backing filesystems. Legacy filesystems remain explicitly not ready until a controlled migration/remount/reformat enables quota accounting.
 
 ## Consequences
 
