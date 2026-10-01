@@ -21,18 +21,33 @@ func (state *windowsSettingsUI) trf(key string, args ...any) string {
 func (state *windowsSettingsUI) applyLanguageTexts() {
 	state.setText(state.hwnd, state.tr("window_title"))
 	for _, item := range [][2]string{
-		{"language_label", "language"},
+		{"brand_name", "brand_name"},
+		{"nav_0", "nav_overview"},
+		{"nav_1", "nav_connection"},
+		{"nav_2", "nav_sync"},
+		{"nav_3", "nav_backup"},
+		{"nav_4", "nav_settings"},
+		{"overview_title", "nav_overview"},
+		{"overview_sync_button", "sync_now"},
+		{"overview_open_button", "open_home_folder"},
+		{"overview_connection_title", "overview_connection"},
+		{"overview_sync_title", "overview_sync_state"},
+		{"overview_backup_title", "overview_backup_state"},
+		{"overview_next_title", "overview_next"},
+		{"overview_last_title", "overview_last"},
+		{"connection_title", "nav_connection"},
+		{"connection_hint", "connection_hint"},
 		{"server_label", "server"},
 		{"connect_button", "connect_save"},
 		{"user_label", "user"},
 		{"password_label", "password"},
 		{"password_hint", "password_hint"},
+		{"sync_title", "nav_sync"},
+		{"sync_hint", "sync_hint"},
 		{"remote_label", "remote_folder"},
 		{"local_label", "local_source"},
 		{"browse_button", "browse"},
 		{"destination_label", "destination"},
-		{"interval_label", "interval"},
-		{"conflict_label", "conflict"},
 		{"new_button", "new_clear"},
 		{"enable_button", "enable"},
 		{"disable_button", "disable"},
@@ -40,8 +55,20 @@ func (state *windowsSettingsUI) applyLanguageTexts() {
 		{"refresh_button", "refresh"},
 		{"profiles_label", "sync_profiles"},
 		{"sync_button", "sync_now"},
+		{"backup_title", "nav_backup"},
+		{"backup_hint", "backup_hint"},
+		{"backup_profile_label", "backup_folder"},
+		{"interval_label", "interval"},
+		{"conflict_label", "conflict"},
+		{"schedule_save_button", "save_schedule"},
+		{"backup_agent_title", "backup_agent_title"},
 		{"agent_enable", "enable_agent"},
 		{"agent_disable", "disable_agent"},
+		{"general_title", "nav_settings"},
+		{"general_hint", "general_hint"},
+		{"language_label", "language"},
+		{"general_background_title", "general_background_title"},
+		{"general_background_hint", "general_background_hint"},
 		{"status_title", "status"},
 	} {
 		controlKey, textKey := item[0], item[1]
@@ -92,6 +119,8 @@ func (state *windowsSettingsUI) changeLanguage() {
 	state.applyLanguageTexts()
 	_ = state.reloadProfiles(state.selectedProfileID)
 	state.refreshAgentStatus()
+	state.refreshBackupProfiles(state.selectedProfileID)
+	state.refreshOverview()
 	state.setStatus(state.tr("ready"))
 	notifyTrayLanguageChanged()
 }

@@ -163,19 +163,33 @@ type windowsSettingsUI struct {
 	language     string
 	localized    map[string]windows.Handle
 
-	serverEdit     windows.Handle
-	usernameEdit   windows.Handle
-	passwordEdit   windows.Handle
-	folderCombo    windows.Handle
-	sourceEdit     windows.Handle
-	destination    windows.Handle
-	interval       windows.Handle
-	conflict       windows.Handle
-	profileList    windows.Handle
-	statusLabel    windows.Handle
-	agentLabel     windows.Handle
-	saveProfileBtn windows.Handle
-	languageCombo  windows.Handle
+	serverEdit         windows.Handle
+	usernameEdit       windows.Handle
+	passwordEdit       windows.Handle
+	folderCombo        windows.Handle
+	sourceEdit         windows.Handle
+	destination        windows.Handle
+	interval           windows.Handle
+	conflict           windows.Handle
+	profileList        windows.Handle
+	statusLabel        windows.Handle
+	agentLabel         windows.Handle
+	saveProfileBtn     windows.Handle
+	languageCombo      windows.Handle
+	backupProfileCombo windows.Handle
+
+	page               int
+	pageControls       [settingsPageCount][]windows.Handle
+	navButtons         [settingsPageCount]windows.Handle
+	overviewHeadline   windows.Handle
+	overviewSubtitle   windows.Handle
+	overviewConnection windows.Handle
+	overviewSync       windows.Handle
+	overviewBackup     windows.Handle
+	overviewNext       windows.Handle
+	overviewLast       windows.Handle
+	windowIcon         windows.Handle
+	connected          bool
 
 	folders           []windowsclient.Folder
 	folderIDs         []string
@@ -300,7 +314,15 @@ func runSettingsUI(args []string) error {
 	if module == 0 {
 		return fmt.Errorf("get settings module handle: %w", moduleErr)
 	}
-	icon, _, _ := procSettingsLoadIcon.Call(0, settingsIDIApplication)
+	brandIcon, brandIconErr := loadHomeAIIcon(48)
+	icon := uintptr(brandIcon)
+	ownedBrandIcon := brandIconErr == nil && brandIcon != 0
+	if !ownedBrandIcon {
+		icon, _, _ = procSettingsLoadIcon.Call(0, settingsIDIApplication)
+	}
+	if ownedBrandIcon {
+		defer destroyHomeAIIcon(brandIcon)
+	}
 	cursor, _, _ := procSettingsLoadCursor.Call(0, settingsIDCArrow)
 	class := settingsWndClassEx{
 		CbSize:        uint32(unsafe.Sizeof(settingsWndClassEx{})),
@@ -322,6 +344,7 @@ func runSettingsUI(args []string) error {
 		settingsPath: settingsPath,
 		language:     preferredUILanguageForSettingsPath(settingsPath),
 		localized:    make(map[string]windows.Handle),
+		windowIcon:   windows.Handle(icon),
 	}
 	activeSettingsUI.Lock()
 	activeSettingsUI.value = state
@@ -341,8 +364,8 @@ func runSettingsUI(args []string) error {
 		settingsWSOverlappedWindow,
 		0x80000000,
 		0x80000000,
-		860,
-		720,
+		980,
+		700,
 		0,
 		0,
 		module,
@@ -369,6 +392,13 @@ func runSettingsUI(args []string) error {
 		}
 		if result == 0 {
 			return nil
+		}
+		if state.handlePageShortcut(&msg) {
+			continue
+		}
+		handled, _, _ := procSettingsIsDialogMessage.Call(hwnd, uintptr(unsafe.Pointer(&msg)))
+		if handled != 0 {
+			continue
 		}
 		procSettingsTranslate.Call(uintptr(unsafe.Pointer(&msg)))
 		procSettingsDispatch.Call(uintptr(unsafe.Pointer(&msg)))
@@ -449,84 +479,7 @@ func settingsWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) ui
 }
 
 func (state *windowsSettingsUI) createControls(module windows.Handle) error {
-	font, _, _ := procSettingsGetStock.Call(settingsDefaultGUIFont)
-	label := func(name, key string, x, y, w, h int32) windows.Handle {
-		hwnd := state.createControl(module, "STATIC", state.tr(key), settingsWSChild|settingsWSVisible, x, y, w, h, 0, windows.Handle(font))
-		state.localized[name] = hwnd
-		return hwnd
-	}
-	edit := func(id uint16, text string, x, y, w, h int32, extra uint32) windows.Handle {
-		return state.createControl(module, "EDIT", text, settingsWSChild|settingsWSVisible|settingsWSTabStop|settingsWSBorder|settingsESAutoHScroll|extra, x, y, w, h, id, windows.Handle(font))
-	}
-	button := func(name string, id uint16, key string, x, y, w, h int32) windows.Handle {
-		hwnd := state.createControl(module, "BUTTON", state.tr(key), settingsWSChild|settingsWSVisible|settingsWSTabStop, x, y, w, h, id, windows.Handle(font))
-		state.localized[name] = hwnd
-		return hwnd
-	}
-
-	label("server_label", "server", 20, 20, 90, 22)
-	state.serverEdit = edit(settingsIDServerEdit, "", 120, 16, 510, 26, 0)
-	button("connect_button", settingsIDConnect, "connect_save", 645, 16, 175, 28)
-
-	label("user_label", "user", 20, 56, 90, 22)
-	state.usernameEdit = edit(settingsIDUsernameEdit, "", 120, 52, 230, 26, 0)
-	label("password_label", "password", 370, 56, 90, 22)
-	state.passwordEdit = edit(settingsIDPasswordEdit, "", 460, 52, 190, 26, settingsESPassword)
-	label("password_hint", "password_hint", 660, 56, 160, 22)
-
-	label("remote_label", "remote_folder", 20, 94, 95, 22)
-	state.folderCombo = state.createControl(module, "COMBOBOX", "", settingsWSChild|settingsWSVisible|settingsWSTabStop|settingsWSVScroll|settingsCBSDropDownList, 120, 90, 700, 240, settingsIDFolderCombo, windows.Handle(font))
-
-	label("local_label", "local_source", 20, 132, 95, 22)
-	state.sourceEdit = edit(settingsIDSourceEdit, "", 120, 128, 610, 26, 0)
-	button("browse_button", settingsIDBrowse, "browse", 740, 128, 80, 28)
-
-	label("destination_label", "destination", 20, 168, 95, 22)
-	state.destination = edit(settingsIDDestination, "", 120, 164, 300, 26, 0)
-	label("interval_label", "interval", 440, 168, 70, 22)
-	state.interval = edit(settingsIDInterval, "15m", 510, 164, 100, 26, 0)
-	label("conflict_label", "conflict", 625, 168, 65, 22)
-	state.conflict = state.createControl(module, "COMBOBOX", "", settingsWSChild|settingsWSVisible|settingsWSTabStop|settingsWSVScroll|settingsCBSDropDownList, 690, 164, 130, 160, settingsIDConflict, windows.Handle(font))
-	state.comboAdd(state.conflict, state.tr("conflict_stop"))
-	state.comboAdd(state.conflict, state.tr("conflict_skip"))
-	state.comboAdd(state.conflict, state.tr("conflict_replace"))
-	procSettingsSendMessage.Call(uintptr(state.conflict), settingsCBSetCurSel, 0, 0)
-
-	state.saveProfileBtn = button("save_button", settingsIDSaveProfile, "add_profile", 120, 204, 125, 30)
-	button("new_button", settingsIDNewProfile, "new_clear", 255, 204, 115, 30)
-	button("enable_button", settingsIDEnableProfile, "enable", 380, 204, 95, 30)
-	button("disable_button", settingsIDDisableProfile, "disable", 485, 204, 95, 30)
-	button("delete_button", settingsIDDeleteProfile, "delete", 590, 204, 95, 30)
-	button("refresh_button", settingsIDRefresh, "refresh", 695, 204, 125, 30)
-
-	label("profiles_label", "sync_profiles", 20, 252, 220, 22)
-	state.profileList = state.createControl(module, "LISTBOX", "", settingsWSChild|settingsWSVisible|settingsWSTabStop|settingsWSBorder|settingsWSVScroll|settingsLBSNotify, 20, 276, 800, 245, settingsIDProfileList, windows.Handle(font))
-
-	state.agentLabel = state.createControl(module, "STATIC", state.tr("autostart_checking"), settingsWSChild|settingsWSVisible, 20, 542, 430, 24, 0, windows.Handle(font))
-	label("language_label", "language", 500, 542, 70, 22)
-	state.languageCombo = state.createControl(module, "COMBOBOX", "", settingsWSChild|settingsWSVisible|settingsWSTabStop|settingsWSVScroll|settingsCBSDropDownList, 575, 538, 245, 100, settingsIDLanguage, windows.Handle(font))
-	state.comboAdd(state.languageCombo, "Русский")
-	state.comboAdd(state.languageCombo, "English")
-	if state.language == uiLanguageRussian {
-		procSettingsSendMessage.Call(uintptr(state.languageCombo), settingsCBSetCurSel, 0, 0)
-	} else {
-		procSettingsSendMessage.Call(uintptr(state.languageCombo), settingsCBSetCurSel, 1, 0)
-	}
-
-	button("sync_button", settingsIDSyncNow, "sync_now", 20, 576, 120, 32)
-	button("agent_enable", settingsIDAgentEnable, "enable_agent", 150, 576, 135, 32)
-	button("agent_disable", settingsIDAgentDisable, "disable_agent", 295, 576, 135, 32)
-
-	label("status_title", "status", 20, 630, 60, 22)
-	state.statusLabel = state.createControl(module, "STATIC", state.tr("ready"), settingsWSChild|settingsWSVisible, 80, 630, 740, 42, 0, windows.Handle(font))
-
-	if state.serverEdit == 0 || state.usernameEdit == 0 || state.passwordEdit == 0 ||
-		state.folderCombo == 0 || state.sourceEdit == 0 || state.destination == 0 ||
-		state.interval == 0 || state.conflict == 0 || state.profileList == 0 ||
-		state.statusLabel == 0 || state.agentLabel == 0 || state.languageCombo == 0 {
-		return errors.New("create Windows settings controls")
-	}
-	return nil
+	return state.createLightControls(module)
 }
 
 func (state *windowsSettingsUI) createControl(module windows.Handle, class, text string, style uint32, x, y, w, h int32, id uint16, font windows.Handle) windows.Handle {
@@ -572,9 +525,13 @@ func (state *windowsSettingsUI) loadInitial() {
 		state.setText(state.usernameEdit, state.profiles[0].Username)
 	}
 	state.refreshAgentStatus()
+	state.refreshOverview()
 }
 
 func (state *windowsSettingsUI) handleCommand(id, notify uint16) {
+	if state.handlePageCommand(id, notify) {
+		return
+	}
 	switch id {
 	case settingsIDConnect:
 		if notify == settingsBNClicked {
@@ -720,10 +677,13 @@ func (state *windowsSettingsUI) finishConnect() {
 		return
 	}
 	if result.err != nil {
+		state.connected = false
 		state.setStatus(state.tr("connection_failed") + ": " + result.err.Error())
+		state.refreshOverview()
 		state.showTechnicalError(result.err)
 		return
 	}
+	state.connected = true
 	state.setText(state.serverEdit, result.server)
 	state.setText(state.usernameEdit, result.user)
 	state.setText(state.passwordEdit, "")
@@ -739,6 +699,7 @@ func (state *windowsSettingsUI) finishConnect() {
 		}
 	}
 	state.setStatus(state.trf("connected_writable", writable))
+	state.refreshOverview()
 }
 
 func (state *windowsSettingsUI) saveProfile() {
@@ -822,6 +783,8 @@ func (state *windowsSettingsUI) reloadProfiles(selectID string) error {
 		state.selectedProfileID = ""
 		state.setText(state.saveProfileBtn, state.tr("add_profile"))
 	}
+	state.refreshBackupProfiles(selectID)
+	state.refreshOverview()
 	return nil
 }
 
@@ -1020,6 +983,7 @@ func (state *windowsSettingsUI) finishSync() {
 		return
 	}
 	_ = state.reloadProfiles(state.selectedProfileID)
+	state.refreshOverview()
 	if result.err != nil {
 		state.setStatus(state.tr("sync_failed") + ": " + result.err.Error())
 		state.showTechnicalError(result.err)
@@ -1099,6 +1063,7 @@ func (state *windowsSettingsUI) finishAgent() {
 	state.agentResult = nil
 	state.asyncMu.Unlock()
 	state.refreshAgentStatus()
+	state.refreshOverview()
 	if result == nil {
 		return
 	}
