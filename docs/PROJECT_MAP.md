@@ -8,8 +8,8 @@
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последний опубликованный релиз:** `0.1.109-dev` — **Core 1.0 readiness**: negative updater bundle tests + единый completion gate\
 **Текущий срез:** `0.1.110-dev` — security/repository hardening: Apache-2.0, signed Core updates и read-only storage preflight\
-**Следующий engineering milestone:** завершить **re-update** после успешного live rollback, затем storage preflight на реальном сервере, DHCP/static reboot persistence и WireGuard reboot persistence\
-**Состояние:** live update/rollback acceptance для `0.1.109-dev` пройден: после отката Core/Web/login/state остались рабочими; обязательный re-update ещё не закрыт. `0.1.110-dev` продолжает code-hardening stable signing и destructive-storage safety без расширения scope ядра.\
+**Следующий engineering milestone:** live acceptance storage preflight на реальном сервере и WireGuard reboot persistence; параллельно завершить operational setup signing key для `0.1.110-dev`\
+**Состояние:** полный live цикл `update → rollback → re-update` для `0.1.109-dev` пройден; сеть после reboot также подтверждена рабочей пользователем. Точный активный режим DHCP/static в этом прогоне не записан. `0.1.110-dev` продолжает code-hardening stable signing и destructive-storage safety без расширения scope ядра.\
 **Обновлено:** 2026-10-01
 
 ### Кандидат 0.1.110-dev — security / repository hardening
@@ -31,7 +31,9 @@
 - ✅ Update hardening получил негативные regression tests: tampered payload, unexpected archive file и path traversal должны fail-closed; valid bundle остаётся положительным control case.
 - ✅ Критерий завершения Core теперь формальный: live rollback/re-update, DHCP/static persistence, WireGuard persistence и stable signing должны быть закрыты до статуса **CORE FOUNDATION COMPLETE**.
 - ✅ Live update → rollback на `0.1.109-dev` подтверждён пользователем 2026-10-01: после отката Core/Web/login/state сохранили работоспособность.
-- 🧪 Re-update после rollback, DHCP/static reboot persistence и WireGuard persistence остаются открыты.
+- ✅ Re-update до `0.1.109-dev` после rollback подтверждён пользователем; нормальная работа сохранена.
+- ✅ Сеть после reboot подтверждена рабочей; конкретный активный режим DHCP/static в этом прогоне не зафиксирован и не выводится предположением.
+- 🧪 WireGuard reboot persistence остаётся отдельной открытой live-проверкой.
 - ✅ PR #92 прошёл полный `core-ci`; release workflow опубликовал `v0.1.109-dev` с Core amd64/arm64 bundles и Windows `.exe` + SHA-256.
 - 🚧 Stable-channel Ed25519 signing/trust root остаётся следующим code-hardening срезом; production/stable выпуск без этого не заявляется.
 
@@ -935,7 +937,7 @@ AI не может расширять собственные права.
 | Риск | Действие |
 |---|---|
 | updater helper раньше был монолитным | ✅ первый extraction refactor выполнен; package-level split можно сделать позже |
-| rollback не проверен живым циклом | acceptance test |
+| rollback не проверен живым циклом | ✅ `0.1.109-dev`: update → rollback → re-update подтверждён на живом сервере |
 | resource scopes заложены, но UI/API управления grants ещё нет | добавить управление ролями/scopes вместе с NAS/Smart Home |
 | durable events не подходят для media/high-rate telemetry | оставить media отдельным data plane |
 | SQLite single-node | не превращать локальную схему в неявный cluster contract |
@@ -984,7 +986,7 @@ AI не может расширять собственные права.
 | `0.1.106-dev` | ✅ Direct host df capacity | `findmnt → df -B1` подтверждён на живом сервере; total/free отображаются |
 | `0.1.107-dev` | 🧪 Windows client light UI | Обзор/Подключение/Синхронизация/Резервные копии/Настройки, Tab navigation, HOME AI icon/tray; live Windows acceptance pending |
 | `0.1.108-dev` | 🧪 Folder usage host du | fallback для **Занято / лимит** через privileged host `du`; live confirmation pending |
-| `0.1.109-dev` | 🧪 Core 1.0 readiness | update → rollback live acceptance пройден; re-update, DHCP/static/WireGuard persistence и remaining readiness gates остаются |
+| `0.1.109-dev` | 🧪 Core 1.0 readiness | полный update → rollback → re-update и active-network reboot acceptance пройдены; WireGuard и remaining readiness gates остаются |
 | `0.1.110-dev` | 🚧 Security/repository hardening | Apache-2.0, Ed25519 Core update verification, storage dry-run/preflight; CI/live acceptance pending |
 
 ## 10. Правило ведения карты
