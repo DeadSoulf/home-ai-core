@@ -26,9 +26,18 @@ type quotaMountInfo struct {
 	Options    string
 }
 
+type userQuotaStat struct {
+	UsedKiB      uint64
+	HardLimitKiB uint64
+}
+
 func quotaToolsAvailable() bool {
-	_, err := exec.LookPath("setquota")
-	return err == nil
+	for _, name := range []string{"setquota", "repquota"} {
+		if _, err := exec.LookPath(name); err != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func inspectSMBHardQuota(
@@ -51,20 +60,24 @@ func inspectSMBHardQuota(
 		if err := quotaMountReady(ctx, info); err != nil {
 			return false, err.Error()
 		}
-		expected, err := quotaHardLimitKiB(info.RootPath, policy.ReservePercent)
+		quota, err := userQuota(ctx, info.RootPath, uid)
 		if err != nil {
 			return false, err.Error()
 		}
-		actual, err := userQuotaHardLimitKiB(ctx, info.RootPath, uid)
+		safeLimit, err := quotaSafeHardLimitKiB(
+			info.RootPath,
+			quota.UsedKiB,
+			policy.ReservePercent,
+		)
 		if err != nil {
 			return false, err.Error()
 		}
-		if actual != expected {
+		if quota.HardLimitKiB == 0 || quota.HardLimitKiB > safeLimit {
 			return false, fmt.Sprintf(
-				"kernel quota on %s is out of sync: hard limit %d KiB, expected %d KiB",
+				"kernel quota on %s is out of sync: hard limit %d KiB, safe maximum %d KiB",
 				info.RootPath,
-				actual,
-				expected,
+				quota.HardLimitKiB,
+				safeLimit,
 			)
 		}
 	}
@@ -102,7 +115,11 @@ func enforceNASUserQuota(ctx context.Context, root string, reservePercent, uid i
 	}
 	var limitKiB uint64
 	if reservePercent > 0 {
-		limitKiB, err = quotaHardLimitKiB(info.RootPath, reservePercent)
+		quota, err := userQuota(ctx, info.RootPath, uid)
+		if err != nil {
+			return err
+		}
+		limitKiB, err = quotaSafeHardLimitKiB(info.RootPath, quota.UsedKiB, reservePercent)
 		if err != nil {
 			return err
 		}
@@ -128,15 +145,15 @@ func enforceNASUserQuota(ctx context.Context, root string, reservePercent, uid i
 		}
 		return fmt.Errorf("apply hard quota on %s: %s", info.RootPath, message)
 	}
-	actual, err := userQuotaHardLimitKiB(ctx, info.RootPath, uid)
+	actual, err := userQuota(ctx, info.RootPath, uid)
 	if err != nil {
 		return err
 	}
-	if actual != limitKiB {
+	if actual.HardLimitKiB != limitKiB {
 		return fmt.Errorf(
 			"verify hard quota on %s: got %d KiB, want %d KiB",
 			info.RootPath,
-			actual,
+			actual.HardLimitKiB,
 			limitKiB,
 		)
 	}
@@ -234,6 +251,9 @@ func quotaMountReady(ctx context.Context, info quotaMountInfo) error {
 		if !enabled {
 			return errors.New("ext4 embedded user quotas are not enabled; controlled migration or reformat is required")
 		}
+		if !hasUserQuotaMountOption(info.Options) {
+			return errors.New("ext4 user quota accounting is not active; remount this Home-AI storage with usrquota")
+		}
 		return nil
 	default:
 		return fmt.Errorf("hard SMB reserve is unsupported on %s; use ext4 or XFS", info.Filesystem)
@@ -255,7 +275,11 @@ func ext4EmbeddedUserQuota(ctx context.Context, source string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("inspect ext4 quota features: %s", strings.TrimSpace(string(output)))
 	}
-	for _, line := range strings.Split(string(output), "\n") {
+	return parseExt4QuotaFeature(string(output))
+}
+
+func parseExt4QuotaFeature(output string) (bool, error) {
+	for _, line := range strings.Split(output, "\n") {
 		key, value, ok := strings.Cut(line, ":")
 		if !ok || strings.TrimSpace(key) != "Filesystem features" {
 			continue
@@ -270,32 +294,57 @@ func ext4EmbeddedUserQuota(ctx context.Context, source string) (bool, error) {
 	return false, errors.New("ext4 filesystem features are unavailable")
 }
 
-func quotaHardLimitKiB(root string, reservePercent int) (uint64, error) {
+func quotaSafeHardLimitKiB(root string, usedKiB uint64, reservePercent int) (uint64, error) {
 	var stat unix.Statfs_t
 	if err := unix.Statfs(root, &stat); err != nil {
 		return 0, fmt.Errorf("inspect filesystem capacity: %w", err)
 	}
 	totalBytes := uint64(stat.Blocks) * uint64(stat.Bsize)
-	return quotaHardLimitKiBForTotal(totalBytes, reservePercent)
+	freeBytes := uint64(stat.Bavail) * uint64(stat.Bsize)
+	return quotaSafeHardLimitKiBForCapacity(totalBytes, freeBytes, usedKiB, reservePercent)
 }
 
-func quotaHardLimitKiBForTotal(totalBytes uint64, reservePercent int) (uint64, error) {
+func quotaSafeHardLimitKiBForCapacity(
+	totalBytes, freeBytes, usedKiB uint64,
+	reservePercent int,
+) (uint64, error) {
 	if reservePercent < 0 || reservePercent > 50 {
 		return 0, errors.New("reserve percent must be between 0 and 50")
 	}
-	usablePercent := uint64(100 - reservePercent)
-	usableBytes := (totalBytes/100)*usablePercent + ((totalBytes%100)*usablePercent)/100
-	limitKiB := usableBytes / 1024
-	if limitKiB == 0 {
-		return 0, errors.New("filesystem is too small for quota enforcement")
+	if reservePercent == 0 {
+		return 0, nil
 	}
-	return limitKiB, nil
+	reserve := percentBytes(totalBytes, reservePercent)
+	var writableBytes uint64
+	if freeBytes > reserve {
+		writableBytes = freeBytes - reserve
+	}
+	writableKiB := writableBytes / 1024
+	if ^uint64(0)-usedKiB < writableKiB {
+		return 0, errors.New("quota hard limit overflows")
+	}
+	limit := usedKiB + writableKiB
+	// A hard limit of zero means "unlimited" to Linux quota tools. When
+	// the configured reserve is already reached on an otherwise empty UID,
+	// keep the limit at the smallest enforceable value instead.
+	if limit == 0 {
+		return 1, nil
+	}
+	return limit, nil
 }
 
-func userQuotaHardLimitKiB(ctx context.Context, root string, uid int) (uint64, error) {
+func percentBytes(total uint64, percent int) uint64 {
+	if total == 0 || percent <= 0 {
+		return 0
+	}
+	value := uint64(percent)
+	return (total/100)*value + ((total%100)*value)/100
+}
+
+func userQuota(ctx context.Context, root string, uid int) (userQuotaStat, error) {
 	repquota, err := exec.LookPath("repquota")
 	if err != nil {
-		return 0, errors.New("repquota is unavailable; install the quota package")
+		return userQuotaStat{}, errors.New("repquota is unavailable; install the quota package")
 	}
 	output, err := exec.CommandContext(
 		ctx,
@@ -306,23 +355,36 @@ func userQuotaHardLimitKiB(ctx context.Context, root string, uid int) (uint64, e
 		root,
 	).CombinedOutput()
 	if err != nil {
-		return 0, fmt.Errorf("inspect user quota on %s: %s", root, strings.TrimSpace(string(output)))
+		return userQuotaStat{}, fmt.Errorf("inspect user quota on %s: %s", root, strings.TrimSpace(string(output)))
 	}
+	stat, found, err := parseUserQuotaCSV(string(output), uid)
+	if err != nil {
+		return userQuotaStat{}, fmt.Errorf("inspect user quota on %s: %w", root, err)
+	}
+	if !found {
+		return userQuotaStat{}, nil
+	}
+	return stat, nil
+}
+
+func parseUserQuotaCSV(output string, uid int) (userQuotaStat, bool, error) {
 	wantID := strconv.Itoa(uid)
-	for _, line := range strings.Split(string(output), "\n") {
+	for _, line := range strings.Split(output, "\n") {
 		fields := strings.Split(line, ",")
 		if len(fields) < 6 || strings.TrimSpace(fields[0]) != wantID {
 			continue
 		}
-		value := strings.TrimSpace(fields[5])
-		if value == "" {
-			return 0, fmt.Errorf("inspect user quota on %s: empty hard limit", root)
-		}
-		hard, err := strconv.ParseUint(value, 10, 64)
+		usedValue := strings.TrimSpace(fields[3])
+		hardValue := strings.TrimSpace(fields[5])
+		used, err := strconv.ParseUint(usedValue, 10, 64)
 		if err != nil {
-			return 0, fmt.Errorf("inspect user quota on %s: invalid hard limit %q", root, value)
+			return userQuotaStat{}, false, fmt.Errorf("invalid used space %q", usedValue)
 		}
-		return hard, nil
+		hard, err := strconv.ParseUint(hardValue, 10, 64)
+		if err != nil {
+			return userQuotaStat{}, false, fmt.Errorf("invalid hard limit %q", hardValue)
+		}
+		return userQuotaStat{UsedKiB: used, HardLimitKiB: hard}, true, nil
 	}
-	return 0, fmt.Errorf("user quota for uid %d is not initialized on %s", uid, root)
+	return userQuotaStat{}, false, nil
 }
