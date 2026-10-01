@@ -195,12 +195,18 @@ When updating from a newer downloaded release, `client install` now handles a ru
 
 The tray status line shows the number of enabled profiles and the latest `OK` / `FAILED` result. The tooltip refreshes after sync cycles. Failed cycles show a Windows notification; successful background cycles stay silent, while manual **Sync now** reports completion.
 
-This handoff installs an executable you already downloaded. Automatic release discovery/download is not part of this slice.
+The installed client can also discover, download, verify and hand off the newest published Windows release automatically:
+
+```powershell
+%LOCALAPPDATA%\HomeAI\bin\home-ai-windows-client.exe client update
+```
+
+`client update` reads the Home-AI GitHub release metadata, requires the exact versioned `.exe` and `.sha256` asset pair, downloads the executable into the per-user Home-AI update cache, verifies SHA-256, and launches only the verified executable for the existing install handoff. If the stable installed client or tray agent still has the old executable open, replacement is retried for a bounded period and the managed agent is restarted afterward when autostart is enabled.
 
 ## Current limitations
 
 - the first native settings UI focuses on connection, sync profiles and agent control; richer transfer history/progress is still deferred;
-- Windows client release discovery/download remains manual; the install handoff itself is automatic;
+- release update is currently an explicit `client update` action; background update checks and unattended installation are deferred;
 - a conventional Windows installer / Start Menu / uninstall entry is still deferred;
 - no bidirectional sync or local-delete propagation;
 - no sync-history/recycle-bin retention policy;

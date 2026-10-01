@@ -57,9 +57,6 @@ func InstallUserClientWithHandoff(source string, timeout time.Duration) (UserCli
 	if err != nil {
 		return UserClientInstallResult{}, err
 	}
-	if !requested {
-		return UserClientInstallResult{}, errors.New("installed Windows client is in use and no Home-AI tray agent was found to close")
-	}
 	if timeout <= 0 {
 		timeout = 15 * time.Second
 	}
@@ -70,7 +67,7 @@ func InstallUserClientWithHandoff(source string, timeout time.Duration) (UserCli
 			return UserClientInstallResult{
 				Path:               destination,
 				Changed:            true,
-				AgentExitRequested: true,
+				AgentExitRequested: requested,
 			}, nil
 		} else {
 			lastErr = err
@@ -79,7 +76,10 @@ func InstallUserClientWithHandoff(source string, timeout time.Duration) (UserCli
 			}
 		}
 		if time.Now().After(deadline) {
-			return UserClientInstallResult{}, fmt.Errorf("replace installed Windows client after agent exit: %w", lastErr)
+			if requested {
+				return UserClientInstallResult{}, fmt.Errorf("replace installed Windows client after agent exit: %w", lastErr)
+			}
+			return UserClientInstallResult{}, fmt.Errorf("replace installed Windows client after update handoff: %w", lastErr)
 		}
 		time.Sleep(100 * time.Millisecond)
 	}

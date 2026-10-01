@@ -10,3 +10,5 @@ Each ADR should include:
 - Consequences
 - Status
 - Date
+
+- [ADR-0032: Automatic Windows client release discovery and verified update handoff](0032-windows-release-update.md)
