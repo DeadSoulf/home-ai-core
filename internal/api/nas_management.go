@@ -64,7 +64,7 @@ func (s *server) fileFolderManagement(w http.ResponseWriter, r *http.Request, ac
 			writeAPIError(w, r, 500, "file_access_unavailable", err.Error(), nil)
 			return
 		}
-		writeJSON(w, 200, map[string]any{"folder": folderView(folder, actor), "access": grants})
+		writeJSON(w, 200, map[string]any{"folder": s.folderView(r.Context(), folder, actor), "access": grants})
 		return
 	}
 	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
@@ -94,7 +94,7 @@ func (s *server) fileFolderManagement(w http.ResponseWriter, r *http.Request, ac
 		writeAPIError(w, r, 503, "file_folder_unavailable", err.Error(), nil)
 		return
 	}
-	usage, err := filedata.UsageOf(root)
+	usage, err := s.folderUsage(r.Context(), folder)
 	if err != nil {
 		writeAPIError(w, r, 503, "file_usage_unavailable", err.Error(), nil)
 		return
@@ -173,7 +173,7 @@ func (s *server) fileUserQuotas(w http.ResponseWriter, r *http.Request, actor se
 			return
 		}
 		id := r.PathValue("userID")
-		usage, err := privateUserUsage(folders, id)
+		usage, err := s.privateUserUsage(r.Context(), folders, id)
 		if err != nil {
 			writeAPIError(w, r, 503, "file_usage_unavailable", err.Error(), nil)
 			return
@@ -203,23 +203,34 @@ func (s *server) fileUserQuotas(w http.ResponseWriter, r *http.Request, actor se
 	}
 	result := []map[string]any{}
 	for _, user := range users {
-		usage, usageErr := privateUserUsage(folders, user.ID)
+		usage, usageErr := s.privateUserUsage(r.Context(), folders, user.ID)
 		result = append(result, map[string]any{"user_id": user.ID, "username": user.Username, "display_name": user.DisplayName, "quota_bytes": quotas[user.ID], "used_bytes": usage.UsedBytes, "reserved_bytes": usage.ReservedBytes, "usage_known": usageErr == nil})
 	}
 	writeJSON(w, 200, map[string]any{"quotas": result})
 }
 
-func privateUserUsage(folders []state.NASFolderRecord, userID string) (filedata.Usage, error) {
+func (s *server) folderUsage(ctx context.Context, folder state.NASFolderRecord) (filedata.Usage, error) {
+	root, err := filedata.FolderRoot(folder.PoolRoot, folder.RelativePath)
+	if err != nil {
+		return filedata.Usage{}, err
+	}
+	if usage, err := filedata.UsageOf(root); err == nil {
+		return usage, nil
+	}
+	usage, err := storage.InspectNASUsage(ctx, folder.PoolRoot, folder.RelativePath)
+	if err != nil {
+		return filedata.Usage{}, err
+	}
+	return filedata.Usage{UsedBytes: usage.UsedBytes, ReservedBytes: usage.ReservedBytes}, nil
+}
+
+func (s *server) privateUserUsage(ctx context.Context, folders []state.NASFolderRecord, userID string) (filedata.Usage, error) {
 	var total filedata.Usage
 	for _, folder := range folders {
 		if folder.Kind != "private" || folder.OwnerUserID != userID {
 			continue
 		}
-		root, err := filedata.FolderRoot(folder.PoolRoot, folder.RelativePath)
-		if err != nil {
-			return total, err
-		}
-		usage, err := filedata.UsageOf(root)
+		usage, err := s.folderUsage(ctx, folder)
 		if err != nil {
 			return total, err
 		}
@@ -232,14 +243,12 @@ func privateUserUsage(folders []state.NASFolderRecord, userID string) (filedata.
 	return total, nil
 }
 
-func folderView(folder state.NASFolderRecord, actor security.Actor) fileFolderResponse {
+func (s *server) folderView(ctx context.Context, folder state.NASFolderRecord, actor security.Actor) fileFolderResponse {
 	response := fileFolderResponse{ID: folder.ID, PoolID: folder.PoolID, PoolName: folder.PoolName, Name: folder.Name, Kind: folder.Kind, OwnerUserID: folder.OwnerUserID, RelativePath: folder.RelativePath, CanRead: true, CanWrite: actor.Has("files.manage") || actor.Allows("files.write", "file_folder", folder.ID), QuotaBytes: folder.QuotaBytes, HardQuotaBytes: folder.HardQuotaBytes}
-	if root, err := filedata.FolderRoot(folder.PoolRoot, folder.RelativePath); err == nil {
-		if usage, err := filedata.UsageOf(root); err == nil {
-			response.UsageKnown = true
-			response.UsedBytes = usage.UsedBytes
-			response.ReservedBytes = usage.ReservedBytes
-		}
+	if usage, err := s.folderUsage(ctx, folder); err == nil {
+		response.UsageKnown = true
+		response.UsedBytes = usage.UsedBytes
+		response.ReservedBytes = usage.ReservedBytes
 	}
 	return response
 }
@@ -280,7 +289,7 @@ func (s *server) fileWriteAllowance(w http.ResponseWriter, r *http.Request, fold
 		writeAPIError(w, r, 503, "file_usage_unavailable", err.Error(), nil)
 		return 0, false
 	}
-	usage, err := filedata.UsageOf(root)
+	usage, err := s.folderUsage(r.Context(), folder)
 	if err != nil {
 		writeAPIError(w, r, 503, "file_usage_unavailable", err.Error(), nil)
 		return 0, false
@@ -298,7 +307,7 @@ func (s *server) fileWriteAllowance(w http.ResponseWriter, r *http.Request, fold
 		allowance = min(allowance, max(int64(0), folder.QuotaBytes-usage.UsedBytes-usage.ReservedBytes+credit))
 	}
 	if userQuota > 0 {
-		total, err := privateUserUsage(folders, folder.OwnerUserID)
+		total, err := s.privateUserUsage(r.Context(), folders, folder.OwnerUserID)
 		if err != nil {
 			writeAPIError(w, r, 503, "file_usage_unavailable", err.Error(), nil)
 			return 0, false
