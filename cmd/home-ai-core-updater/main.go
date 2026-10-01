@@ -202,6 +202,7 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		ctx, cancel := context.WithTimeout(parent, 40*time.Second)
 		defer cancel()
 		available, active, smbError, configuredUsers := inspectSMB(ctx, request.SMBUsers)
+		quotaReady, quotaError := inspectSMBHardQuota(ctx, request.SMBShares, uid)
 		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
 			OK:                 true,
 			Message:            "SMB inspected",
@@ -211,6 +212,8 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 			SMBActive:          active,
 			SMBError:           smbError,
 			SMBConfiguredUsers: configuredUsers,
+			SMBHardQuotaReady:  quotaReady,
+			SMBHardQuotaError:  quotaError,
 		})
 		return
 	}
