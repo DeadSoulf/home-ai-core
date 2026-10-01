@@ -7,10 +7,23 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последний опубликованный релиз:** `0.1.109-dev` — **Core 1.0 readiness**: negative updater bundle tests + единый completion gate\
-**Текущий срез:** `0.1.109-dev` — **Core 1.0 readiness**: негативные тесты update bundle + единый readiness gate без расширения scope ядра\
-**Следующий engineering milestone:** live acceptance **update → rollback → re-update**, DHCP/static reboot persistence и WireGuard reboot persistence; затем stable-channel signing\
-**Состояние:** фундамент Core функционально готов для продуктовых модулей; `0.1.109-dev` формализует критерий **CORE FOUNDATION COMPLETE** и усиливает update failure coverage. Files folder usage `0.1.108-dev`, SMB/квоты и Windows UI остаются отдельной продуктовой acceptance, а не новым scope ядра.\
+**Текущий срез:** `0.1.110-dev` — security/repository hardening: Apache-2.0, signed Core updates и read-only storage preflight\
+**Следующий engineering milestone:** live acceptance **update → rollback → re-update**, storage preflight на реальном сервере, DHCP/static reboot persistence и WireGuard reboot persistence\
+**Состояние:** Core-readiness `0.1.109-dev` сохранён; `0.1.110-dev` закрывает code-hardening для stable signing и усиливает destructive-storage safety без расширения scope ядра.\
 **Обновлено:** 2026-10-01
+
+### Кандидат 0.1.110-dev — security / repository hardening
+
+- ✅ Добавлена лицензия Apache-2.0 для публичного репозитория.
+- ✅ Core updater получил detached Ed25519 verification checksum metadata; stable/RC release без подписи больше не принимается.
+- ✅ Release workflow умеет подписывать Core checksum-файлы через GitHub Actions secret `HOME_AI_UPDATE_SIGNING_KEY`; приватный ключ не хранится в репозитории и на Home-AI node.
+- ✅ Зафиксирован trust root `/etc/home-ai-core/update-trusted.pub` и отдельный operational document по генерации/ротации ключа.
+- ✅ Исправлен stale `helper_protocol: 2` в генераторе update bundle; новый helper contract — protocol v5.
+- ✅ Добавлен read-only storage dry-run/preflight для mount/unmount/partition/format/label paths; destructive preflight отдельно проверяет system disk, mounts, active swap, LVM и доступность filesystem tools.
+- ✅ Web перед format/create/delete/delete-all сначала выполняет dry-run и только после успешного preflight запускает подтверждённую операцию.
+- ✅ Старые PR #34, #55 и #67 проверены против актуального `main` и закрыты как superseded; PR #91 уже слит.
+- 🧪 Требуется полный CI и live acceptance storage preflight на реальном сервере.
+- 🔐 Для фактической подписи релизов нужно один раз создать dedicated Ed25519 key pair, загрузить private PEM в GitHub Actions secret и установить public key на узлы. Stable/RC без этого fail-closed.
 
 ### Выпуск 0.1.109-dev — Core 1.0 readiness
 
@@ -971,6 +984,7 @@ AI не может расширять собственные права.
 | `0.1.107-dev` | 🧪 Windows client light UI | Обзор/Подключение/Синхронизация/Резервные копии/Настройки, Tab navigation, HOME AI icon/tray; live Windows acceptance pending |
 | `0.1.108-dev` | 🧪 Folder usage host du | fallback для **Занято / лимит** через privileged host `du`; live confirmation pending |
 | `0.1.109-dev` | 🧪 Core 1.0 readiness | negative updater bundle tests + единый completion gate опубликованы; live rollback/network/WireGuard acceptance и stable signing остаются |
+| `0.1.110-dev` | 🚧 Security/repository hardening | Apache-2.0, Ed25519 Core update verification, storage dry-run/preflight; CI/live acceptance pending |
 
 ## 10. Правило ведения карты
 
