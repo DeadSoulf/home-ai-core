@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { RealtimeStatus } from "../api/client";
 import type { Actor } from "../api/types";
+import { COPYRIGHT_NOTICE } from "../branding";
 import { LanguageSwitch, useI18n } from "../i18n";
 import { hasPermission, visibleNavigation } from "../navigation";
 
@@ -110,6 +111,7 @@ export function Shell(props: {
             <LanguageSwitch />
             <button type="button" className="button secondary" onClick={props.onLogout}>{t("signOut")}</button>
           </div>
+          <div className="product-copyright">{COPYRIGHT_NOTICE}</div>
         </div>
       </aside>
       <main className="main-content" inert={menuOpen}>
