@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { api, APIError } from "../api/client";
 import type { Actor } from "../api/types";
+import { COPYRIGHT_NOTICE } from "../branding";
 import { LanguageSwitch, useI18n } from "../i18n";
 
 
@@ -136,6 +137,7 @@ function AuthLayout(props: {title: string; subtitle: string; children: ReactNode
           <h1>{props.title}</h1>
           <p className="muted">{props.subtitle}</p>
           {props.children}
+          <div className="auth-copyright">{COPYRIGHT_NOTICE}</div>
         </section>
       </div>
     </main>
