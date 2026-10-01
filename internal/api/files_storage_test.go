@@ -142,7 +142,6 @@ func TestFilePoolCapacityFallbackRequiresKnownFreeSpace(t *testing.T) {
 	}
 }
 
-
 func TestFolderUsageFallsBackToPrivilegedHelper(t *testing.T) {
 	previous := inspectNASFolderUsage
 	inspectNASFolderUsage = func(_ context.Context, root, relative string) (storage.NASUsage, error) {
