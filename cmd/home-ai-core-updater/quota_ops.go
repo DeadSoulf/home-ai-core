@@ -50,19 +50,32 @@ func inspectSMBHardQuota(
 		return false, err.Error()
 	}
 	for _, policy := range policies {
-		if policy.ReservePercent == 0 {
-			continue
-		}
 		info, err := inspectQuotaMount(ctx, policy.RootPath)
 		if err != nil {
+			if policy.ReservePercent == 0 {
+				continue
+			}
 			return false, err.Error()
 		}
 		if err := quotaMountReady(ctx, info); err != nil {
+			if policy.ReservePercent == 0 {
+				continue
+			}
 			return false, err.Error()
 		}
 		quota, err := userQuota(ctx, info.RootPath, uid)
 		if err != nil {
 			return false, err.Error()
+		}
+		if policy.ReservePercent == 0 {
+			if quota.HardLimitKiB != 0 {
+				return false, fmt.Sprintf(
+					"kernel quota on %s is still limited to %d KiB while the pool reserve is disabled",
+					info.RootPath,
+					quota.HardLimitKiB,
+				)
+			}
+			continue
 		}
 		safeLimit, err := quotaSafeHardLimitKiB(
 			info.RootPath,
