@@ -41,7 +41,6 @@ func TestMountInfoDeviceForPathDecodesEscapes(t *testing.T) {
 	}
 }
 
-
 func TestFilePoolCapacityFallsBackToBackingStorageInventory(t *testing.T) {
 	record := state.NASPoolRecord{
 		StorageDevicePath:     "/dev/sdb1",
