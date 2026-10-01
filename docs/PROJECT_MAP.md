@@ -7,7 +7,7 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.83-dev` — единые пользователи и настраиваемые права доступа\
 **Текущий срез:** `0.1.83-dev` — published; live unified-users acceptance pending\
-**Следующий engineering milestone:** live acceptance unified users, затем возврат к storage-purpose slice и automatic Windows release discovery/download + SHA-256 verified install handoff\
+**Следующий engineering milestone:** live acceptance unified users и storage-purpose slice; automatic Windows release discovery/download + SHA-256 verified install handoff реализуется следующим F2-срезом\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
 
@@ -497,7 +497,7 @@ Check
 9. ✅ ADR-0026 + native Windows tests + полный core-ci;
 10. 🧪 реальная Windows acceptance установки, tray и обновления установленного binary остаётся незавершённой.
 
-Основной следующий engineering milestone: automatic Windows release discovery/download + SHA-256 verified install handoff. Self-update handoff и tray health/notifications входят в `0.1.80-dev`; live Windows/NAS acceptance, logout/reboot autostart acceptance, SMB и rollback остаются отдельными практическими проверками перед отметкой F2 как завершённого.
+Текущий Windows engineering slice: automatic release discovery/download + SHA-256 verified install handoff через `client update`. Self-update handoff и tray health/notifications уже входят в `0.1.80-dev`; live Windows/NAS acceptance, logout/reboot autostart acceptance, SMB и rollback остаются отдельными практическими проверками перед отметкой F2 как завершённого.
 
 ## 4. Следующие продуктовые этапы
 
