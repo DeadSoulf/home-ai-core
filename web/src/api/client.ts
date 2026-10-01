@@ -488,7 +488,7 @@ export const api = {
     postJSON<{name: string}>("/api/v1/storage/name", {device, name}, true),
 
   storageOperation: async (input: {
-    operation: "mount" | "unmount" | "format" | "partition.create" | "partition.delete" | "partition.delete_all" | "label.rename";
+    operation: "mount" | "unmount" | "format" | "partition.create" | "partition.delete" | "partition.delete_all" | "label.rename" | "preflight";
     device: string;
     mountpoint?: string;
     filesystem?: "ext4" | "xfs" | "vfat";
