@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
@@ -481,19 +482,8 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 				return "", fmt.Errorf("mount device: %s", message)
 			}
 		}
-		targets, err = mountedTargets(ctx, device)
-		if err != nil {
-			return "", fmt.Errorf("verify mount: %w", err)
-		}
-		mounted := false
-		for _, mountedTarget := range targets {
-			if mountedTarget == target {
-				mounted = true
-				break
-			}
-		}
-		if !mounted {
-			return "", errors.New("mount completed but verification did not find the requested mount")
+		if err := waitForMountedTarget(ctx, device, target); err != nil {
+			return "", err
 		}
 		if quotaOptions != "" && !mountedWithQuota {
 			return "device mounted without quota mount options", nil
@@ -736,6 +726,32 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 	default:
 		return "", errors.New("unsupported storage operation")
 	}
+}
+
+func waitForMountedTarget(ctx context.Context, device, target string) error {
+	const attempts = 6
+	for attempt := 0; attempt < attempts; attempt++ {
+		targets, err := mountedTargets(ctx, device)
+		if err != nil {
+			return fmt.Errorf("verify mount: %w", err)
+		}
+		if mountTargetPresent(targets, target) {
+			return nil
+		}
+		if attempt == attempts-1 {
+			break
+		}
+		timer := time.NewTimer(150 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return fmt.Errorf("verify mount: %w", ctx.Err())
+		case <-timer.C:
+		}
+	}
+	return errors.New("mount completed but verification did not find the requested mount point")
 }
 
 func mountTargetPresent(targets []string, target string) bool {
