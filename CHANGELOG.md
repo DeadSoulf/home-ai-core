@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.106-dev
+
+- Replace indirect Files capacity discovery with host-level `df -B1` for mounted filesystems.
+- The privileged helper resolves the real mountpoint with host `findmnt`, then returns exact total and available bytes from the mounted filesystem.
+- Extend filesystem inspection with `total_bytes`, `total_known` and the resolved mountpoint.
+- Keep `lsblk SIZE/FSAVAIL` and offline filesystem inspection only as fallback paths.
+- Invalidate the 30-second storage inspection cache immediately after successful mount, unmount, format or other storage mutations.
+- Prefer helper-reported mounted filesystem totals/free space when calculating Files pool capacity and reserve thresholds.
+
 ## 0.1.105-dev
 
 - Fix Files storage capacity inspection after host-namespace mounting.
