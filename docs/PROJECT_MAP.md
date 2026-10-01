@@ -8,10 +8,22 @@
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.113-dev` — Windows dashboard polish после live acceptance: RU localization, rounded controls, fixed status indicator и startup connection refresh\
-**Текущий срез:** `0.1.113-dev` опубликован; ожидается повторная live Windows acceptance исправленного dashboard/tray\
-**Следующий engineering milestone:** завершить live storage preflight и повторную Windows UI/tray acceptance `0.1.113-dev`; после этого основной продуктовый маршрут переходит к **F3 Native Smart Home**. Stable signing-key provisioning и long-duration updater tests остаются release/operations gates\
-**Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01: update/rollback/re-update, network reboot persistence и WireGuard reboot persistence подтверждены live; stable/RC Ed25519 verification/trust-root contract реализован. Debian initial installer acceptance также подтверждён пользователем. `0.1.113-dev` остаётся текущим Windows polish release; его повторная live UI-проверка ещё в процессе.\
+**Текущий срез:** `0.1.114-dev` — отдельная read-only **Проверка безопасности / Storage Preflight** для физического диска; Windows UI acceptance `0.1.113-dev` продолжается параллельно\
+**Следующий engineering milestone:** опубликовать `0.1.114-dev` и пройти live storage preflight через новую безопасную кнопку; Windows UI/tray `0.1.113-dev` остаётся в процессе. После этих acceptance основной продуктовый маршрут переходит к **F3 Native Smart Home**. Stable signing-key provisioning и long-duration updater tests остаются release/operations gates\
+**Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. `0.1.114-dev` добавляет post-foundation release-hardening UX: standalone storage preflight, который server-side принудительно выполняется только как `dry_run` и не имеет destructive execution path. Debian installer/WireGuard acceptance закрыты; Windows polish acceptance остаётся в процессе.\
 **Обновлено:** 2026-10-01
+
+### Кандидат 0.1.114-dev — standalone Storage Preflight
+
+- ✅ В карточку физического диска добавлена отдельная кнопка **Проверить безопасность / Safety check**.
+- ✅ Web вызывает новую API operation `preflight`; пользователь не вводит destructive confirmation и не запускает format/delete.
+- ✅ Сервер **принудительно** преобразует `preflight` в существующий destructive planner с `dry_run=true`, даже если клиент не передал dry-run.
+- ✅ У standalone preflight нет пути к реальному форматированию или удалению разделов.
+- ✅ Повторно используются существующие защиты: system disk, Home-AI file-pool usage, mounts, active swap и cross-disk LVM.
+- ✅ Успешная проверка возвращает read-only план; ошибки безопасности показываются через существующие RU/EN friendly messages.
+- ✅ Audit получает отдельное событие `storage.preflight.plan`.
+- ✅ Добавлен regression test, доказывающий, что API preflight всегда принудительно остаётся dry-run.
+- 🧪 После публикации требуется live acceptance на реальном сервере: безопасный диск должен вернуть план без изменений; системный/защищённый диск должен быть заблокирован без изменений.
 
 ### ✅ CORE FOUNDATION COMPLETE — 2026-10-01
 
@@ -22,7 +34,7 @@
 - ✅ Stable/RC Core update verification fail-closed через detached Ed25519; trust-root contract реализован и протестирован.
 - ✅ Initial Debian installer acceptance подтверждён пользователем.
 - 🔐 Реальный production signing key + установка pinned public trust root остаются **stable-release operational gate**, а не незавершённой функцией Core.
-- 🧪 Live storage dry-run/preflight и long-duration updater interruption/recovery tests остаются release-hardening checks.
+- 🧪 Live storage dry-run/preflight и long-duration updater interruption/recovery tests остаются release-hardening checks; `0.1.114-dev` добавляет отдельную безопасную Web-кнопку для live preflight без запуска destructive action.
 - 🧪 Windows visual/DPI/tray acceptance относится к Windows client product work и не переоткрывает Core Foundation.
 
 ### Выпуск 0.1.113-dev — Windows dashboard polish после live acceptance
@@ -1059,6 +1071,7 @@ AI не может расширять собственные права.
 | `0.1.111-dev` | 🧪 Windows visual UI + Debian installer | dashboard/tray опубликованы; Debian initial installer live acceptance подтверждён; повторная Windows UI acceptance продолжается |
 | `0.1.112-dev` | ✅ TexNik copyright attribution | опубликовано: NOTICE/LICENSE/README/Web/Windows/Debian attribution; runtime behavior unchanged; полный CI/release зелёный |
 | `0.1.113-dev` | 🧪 Windows UI polish | опубликовано: RU localization, owner-draw buttons, fixed status check, compact cards, silent startup connection refresh; automated CI/release зелёные, repeat live acceptance pending |
+| `0.1.114-dev` | 🚧 Standalone storage preflight | отдельная Safety check кнопка + forced server-side dry-run + audit/test; CI/release и live acceptance pending |
 
 ## 10. Правило ведения карты
 
