@@ -29,7 +29,7 @@ type inspectLsblkNode struct {
 }
 
 func inspectFilesystemStats(ctx context.Context) ([]updaterhelper.FilesystemStat, error) {
-	output, err := exec.CommandContext(
+	output, err := hostMountCommand(
 		ctx,
 		"/usr/bin/lsblk",
 		"--json",
