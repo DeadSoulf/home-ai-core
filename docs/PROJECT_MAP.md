@@ -6,13 +6,13 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
-**Последний опубликованный релиз:** `0.1.111-dev` — утверждённый HOME AI Windows dashboard + versioned initial Debian installers amd64/arm64\
-**Текущий срез:** `0.1.112-dev` — единый copyright/author attribution **TexNik** для репозитория, Web UI, Windows-клиента и Debian packages\
+**Последний опубликованный релиз:** `0.1.112-dev` — единый copyright/author attribution **TexNik** для репозитория, Web UI, Windows-клиента и Debian packages\
+**Текущий срез:** `0.1.112-dev` опубликован; attribution **TexNik** присутствует в NOTICE/LICENSE/README, Web UI, Windows-клиенте и Debian packages\
 **Следующий engineering milestone:** live acceptance Windows UI/tray `0.1.111-dev` и первоначальной установки опубликованного Debian `.deb`; Core-задачи storage preflight, WireGuard reboot persistence и signing-key provisioning остаются параллельными открытыми acceptance/gates\
-**Состояние:** `0.1.111-dev` остаётся последним опубликованным functional release. `0.1.112-dev` не меняет runtime behavior: добавляет `TexNik` attribution в NOTICE/LICENSE/README/package metadata, Web UI, Windows UI и Debian copyright metadata. Live Windows/Debian acceptance `0.1.111-dev` остаётся открытой.\
+**Состояние:** `0.1.112-dev` прошёл полный CI и release workflow; опубликованы Core bundles, Windows `.exe` и Debian `.deb` amd64/arm64 с SHA-256. Runtime behavior не менялся. Live Windows/Debian acceptance функционала `0.1.111-dev` остаётся открытой.\
 **Обновлено:** 2026-10-01
 
-### Кандидат 0.1.112-dev — copyright / author attribution TexNik
+### Выпуск 0.1.112-dev — copyright / author attribution TexNik
 
 - ✅ Добавлен корневой `NOTICE` с `Copyright 2026 TexNik`.
 - ✅ Apache-2.0 copyright notice в `LICENSE` приведён к `TexNik`; условия лицензии не меняются.
@@ -20,7 +20,7 @@
 - ✅ Web UI показывает `© 2026 TexNik` после входа и на экранах login/first-run.
 - ✅ Native Windows client показывает тот же copyright в постоянной боковой панели.
 - ✅ Debian initial installer содержит `/usr/share/doc/home-ai-core/copyright` с attribution `TexNik`.
-- 🧪 Требуется полный CI и публикация versioned artifacts `0.1.112-dev`.
+- ✅ PR #100 прошёл полный `core-ci`; release workflow опубликовал `v0.1.112-dev` с Core amd64/arm64, Windows `.exe` и Debian `.deb` amd64/arm64 + SHA-256.
 
 ### Выпуск 0.1.111-dev — Windows visual UI + initial Debian installer
 
@@ -1014,7 +1014,7 @@ AI не может расширять собственные права.
 | `0.1.109-dev` | 🧪 Core 1.0 readiness | полный update → rollback → re-update и active-network reboot acceptance пройдены; WireGuard и remaining readiness gates остаются |
 | `0.1.110-dev` | 🧪 Security/repository hardening | опубликовано: Apache-2.0, Ed25519 Core update verification, storage dry-run/preflight; live acceptance и signing-key provisioning pending |
 | `0.1.111-dev` | 🧪 Windows visual UI + Debian installer | опубликовано: dashboard/tray UI, Windows `.exe`, initial `.deb` amd64/arm64 + SHA-256; automated CI зелёный, live Windows/Debian acceptance pending |
-| `0.1.112-dev` | 🚧 TexNik copyright attribution | NOTICE/LICENSE/README/Web/Windows/Debian attribution; runtime behavior unchanged; CI/release pending |
+| `0.1.112-dev` | ✅ TexNik copyright attribution | опубликовано: NOTICE/LICENSE/README/Web/Windows/Debian attribution; runtime behavior unchanged; полный CI/release зелёный |
 
 ## 10. Правило ведения карты
 
