@@ -78,7 +78,6 @@ func TestHostFilesystemInspectionTargetsPID1MountNamespace(t *testing.T) {
 	}
 }
 
-
 func TestParseDFCapacityOutput(t *testing.T) {
 	output := []byte("  1B-blocks       Avail\n999653638144 753428987904\n")
 	total, free, ok := parseDFCapacityOutput(output)
