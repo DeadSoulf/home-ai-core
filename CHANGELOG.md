@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.96-dev
+
+- Fix mojibake characters in the Files UI where UTF-8 em dashes and middle dots were rendered as `вЂ—` / `В·`.
+- Restore readable placeholders and separators across folders, Windows access and storage tables.
+
 ## 0.1.95-dev
 
 - Fix a blank Files → Storage page when an assigned storage device has no active mountpoints.

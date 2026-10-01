@@ -497,7 +497,7 @@ export function FilesPage({
                   <td>{folder.pool_name}</td>
                   <td>
                     {folder.kind === "private"
-                      ? (userName.get(folder.owner_user_id || "") || folder.owner_user_id || "вЂ”")
+                      ? (userName.get(folder.owner_user_id || "") || folder.owner_user_id || "—")
                       : t("fileAllMembers")}
                   </td>
                   <td>{folder.can_write ? t("fileReadWrite") : t("fileReadOnly")}</td>
@@ -598,7 +598,7 @@ export function FilesPage({
                       ? 100
                       : Math.floor((uploadProgress.received / uploadProgress.total) * 100)),
                   )}
-                {uploadProgress.resumed ? ` В· ${t("fileUploadResumed")}` : ""}
+                {uploadProgress.resumed ? ` · ${t("fileUploadResumed")}` : ""}
               </span>
             </div>
           )}
@@ -635,7 +635,7 @@ export function FilesPage({
                         )}
                       </td>
                       <td>{entry.kind === "directory" ? t("fileDirectory") : entry.kind === "file" ? t("fileRegularFile") : t("fileSymlink")}</td>
-                      <td>{entry.kind === "file" ? formatFileSize(entry.size_bytes || 0) : "вЂ”"}</td>
+                      <td>{entry.kind === "file" ? formatFileSize(entry.size_bytes || 0) : "—"}</td>
                       <td>{new Date(entry.modified_at).toLocaleString()}</td>
                       <td>
                         <div className="network-actions">
@@ -707,7 +707,7 @@ export function FilesPage({
                           <td>{entry.name}</td>
                           <td className="mono">{entry.original_path}</td>
                           <td>{entry.kind === "directory" ? t("fileDirectory") : t("fileRegularFile")}</td>
-                          <td>{entry.kind === "file" ? formatFileSize(entry.size_bytes || 0) : "вЂ”"}</td>
+                          <td>{entry.kind === "file" ? formatFileSize(entry.size_bytes || 0) : "—"}</td>
                           <td>{date(entry.deleted_at)}</td>
                           <td>
                             {selectedFolder.can_write && (
@@ -754,7 +754,7 @@ export function FilesPage({
               <dt>{t("state")}</dt>
               <dd>{smbStatus.available ? (smbStatus.active ? t("smbActive") : t("smbInactive")) : t("smbNotInstalled")}</dd>
               <dt>{t("hostname")}</dt>
-              <dd className="mono">{smbStatus.hostname || "вЂ”"}</dd>
+              <dd className="mono">{smbStatus.hostname || "—"}</dd>
               <dt>{t("smbWorkgroup")}</dt>
               <dd>{smbStatus.workgroup || "WORKGROUP"}</dd>
               <dt>{t("smbHardQuota")}</dt>
@@ -872,7 +872,7 @@ export function FilesPage({
                     <option value="">{t("fileChooseUser")}</option>
                     {smbStatus.users.map((user) => (
                       <option key={user.user_id} value={user.user_id}>
-                        {user.display_name || user.username} В· {user.smb_username}
+                        {user.display_name || user.username} · {user.smb_username}
                       </option>
                     ))}
                   </select>
@@ -937,7 +937,7 @@ export function FilesPage({
                       <td>
                         {pool.capacity_known
                           ? `${formatFileSize(pool.free_bytes || 0)} / ${formatFileSize(pool.size_bytes || 0)}`
-                          : "вЂ”"}
+                          : "—"}
                       </td>
                       <td>
                         <span className={stateClass}>{stateLabel}</span>
@@ -1026,10 +1026,10 @@ export function FilesPage({
                   return (
                     <tr key={storage.filesystem_uuid || storage.device}>
                       <td className="mono">{storage.device}</td>
-                      <td>{storage.label || "вЂ”"}</td>
-                      <td>{storage.filesystem || "вЂ”"}</td>
-                      <td className="mono">{mountpoints.join(", ") || "вЂ”"}</td>
-                      <td>{storage.free_known ? formatFileSize(storage.free_bytes || 0) : "вЂ”"}</td>
+                      <td>{storage.label || "—"}</td>
+                      <td>{storage.filesystem || "—"}</td>
+                      <td className="mono">{mountpoints.join(", ") || "—"}</td>
+                      <td>{storage.free_known ? formatFileSize(storage.free_bytes || 0) : "—"}</td>
                       <td>
                         {!storage.present
                           ? t("fileStorageMissing")
@@ -1079,7 +1079,7 @@ export function FilesPage({
                   <option value="">{t("fileChooseMountedStorage")}</option>
                   {mountOptions.map((mount) => (
                     <option key={mount.path} value={mount.path}>
-                      {mount.path} В· {mount.filesystem || "filesystem"} В· {mount.device || "вЂ”"}
+                      {mount.path} · {mount.filesystem || "filesystem"} · {mount.device || "—"}
                     </option>
                   ))}
                 </select>
