@@ -6,8 +6,8 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.85-dev` — защита дисков и устойчивая привязка NAS pool к filesystem\
-**Текущий срез:** `0.1.85-dev` — published; live disk/pool binding acceptance pending\
-**Следующий engineering milestone:** live acceptance disk purpose/pool binding; затем F2 quotas/policies, reserve free space и capacity warnings\
+**Текущий срез:** post-`0.1.85-dev` — NAS free-space reserve and capacity warnings in development\
+**Следующий engineering milestone:** finish pool capacity policy; затем hard SMB/filesystem enforcement и per-folder/per-user quotas\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-10-01
 
@@ -67,6 +67,11 @@
 - 🚧 ADR-0030 фиксирует physical-purpose boundary и отделяет назначение ёмкости от логических NAS folders.
 - 🚧 Занятый NAS pool физический storage получает usage-lock: нельзя снять/сменить purpose, размонтировать, форматировать или удалить backing partition/disk; Web показывает причину блокировки.
 - 🚧 Новые NAS pools сохраняют backing device path + filesystem UUID; создание pool разрешено только на точном mounted storage с purpose=`files`, а usage-lock продолжает работать после размонтирования/смены `/dev/...` имени.
+- 🚧 Миграция `016_nas_pool_capacity_policy.sql`: каждый NAS pool получает hard reserve 5% и warning 10% по умолчанию; администратор может менять пороги в **Файлы**.
+- 🚧 Ёмкость pool читается через live Linux `statfs`; Web показывает free/total и состояния OK / warning / reserve reached.
+- 🚧 Direct и resumable uploads через Core/Windows client проверяют reserve на сервере; при нарушении возвращается HTTP 507 `file_pool_reserve_reached`.
+- 🚧 SMB пока пишет напрямую в filesystem и не покрыт hard reserve; следующий слой — filesystem/Samba quota enforcement.
+- 🚧 ADR-0033 фиксирует capacity-policy boundary; per-folder/per-user quotas остаются следующим уровнем.
 ### Выпуск 0.1.82-dev — русский и английский Windows-клиент
 
 - Один Windows `.exe` поддерживает русский и английский интерфейс без отдельной сборки.
