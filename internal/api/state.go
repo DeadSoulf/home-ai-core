@@ -18,7 +18,9 @@ type State interface {
 	ListStoragePurposes(ctx context.Context) ([]state.StoragePurposeRecord, error)
 
 	CreateNASPool(ctx context.Context, name, rootPath, storageDevicePath, storageFilesystemUUID, createdBy string, now time.Time) (state.NASPoolRecord, error)
+	NASPool(ctx context.Context, poolID string) (state.NASPoolRecord, error)
 	ListNASPools(ctx context.Context) ([]state.NASPoolRecord, error)
+	UpdateNASPoolCapacityPolicy(ctx context.Context, poolID string, reservePercent, warningPercent int, now time.Time) (state.NASPoolRecord, error)
 	CreateNASFolder(
 		ctx context.Context,
 		poolID, name, kind, ownerUserID, createdBy string,
