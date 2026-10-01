@@ -5,8 +5,8 @@
 > Аудит уже сделанного: [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
-**Последний опубликованный релиз:** `0.1.86-dev` — NAS free-space reserve и capacity warnings\
-**Текущий срез:** `0.1.87-dev` — release candidate; kernel-enforced SMB reserve\
+**Последний опубликованный релиз:** `0.1.87-dev` — kernel-enforced SMB free-space reserve\
+**Текущий срез:** `0.1.87-dev` — published; live SMB/quota acceptance pending\
 **Следующий engineering milestone:** live SMB/quota acceptance; затем controlled legacy quota migration и per-folder/per-user quotas\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-10-01
@@ -23,7 +23,7 @@
 - Samba installation устанавливает также пакет `quota`.
 - Новые ext4 создаются с embedded user quota и `-m 0`, ext4 mounts получают `usrquota`, XFS — `uquota`.
 - Legacy ext4/XFS автоматически не переформатируются и не live-remount: для них нужен controlled maintenance path.
-- ADR-0034 и PR #65 прошли полный CI.
+- ADR-0034 и PR #65 прошли полный CI; release workflow опубликовал `v0.1.87-dev` с amd64/arm64 Core bundles и Windows `.exe` + SHA-256.
 - Практическая проверка SMB quota на установленном сервере остаётся acceptance step.
 
 ### Выпуск 0.1.86-dev — резерв свободного места NAS
