@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.94-dev
+
+- Make update-bundle downloads resilient to transient GitHub/CDN failures such as HTTP 502, 503 and 504, plus HTTP 408 and 429.
+- Retry transient bundle-download failures with bounded backoff instead of failing the update after the first gateway error.
+- Use a dedicated two-minute HTTP timeout for release bundles while retaining the existing shorter timeout for update metadata.
+- Preserve strict bundle size and SHA-256 verification after retries.
+- Add updater regression tests covering successful recovery from repeated HTTP 504 responses and no retry for permanent HTTP errors.
+
 ## 0.1.93-dev
 
 - Replace Files hash-only navigation with stable direct routes: `/files/storage` and `/files/windows`.
