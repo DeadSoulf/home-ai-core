@@ -881,6 +881,43 @@ func TestStorageUsageMatchesPoolBelowMountAndDescendants(t *testing.T) {
 	}
 }
 
+func TestStorageUsageMatchesPersistedUUIDWhenUnmounted(t *testing.T) {
+	node := systeminfo.BlockNode{
+		Path: "/dev/sdb1",
+		Type: "part",
+		UUID: "uuid-files",
+	}
+	pools := []state.NASPoolRecord{{
+		ID:                    "nsp-main",
+		Name:                  "Main",
+		RootPath:              "/mnt/home-ai-core/files",
+		StorageDevicePath:     "/dev/sdb1",
+		StorageFilesystemUUID: "uuid-files",
+	}}
+	usage := storageUsageForNode(node, pools)
+	if len(usage) != 1 || usage[0].ID != "nsp-main" {
+		t.Fatalf("usage = %#v", usage)
+	}
+}
+
+func TestStorageUsageUUIDTakesPrecedenceOverDevicePath(t *testing.T) {
+	node := systeminfo.BlockNode{
+		Path: "/dev/sdb1",
+		Type: "part",
+		UUID: "uuid-new",
+	}
+	pools := []state.NASPoolRecord{{
+		ID:                    "nsp-old",
+		Name:                  "Old",
+		RootPath:              "/mnt/home-ai-core/files",
+		StorageDevicePath:     "/dev/sdb1",
+		StorageFilesystemUUID: "uuid-old",
+	}}
+	if usage := storageUsageForNode(node, pools); len(usage) != 0 {
+		t.Fatalf("stale pool identity matched reformatted storage: %#v", usage)
+	}
+}
+
 func TestStorageUsageDoesNotMatchSiblingPrefix(t *testing.T) {
 	usage := storageUsageForMountpoints(
 		[]string{"/mnt/home-ai-core/data"},
