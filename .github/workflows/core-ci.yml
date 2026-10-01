@@ -130,8 +130,10 @@ jobs:
 
           curl --fail --silent http://127.0.0.1:18080/ >/tmp/home-ai-index.html
           curl --fail --silent http://127.0.0.1:18080/system >/tmp/home-ai-system-page.html
+          curl --fail --silent http://127.0.0.1:18080/files/storage >/tmp/home-ai-files-storage-page.html
           grep -q "Home-AI-Core" /tmp/home-ai-index.html
           grep -q "Home-AI-Core" /tmp/home-ai-system-page.html
+          grep -q "Home-AI-Core" /tmp/home-ai-files-storage-page.html
 
           curl --fail --silent             http://127.0.0.1:18080/api/v1/security/setup-status             >/tmp/home-ai-setup.json
 
