@@ -26,6 +26,12 @@ const (
 )
 
 const (
+	settingsCompactWindowWidth  = 976
+	settingsCompactWindowHeight = 635
+	settingsSidebarWidth        = 196
+)
+
+const (
 	settingsIDNavOverview   = 2101
 	settingsIDNavConnection = 2102
 	settingsIDNavSync       = 2103
@@ -105,146 +111,153 @@ func (state *windowsSettingsUI) createLightControls(module windows.Handle) error
 		return hwnd
 	}
 
-	// Persistent HOME AI brand and cloud-drive-style left navigation.
+	// Compact HOME AI sidebar from the approved Figma layout.
 	if state.windowIcon != 0 {
-		iconView := state.createControl(module, "STATIC", "", settingsWSChild|settingsWSVisible|settingsSSIcon, 22, 20, 40, 40, 0, windows.Handle(font))
+		iconView := state.createControl(module, "STATIC", "", settingsWSChild|settingsWSVisible|settingsSSIcon, 25, 25, 48, 48, 0, windows.Handle(font))
 		if iconView != 0 {
 			state.setVisualRole(iconView, settingsVisualSidebar)
 			procSettingsSendMessage.Call(uintptr(iconView), settingsSTMSetIcon, uintptr(state.windowIcon), 0)
 		}
 	}
-	brand := static("brand_name", "brand_name", 72, 27, 110, 28, -1, settingsVisualSidebar)
+	brand := static("brand_name", "brand_name", 90, 29, 92, 28, -1, settingsVisualSidebar)
 	state.setControlFont(brand, state.visual.titleFont)
-	staticText("", "© 2026 TexNik", 18, 692, 170, 22, -1, settingsVisualSidebar)
+	staticText("brand_desktop", "Desktop", 91, 58, 88, 18, -1, settingsVisualSidebarMuted)
+	staticText("", "© 2026 TexNik", 18, 560, 150, 20, -1, settingsVisualSidebarMuted)
 
 	nav := func(page int, id uint16, key string, y int32, first bool) {
 		style := uint32(settingsWSChild | settingsWSVisible | settingsWSTabStop | settingsBSOwnerDraw)
 		if first {
 			style |= settingsWSGroup
 		}
-		hwnd := state.createControl(module, "BUTTON", state.tr(key), style, 18, y, 170, 38, id, windows.Handle(font))
+		hwnd := state.createControl(module, "BUTTON", state.tr(key), style, 16, y, 164, 36, id, windows.Handle(font))
 		state.navButtons[page] = hwnd
 		state.buttonRoles[hwnd] = settingsButtonNavigation
 		state.localized[fmt.Sprintf("nav_%d", page)] = hwnd
 	}
-	nav(settingsPageOverview, settingsIDNavOverview, "nav_overview", 92, true)
-	nav(settingsPageConnection, settingsIDNavConnection, "nav_connection", 136, false)
-	nav(settingsPageSync, settingsIDNavSync, "nav_sync", 180, false)
-	nav(settingsPageBackup, settingsIDNavBackup, "nav_backup", 224, false)
-	nav(settingsPageGeneral, settingsIDNavGeneral, "nav_settings", 268, false)
+	nav(settingsPageOverview, settingsIDNavOverview, "nav_overview", 112, true)
+	nav(settingsPageConnection, settingsIDNavConnection, "nav_connection", 156, false)
+	nav(settingsPageSync, settingsIDNavSync, "nav_sync", 200, false)
+	nav(settingsPageBackup, settingsIDNavBackup, "nav_backup", 244, false)
+	nav(settingsPageGeneral, settingsIDNavGeneral, "nav_settings", 288, false)
 
-	// Overview — visually mirrors the approved HOME AI dashboard mockup.
-	title := static("overview_title", "nav_overview", 225, 24, 360, 30, settingsPageOverview, settingsVisualMain)
+	// Overview — exact compact geometry from Figma node 2:2.
+	title := static("overview_title", "nav_overview", 224, 24, 360, 28, settingsPageOverview, settingsVisualMain)
 	state.setControlFont(title, state.visual.titleFont)
+	static("overview_main_subtitle", "overview_main_subtitle", 225, 55, 420, 20, settingsPageOverview, settingsVisualMuted)
 
-	state.overviewHeadline = static("", "overview_not_configured", 310, 86, 545, 34, settingsPageOverview, settingsVisualHero)
+	state.overviewHeadline = static("", "overview_not_configured", 301, 107, 395, 26, settingsPageOverview, settingsVisualHero)
 	state.setControlFont(state.overviewHeadline, state.visual.headlineFont)
-	state.overviewSubtitle = static("", "overview_hint", 310, 125, 545, 24, settingsPageOverview, settingsVisualHero)
+	state.overviewSubtitle = static("", "overview_hint", 302, 139, 390, 20, settingsPageOverview, settingsVisualHeroMuted)
 	state.setControlFont(state.overviewSubtitle, state.visual.subtitleFont)
-	button("overview_sync_button", settingsIDSyncNow, "sync_now", 906, 88, 218, 38, settingsPageOverview)
-	button("overview_open_button", settingsIDOpenLocal, "open_home_folder", 906, 136, 218, 32, settingsPageOverview)
+	button("overview_sync_button", settingsIDSyncNow, "sync_compact", 733, 105, 181, 34, settingsPageOverview)
+	button("overview_open_button", settingsIDOpenLocal, "open_home_folder", 733, 149, 181, 34, settingsPageOverview)
 
-	connTitle := static("overview_connection_title", "overview_connection", 245, 228, 180, 22, settingsPageOverview, settingsVisualCard)
+	// Four compact status cards.
+	connTitle := static("overview_connection_title", "overview_connection", 242, 234, 128, 16, settingsPageOverview, settingsVisualCardMuted)
 	state.setControlFont(connTitle, state.visual.cardTitleFont)
-	state.overviewConnection = staticText("", state.tr("overview_not_configured"), 245, 254, 178, 42, settingsPageOverview, settingsVisualCard)
+	state.overviewConnection = staticText("", state.tr("overview_not_configured"), 242, 258, 128, 20, settingsPageOverview, settingsVisualCard)
 	state.setControlFont(state.overviewConnection, state.visual.cardValueFont)
+	state.overviewConnectionHint = staticText("", "", 242, 284, 128, 16, settingsPageOverview, settingsVisualCardAccent)
 
-	folderTitle := static("overview_folder_title", "overview_folder", 476, 228, 180, 22, settingsPageOverview, settingsVisualCard)
+	folderTitle := static("overview_folder_title", "overview_folder", 419, 234, 128, 16, settingsPageOverview, settingsVisualCardMuted)
 	state.setControlFont(folderTitle, state.visual.cardTitleFont)
-	state.overviewSync = staticText("", state.tr("overview_not_configured"), 476, 254, 178, 42, settingsPageOverview, settingsVisualCard)
+	state.overviewSync = staticText("", state.tr("overview_folder_none"), 419, 258, 128, 20, settingsPageOverview, settingsVisualCard)
 	state.setControlFont(state.overviewSync, state.visual.cardValueFont)
+	state.overviewSyncHint = staticText("", "", 419, 284, 128, 16, settingsPageOverview, settingsVisualCardMuted)
 
-	lastTitle := static("overview_last_title", "overview_last", 707, 228, 180, 22, settingsPageOverview, settingsVisualCard)
+	lastTitle := static("overview_last_title", "overview_last_short", 596, 234, 128, 16, settingsPageOverview, settingsVisualCardMuted)
 	state.setControlFont(lastTitle, state.visual.cardTitleFont)
-	state.overviewLast = staticText("", state.tr("overview_not_synced"), 707, 254, 178, 42, settingsPageOverview, settingsVisualCard)
+	state.overviewLast = staticText("", state.tr("overview_not_synced"), 596, 258, 128, 20, settingsPageOverview, settingsVisualCard)
 	state.setControlFont(state.overviewLast, state.visual.cardValueFont)
 
-	nextTitle := static("overview_next_title", "overview_next", 938, 228, 190, 22, settingsPageOverview, settingsVisualCard)
+	nextTitle := static("overview_next_title", "overview_next", 773, 234, 128, 16, settingsPageOverview, settingsVisualCardMuted)
 	state.setControlFont(nextTitle, state.visual.cardTitleFont)
-	state.overviewNext = staticText("", state.tr("overview_next_manual"), 938, 254, 190, 42, settingsPageOverview, settingsVisualCard)
+	state.overviewNext = staticText("", state.tr("overview_next_manual_short"), 773, 258, 128, 20, settingsPageOverview, settingsVisualCard)
 	state.setControlFont(state.overviewNext, state.visual.cardValueFont)
 
-	recentTitle := static("overview_recent_title", "recent_activity", 245, 350, 260, 26, settingsPageOverview, settingsVisualCard)
-	state.setControlFont(recentTitle, state.visual.titleFont)
+	recentTitle := static("overview_recent_title", "recent_activity", 242, 348, 300, 24, settingsPageOverview, settingsVisualCard)
+	state.setControlFont(recentTitle, state.visual.cardValueFont)
 	for i := range state.overviewRecent {
-		state.overviewRecent[i] = staticText("", state.tr("recent_activity_empty"), 250, int32(392+i*58), 520, 42, settingsPageOverview, settingsVisualCard)
+		state.overviewRecent[i] = staticText("", state.tr("recent_activity_empty"), 242, int32(384+i*46), 416, 38, settingsPageOverview, settingsVisualCardMuted)
 	}
+	static("overview_recent_hint", "recent_activity_hint", 242, 536, 360, 16, settingsPageOverview, settingsVisualCardMuted)
 
-	backupTitle := static("overview_backup_title", "backup_summary", 835, 350, 230, 24, settingsPageOverview, settingsVisualCard)
+	backupTitle := static("overview_backup_title", "backup_summary", 714, 348, 190, 18, settingsPageOverview, settingsVisualCardMuted)
 	state.setControlFont(backupTitle, state.visual.cardTitleFont)
-	state.overviewBackup = staticText("", state.tr("overview_agent_unknown"), 835, 380, 285, 52, settingsPageOverview, settingsVisualCard)
-	state.setControlFont(state.overviewBackup, state.visual.cardValueFont)
+	static("overview_backup_label", "backup_background", 714, 376, 190, 18, settingsPageOverview, settingsVisualCard)
+	state.overviewBackup = staticText("", state.tr("backup_off"), 714, 404, 190, 18, settingsPageOverview, settingsVisualCardDanger)
+	state.setControlFont(state.overviewBackup, state.visual.cardTitleFont)
 
-	storageTitle := static("overview_storage_title", "storage_summary", 835, 490, 240, 24, settingsPageOverview, settingsVisualCard)
+	storageTitle := static("overview_storage_title", "storage_summary", 714, 476, 190, 18, settingsPageOverview, settingsVisualCardMuted)
 	state.setControlFont(storageTitle, state.visual.cardTitleFont)
-	state.overviewStorage = staticText("", state.tr("storage_unknown"), 835, 518, 285, 28, settingsPageOverview, settingsVisualCard)
-	state.setControlFont(state.overviewStorage, state.visual.cardValueFont)
-	state.overviewStorageHint = staticText("", "", 835, 568, 285, 20, settingsPageOverview, settingsVisualCard)
+	state.overviewStorage = staticText("", state.tr("storage_unknown"), 714, 504, 190, 20, settingsPageOverview, settingsVisualCard)
+	state.setControlFont(state.overviewStorage, state.visual.cardTitleFont)
+	state.overviewStorageHint = staticText("", "", 714, 562, 200, 16, settingsPageOverview, settingsVisualCardMuted)
 
 	// Connection.
-	connectionTitle := static("connection_title", "nav_connection", 250, 42, 320, 30, settingsPageConnection, settingsVisualCard)
+	connectionTitle := static("connection_title", "nav_connection", 224, 32, 320, 28, settingsPageConnection, settingsVisualCard)
 	state.setControlFont(connectionTitle, state.visual.titleFont)
-	static("connection_hint", "connection_hint", 250, 82, 760, 38, settingsPageConnection, settingsVisualCard)
-	static("server_label", "server", 250, 146, 120, 22, settingsPageConnection, settingsVisualCard)
-	state.serverEdit = edit(settingsIDServerEdit, "", 250, 172, 570, 30, 0, settingsPageConnection)
-	static("user_label", "user", 250, 224, 120, 22, settingsPageConnection, settingsVisualCard)
-	state.usernameEdit = edit(settingsIDUsernameEdit, "", 250, 250, 270, 30, 0, settingsPageConnection)
-	static("password_label", "password", 548, 224, 120, 22, settingsPageConnection, settingsVisualCard)
-	state.passwordEdit = edit(settingsIDPasswordEdit, "", 548, 250, 272, 30, settingsESPassword, settingsPageConnection)
-	static("password_hint", "password_hint", 250, 292, 570, 22, settingsPageConnection, settingsVisualCard)
-	button("connect_button", settingsIDConnect, "connect_save", 250, 342, 230, 38, settingsPageConnection)
+	static("connection_hint", "connection_hint", 224, 72, 680, 38, settingsPageConnection, settingsVisualCardMuted)
+	static("server_label", "server", 224, 126, 120, 20, settingsPageConnection, settingsVisualCardMuted)
+	state.serverEdit = edit(settingsIDServerEdit, "", 224, 150, 520, 30, 0, settingsPageConnection)
+	static("user_label", "user", 224, 204, 120, 20, settingsPageConnection, settingsVisualCardMuted)
+	state.usernameEdit = edit(settingsIDUsernameEdit, "", 224, 228, 250, 30, 0, settingsPageConnection)
+	static("password_label", "password", 500, 204, 120, 20, settingsPageConnection, settingsVisualCardMuted)
+	state.passwordEdit = edit(settingsIDPasswordEdit, "", 500, 228, 244, 30, settingsESPassword, settingsPageConnection)
+	static("password_hint", "password_hint", 224, 270, 520, 20, settingsPageConnection, settingsVisualCardMuted)
+	button("connect_button", settingsIDConnect, "connect_save", 224, 312, 220, 36, settingsPageConnection)
 
 	// Synchronization.
-	syncTitle := static("sync_title", "nav_sync", 250, 42, 340, 30, settingsPageSync, settingsVisualCard)
+	syncTitle := static("sync_title", "nav_sync", 224, 32, 340, 28, settingsPageSync, settingsVisualCard)
 	state.setControlFont(syncTitle, state.visual.titleFont)
-	static("sync_hint", "sync_hint", 250, 82, 780, 38, settingsPageSync, settingsVisualCard)
-	static("remote_label", "remote_folder", 250, 136, 180, 22, settingsPageSync, settingsVisualCard)
-	state.folderCombo = combo(settingsIDFolderCombo, 250, 162, 760, 240, settingsPageSync)
-	static("local_label", "local_source", 250, 212, 180, 22, settingsPageSync, settingsVisualCard)
-	state.sourceEdit = edit(settingsIDSourceEdit, "", 250, 238, 646, 30, 0, settingsPageSync)
-	button("browse_button", settingsIDBrowse, "browse", 910, 237, 100, 32, settingsPageSync)
-	static("destination_label", "destination", 250, 286, 180, 22, settingsPageSync, settingsVisualCard)
-	state.destination = edit(settingsIDDestination, "", 250, 312, 760, 30, 0, settingsPageSync)
+	static("sync_hint", "sync_hint", 224, 72, 680, 36, settingsPageSync, settingsVisualCardMuted)
+	static("remote_label", "remote_folder", 224, 116, 180, 20, settingsPageSync, settingsVisualCardMuted)
+	state.folderCombo = combo(settingsIDFolderCombo, 224, 140, 680, 200, settingsPageSync)
+	static("local_label", "local_source", 224, 190, 180, 20, settingsPageSync, settingsVisualCardMuted)
+	state.sourceEdit = edit(settingsIDSourceEdit, "", 224, 214, 568, 30, 0, settingsPageSync)
+	button("browse_button", settingsIDBrowse, "browse", 804, 213, 100, 32, settingsPageSync)
+	static("destination_label", "destination", 224, 258, 180, 20, settingsPageSync, settingsVisualCardMuted)
+	state.destination = edit(settingsIDDestination, "", 224, 282, 680, 30, 0, settingsPageSync)
 
-	state.saveProfileBtn = button("save_button", settingsIDSaveProfile, "add_profile", 250, 360, 150, 34, settingsPageSync)
-	button("new_button", settingsIDNewProfile, "new_clear", 410, 360, 132, 34, settingsPageSync)
-	button("enable_button", settingsIDEnableProfile, "enable", 552, 360, 105, 34, settingsPageSync)
-	button("disable_button", settingsIDDisableProfile, "disable", 667, 360, 105, 34, settingsPageSync)
-	button("delete_button", settingsIDDeleteProfile, "delete", 782, 360, 100, 34, settingsPageSync)
-	button("refresh_button", settingsIDRefresh, "refresh", 892, 360, 118, 34, settingsPageSync)
+	state.saveProfileBtn = button("save_button", settingsIDSaveProfile, "add_profile", 224, 326, 140, 34, settingsPageSync)
+	button("new_button", settingsIDNewProfile, "new_clear", 374, 326, 126, 34, settingsPageSync)
+	button("enable_button", settingsIDEnableProfile, "enable", 510, 326, 96, 34, settingsPageSync)
+	button("disable_button", settingsIDDisableProfile, "disable", 616, 326, 96, 34, settingsPageSync)
+	button("delete_button", settingsIDDeleteProfile, "delete", 722, 326, 86, 34, settingsPageSync)
+	button("refresh_button", settingsIDRefresh, "refresh", 818, 326, 86, 34, settingsPageSync)
 
-	static("profiles_label", "sync_profiles", 250, 418, 300, 22, settingsPageSync, settingsVisualCard)
-	state.profileList = state.createControl(module, "LISTBOX", "", settingsWSChild|settingsWSVisible|settingsWSTabStop|settingsWSBorder|settingsWSVScroll|settingsLBSNotify, 250, 446, 760, 150, settingsIDProfileList, windows.Handle(font))
+	static("profiles_label", "sync_profiles", 224, 374, 300, 20, settingsPageSync, settingsVisualCardMuted)
+	state.profileList = state.createControl(module, "LISTBOX", "", settingsWSChild|settingsWSVisible|settingsWSTabStop|settingsWSBorder|settingsWSVScroll|settingsLBSNotify, 224, 398, 680, 120, settingsIDProfileList, windows.Handle(font))
 	state.trackPage(settingsPageSync, state.profileList)
-	button("sync_button", settingsIDSyncNow, "sync_now", 790, 612, 220, 36, settingsPageSync)
+	button("sync_button", settingsIDSyncNow, "sync_now", 704, 532, 200, 34, settingsPageSync)
 
 	// Backups / schedule.
-	backupPageTitle := static("backup_title", "nav_backup", 250, 42, 340, 30, settingsPageBackup, settingsVisualCard)
+	backupPageTitle := static("backup_title", "nav_backup", 224, 32, 340, 28, settingsPageBackup, settingsVisualCard)
 	state.setControlFont(backupPageTitle, state.visual.titleFont)
-	static("backup_hint", "backup_hint", 250, 82, 780, 44, settingsPageBackup, settingsVisualCard)
-	static("backup_profile_label", "backup_folder", 250, 146, 190, 22, settingsPageBackup, settingsVisualCard)
-	state.backupProfileCombo = combo(settingsIDBackupProfile, 250, 172, 760, 220, settingsPageBackup)
-	static("interval_label", "interval", 250, 228, 180, 22, settingsPageBackup, settingsVisualCard)
-	state.interval = edit(settingsIDInterval, "15m", 250, 254, 240, 30, 0, settingsPageBackup)
-	static("conflict_label", "conflict", 530, 228, 180, 22, settingsPageBackup, settingsVisualCard)
-	state.conflict = combo(settingsIDConflict, 530, 254, 330, 160, settingsPageBackup)
+	static("backup_hint", "backup_hint", 224, 72, 680, 40, settingsPageBackup, settingsVisualCardMuted)
+	static("backup_profile_label", "backup_folder", 224, 124, 190, 20, settingsPageBackup, settingsVisualCardMuted)
+	state.backupProfileCombo = combo(settingsIDBackupProfile, 224, 148, 680, 180, settingsPageBackup)
+	static("interval_label", "interval", 224, 198, 180, 20, settingsPageBackup, settingsVisualCardMuted)
+	state.interval = edit(settingsIDInterval, "15m", 224, 222, 220, 30, 0, settingsPageBackup)
+	static("conflict_label", "conflict", 476, 198, 180, 20, settingsPageBackup, settingsVisualCardMuted)
+	state.conflict = combo(settingsIDConflict, 476, 222, 300, 150, settingsPageBackup)
 	state.comboAdd(state.conflict, state.tr("conflict_stop"))
 	state.comboAdd(state.conflict, state.tr("conflict_skip"))
 	state.comboAdd(state.conflict, state.tr("conflict_replace"))
 	procSettingsSendMessage.Call(uintptr(state.conflict), settingsCBSetCurSel, 0, 0)
-	button("schedule_save_button", settingsIDSaveSchedule, "save_schedule", 250, 310, 230, 36, settingsPageBackup)
+	button("schedule_save_button", settingsIDSaveSchedule, "save_schedule", 224, 270, 220, 34, settingsPageBackup)
 
-	static("backup_agent_title", "backup_agent_title", 250, 390, 260, 24, settingsPageBackup, settingsVisualCard)
-	state.agentLabel = static("", "autostart_checking", 250, 422, 760, 48, settingsPageBackup, settingsVisualCard)
-	button("agent_enable", settingsIDAgentEnable, "enable_agent", 250, 492, 190, 36, settingsPageBackup)
-	button("agent_disable", settingsIDAgentDisable, "disable_agent", 452, 492, 190, 36, settingsPageBackup)
+	static("backup_agent_title", "backup_agent_title", 224, 326, 260, 20, settingsPageBackup, settingsVisualCard)
+	state.agentLabel = static("", "autostart_checking", 224, 354, 680, 44, settingsPageBackup, settingsVisualCardMuted)
+	button("agent_enable", settingsIDAgentEnable, "enable_agent", 224, 418, 180, 34, settingsPageBackup)
+	button("agent_disable", settingsIDAgentDisable, "disable_agent", 416, 418, 180, 34, settingsPageBackup)
 
 	// General settings.
-	generalTitle := static("general_title", "nav_settings", 250, 42, 340, 30, settingsPageGeneral, settingsVisualCard)
+	generalTitle := static("general_title", "nav_settings", 224, 32, 340, 28, settingsPageGeneral, settingsVisualCard)
 	state.setControlFont(generalTitle, state.visual.titleFont)
-	static("general_hint", "general_hint", 250, 82, 780, 38, settingsPageGeneral, settingsVisualCard)
-	static("language_label", "language", 250, 146, 180, 22, settingsPageGeneral, settingsVisualCard)
-	state.languageCombo = combo(settingsIDLanguage, 250, 172, 300, 120, settingsPageGeneral)
+	static("general_hint", "general_hint", 224, 72, 680, 36, settingsPageGeneral, settingsVisualCardMuted)
+	static("language_label", "language", 224, 126, 180, 20, settingsPageGeneral, settingsVisualCardMuted)
+	state.languageCombo = combo(settingsIDLanguage, 224, 150, 300, 120, settingsPageGeneral)
 	state.comboAdd(state.languageCombo, "Русский")
 	state.comboAdd(state.languageCombo, "English")
 	if state.language == uiLanguageRussian {
@@ -252,13 +265,13 @@ func (state *windowsSettingsUI) createLightControls(module windows.Handle) error
 	} else {
 		procSettingsSendMessage.Call(uintptr(state.languageCombo), settingsCBSetCurSel, 1, 0)
 	}
-	static("general_background_title", "general_background_title", 250, 250, 260, 24, settingsPageGeneral, settingsVisualCard)
-	static("general_background_hint", "general_background_hint", 250, 282, 760, 70, settingsPageGeneral, settingsVisualCard)
+	static("general_background_title", "general_background_title", 224, 224, 260, 22, settingsPageGeneral, settingsVisualCard)
+	static("general_background_hint", "general_background_hint", 224, 254, 680, 64, settingsPageGeneral, settingsVisualCardMuted)
 
-	// Small global status line.
-	static("status_title", "status", 225, 692, 78, 22, -1, settingsVisualMain)
-	state.statusLabel = state.createControl(module, "STATIC", state.tr("ready"), settingsWSChild|settingsWSVisible, 305, 692, 810, 30, 0, windows.Handle(font))
-	state.setVisualRole(state.statusLabel, settingsVisualMain)
+	// Global status is hidden on Overview and visible on functional pages.
+	static("status_title", "status", 224, 560, 74, 20, -1, settingsVisualMuted)
+	state.statusLabel = state.createControl(module, "STATIC", state.tr("ready"), settingsWSChild|settingsWSVisible, 302, 560, 602, 20, 0, windows.Handle(font))
+	state.setVisualRole(state.statusLabel, settingsVisualMuted)
 
 	if state.serverEdit == 0 || state.usernameEdit == 0 || state.passwordEdit == 0 ||
 		state.folderCombo == 0 || state.sourceEdit == 0 || state.destination == 0 ||
@@ -502,7 +515,11 @@ func (state *windowsSettingsUI) refreshOverview() {
 		state.setText(state.overviewSubtitle, state.tr("overview_no_enabled"))
 	case lastSuccess.IsZero():
 		state.setText(state.overviewHeadline, state.tr("overview_ready"))
-		state.setText(state.overviewSubtitle, state.trf("overview_enabled_count", enabled))
+		if state.connected {
+			state.setText(state.overviewSubtitle, state.trf("overview_ready_connected", dashboardFolderCount(enabled, state.language)))
+		} else {
+			state.setText(state.overviewSubtitle, state.trf("overview_enabled_count", enabled))
+		}
 	default:
 		state.setText(state.overviewHeadline, state.tr("overview_all_synced"))
 		state.setText(state.overviewSubtitle, state.tr("overview_files_current"))
@@ -510,11 +527,14 @@ func (state *windowsSettingsUI) refreshOverview() {
 
 	server := strings.TrimSpace(state.text(state.serverEdit))
 	if server == "" {
-		state.setText(state.overviewConnection, state.tr("overview_not_configured"))
+		state.setText(state.overviewConnection, state.tr("overview_connection_none"))
+		state.setText(state.overviewConnectionHint, "")
 	} else if state.connected {
-		state.setText(state.overviewConnection, state.trf("overview_connected_short", dashboardServerLabel(server)))
+		state.setText(state.overviewConnection, state.tr("overview_connection_connected"))
+		state.setText(state.overviewConnectionHint, dashboardServerLabel(server))
 	} else {
-		state.setText(state.overviewConnection, state.trf("overview_configured_short", dashboardServerLabel(server)))
+		state.setText(state.overviewConnection, state.tr("overview_connection_configured"))
+		state.setText(state.overviewConnectionHint, dashboardServerLabel(server))
 	}
 
 	if folder := state.primaryLocalFolder(); folder != "" {
@@ -523,8 +543,14 @@ func (state *windowsSettingsUI) refreshOverview() {
 			label = folder
 		}
 		state.setText(state.overviewSync, label)
+		count := enabled
+		if count == 0 {
+			count = len(state.profiles)
+		}
+		state.setText(state.overviewSyncHint, dashboardFolderCount(count, state.language))
 	} else {
 		state.setText(state.overviewSync, state.tr("overview_folder_none"))
+		state.setText(state.overviewSyncHint, "")
 	}
 
 	if lastSuccess.IsZero() {
@@ -533,7 +559,7 @@ func (state *windowsSettingsUI) refreshOverview() {
 		state.setText(state.overviewLast, dashboardTime(lastSuccess, state.language))
 	}
 	if next.IsZero() {
-		state.setText(state.overviewNext, state.tr("overview_next_manual"))
+		state.setText(state.overviewNext, state.tr("overview_next_manual_short"))
 	} else {
 		state.setText(state.overviewNext, dashboardTime(next, state.language))
 	}
@@ -541,10 +567,13 @@ func (state *windowsSettingsUI) refreshOverview() {
 	autostart, err := windowsclient.UserAgentAutostartStatus()
 	if err != nil {
 		state.setText(state.overviewBackup, state.tr("overview_agent_unknown"))
+		state.setVisualRole(state.overviewBackup, settingsVisualCardMuted)
 	} else if autostart.Enabled {
-		state.setText(state.overviewBackup, state.trf("overview_agent_on_count", enabled))
+		state.setText(state.overviewBackup, state.tr("backup_on"))
+		state.setVisualRole(state.overviewBackup, settingsVisualCardPositive)
 	} else {
-		state.setText(state.overviewBackup, state.tr("overview_agent_off"))
+		state.setText(state.overviewBackup, state.tr("backup_off"))
+		state.setVisualRole(state.overviewBackup, settingsVisualCardDanger)
 	}
 
 	state.refreshRecentActivity()
@@ -639,6 +668,25 @@ func dashboardServerLabel(server string) string {
 		server = string(runes[:23]) + "…"
 	}
 	return server
+}
+
+func dashboardFolderCount(count int, language string) string {
+	if normalizeUILanguage(language) != uiLanguageRussian {
+		if count == 1 {
+			return "1 folder"
+		}
+		return fmt.Sprintf("%d folders", count)
+	}
+	mod10 := count % 10
+	mod100 := count % 100
+	switch {
+	case mod10 == 1 && mod100 != 11:
+		return fmt.Sprintf("%d папка", count)
+	case mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14):
+		return fmt.Sprintf("%d папки", count)
+	default:
+		return fmt.Sprintf("%d папок", count)
+	}
 }
 
 func dashboardBytes(value int64) string {

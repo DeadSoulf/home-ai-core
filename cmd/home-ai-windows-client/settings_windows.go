@@ -185,7 +185,9 @@ type windowsSettingsUI struct {
 	overviewHeadline       windows.Handle
 	overviewSubtitle       windows.Handle
 	overviewConnection     windows.Handle
+	overviewConnectionHint windows.Handle
 	overviewSync           windows.Handle
+	overviewSyncHint       windows.Handle
 	overviewBackup         windows.Handle
 	overviewNext           windows.Handle
 	overviewLast           windows.Handle
@@ -374,8 +376,8 @@ func runSettingsUI(args []string) error {
 		settingsWSOverlappedWindow,
 		0x80000000,
 		0x80000000,
-		1180,
-		760,
+		settingsCompactWindowWidth,
+		settingsCompactWindowHeight,
 		0,
 		0,
 		module,

@@ -43,3 +43,32 @@ func TestTrayPopupSnapshotWithoutProfiles(t *testing.T) {
 		}
 	}
 }
+
+func TestCompactFigmaGeometry(t *testing.T) {
+	if settingsCompactWindowWidth != 976 || settingsCompactWindowHeight != 635 {
+		t.Fatalf("compact window = %dx%d, want 976x635", settingsCompactWindowWidth, settingsCompactWindowHeight)
+	}
+	if settingsSidebarWidth != 196 {
+		t.Fatalf("sidebar width = %d, want 196", settingsSidebarWidth)
+	}
+}
+
+func TestDashboardFolderCount(t *testing.T) {
+	tests := []struct {
+		count    int
+		language string
+		want     string
+	}{
+		{1, uiLanguageRussian, "1 папка"},
+		{2, uiLanguageRussian, "2 папки"},
+		{5, uiLanguageRussian, "5 папок"},
+		{11, uiLanguageRussian, "11 папок"},
+		{1, uiLanguageEnglish, "1 folder"},
+		{3, uiLanguageEnglish, "3 folders"},
+	}
+	for _, tt := range tests {
+		if got := dashboardFolderCount(tt.count, tt.language); got != tt.want {
+			t.Fatalf("dashboardFolderCount(%d, %q) = %q, want %q", tt.count, tt.language, got, tt.want)
+		}
+	}
+}
