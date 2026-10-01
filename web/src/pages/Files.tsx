@@ -129,6 +129,26 @@ export function FilesPage({
     }
   }
 
+  async function mountFileStorage(storage: StoragePurposeAssignment) {
+    const busyKey = `storage-mount-${storage.device}`;
+    setBusy(busyKey);
+    setFormError("");
+    setNotice("");
+    try {
+      await api.storageOperation({operation: "mount", device: storage.device});
+      const deviceName = storage.device.split("/").filter(Boolean).pop() || "";
+      if (deviceName) {
+        setPoolRoot(`/mnt/home-ai-core/${deviceName}`);
+      }
+      setNotice(t("fileStorageMounted"));
+      resource.reload();
+    } catch (reason) {
+      setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function createPool(event: FormEvent) {
     event.preventDefault();
     setBusy("pool");
@@ -1016,6 +1036,7 @@ export function FilesPage({
                   <th>{t("mountPoints")}</th>
                   <th>{t("freeSpace")}</th>
                   <th>{t("state")}</th>
+                  <th>{t("actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1041,12 +1062,24 @@ export function FilesPage({
                                 ? t("fileStorageReady")
                                 : t("fileStorageNeedsMount")}
                       </td>
+                      <td>
+                        {storage.present && storage.filesystem && mountpoints.length === 0 && !alreadyPool ? (
+                          <button
+                            className="button compact primary"
+                            type="button"
+                            disabled={busy !== ""}
+                            onClick={() => void mountFileStorage(storage)}
+                          >
+                            {busy === `storage-mount-${storage.device}` ? t("working") : t("mount")}
+                          </button>
+                        ) : "—"}
+                      </td>
                     </tr>
                   );
                 })}
                 {fileStorage.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="muted">{t("fileNoAssignedStorage")}</td>
+                    <td colSpan={7} className="muted">{t("fileNoAssignedStorage")}</td>
                   </tr>
                 )}
               </tbody>
