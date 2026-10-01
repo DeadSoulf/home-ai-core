@@ -77,3 +77,21 @@ func TestHostFilesystemInspectionTargetsPID1MountNamespace(t *testing.T) {
 		t.Fatalf("host filesystem inspection args = %q, want %q", got, want)
 	}
 }
+
+
+func TestParseDFCapacityOutput(t *testing.T) {
+	output := []byte("  1B-blocks       Avail\n999653638144 753428987904\n")
+	total, free, ok := parseDFCapacityOutput(output)
+	if !ok {
+		t.Fatal("expected df capacity output to parse")
+	}
+	if total != 999653638144 || free != 753428987904 {
+		t.Fatalf("capacity = %d/%d, want 999653638144/753428987904", total, free)
+	}
+}
+
+func TestParseDFCapacityOutputRejectsInvalidData(t *testing.T) {
+	if total, free, ok := parseDFCapacityOutput([]byte("Size Avail\n- -\n")); ok {
+		t.Fatalf("unexpected parsed capacity: %d/%d", total, free)
+	}
+}
