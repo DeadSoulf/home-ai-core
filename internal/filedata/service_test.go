@@ -3,7 +3,6 @@ package filedata
 import (
 	"bytes"
 	"errors"
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
