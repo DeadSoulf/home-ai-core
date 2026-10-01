@@ -1,8 +1,8 @@
 # AI Agent Foundation
 
-**Status:** implementation started  
+**Status:** first contract slice published  
 **Started:** 2026-10-01  
-**Target first implementation slice:** `0.1.115-dev`
+**First implementation slice:** `0.1.115-dev` published
 
 ## Goal
 
@@ -108,6 +108,8 @@ No single model vendor becomes a Core dependency.
 ## First implementation slices
 
 ### 0.1.115-dev — Agent contracts
+
+Published in `v0.1.115-dev` after full Core/Web, Windows and Debian CI/release checks.
 
 - ✅ first-party `ai.agent` module identity/capability;
 - ✅ Core startup registration through the existing Module Registry;
