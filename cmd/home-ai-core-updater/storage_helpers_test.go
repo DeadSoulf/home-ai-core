@@ -95,7 +95,6 @@ func TestParseDFCapacityOutputRejectsInvalidData(t *testing.T) {
 	}
 }
 
-
 func TestSummarizeDestructivePlanIncludesReadOnlyActions(t *testing.T) {
 	got := summarizeDestructivePlan("format as ext4", "/dev/sdb1", destructiveUsagePlan{
 		Mounts:       []string{"/dev/sdb1@/mnt/home-ai-core/sdb1"},
