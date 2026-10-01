@@ -5,8 +5,8 @@
 > Аудит уже сделанного: [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
-**Последний опубликованный релиз:** `0.1.87-dev` — kernel-enforced SMB free-space reserve\
-**Текущий срез:** `0.1.88-dev` — release candidate; disk-first Web storage workflow\
+**Последний опубликованный релиз:** `0.1.88-dev` — disk-first Web storage workflow\
+**Текущий срез:** `0.1.88-dev` — published; live storage UI and SMB/quota acceptance pending\
 **Следующий engineering milestone:** live acceptance нового storage UI и SMB/quota; затем controlled legacy quota migration и per-folder/per-user quotas\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-10-01
@@ -19,7 +19,8 @@
 - Внутри выбранного диска остаются существующие разделы/LVM и все операции: purpose files/video, mount/unmount, rename, create, format и delete.
 - Существующие server-side usage-lock и system-disk protections не меняются и продолжают блокировать опасные операции.
 - Новый слой реализован поверх текущего StorageDevices, чтобы не дублировать storage API и проверенную safety-логику.
-- Release candidate: требуется полный CI и live UI acceptance.
+- PR #68 прошёл полный CI; release workflow опубликовал `v0.1.88-dev` с amd64/arm64 Core bundles и Windows `.exe` + SHA-256.
+- Практическая проверка нового storage UI на установленном сервере остаётся acceptance step.
 
 ### Выпуск 0.1.87-dev — kernel hard reserve для SMB
 
