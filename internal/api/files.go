@@ -1127,6 +1127,35 @@ func (s *server) filePoolCapacityPolicy(
 	}
 }
 
+func mountedPathBackedByDevice(rootPath, devicePath string) bool {
+	rootPath = filepath.Clean(strings.TrimSpace(rootPath))
+	devicePath = filepath.Clean(strings.TrimSpace(devicePath))
+	if rootPath == "." || devicePath == "." || rootPath == string(filepath.Separator) {
+		return false
+	}
+
+	var rootStat syscall.Stat_t
+	if err := syscall.Stat(rootPath, &rootStat); err != nil {
+		return false
+	}
+	var parentStat syscall.Stat_t
+	if err := syscall.Stat(filepath.Dir(rootPath), &parentStat); err != nil {
+		return false
+	}
+	var deviceStat syscall.Stat_t
+	if err := syscall.Stat(devicePath, &deviceStat); err != nil {
+		return false
+	}
+	if deviceStat.Mode&syscall.S_IFMT != syscall.S_IFBLK {
+		return false
+	}
+	return mountBoundaryMatchesDevice(rootStat.Dev, parentStat.Dev, deviceStat.Rdev)
+}
+
+func mountBoundaryMatchesDevice(rootDeviceID, parentDeviceID, blockDeviceID uint64) bool {
+	return rootDeviceID == blockDeviceID && parentDeviceID != rootDeviceID
+}
+
 func filePoolStorageNode(
 	rootPath string,
 	assignments []state.StoragePurposeRecord,
@@ -1148,6 +1177,9 @@ func filePoolStorageNode(
 			if filepath.Clean(strings.TrimSpace(mountpoint)) == rootPath {
 				return node, nil
 			}
+		}
+		if mountedPathBackedByDevice(rootPath, node.Path) {
+			return node, nil
 		}
 	}
 	return systeminfo.BlockNode{}, errors.New("file pool root must be a mounted storage device explicitly assigned to Files")
