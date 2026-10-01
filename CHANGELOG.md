@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.90-dev
+
+- Moved physical-disk actions out of the partition table and into the selected disk summary card.
+- Removed the Actions column from the selected-disk partition/LVM table.
+- Added expandable per-partition management rows directly beneath each partition/LVM entry.
+- Kept mount/unmount, label, purpose, format and delete controls together inside the expanded partition management panel.
+- Preserved the existing system-disk and in-use Files storage protections without changing storage API behavior.
+- Reduced the selected-disk table width further by removing the dedicated actions column.
+
 ## 0.1.89-dev
 
 - Made the selected-disk partition/LVM table substantially more compact.
