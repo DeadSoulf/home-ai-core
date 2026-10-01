@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -114,6 +115,13 @@ func (s *server) storageOperation(
 	}
 
 	response := map[string]any{"message": message}
+	if input.Operation == "mount" {
+		mountpoint := strings.TrimSpace(input.Mountpoint)
+		if mountpoint == "" {
+			mountpoint = filepath.Join("/mnt/home-ai-core", filepath.Base(input.Device))
+		}
+		response["mountpoint"] = filepath.Clean(mountpoint)
+	}
 	var purposeWarning string
 
 	switch input.Operation {
