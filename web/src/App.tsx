@@ -6,6 +6,7 @@ import { useI18n } from "./i18n";
 import { accessiblePath, fileSection, fileSectionPath, systemSection } from "./navigation";
 import { FirstRunPage, LoginPage } from "./pages/Auth";
 import { AccountPage } from "./pages/Account";
+import { AIPage } from "./pages/AI";
 import { AuditPage } from "./pages/Audit";
 import { Dashboard } from "./pages/Dashboard";
 import { FilesPage } from "./pages/Files";
@@ -18,7 +19,7 @@ type Phase = "loading" | "setup" | "login" | "app";
 
 function currentPath(): string {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
-  const known = ["/", "/files", "/files/storage", "/files/windows", "/system", "/modules", "/jobs", "/audit", "/users", "/account"];
+  const known = ["/", "/ai", "/files", "/files/storage", "/files/windows", "/system", "/modules", "/jobs", "/audit", "/users", "/account"];
   if (!known.includes(path)) return "/";
   return path + (path === "/system" || path === "/files" ? window.location.hash : "");
 }
@@ -199,6 +200,9 @@ export default function App() {
           />
         )
         : accountPage;
+      break;
+    case "/ai":
+      page = <AIPage />;
       break;
     case "/modules":
       page = has("modules.read") ? <ModulesPage revision={revision} /> : accountPage;
