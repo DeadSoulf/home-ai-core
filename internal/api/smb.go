@@ -83,15 +83,15 @@ func (s *server) smbStatus(
 	hostname, _ := os.Hostname()
 	writeJSON(w, http.StatusOK, map[string]any{
 		"smb": map[string]any{
-			"available": status.Available,
-			"active":    status.Active,
-			"error":     status.Error,
-			"hostname":  hostname,
-			"workgroup": defaultSMBWorkgroup,
-			"users":             users,
-			"shares":            model.ShareViews,
-			"hard_quota_ready":  status.HardQuotaReady,
-			"hard_quota_error":  status.HardQuotaError,
+			"available":        status.Available,
+			"active":           status.Active,
+			"error":            status.Error,
+			"hostname":         hostname,
+			"workgroup":        defaultSMBWorkgroup,
+			"users":            users,
+			"shares":           model.ShareViews,
+			"hard_quota_ready": status.HardQuotaReady,
+			"hard_quota_error": status.HardQuotaError,
 		},
 	})
 }
