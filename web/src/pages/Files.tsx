@@ -930,7 +930,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                             type="submit"
                             disabled={busy !== ""}
                           >
-                            {busy === `pool-policy-${pool.id}` ? t("working") : t("save")}
+                            {busy === `pool-policy-${pool.id}` ? t("working") : t("filePoolPolicySave")}
                           </button>
                         </form>
                         {pool.capacity_known && (
