@@ -21,9 +21,9 @@ type Message struct {
 }
 
 type ToolCall struct {
-	ID      string `json:"id"`
-	ToolID  string `json:"tool_id"`
-	Input   json.RawMessage `json:"input,omitempty"`
+	ID     string          `json:"id"`
+	ToolID string          `json:"tool_id"`
+	Input  json.RawMessage `json:"input,omitempty"`
 }
 
 type ModelRequest struct {
