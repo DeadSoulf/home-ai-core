@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.86-dev
+
+- Added per-NAS-pool free-space capacity policies with migration 016.
+- Existing and new pools default to a 5% hard reserve and a 10% low-space warning threshold.
+- Read live filesystem capacity with Linux `statfs` and expose free/total, reserve/warning bytes and capacity state through the Files API.
+- Added a Web editor for pool reserve and warning percentages with visible OK / low-space / reserve-reached states.
+- Enforce the hard reserve for direct uploads before their temporary file can cross the configured limit.
+- Reject resumable uploads that cannot fit above the reserve and re-check live free space before every chunk.
+- Return HTTP 507 `file_pool_reserve_reached` for capacity-blocked Core/Windows-client writes and fail capacity-consuming API writes closed when capacity cannot be read.
+- Keep same-filesystem moves, recycle-bin operations and restores available because they do not materially increase occupied bytes.
+- Documented the SMB boundary: direct Samba writes still bypass Core and need a later filesystem/Samba quota layer for hard enforcement.
+- Added ADR-0033 plus state, filedata, API and Web client coverage; PR #63 passed the full CI suite.
+
 ## 0.1.85-dev
 
 - Hardened physical storage that backs active Home-AI file pools against accidental destructive operations.
