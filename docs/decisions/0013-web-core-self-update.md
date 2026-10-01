@@ -2,7 +2,7 @@
 
 - Status: Accepted, revised for Update System v2
 - Original date: 2026-09-28
-- Revised: 2026-09-29
+- Revised: 2026-10-01
 
 ## Context
 
@@ -19,6 +19,7 @@ GitHub publishes one update bundle per supported architecture:
 ```text
 home-ai-core-update_<version>_<arch>.tar.gz
 home-ai-core-update_<version>_<arch>.tar.gz.sha256
+home-ai-core-update_<version>_<arch>.tar.gz.sha256.sig
 ```
 
 The bundle contains:
@@ -42,7 +43,10 @@ The browser cannot supply an arbitrary update URL.
 
 The unprivileged Core downloads the exact selected archive into its update state directory and verifies:
 
-- archive checksum
+- detached Ed25519 signature over the exact checksum-file bytes when a signature is present;
+- non-development releases require that detached signature and are ignored/rejected if it is absent;
+- the trusted public key comes from the local `/etc/home-ai-core/update-trusted.pub` trust root;
+- archive checksum;
 - size limits
 - manifest product/version/architecture
 - safe relative paths
@@ -76,9 +80,11 @@ The `.deb` is not the normal update transport. It remains the initial/bootstrap 
 - Helper access is restricted to the `home-ai-core` service account over AF_UNIX.
 - No arbitrary command or executable path is accepted from Web input.
 - Bundle contents are bounded and verified before privileged installation.
+- A release-site attacker cannot replace a stable bundle and checksum without also producing a valid Ed25519 signature from the separately held project signing key.
+- Development releases remain allowed to operate unsigned until the dedicated signing key is provisioned; this exception does not apply to stable/RC releases.
 - Only one install/rollback operation can run at a time.
 - Update mutations require authenticated permission and CSRF protection.
 
 ## Remaining production work
 
-Detached signing and stable-channel release policy remain separate production-hardening tasks beyond the current development-channel SHA-256/GitHub trust model.
+The detached-signature protocol and stable fail-closed policy are implemented. Remaining operational work is provisioning the dedicated private key into the `HOME_AI_UPDATE_SIGNING_KEY` Actions secret, installing the matching public key on managed nodes, defining key rotation/revocation, and running long-duration failure tests.
