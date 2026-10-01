@@ -191,7 +191,7 @@ func (s *Service) StreamConversation(
 	messages := make([]Message, 0, len(history)+1)
 	messages = append(messages, Message{
 		Role: RoleSystem,
-		Content: "You are the local Home-AI assistant. Answer clearly and do not claim that you changed the home or server unless a Home-AI tool actually performed that action.",
+		Content: "You are the local Home-AI assistant. Reply in the user's language unless asked otherwise. Answer clearly and do not claim that you changed the home or server unless a Home-AI tool actually performed that action.",
 	})
 	for _, item := range history {
 		messages = append(messages, Message{Role: MessageRole(item.Role), Content: item.Content})
