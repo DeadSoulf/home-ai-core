@@ -6,6 +6,7 @@ import (
 	"math"
 	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/state"
 	"github.com/DeadSoulf/home-ai-core/internal/storage"
 	"github.com/DeadSoulf/home-ai-core/internal/systeminfo"
+	"golang.org/x/sys/unix"
 )
 
 var (
@@ -1134,14 +1136,15 @@ func mountedPathBackedByDevice(rootPath, devicePath string) bool {
 		return false
 	}
 
-	var rootStat syscall.Stat_t
-	if err := syscall.Stat(rootPath, &rootStat); err != nil {
+	mountInfo, err := os.ReadFile("/proc/self/mountinfo")
+	if err != nil {
 		return false
 	}
-	var parentStat syscall.Stat_t
-	if err := syscall.Stat(filepath.Dir(rootPath), &parentStat); err != nil {
+	major, minor, ok := mountInfoDeviceForPath(mountInfo, rootPath)
+	if !ok {
 		return false
 	}
+
 	var deviceStat syscall.Stat_t
 	if err := syscall.Stat(devicePath, &deviceStat); err != nil {
 		return false
@@ -1149,11 +1152,45 @@ func mountedPathBackedByDevice(rootPath, devicePath string) bool {
 	if deviceStat.Mode&syscall.S_IFMT != syscall.S_IFBLK {
 		return false
 	}
-	return mountBoundaryMatchesDevice(rootStat.Dev, parentStat.Dev, deviceStat.Rdev)
+	return uint32(unix.Major(deviceStat.Rdev)) == major && uint32(unix.Minor(deviceStat.Rdev)) == minor
 }
 
-func mountBoundaryMatchesDevice(rootDeviceID, parentDeviceID, blockDeviceID uint64) bool {
-	return rootDeviceID == blockDeviceID && parentDeviceID != rootDeviceID
+func mountInfoDeviceForPath(data []byte, rootPath string) (uint32, uint32, bool) {
+	rootPath = filepath.Clean(strings.TrimSpace(rootPath))
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 6 {
+			continue
+		}
+		mountpoint := decodeMountInfoPath(fields[4])
+		if filepath.Clean(mountpoint) != rootPath {
+			continue
+		}
+		majorText, minorText, ok := strings.Cut(fields[2], ":")
+		if !ok {
+			return 0, 0, false
+		}
+		majorValue, err := strconv.ParseUint(majorText, 10, 32)
+		if err != nil {
+			return 0, 0, false
+		}
+		minorValue, err := strconv.ParseUint(minorText, 10, 32)
+		if err != nil {
+			return 0, 0, false
+		}
+		return uint32(majorValue), uint32(minorValue), true
+	}
+	return 0, 0, false
+}
+
+func decodeMountInfoPath(value string) string {
+	replacer := strings.NewReplacer(
+		"\\040", " ",
+		"\\011", "\t",
+		"\\012", "\n",
+		"\\134", "\\",
+	)
+	return replacer.Replace(value)
 }
 
 func filePoolStorageNode(
