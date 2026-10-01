@@ -30,12 +30,16 @@ type Client struct {
 }
 
 type Folder struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Kind     string `json:"kind"`
-	PoolName string `json:"pool_name"`
-	CanRead  bool   `json:"can_read"`
-	CanWrite bool   `json:"can_write"`
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	Kind          string `json:"kind"`
+	PoolName      string `json:"pool_name"`
+	CanRead       bool   `json:"can_read"`
+	CanWrite      bool   `json:"can_write"`
+	QuotaBytes    int64  `json:"quota_bytes,omitempty"`
+	UsedBytes     int64  `json:"used_bytes,omitempty"`
+	ReservedBytes int64  `json:"reserved_bytes,omitempty"`
+	UsageKnown    bool   `json:"usage_known,omitempty"`
 }
 
 type UploadChunk struct {

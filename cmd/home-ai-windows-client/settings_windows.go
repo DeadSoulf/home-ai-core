@@ -178,18 +178,24 @@ type windowsSettingsUI struct {
 	languageCombo      windows.Handle
 	backupProfileCombo windows.Handle
 
-	page               int
-	pageControls       [settingsPageCount][]windows.Handle
-	navButtons         [settingsPageCount]windows.Handle
-	overviewHeadline   windows.Handle
-	overviewSubtitle   windows.Handle
-	overviewConnection windows.Handle
-	overviewSync       windows.Handle
-	overviewBackup     windows.Handle
-	overviewNext       windows.Handle
-	overviewLast       windows.Handle
-	windowIcon         windows.Handle
-	connected          bool
+	page                   int
+	pageControls           [settingsPageCount][]windows.Handle
+	navButtons             [settingsPageCount]windows.Handle
+	overviewHeadline       windows.Handle
+	overviewSubtitle       windows.Handle
+	overviewConnection     windows.Handle
+	overviewSync           windows.Handle
+	overviewBackup         windows.Handle
+	overviewNext           windows.Handle
+	overviewLast           windows.Handle
+	overviewRecent         [3]windows.Handle
+	overviewStorage        windows.Handle
+	overviewStorageHint    windows.Handle
+	overviewStoragePercent int
+	windowIcon             windows.Handle
+	connected              bool
+	visual                 settingsVisualResources
+	visualRoles            map[windows.Handle]settingsVisualRole
 
 	folders           []windowsclient.Folder
 	folderIDs         []string
@@ -344,6 +350,7 @@ func runSettingsUI(args []string) error {
 		settingsPath: settingsPath,
 		language:     preferredUILanguageForSettingsPath(settingsPath),
 		localized:    make(map[string]windows.Handle),
+		visualRoles:  make(map[windows.Handle]settingsVisualRole),
 		windowIcon:   windows.Handle(icon),
 	}
 	activeSettingsUI.Lock()
@@ -364,8 +371,8 @@ func runSettingsUI(args []string) error {
 		settingsWSOverlappedWindow,
 		0x80000000,
 		0x80000000,
-		980,
-		700,
+		1180,
+		760,
 		0,
 		0,
 		module,
@@ -375,6 +382,11 @@ func runSettingsUI(args []string) error {
 		return fmt.Errorf("create settings window: %w", createErr)
 	}
 	state.hwnd = windows.Handle(hwnd)
+	if err := state.initVisualResources(); err != nil {
+		procSettingsDestroyWindow.Call(hwnd)
+		return err
+	}
+	defer state.releaseVisualResources()
 	if err := state.createControls(windows.Handle(module)); err != nil {
 		procSettingsDestroyWindow.Call(hwnd)
 		return err
@@ -445,6 +457,14 @@ func settingsWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) ui
 	activeSettingsUI.Unlock()
 
 	switch message {
+	case settingsWMPaint:
+		if state != nil {
+			return state.paintWindow(hwnd)
+		}
+	case settingsWMCTLColorStatic:
+		if state != nil {
+			return state.handleStaticColor(wParam, lParam)
+		}
 	case settingsWMCommand:
 		if state != nil {
 			id := uint16(wParam & 0xffff)

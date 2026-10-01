@@ -34,11 +34,25 @@ jobs:
         run: go test ./...
 
       - name: Build initial Debian installer
-        run: sh ./scripts/build-deb.sh "${{ matrix.arch }}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh ./scripts/build-deb.sh "${{ matrix.arch }}"
+          DEB="$(find build/packages -maxdepth 1 -type f -name "home-ai-core_*_${{ matrix.arch }}.deb" -print -quit)"
+          test -n "$DEB"
+          dpkg-deb --info "$DEB" >/dev/null
+          CONTENTS="$(mktemp)"
+          dpkg-deb --contents "$DEB" > "$CONTENTS"
+          grep -q 'usr/bin/home-ai-core' "$CONTENTS"
+          grep -q 'usr/libexec/home-ai-core/home-ai-core-updater' "$CONTENTS"
+          rm -f "$CONTENTS"
+          sha256sum "$DEB" > "$DEB.sha256"
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
           name: installer-${{ matrix.arch }}
-          path: build/packages/*.deb
+          path: |
+            build/packages/*.deb
+            build/packages/*.deb.sha256
           if-no-files-found: error

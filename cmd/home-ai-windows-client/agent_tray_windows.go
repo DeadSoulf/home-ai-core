@@ -104,14 +104,19 @@ type trayNotifyIconData struct {
 }
 
 type windowsAgentTray struct {
-	hwnd       windows.Handle
-	logPath    string
-	configPath string
-	runNow     chan struct{}
-	exit       chan struct{}
-	exitOnce   sync.Once
-	closeOnce  sync.Once
-	done       chan struct{}
+	hwnd          windows.Handle
+	logPath       string
+	configPath    string
+	runNow        chan struct{}
+	exit          chan struct{}
+	exitOnce      sync.Once
+	closeOnce     sync.Once
+	done          chan struct{}
+	icon          windows.Handle
+	popup         windows.Handle
+	popupStatus   windows.Handle
+	popupSubtitle windows.Handle
+	popupRows     [3]windows.Handle
 
 	statusMu    sync.Mutex
 	statusText  string
@@ -210,6 +215,7 @@ func (state *windowsAgentTray) loop(ready chan<- error) {
 	if ownedBrandIcon {
 		defer destroyHomeAIIcon(brandIcon)
 	}
+	state.icon = windows.Handle(icon)
 	cursor, _, _ := procLoadCursorW.Call(0, idcArrow)
 	class := trayWndClassEx{
 		CbSize:        uint32(unsafe.Sizeof(trayWndClassEx{})),
@@ -295,7 +301,10 @@ func trayWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintpt
 			break
 		}
 		switch uint32(lParam) {
-		case wmLButtonUp, wmRButtonUp:
+		case wmLButtonUp:
+			state.showStatusPopup()
+			return 0
+		case wmRButtonUp:
 			state.showMenu()
 			return 0
 		case wmLButtonDblClk:
@@ -311,26 +320,7 @@ func trayWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintpt
 		if state == nil {
 			break
 		}
-		switch uint16(wParam & 0xffff) {
-		case traySyncNow:
-			select {
-			case state.runNow <- struct{}{}:
-			default:
-			}
-		case trayOpenLog:
-			state.openPath(state.logPath)
-		case trayOpenConfig:
-			state.openPath(state.configPath)
-		case trayOpenFolder:
-			if path := primaryLocalFolderForConfig(state.configPath); path != "" {
-				state.openPath(path)
-			}
-		case traySettings:
-			_ = startSettingsProcess(state.configPath)
-		case trayExit:
-			state.signalExit()
-			procDestroyWindow.Call(hwnd)
-		}
+		state.handleTrayCommand(uint16(wParam & 0xffff))
 		return 0
 	case wmDestroy:
 		if state != nil {
@@ -403,6 +393,7 @@ func (state *windowsAgentTray) applyStatus() {
 	}
 	copy(notify.SzTip[:], windows.StringToUTF16(tip))
 	procShellNotifyIconW.Call(nimModify, uintptr(unsafe.Pointer(&notify)))
+	state.refreshStatusPopup()
 
 	if message == "" {
 		return
