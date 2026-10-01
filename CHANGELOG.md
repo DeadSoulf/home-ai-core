@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.97-dev
+
+- Add a direct Mount action to Files → Storage for assigned filesystems that are present but not mounted.
+- Mount file storage into the managed /mnt/home-ai-core path without requiring a detour through System → Storage.
+- Automatically select the newly mounted filesystem in the Create storage pool form.
+- Keep the storage selector limited to mounted, managed filesystems so pool roots always reference usable storage.
+
 ## 0.1.96-dev
 
 - Fix mojibake characters in the Files UI where UTF-8 em dashes and middle dots were rendered as `вЂ—` / `В·`.
