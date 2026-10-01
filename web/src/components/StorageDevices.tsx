@@ -83,10 +83,14 @@ export function StorageDevices({
   devices,
   onChanged,
   canManage = false,
+  expandedByDefault = false,
+  showDiskToolbar = true,
 }: {
   devices: BlockNode[];
   onChanged: () => void;
   canManage?: boolean;
+  expandedByDefault?: boolean;
+  showDiskToolbar?: boolean;
 }) {
   const {t} = useI18n();
   const [busy, setBusy] = useState("");
@@ -101,9 +105,11 @@ export function StorageDevices({
   const [partitionPurpose, setPartitionPurpose] = useState<StoragePurpose>("files");
   const [purposes, setPurposes] = useState<StoragePurposeAssignment[]>([]);
   const [collapsed, setCollapsed] = useState<string[]>(() =>
-    devices
-      .filter((node) => node.type === "disk")
-      .map((node) => node.path || node.name),
+    expandedByDefault
+      ? []
+      : devices
+          .filter((node) => node.type === "disk")
+          .map((node) => node.path || node.name),
   );
   const [partitionProgress, setPartitionProgress] = useState<{device: string; text: string} | null>(null);
   const [columnWidths, setColumnWidths] = useState<Record<StorageColumn, number>>(initialColumnWidths);
@@ -519,22 +525,24 @@ export function StorageDevices({
         </div>
       )}
 
-      <div className="storage-tree-toolbar">
-        <button
-          type="button"
-          className="button secondary compact"
-          onClick={collapseAll}
-        >
-          {t("collapseAllDisks")}
-        </button>
-        <button
-          type="button"
-          className="button secondary compact"
-          onClick={expandAll}
-        >
-          {t("expandAllDisks")}
-        </button>
-      </div>
+      {showDiskToolbar && (
+        <div className="storage-tree-toolbar">
+          <button
+            type="button"
+            className="button secondary compact"
+            onClick={collapseAll}
+          >
+            {t("collapseAllDisks")}
+          </button>
+          <button
+            type="button"
+            className="button secondary compact"
+            onClick={expandAll}
+          >
+            {t("expandAllDisks")}
+          </button>
+        </div>
+      )}
 
       <div className="table-wrap">
         <table
