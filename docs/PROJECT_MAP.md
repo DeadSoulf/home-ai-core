@@ -9,9 +9,21 @@
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.113-dev` — Windows dashboard polish после live acceptance: RU localization, rounded controls, fixed status indicator и startup connection refresh\
 **Текущий срез:** `0.1.113-dev` опубликован; ожидается повторная live Windows acceptance исправленного dashboard/tray\
-**Следующий engineering milestone:** повторная live acceptance Windows UI/tray `0.1.113-dev` на реальном Windows; отдельно остаётся первоначальная установка Debian `.deb`, storage preflight, WireGuard reboot persistence и signing-key provisioning\
-**Состояние:** live-скриншот `0.1.111-dev` выявил смешанную RU/EN локализацию, classic buttons, clipped status check, крупные переносы текста и отсутствие startup connection refresh. `0.1.113-dev` опубликован с исправлениями; PR/main `core-ci` и release workflow зелёные, Windows `.exe`, Core bundles и Debian `.deb` amd64/arm64 опубликованы с SHA-256. Повторная live-проверка Windows ещё не выполнена.\
+**Следующий engineering milestone:** завершить live storage preflight и повторную Windows UI/tray acceptance `0.1.113-dev`; после этого основной продуктовый маршрут переходит к **F3 Native Smart Home**. Stable signing-key provisioning и long-duration updater tests остаются release/operations gates\
+**Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01: update/rollback/re-update, network reboot persistence и WireGuard reboot persistence подтверждены live; stable/RC Ed25519 verification/trust-root contract реализован. Debian initial installer acceptance также подтверждён пользователем. `0.1.113-dev` остаётся текущим Windows polish release; его повторная live UI-проверка ещё в процессе.\
 **Обновлено:** 2026-10-01
+
+### ✅ CORE FOUNDATION COMPLETE — 2026-10-01
+
+- ✅ Core API, identity, RBAC/scoped permissions, audit, jobs, events, WebSocket, modules, hardware inventory и privileged-helper boundaries завершены.
+- ✅ Update safety подтверждён automated tests и live циклом `update → rollback → re-update`.
+- ✅ Active Home-AI network configuration переживает reboot и возвращает connectivity.
+- ✅ WireGuard tunnel/peer workflow, reboot persistence, autostart и peer/handshake visibility подтверждены пользователем на живом сервере.
+- ✅ Stable/RC Core update verification fail-closed через detached Ed25519; trust-root contract реализован и протестирован.
+- ✅ Initial Debian installer acceptance подтверждён пользователем.
+- 🔐 Реальный production signing key + установка pinned public trust root остаются **stable-release operational gate**, а не незавершённой функцией Core.
+- 🧪 Live storage dry-run/preflight и long-duration updater interruption/recovery tests остаются release-hardening checks.
+- 🧪 Windows visual/DPI/tray acceptance относится к Windows client product work и не переоткрывает Core Foundation.
 
 ### Выпуск 0.1.113-dev — Windows dashboard polish после live acceptance
 
@@ -41,14 +53,14 @@
 ### Сводка завершённых работ 0.1.109–0.1.112
 
 - ✅ **Core update safety:** negative bundle tests, полный live `update → rollback → re-update`, сохранение login/System/state и повторный нормальный запуск.
-- ✅ **Network persistence:** после reboot сеть подтверждена рабочей на живом сервере; отдельная WireGuard persistence-проверка остаётся открытой.
+- ✅ **Network persistence:** после reboot сеть подтверждена рабочей на живом сервере; WireGuard reboot/autostart/handshake acceptance также подтверждён.
 - ✅ **Security/update signing:** detached Ed25519 verification и fail-closed для stable/RC реализованы; private signing key не хранится в репозитории/на node.
 - ✅ **Storage safety:** destructive storage Web actions получили read-only dry-run/preflight до подтверждённого изменения.
 - ✅ **Windows client:** утверждённый HOME AI dashboard, sidebar navigation, cards, tray popup, сохранённый sync/agent/Credential Manager engine.
 - ✅ **Initial Debian installer:** amd64/arm64 `.deb` теперь собираются/инспектируются в CI и публикуются versioned вместе с релизом.
 - ✅ **Project attribution:** `TexNik` закреплён в NOTICE/LICENSE/README, Web UI, Windows UI и Debian package metadata.
 - ✅ **Release pipeline:** `0.1.109-dev` → `0.1.112-dev` опубликованы с требуемыми Core/Windows/Debian artifacts и SHA-256.
-- 🧪 Открыты только отдельные live/operational gates: Windows visual/DPI/tray acceptance, initial Debian install acceptance, storage preflight live acceptance, WireGuard reboot persistence, signing-key/trust-root provisioning и long-duration updater failure testing.
+- 🧪 После закрытия Core остаются отдельные product/release checks: Windows visual/DPI/tray acceptance, storage preflight live acceptance, signing-key/trust-root provisioning и long-duration updater failure testing.
 
 ### Выпуск 0.1.111-dev — Windows visual UI + initial Debian installer
 
@@ -62,7 +74,7 @@
 - ✅ Сохранён release signing из `0.1.110-dev`: Debian job добавлен поверх актуального workflow без удаления **Sign Core update checksums** / Ed25519 trust path.
 - ✅ Release workflow опубликовал `v0.1.111-dev`: Core update bundles amd64/arm64, Windows `.exe`, `home-ai-core_0.1.111.dev_amd64.deb`, `home-ai-core_0.1.111.dev_arm64.deb` и соответствующие SHA-256.
 - 🧪 Требуется визуальная проверка на реальном Windows: геометрия карточек, DPI/scaling, RU/EN тексты, Tab navigation и tray popup.
-- 🧪 Требуется первоначальная установка опубликованного `.deb` на чистом/тестовом Debian и проверка systemd Core + updater после установки.
+- ✅ Первоначальная установка опубликованного Debian `.deb` подтверждена пользователем на живой системе; installer acceptance закрыт.
 - 🚧 Точное расписание по дням/часам и отдельный Explorer virtual-drive/provider этим срезом не заявляются; текущий scheduler остаётся interval-based.
 ### Выпуск 0.1.110-dev — security / repository hardening
 
@@ -86,7 +98,7 @@
 - ✅ Live update → rollback на `0.1.109-dev` подтверждён пользователем 2026-10-01: после отката Core/Web/login/state сохранили работоспособность.
 - ✅ Re-update до `0.1.109-dev` после rollback подтверждён пользователем; нормальная работа сохранена.
 - ✅ Сеть после reboot подтверждена рабочей; конкретный активный режим DHCP/static в этом прогоне не зафиксирован и не выводится предположением.
-- 🧪 WireGuard reboot persistence остаётся отдельной открытой live-проверкой.
+- ✅ WireGuard tunnel/peer, reboot persistence, autostart и handshake visibility подтверждены пользователем; live gate закрыт.
 - ✅ PR #92 прошёл полный `core-ci`; release workflow опубликовал `v0.1.109-dev` с Core amd64/arm64 bundles и Windows `.exe` + SHA-256.
 - ✅ PR #96 и #99 зафиксировали live acceptance: update/rollback/re-update и network-after-reboot результаты внесены в canonical Core acceptance docs.
 - ✅ Stable-channel Ed25519 verification/fail-closed код реализован в `0.1.110-dev`; до production/stable остаётся operational provisioning dedicated signing key + trust root.
@@ -568,7 +580,7 @@ Check
 - ✅ negative update-bundle tests для tamper/unexpected-file/path-traversal;
 - ✅ полный `update → rollback → re-update` подтверждён на живом сервере (`0.1.109-dev`);
 - ✅ активная Home-AI network configuration переживает reboot и возвращает connectivity; точный режим DHCP/static в этом прогоне не фиксировался;
-- 🧪 WireGuard reboot/autostart/handshake acceptance остаётся отдельным live gate из [CORE_ACCEPTANCE.md](CORE_ACCEPTANCE.md);
+- ✅ WireGuard reboot/autostart/handshake acceptance подтверждён пользователем и закрыт в [CORE_ACCEPTANCE.md](CORE_ACCEPTANCE.md);
 - ✅ stable/RC fail-closed Ed25519 verification реализован в `0.1.110-dev`;
 - 🔐 operational provisioning signing key + pinned trust root остаётся до stable/commercial release;
 - ⏭ targeted tests для privileged routing/validation при следующем package-level refactor.
@@ -1042,9 +1054,9 @@ AI не может расширять собственные права.
 | `0.1.106-dev` | ✅ Direct host df capacity | `findmnt → df -B1` подтверждён на живом сервере; total/free отображаются |
 | `0.1.107-dev` | 🧪 Windows client light UI | Обзор/Подключение/Синхронизация/Резервные копии/Настройки, Tab navigation, HOME AI icon/tray; live Windows acceptance pending |
 | `0.1.108-dev` | 🧪 Folder usage host du | fallback для **Занято / лимит** через privileged host `du`; live confirmation pending |
-| `0.1.109-dev` | 🧪 Core 1.0 readiness | полный update → rollback → re-update и active-network reboot acceptance пройдены; WireGuard и remaining readiness gates остаются |
+| `0.1.109-dev` | ✅ Core 1.0 readiness base | полный update → rollback → re-update, network reboot и WireGuard live acceptance пройдены; Foundation позднее формально закрыт как COMPLETE |
 | `0.1.110-dev` | 🧪 Security/repository hardening | опубликовано: Apache-2.0, Ed25519 Core update verification, storage dry-run/preflight; live acceptance и signing-key provisioning pending |
-| `0.1.111-dev` | 🧪 Windows visual UI + Debian installer | опубликовано: dashboard/tray UI, Windows `.exe`, initial `.deb` amd64/arm64 + SHA-256; automated CI зелёный, live Windows/Debian acceptance pending |
+| `0.1.111-dev` | 🧪 Windows visual UI + Debian installer | dashboard/tray опубликованы; Debian initial installer live acceptance подтверждён; повторная Windows UI acceptance продолжается |
 | `0.1.112-dev` | ✅ TexNik copyright attribution | опубликовано: NOTICE/LICENSE/README/Web/Windows/Debian attribution; runtime behavior unchanged; полный CI/release зелёный |
 | `0.1.113-dev` | 🧪 Windows UI polish | опубликовано: RU localization, owner-draw buttons, fixed status check, compact cards, silent startup connection refresh; automated CI/release зелёные, repeat live acceptance pending |
 

@@ -49,14 +49,19 @@ Use a non-critical physical interface when possible.
 
 ## WireGuard
 
-- [ ] Install `wireguard-tools` from Web.
-- [ ] Create a test `wg0` tunnel.
-- [ ] Add a peer.
-- [ ] Confirm the tunnel starts.
-- [ ] Reboot.
-- [ ] Confirm `wg0` starts automatically.
-- [ ] Confirm peer state/handshake data is visible in Web.
-- [ ] Remove the test tunnel when finished.
+- [x] Install `wireguard-tools` from Web.
+- [x] Create a test `wg0` tunnel.
+- [x] Add a peer.
+- [x] Confirm the tunnel starts.
+- [x] Reboot.
+- [x] Confirm `wg0` starts automatically.
+- [x] Confirm peer state/handshake data is visible in Web.
+- [x] Remove the test tunnel when finished.
+
+### WireGuard live acceptance — 2026-10-01
+
+- WireGuard tunnel/peer workflow, reboot persistence, automatic start and peer/handshake visibility were confirmed working by the user.
+- The exact test peer/address values are intentionally not recorded in project documentation.
 
 ## Result recording
 
