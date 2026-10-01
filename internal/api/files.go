@@ -79,7 +79,7 @@ func (s *server) filePools(
 		}
 		pools := make([]filePoolResponse, 0, len(records))
 		for _, record := range records {
-			pools = append(pools, filePoolResponseFor(record))
+			pools = append(pools, s.filePoolResponse(r.Context(), record))
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"pools": pools})
 	case http.MethodPost:
@@ -141,7 +141,7 @@ func (s *server) filePools(
 				},
 			)
 			s.realtime.Publish("files.pool.created", map[string]any{"pool_id": record.ID}, requestIDFromContext(r.Context()))
-			writeJSON(w, http.StatusCreated, map[string]any{"pool": filePoolResponseFor(record)})
+			writeJSON(w, http.StatusCreated, map[string]any{"pool": s.filePoolResponse(r.Context(), record)})
 		}
 	default:
 		w.Header().Set("Allow", http.MethodGet+", "+http.MethodPost)
@@ -934,6 +934,75 @@ func (s *server) authorizedFileFolder(
 	return folder, root, true
 }
 
+func (s *server) filePoolResponse(ctx context.Context, record state.NASPoolRecord) filePoolResponse {
+	response := filePoolResponseFor(record)
+	if response.CapacityKnown {
+		return response
+	}
+	capacity, ok := s.filePoolCapacityFallback(ctx, record)
+	if !ok {
+		return response
+	}
+	applyFilePoolCapacity(&response, record, capacity)
+	return response
+}
+
+func (s *server) filePoolCapacityFallback(ctx context.Context, record state.NASPoolRecord) (filedata.Capacity, bool) {
+	nodes := systeminfo.Collect(s.nodeID).BlockTree
+	assignment := state.StoragePurposeRecord{
+		DevicePath:     record.StorageDevicePath,
+		FilesystemUUID: record.StorageFilesystemUUID,
+		Purpose:        state.StoragePurposeFiles,
+	}
+	node, ok := blockNodeForStoragePurpose(nodes, assignment)
+	if !ok || node.SizeBytes == 0 {
+		return filedata.Capacity{}, false
+	}
+
+	freeBytes := node.FreeBytes
+	freeKnown := node.FreeKnown
+	if !freeKnown {
+		if inspection, err := storage.Inspect(ctx); err == nil {
+			for _, stat := range inspection.Filesystems {
+				if filepath.Clean(strings.TrimSpace(stat.Device)) != filepath.Clean(strings.TrimSpace(node.Path)) {
+					continue
+				}
+				if stat.FreeKnown {
+					freeBytes = stat.FreeBytes
+					freeKnown = true
+				}
+				break
+			}
+		}
+	}
+	if !freeKnown {
+		return filedata.Capacity{}, false
+	}
+	return filedata.Capacity{
+		TotalBytes: node.SizeBytes,
+		FreeBytes:  freeBytes,
+	}, true
+}
+
+func applyFilePoolCapacity(response *filePoolResponse, record state.NASPoolRecord, capacity filedata.Capacity) {
+	if response == nil {
+		return
+	}
+	response.CapacityKnown = true
+	response.SizeBytes = capacity.TotalBytes
+	response.FreeBytes = capacity.FreeBytes
+	response.ReserveBytes = capacityPercentBytes(capacity.TotalBytes, record.ReservePercent)
+	response.WarningBytes = capacityPercentBytes(capacity.TotalBytes, record.WarningPercent)
+	switch {
+	case record.ReservePercent > 0 && capacity.FreeBytes <= response.ReserveBytes:
+		response.CapacityState = "reserve"
+	case record.WarningPercent > 0 && capacity.FreeBytes <= response.WarningBytes:
+		response.CapacityState = "warning"
+	default:
+		response.CapacityState = "ok"
+	}
+}
+
 func filePoolResponseFor(record state.NASPoolRecord) filePoolResponse {
 	response := filePoolResponse{
 		ID:                    record.ID,
@@ -949,19 +1018,7 @@ func filePoolResponseFor(record state.NASPoolRecord) filePoolResponse {
 	if err != nil {
 		return response
 	}
-	response.CapacityKnown = true
-	response.SizeBytes = capacity.TotalBytes
-	response.FreeBytes = capacity.FreeBytes
-	response.ReserveBytes = capacityPercentBytes(capacity.TotalBytes, record.ReservePercent)
-	response.WarningBytes = capacityPercentBytes(capacity.TotalBytes, record.WarningPercent)
-	switch {
-	case record.ReservePercent > 0 && capacity.FreeBytes <= response.ReserveBytes:
-		response.CapacityState = "reserve"
-	case record.WarningPercent > 0 && capacity.FreeBytes <= response.WarningBytes:
-		response.CapacityState = "warning"
-	default:
-		response.CapacityState = "ok"
-	}
+	applyFilePoolCapacity(&response, record, capacity)
 	return response
 }
 
@@ -979,6 +1036,14 @@ func filePoolWriteAllowance(
 	folder state.NASFolderRecord,
 ) (int64, bool) {
 	capacity, err := readFilePoolCapacity(folder.PoolRoot)
+	if err != nil {
+		if pool, poolErr := s.state.NASPool(r.Context(), folder.PoolID); poolErr == nil {
+			if fallback, ok := s.filePoolCapacityFallback(r.Context(), pool); ok {
+				capacity = fallback
+				err = nil
+			}
+		}
+	}
 	if err != nil {
 		writeAPIError(
 			w,
@@ -1008,6 +1073,14 @@ func writeFilePoolReserveError(
 	folder state.NASFolderRecord,
 ) {
 	capacity, err := readFilePoolCapacity(folder.PoolRoot)
+	if err != nil {
+		if pool, poolErr := s.state.NASPool(r.Context(), folder.PoolID); poolErr == nil {
+			if fallback, ok := s.filePoolCapacityFallback(r.Context(), pool); ok {
+				capacity = fallback
+				err = nil
+			}
+		}
+	}
 	if err != nil {
 		writeAPIError(
 			w,
@@ -1125,7 +1198,7 @@ func (s *server) filePoolCapacityPolicy(
 			requestIDFromContext(r.Context()),
 		)
 		warning := s.finishSMBAccessChange(r, active)
-		writeJSON(w, http.StatusOK, map[string]any{"pool": filePoolResponseFor(record), "hard_quota_error": hardQuotaError, "warning": warning})
+		writeJSON(w, http.StatusOK, map[string]any{"pool": s.filePoolResponse(r.Context(), record), "hard_quota_error": hardQuotaError, "warning": warning})
 	}
 }
 
