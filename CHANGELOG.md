@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.111-dev
+
+- Implement the approved HOME AI Windows dashboard design with a Windows 11-style light layout, left navigation, rounded status/cards, recent synchronization activity, backup status and HOME AI storage usage.
+- Add a compact HOME AI tray status popup on normal left click while keeping the right-click context menu and existing single-agent synchronization engine.
+- Preserve the existing keyboard navigation, Credential Manager authentication, sync profiles, queue/copy engine, background agent, Explorer folder access and client update path.
+- Extend Windows folder metadata handling with optional used/quota values so the dashboard can show storage usage when the server provides it.
+- Add native Windows coverage for the visual resources, dashboard formatting and tray-popup snapshot, alongside the existing Windows client test suite and cross-build.
+- Build and inspect the initial Debian installer for amd64 and arm64 in normal CI.
+- Build version-matched Debian initial installers on every VERSION release and publish each `.deb` plus its SHA-256 alongside Core update bundles and the Windows client.
+- Keep the existing Core update checksum signing step intact; Debian-installer publication does not weaken the 0.1.110-dev Ed25519 update trust path.
+- Real Windows visual/tray acceptance and installation of the published Debian packages on a physical Debian node remain live acceptance steps.
+
 ## 0.1.110-dev
 
 - Add Apache-2.0 licensing for the public repository.
