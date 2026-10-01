@@ -294,6 +294,13 @@ export type NetworkProfileStatus = {
 
 export type StoragePurpose = "files" | "video";
 
+export type StoragePurposeUsage = {
+  type: "file_pool";
+  id: string;
+  name: string;
+  root_path?: string;
+};
+
 export type StoragePurposeAssignment = {
   device: string;
   filesystem_uuid?: string;
@@ -305,6 +312,8 @@ export type StoragePurposeAssignment = {
   size_bytes?: number;
   free_bytes?: number;
   free_known: boolean;
+  in_use: boolean;
+  used_by: StoragePurposeUsage[];
 };
 
 export type FilePool = {
