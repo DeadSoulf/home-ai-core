@@ -498,6 +498,7 @@ export const api = {
     purpose?: StoragePurpose;
   }) => postJSON<{
     message: string;
+    mountpoint?: string;
     device?: string;
     purpose?: StoragePurpose;
     purpose_assigned?: boolean;
