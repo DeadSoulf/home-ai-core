@@ -19,7 +19,9 @@ export function Shell(props: {
   const menuButton = useRef<HTMLButtonElement>(null);
   const sidebar = useRef<HTMLElement>(null);
   const groups = visibleNavigation(props.actor);
-  const current = groups.flatMap((group) => group.items).find((item) => item.path === props.path.split("#")[0]);
+  const route = props.path.split("#")[0];
+  const isActivePath = (path: string) => path === "/" ? route === "/" : route === path || route.startsWith(path + "/");
+  const current = groups.flatMap((group) => group.items).find((item) => isActivePath(item.path));
   const closeMenu = () => {
     setMenuOpen(false);
   };
@@ -85,8 +87,8 @@ export function Shell(props: {
             <div className="nav-group" key={group.label}>
               {group.label !== "home" && <span className="nav-group-label">{t(group.label)}</span>}
               {group.items.map(({path, label}) => (
-                <button type="button" key={path} className={props.path.split("#")[0] === path ? "nav-item active" : "nav-item"}
-                  aria-current={props.path.split("#")[0] === path ? "page" : undefined}
+                <button type="button" key={path} className={isActivePath(path) ? "nav-item active" : "nav-item"}
+                  aria-current={isActivePath(path) ? "page" : undefined}
                   onClick={() => { props.onNavigate(path); if (menuOpen) closeMenu(); }}>
                   <span>{t(label)}</span>
                   {path === "/system" && props.availableUpdate && hasPermission(props.actor, "updates.read") &&
