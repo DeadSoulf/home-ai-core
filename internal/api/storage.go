@@ -36,6 +36,7 @@ func (s *server) storageOperation(
 		Filesystem string `json:"filesystem,omitempty"`
 		Label      string `json:"label,omitempty"`
 		Confirm    string `json:"confirm,omitempty"`
+		DryRun     bool   `json:"dry_run,omitempty"`
 		SizeMiB    uint64 `json:"size_mib,omitempty"`
 		Purpose    string `json:"purpose,omitempty"`
 	}
@@ -106,11 +107,26 @@ func (s *server) storageOperation(
 		Filesystem: input.Filesystem,
 		Label:      input.Label,
 		Confirm:    input.Confirm,
+		DryRun:     input.DryRun,
 		SizeMiB:    input.SizeMiB,
 	})
 	if err != nil {
 		s.logger.Error("storage operation failed", "operation", input.Operation, "device", input.Device, "error", err)
 		writeAPIError(w, r, http.StatusBadGateway, "storage_operation_failed", err.Error(), nil)
+		return
+	}
+	if input.DryRun {
+		s.security.RecordAudit(
+			r.Context(),
+			s.securityRequestContext(r),
+			actor,
+			"storage."+input.Operation+".plan",
+			"block_device",
+			input.Device,
+			"success",
+			map[string]any{"filesystem": input.Filesystem, "label": input.Label, "size_mib": input.SizeMiB},
+		)
+		writeJSON(w, http.StatusOK, map[string]any{"message": message, "dry_run": true})
 		return
 	}
 	storage.InvalidateInspectionCache()
