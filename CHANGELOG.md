@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.114-dev
+
+- Add a standalone **Safety check / Проверить безопасность** action to the physical-disk page.
+- Add a dedicated `preflight` API mode that is forcibly mapped server-side to the existing destructive storage planner with `dry_run=true`.
+- Make the standalone preflight path incapable of formatting, deleting partitions or mutating the disk even when the client omits the dry-run flag.
+- Reuse existing system-disk, Home-AI pool usage, mount, active swap and cross-disk LVM safety checks and return the resulting read-only plan to the UI.
+- Record standalone checks as `storage.preflight.plan` audit events.
+- Add RU/EN copy explaining that the check is read-only and makes no disk changes.
+- Add regression coverage proving the preflight API mode always forces dry-run.
+- Keep the existing automatic preflight before format/create/delete operations unchanged.
+
 ## 0.1.113-dev
 
 - Fix the live-accepted Windows dashboard after the 0.1.111 screenshot exposed mixed Russian/English labels, oversized card copy, classic heavy buttons and a clipped status check.
