@@ -75,7 +75,7 @@ describe("storage disk-first overview", () => {
       </I18nProvider>,
     );
 
-    expect(markup.match(/class="storage-disk-card/g)).toHaveLength(2);
+    expect(markup.match(/class="storage-disk-card"/g)).toHaveLength(2);
     expect(markup).toContain("Data disk");
     expect(markup).toContain("Video disk");
     expect(markup).not.toContain("Files partition");
