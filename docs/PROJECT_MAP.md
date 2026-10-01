@@ -7,13 +7,13 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.116-dev` — compact Figma Windows UI: меньшее окно, logo-style sidebar, gradient hero и compact cards\
-**Текущий срез:** `0.1.117-dev` — первый вызываемый **AI Agent read-tool/API** слой: system/jobs/modules tools, permission filtering, timeout и Audit; compact Windows UI `0.1.116-dev` опубликован и ожидает live visual/DPI acceptance\
-**Следующий engineering milestone:** завершить и опубликовать `0.1.117-dev`; затем local model provider + persistent AI sessions + streaming Web chat. Параллельно live acceptance compact Windows UI `0.1.116-dev`; stable signing-key provisioning и long-duration updater tests остаются release/operations gates\
+**Последний опубликованный релиз:** `0.1.117-dev` — первый вызываемый AI Agent read-tool/API слой: system/jobs/modules tools, permission filtering, timeout и Audit\
+**Текущий срез:** `0.1.117-dev` опубликован: **AI Agent read-tool/API** слой доступен через authenticated API; compact Windows UI `0.1.116-dev` остаётся на параллельной live visual/DPI acceptance\
+**Следующий engineering milestone:** **AI Local Conversation** — local model provider adapter, persistent AI sessions, streaming Web chat, context limits/cancellation и provider health UI. Параллельно live acceptance compact Windows UI `0.1.116-dev`; stable signing-key provisioning и long-duration updater tests остаются release/operations gates\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent развивается как first-party module: `0.1.115-dev` дал tool/provider contracts, `0.1.117-dev` добавляет реальные read-only Core tools + authenticated API + audit. Compact Windows UI `0.1.116-dev` опубликован и не откатывается; его live visual/DPI acceptance ещё открыт.\
 **Обновлено:** 2026-10-01
 
-### Кандидат 0.1.117-dev — AI Agent read tools + API
+### Выпуск 0.1.117-dev — AI Agent read tools + API
 
 - ✅ Добавлены реальные read-only tools: `core.system.status`, `core.jobs.list`, `core.modules.list`.
 - ✅ Tool discovery фильтруется по effective permissions текущего пользователя.
@@ -24,7 +24,9 @@
 - ✅ Каждое выполнение ограничено server-side timeout.
 - ✅ Audit пишет `ai.tool.execute` для success/denied/failed без raw AI input.
 - ✅ Regression tests покрывают permission-filtered discovery, success, denial, audit и payload redaction.
-- 🚧 Требуется полный CI/release; после этого следующий срез — local model provider + persistent sessions + streaming Web chat.
+- ✅ PR #110 прошёл полный `core-ci`; main CI также завершился успешно.
+- ✅ Release workflow опубликовал `v0.1.117-dev` с Core update bundles amd64/arm64, Windows `.exe`, Debian `.deb` amd64/arm64 и SHA-256.
+- ⏭ Следующий срез — local model provider + persistent sessions + streaming Web chat.
 
 ### Выпуск 0.1.116-dev — compact Figma Windows client
 
@@ -1144,7 +1146,7 @@ AI не может расширять собственные права.
 | `0.1.114-dev` | ✅ Standalone storage preflight | опубликовано и live-подтверждено: Safety check + forced server-side dry-run + audit/test |
 | `0.1.115-dev` | ✅ AI Agent Foundation v1 contracts | опубликовано: first-party `ai.agent`, Tool Registry, provider contract, permission/scope/approval boundaries + tests; API/audit/read tools next |
 | `0.1.116-dev` | 🧪 Compact Figma Windows UI | опубликовано: native window `976×635`, dark logo-style sidebar, gradient hero, compact cards/pages; automated CI/release зелёные, live acceptance pending |
-| `0.1.117-dev` | 🚧 AI read tools + API | system/jobs/modules read tools + permission filtering + timeout + audit + authenticated API; CI/release pending |
+| `0.1.117-dev` | ✅ AI read tools + API | опубликовано: system/jobs/modules read tools + permission filtering + timeout + audit + authenticated API; PR/main CI и release зелёные |
 
 ## 10. Правило ведения карты
 
