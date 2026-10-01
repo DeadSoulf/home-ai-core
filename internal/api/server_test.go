@@ -840,6 +840,81 @@ func TestStoragePurposeResponseKeepsMissingAssignment(t *testing.T) {
 	}
 }
 
+func TestStorageUsageMatchesFilePoolMount(t *testing.T) {
+	node := systeminfo.BlockNode{
+		Path:        "/dev/sdb1",
+		Type:        "part",
+		Mountpoints: []string{"/mnt/home-ai-core/files"},
+	}
+	pools := []state.NASPoolRecord{
+		{ID: "nsp-main", Name: "Main", RootPath: "/mnt/home-ai-core/files"},
+	}
+	usage := storageUsageForNode(node, pools)
+	if len(usage) != 1 {
+		t.Fatalf("usage = %#v", usage)
+	}
+	if usage[0].Type != "file_pool" || usage[0].ID != "nsp-main" || usage[0].Name != "Main" {
+		t.Fatalf("unexpected usage: %#v", usage[0])
+	}
+}
+
+func TestStorageUsageMatchesPoolBelowMountAndDescendants(t *testing.T) {
+	node := systeminfo.BlockNode{
+		Path: "/dev/sdb1",
+		Type: "part",
+		Children: []systeminfo.BlockNode{
+			{
+				Path:        "/dev/mapper/vg-data",
+				Type:        "lvm",
+				Mountpoints: []string{"/mnt/home-ai-core/data"},
+			},
+		},
+	}
+	pools := []state.NASPoolRecord{
+		{ID: "nsp-main", Name: "Main", RootPath: "/mnt/home-ai-core/data/pool-root"},
+	}
+	usage := storageUsageForNode(node, pools)
+	if len(usage) != 1 || usage[0].ID != "nsp-main" {
+		t.Fatalf("usage = %#v", usage)
+	}
+}
+
+func TestStorageUsageDoesNotMatchSiblingPrefix(t *testing.T) {
+	usage := storageUsageForMountpoints(
+		[]string{"/mnt/home-ai-core/data"},
+		[]state.NASPoolRecord{{ID: "nsp-other", Name: "Other", RootPath: "/mnt/home-ai-core/data2"}},
+	)
+	if len(usage) != 0 {
+		t.Fatalf("unexpected sibling usage: %#v", usage)
+	}
+}
+
+func TestStoragePurposeUsageResponseMarksAssignedStorageBusy(t *testing.T) {
+	record := state.StoragePurposeRecord{
+		DevicePath:     "/dev/sdb1",
+		FilesystemUUID: "uuid-files",
+		Purpose:        state.StoragePurposeFiles,
+	}
+	nodes := []systeminfo.BlockNode{{
+		Path:           "/dev/sdb1",
+		Type:           "part",
+		UUID:           "uuid-files",
+		Filesystem:     "ext4",
+		Mountpoints:    []string{"/mnt/home-ai-core/files"},
+		SizeBytes:      1000,
+		FreeBytes:      400,
+		FreeKnown:      true,
+	}}
+	response := storagePurposeResponseFor(record, nodes)
+	response.UsedBy = storageUsageForMountpoints(response.Mountpoints, []state.NASPoolRecord{{
+		ID: "nsp-main", Name: "Main", RootPath: "/mnt/home-ai-core/files",
+	}})
+	response.InUse = len(response.UsedBy) > 0
+	if !response.InUse || len(response.UsedBy) != 1 || response.UsedBy[0].ID != "nsp-main" {
+		t.Fatalf("unexpected response usage: %#v", response)
+	}
+}
+
 func TestFilePoolCreateRequiresManage(t *testing.T) {
 	sec := defaultFakeSecurity()
 	sec.actor.Permissions = []string{"security.self.read"}
