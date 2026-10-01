@@ -5,8 +5,8 @@
 > Аудит уже сделанного: [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
-**Последний опубликованный релиз:** `0.1.83-dev` — единые пользователи и настраиваемые права доступа\
-**Текущий срез:** `0.1.84-dev` — release candidate; automatic Windows client release update\
+**Последний опубликованный релиз:** `0.1.84-dev` — автоматическое проверяемое обновление Windows-клиента\
+**Текущий срез:** `0.1.84-dev` — published; live Windows update acceptance pending\
 **Следующий engineering milestone:** live acceptance unified users, storage-purpose и Windows update; затем F2 quotas/policies и дальнейшая стабилизация NAS\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-10-01
@@ -22,6 +22,7 @@
 - Если работает tray-agent, сохраняется существующий штатный WM_CLOSE → replace → restart flow.
 - Пароли, bearer tokens и Home-AI credentials в update process arguments/state не передаются.
 - ADR-0032 и PR #58 прошли полный CI, включая native Windows tests и Windows cross-build.
+- Release workflow опубликовал `v0.1.84-dev`: amd64/arm64 Core bundles и Windows `.exe` + `.sha256`.
 - Практическая проверка `0.1.83-dev → 0.1.84-dev` на реальном Windows остаётся acceptance step.
 
 ### Выпуск 0.1.83-dev — единые пользователи и права доступа
