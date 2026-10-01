@@ -98,6 +98,7 @@ export function StorageDevices({
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [preflightDevice, setPreflightDevice] = useState("");
   const [formatDevice, setFormatDevice] = useState("");
   const [createDisk, setCreateDisk] = useState("");
   const [partitionSizeGiB, setPartitionSizeGiB] = useState("");
@@ -281,6 +282,26 @@ export function StorageDevices({
     } catch (reason) {
       setStorageError(reason);
     } finally {
+      setBusy("");
+    }
+  }
+
+  async function preflight(node: BlockNode) {
+    if (!node.path || node.type !== "disk") return;
+    setBusy(node.path);
+    setPreflightDevice(node.path);
+    setError("");
+    setMessage("");
+    try {
+      const result = await api.storageOperation({
+        operation: "preflight",
+        device: node.path,
+      });
+      setMessage(t("storagePreflightPassed") + " " + result.message);
+    } catch (reason) {
+      setStorageError(reason);
+    } finally {
+      setPreflightDevice("");
       setBusy("");
     }
   }
@@ -571,6 +592,15 @@ export function StorageDevices({
 
         {canManage && (
           <div className="storage-disk-action-bar">
+            <button
+              type="button"
+              className="button secondary"
+              disabled={operationBusy || !node.path}
+              title={t("storagePreflightHint")}
+              onClick={() => preflight(node)}
+            >
+              {preflightDevice === node.path ? t("storagePreflightRunning") : t("storagePreflight")}
+            </button>
             <button
               type="button"
               className="button secondary"
