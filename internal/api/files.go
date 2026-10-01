@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -22,6 +23,7 @@ var (
 	resolveFilePoolStorage = func(nodeID, rootPath string, assignments []state.StoragePurposeRecord) (systeminfo.BlockNode, error) {
 		return filePoolStorageNode(rootPath, assignments, systeminfo.Collect(nodeID).BlockTree)
 	}
+	readFilePoolCapacity = filedata.ReadCapacity
 )
 
 type filePoolResponse struct {
@@ -30,6 +32,14 @@ type filePoolResponse struct {
 	RootPath              string `json:"root_path"`
 	StorageDevicePath     string `json:"storage_device,omitempty"`
 	StorageFilesystemUUID string `json:"storage_filesystem_uuid,omitempty"`
+	ReservePercent        int    `json:"reserve_percent"`
+	WarningPercent        int    `json:"warning_percent"`
+	CapacityKnown         bool   `json:"capacity_known"`
+	SizeBytes             uint64 `json:"size_bytes,omitempty"`
+	FreeBytes             uint64 `json:"free_bytes,omitempty"`
+	ReserveBytes          uint64 `json:"reserve_bytes,omitempty"`
+	WarningBytes          uint64 `json:"warning_bytes,omitempty"`
+	CapacityState         string `json:"capacity_state"`
 }
 
 type fileFolderResponse struct {
@@ -59,13 +69,7 @@ func (s *server) filePools(
 		}
 		pools := make([]filePoolResponse, 0, len(records))
 		for _, record := range records {
-			pools = append(pools, filePoolResponse{
-				ID:                    record.ID,
-				Name:                  record.Name,
-				RootPath:              record.RootPath,
-				StorageDevicePath:     record.StorageDevicePath,
-				StorageFilesystemUUID: record.StorageFilesystemUUID,
-			})
+			pools = append(pools, filePoolResponseFor(record))
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"pools": pools})
 	case http.MethodPost:
@@ -127,13 +131,7 @@ func (s *server) filePools(
 				},
 			)
 			s.realtime.Publish("files.pool.created", map[string]any{"pool_id": record.ID}, requestIDFromContext(r.Context()))
-			writeJSON(w, http.StatusCreated, map[string]any{"pool": filePoolResponse{
-				ID:                    record.ID,
-				Name:                  record.Name,
-				RootPath:              record.RootPath,
-				StorageDevicePath:     record.StorageDevicePath,
-				StorageFilesystemUUID: record.StorageFilesystemUUID,
-			}})
+			writeJSON(w, http.StatusCreated, map[string]any{"pool": filePoolResponseFor(record)})
 		}
 	default:
 		w.Header().Set("Allow", http.MethodGet+", "+http.MethodPost)
@@ -347,12 +345,20 @@ func (s *server) fileFolderContent(
 		defer file.Close()
 		http.ServeContent(w, r, info.Name(), info.ModTime(), file)
 	case http.MethodPut:
+		allowance, ok := filePoolWriteAllowance(w, r, folder)
+		if !ok {
+			return
+		}
 		r.Body = http.MaxBytesReader(w, r.Body, maxFileUploadBytes)
-		written, err := filedata.Upload(root, relative, r.Body)
+		written, err := filedata.UploadLimited(root, relative, r.Body, allowance)
 		if err != nil {
 			var maxErr *http.MaxBytesError
 			if errors.As(err, &maxErr) {
 				writeAPIError(w, r, http.StatusRequestEntityTooLarge, "file_too_large", "file exceeds upload limit", nil)
+				return
+			}
+			if errors.Is(err, filedata.ErrCapacityLimit) {
+				writeFilePoolReserveError(w, r, folder)
 				return
 			}
 			writeAPIError(w, r, http.StatusBadRequest, "file_upload_failed", err.Error(), nil)
@@ -414,6 +420,14 @@ func (s *server) fileFolderUploads(
 		}
 		if err := decodeJSON(w, r, &input); err != nil {
 			writeAPIError(w, r, http.StatusBadRequest, "invalid_file_upload", err.Error(), nil)
+			return
+		}
+		allowance, ok := filePoolWriteAllowance(w, r, folder)
+		if !ok {
+			return
+		}
+		if input.TotalBytes > allowance {
+			writeFilePoolReserveError(w, r, folder)
 			return
 		}
 		session, err := filedata.CreateUpload(
@@ -521,9 +535,21 @@ func (s *server) fileFolderUploadChunk(
 		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
 		return
 	}
-	_, root, ok := s.authorizedFileFolder(w, r, actor, true)
+	folder, root, ok := s.authorizedFileFolder(w, r, actor, true)
 	if !ok {
 		return
+	}
+	allowance, ok := filePoolWriteAllowance(w, r, folder)
+	if !ok {
+		return
+	}
+	if allowance <= 0 {
+		writeFilePoolReserveError(w, r, folder)
+		return
+	}
+	chunkLimit := filedata.MaxUploadChunkBytes
+	if allowance < chunkLimit {
+		chunkLimit = allowance
 	}
 
 	offset, err := strconv.ParseInt(strings.TrimSpace(r.Header.Get("Upload-Offset")), 10, 64)
@@ -537,7 +563,7 @@ func (s *server) fileFolderUploadChunk(
 		offset,
 		r.Header.Get("X-Chunk-SHA256"),
 		r.Body,
-		filedata.MaxUploadChunkBytes,
+		chunkLimit,
 		time.Now().UTC(),
 	)
 	switch {
@@ -547,6 +573,8 @@ func (s *server) fileFolderUploadChunk(
 		writeAPIError(w, r, http.StatusConflict, "file_upload_offset_mismatch", err.Error(), nil)
 	case errors.Is(err, filedata.ErrUploadChecksumMismatch):
 		writeAPIError(w, r, http.StatusUnprocessableEntity, "file_upload_checksum_mismatch", err.Error(), nil)
+	case errors.Is(err, filedata.ErrUploadChunkTooLarge) && chunkLimit < filedata.MaxUploadChunkBytes:
+		writeFilePoolReserveError(w, r, folder)
 	case errors.Is(err, filedata.ErrUploadChunkTooLarge):
 		writeAPIError(w, r, http.StatusRequestEntityTooLarge, "file_upload_chunk_too_large", err.Error(), nil)
 	case err != nil:
@@ -849,6 +877,174 @@ func (s *server) authorizedFileFolder(
 		return state.NASFolderRecord{}, "", false
 	}
 	return folder, root, true
+}
+
+func filePoolResponseFor(record state.NASPoolRecord) filePoolResponse {
+	response := filePoolResponse{
+		ID:                    record.ID,
+		Name:                  record.Name,
+		RootPath:              record.RootPath,
+		StorageDevicePath:     record.StorageDevicePath,
+		StorageFilesystemUUID: record.StorageFilesystemUUID,
+		ReservePercent:        record.ReservePercent,
+		WarningPercent:        record.WarningPercent,
+		CapacityState:         "unknown",
+	}
+	capacity, err := readFilePoolCapacity(record.RootPath)
+	if err != nil {
+		return response
+	}
+	response.CapacityKnown = true
+	response.SizeBytes = capacity.TotalBytes
+	response.FreeBytes = capacity.FreeBytes
+	response.ReserveBytes = capacityPercentBytes(capacity.TotalBytes, record.ReservePercent)
+	response.WarningBytes = capacityPercentBytes(capacity.TotalBytes, record.WarningPercent)
+	switch {
+	case record.ReservePercent > 0 && capacity.FreeBytes <= response.ReserveBytes:
+		response.CapacityState = "reserve"
+	case record.WarningPercent > 0 && capacity.FreeBytes <= response.WarningBytes:
+		response.CapacityState = "warning"
+	default:
+		response.CapacityState = "ok"
+	}
+	return response
+}
+
+func capacityPercentBytes(total uint64, percent int) uint64 {
+	if total == 0 || percent <= 0 {
+		return 0
+	}
+	value := uint64(percent)
+	return (total/100)*value + ((total%100)*value)/100
+}
+
+func filePoolWriteAllowance(
+	w http.ResponseWriter,
+	r *http.Request,
+	folder state.NASFolderRecord,
+) (int64, bool) {
+	capacity, err := readFilePoolCapacity(folder.PoolRoot)
+	if err != nil {
+		writeAPIError(
+			w,
+			r,
+			http.StatusServiceUnavailable,
+			"file_pool_capacity_unavailable",
+			"file pool capacity is unavailable",
+			map[string]any{"pool_id": folder.PoolID},
+		)
+		return 0, false
+	}
+	reserveBytes := capacityPercentBytes(capacity.TotalBytes, folder.PoolReservePercent)
+	if capacity.FreeBytes <= reserveBytes {
+		writeFilePoolReserveErrorWithCapacity(w, r, folder, capacity)
+		return 0, false
+	}
+	available := capacity.FreeBytes - reserveBytes
+	if available > uint64(math.MaxInt64) {
+		return math.MaxInt64, true
+	}
+	return int64(available), true
+}
+
+func writeFilePoolReserveError(
+	w http.ResponseWriter,
+	r *http.Request,
+	folder state.NASFolderRecord,
+) {
+	capacity, err := readFilePoolCapacity(folder.PoolRoot)
+	if err != nil {
+		writeAPIError(
+			w,
+			r,
+			http.StatusInsufficientStorage,
+			"file_pool_reserve_reached",
+			"file pool free-space reserve would be violated",
+			map[string]any{"pool_id": folder.PoolID, "reserve_percent": folder.PoolReservePercent},
+		)
+		return
+	}
+	writeFilePoolReserveErrorWithCapacity(w, r, folder, capacity)
+}
+
+func writeFilePoolReserveErrorWithCapacity(
+	w http.ResponseWriter,
+	r *http.Request,
+	folder state.NASFolderRecord,
+	capacity filedata.Capacity,
+) {
+	writeAPIError(
+		w,
+		r,
+		http.StatusInsufficientStorage,
+		"file_pool_reserve_reached",
+		"file pool free-space reserve would be violated",
+		map[string]any{
+			"pool_id":         folder.PoolID,
+			"pool_name":       folder.PoolName,
+			"free_bytes":      capacity.FreeBytes,
+			"reserve_bytes":   capacityPercentBytes(capacity.TotalBytes, folder.PoolReservePercent),
+			"reserve_percent": folder.PoolReservePercent,
+		},
+	)
+}
+
+func (s *server) filePoolCapacityPolicy(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if r.Method != http.MethodPatch {
+		w.Header().Set("Allow", http.MethodPatch)
+		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		return
+	}
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	var input struct {
+		ReservePercent int `json:"reserve_percent"`
+		WarningPercent int `json:"warning_percent"`
+	}
+	if err := decodeJSON(w, r, &input); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_file_pool_policy", err.Error(), nil)
+		return
+	}
+	record, err := s.state.UpdateNASPoolCapacityPolicy(
+		r.Context(),
+		strings.TrimSpace(r.PathValue("poolID")),
+		input.ReservePercent,
+		input.WarningPercent,
+		time.Now().UTC(),
+	)
+	switch {
+	case errors.Is(err, state.ErrNASPoolNotFound):
+		writeAPIError(w, r, http.StatusNotFound, "file_pool_not_found", "file pool not found", nil)
+	case err != nil:
+		writeAPIError(w, r, http.StatusBadRequest, "file_pool_policy_update_failed", err.Error(), nil)
+	default:
+		s.security.RecordAudit(
+			r.Context(),
+			s.securityRequestContext(r),
+			actor,
+			"files.pool.capacity_policy.update",
+			"file_pool",
+			record.ID,
+			"success",
+			map[string]any{
+				"reserve_percent": record.ReservePercent,
+				"warning_percent": record.WarningPercent,
+			},
+		)
+		s.realtime.Publish(
+			"files.pool.capacity_policy.changed",
+			map[string]any{"pool_id": record.ID},
+			requestIDFromContext(r.Context()),
+		)
+		writeJSON(w, http.StatusOK, map[string]any{"pool": filePoolResponseFor(record)})
+	}
 }
 
 func filePoolStorageNode(
