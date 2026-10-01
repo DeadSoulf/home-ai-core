@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.116-dev
+
+- Implement the approved Figma `HOME AI Windows Client — Compact Main Window` design in the native Win32 client.
+- Reduce the native window from 1180×760 to 976×635 so its usable client area closely matches the 960×596 Figma content below the standard Windows title bar.
+- Replace the light sidebar with the logo-derived `#070B14` navy surface, blue/cyan accents, selected navigation dots and the existing embedded HOME AI icon.
+- Render the Overview hero as a rounded navy→blue GDI gradient with cyan outline and green synchronization status check.
+- Match the Figma compact geometry for the four status cards, Recent activity, Backups and HOME AI storage panels.
+- Compact Connection, Synchronization, Backups and Settings pages so all existing controls remain usable inside the smaller window.
+- Split compact Overview values/hints so connection state, server host, local folder and folder count fit the smaller cards without multiline overflow.
+- Keep RU/EN switching, Tab / Shift+Tab / Ctrl+Tab, sidebar arrow navigation, Credential Manager, sync profiles, queue/copy, background agent, tray, updater and Debian installer behavior unchanged.
+- Reuse the existing embedded HOME AI brand icon instead of temporary Figma-export assets.
+- Native Windows tests, Windows cross-build, Debian installer checks and full pull-request CI pass on the compact UI code; live Windows visual/DPI acceptance remains pending.
+
 ## 0.1.115-dev
 
 - Start the **AI Agent Foundation** as a first-party `ai.agent` module so agent contracts can evolve together with NAS, Smart Home and NVR.

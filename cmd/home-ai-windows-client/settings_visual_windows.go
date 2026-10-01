@@ -27,17 +27,24 @@ const (
 	settingsDTSingleLine  = 0x0020
 	settingsDTEndEllipsis = 0x8000
 
+	settingsGradientFillRectH = 0
+
 	settingsFWNormal   = 400
+	settingsFWMedium   = 500
 	settingsFWSemibold = 600
 	settingsFWBold     = 700
 
 	settingsVisualMain settingsVisualRole = iota
-	settingsVisualSidebar
-	settingsVisualHero
-	settingsVisualCard
 	settingsVisualMuted
-	settingsVisualPositive
-	settingsVisualStatusIcon
+	settingsVisualSidebar
+	settingsVisualSidebarMuted
+	settingsVisualHero
+	settingsVisualHeroMuted
+	settingsVisualCard
+	settingsVisualCardMuted
+	settingsVisualCardAccent
+	settingsVisualCardPositive
+	settingsVisualCardDanger
 )
 
 type settingsVisualRole int
@@ -78,16 +85,35 @@ type settingsPaintStruct struct {
 	Reserved  [32]byte
 }
 
+type settingsTriVertex struct {
+	X     int32
+	Y     int32
+	Red   uint16
+	Green uint16
+	Blue  uint16
+	Alpha uint16
+}
+
+type settingsGradientRect struct {
+	UpperLeft  uint32
+	LowerRight uint32
+}
+
 type settingsVisualResources struct {
 	mainBrush          windows.Handle
 	sidebarBrush       windows.Handle
 	heroBrush          windows.Handle
 	cardBrush          windows.Handle
+	navSelectedBrush   windows.Handle
 	successBrush       windows.Handle
-	statusBrush        windows.Handle
 	accentBrush        windows.Handle
 	accentPressedBrush windows.Handle
+	cyanBrush          windows.Handle
+	navMutedBrush      windows.Handle
+	storageTrackBrush  windows.Handle
 	borderPen          windows.Handle
+	accentPen          windows.Handle
+	glowPen            windows.Handle
 	checkPen           windows.Handle
 	titleFont          windows.Handle
 	headlineFont       windows.Handle
@@ -97,29 +123,37 @@ type settingsVisualResources struct {
 }
 
 var (
-	procSettingsBeginPaint     = settingsUser32.NewProc("BeginPaint")
-	procSettingsEndPaint       = settingsUser32.NewProc("EndPaint")
-	procSettingsGetClientRect  = settingsUser32.NewProc("GetClientRect")
-	procSettingsFillRect       = settingsUser32.NewProc("FillRect")
-	procSettingsInvalidateRect = settingsUser32.NewProc("InvalidateRect")
-	procSettingsSetTextColor   = settingsGDI32.NewProc("SetTextColor")
-	procSettingsSetBkColor     = settingsGDI32.NewProc("SetBkColor")
-	procSettingsSetBkMode      = settingsGDI32.NewProc("SetBkMode")
-	procSettingsCreateBrush    = settingsGDI32.NewProc("CreateSolidBrush")
-	procSettingsCreatePen      = settingsGDI32.NewProc("CreatePen")
-	procSettingsSelectObject   = settingsGDI32.NewProc("SelectObject")
-	procSettingsDeleteObject   = settingsGDI32.NewProc("DeleteObject")
-	procSettingsRoundRect      = settingsGDI32.NewProc("RoundRect")
-	procSettingsEllipse        = settingsGDI32.NewProc("Ellipse")
-	procSettingsCreateFont     = settingsGDI32.NewProc("CreateFontW")
-	procSettingsMoveToEx       = settingsGDI32.NewProc("MoveToEx")
-	procSettingsLineTo         = settingsGDI32.NewProc("LineTo")
-	procSettingsDrawText       = settingsUser32.NewProc("DrawTextW")
-	procSettingsDrawFocusRect  = settingsUser32.NewProc("DrawFocusRect")
+	settingsMsimg32                = windows.NewLazySystemDLL("msimg32.dll")
+	procSettingsBeginPaint         = settingsUser32.NewProc("BeginPaint")
+	procSettingsEndPaint           = settingsUser32.NewProc("EndPaint")
+	procSettingsGetClientRect      = settingsUser32.NewProc("GetClientRect")
+	procSettingsFillRect           = settingsUser32.NewProc("FillRect")
+	procSettingsInvalidateRect     = settingsUser32.NewProc("InvalidateRect")
+	procSettingsSetTextColor       = settingsGDI32.NewProc("SetTextColor")
+	procSettingsSetBkColor         = settingsGDI32.NewProc("SetBkColor")
+	procSettingsSetBkMode          = settingsGDI32.NewProc("SetBkMode")
+	procSettingsCreateBrush        = settingsGDI32.NewProc("CreateSolidBrush")
+	procSettingsCreatePen          = settingsGDI32.NewProc("CreatePen")
+	procSettingsSelectObject       = settingsGDI32.NewProc("SelectObject")
+	procSettingsDeleteObject       = settingsGDI32.NewProc("DeleteObject")
+	procSettingsRoundRect          = settingsGDI32.NewProc("RoundRect")
+	procSettingsEllipse            = settingsGDI32.NewProc("Ellipse")
+	procSettingsCreateFont         = settingsGDI32.NewProc("CreateFontW")
+	procSettingsMoveToEx           = settingsGDI32.NewProc("MoveToEx")
+	procSettingsLineTo             = settingsGDI32.NewProc("LineTo")
+	procSettingsCreateRoundRectRgn = settingsGDI32.NewProc("CreateRoundRectRgn")
+	procSettingsSelectClipRgn      = settingsGDI32.NewProc("SelectClipRgn")
+	procSettingsDrawText           = settingsUser32.NewProc("DrawTextW")
+	procSettingsDrawFocusRect      = settingsUser32.NewProc("DrawFocusRect")
+	procSettingsGradientFill       = settingsMsimg32.NewProc("GradientFill")
 )
 
 func settingsRGB(r, g, b byte) uintptr {
 	return uintptr(uint32(r) | uint32(g)<<8 | uint32(b)<<16)
+}
+
+func settingsColor16(value byte) uint16 {
+	return uint16(value) << 8
 }
 
 func createSettingsFont(height int32, weight int32) windows.Handle {
@@ -137,30 +171,45 @@ func createSettingsFont(height int32, weight int32) windows.Handle {
 }
 
 func (state *windowsSettingsUI) initVisualResources() error {
-	state.visual.mainBrush = windows.Handle(mustCreateBrush(248, 250, 252))
-	state.visual.sidebarBrush = windows.Handle(mustCreateBrush(246, 249, 253))
-	state.visual.heroBrush = windows.Handle(mustCreateBrush(232, 244, 255))
+	// Figma target: #F8FAFE main, #070B14 sidebar, #04172E → #064285 hero,
+	// #0561DB primary, #1FB8FA cyan accent, #DBE5F5 card border.
+	state.visual.mainBrush = windows.Handle(mustCreateBrush(248, 250, 254))
+	state.visual.sidebarBrush = windows.Handle(mustCreateBrush(7, 11, 20))
+	state.visual.heroBrush = windows.Handle(mustCreateBrush(5, 44, 91))
 	state.visual.cardBrush = windows.Handle(mustCreateBrush(255, 255, 255))
-	state.visual.successBrush = windows.Handle(mustCreateBrush(230, 247, 238))
-	state.visual.statusBrush = windows.Handle(mustCreateBrush(47, 184, 113))
-	state.visual.accentBrush = windows.Handle(mustCreateBrush(36, 111, 220))
-	state.visual.accentPressedBrush = windows.Handle(mustCreateBrush(27, 91, 185))
-	pen, _, _ := procSettingsCreatePen.Call(0, 1, settingsRGB(224, 230, 238))
-	state.visual.borderPen = windows.Handle(pen)
+	state.visual.navSelectedBrush = windows.Handle(mustCreateBrush(9, 34, 62))
+	state.visual.successBrush = windows.Handle(mustCreateBrush(20, 173, 112))
+	state.visual.accentBrush = windows.Handle(mustCreateBrush(5, 97, 219))
+	state.visual.accentPressedBrush = windows.Handle(mustCreateBrush(4, 76, 173))
+	state.visual.cyanBrush = windows.Handle(mustCreateBrush(31, 184, 250))
+	state.visual.navMutedBrush = windows.Handle(mustCreateBrush(95, 133, 173))
+	state.visual.storageTrackBrush = windows.Handle(mustCreateBrush(224, 237, 250))
+
+	borderPen, _, _ := procSettingsCreatePen.Call(0, 1, settingsRGB(219, 229, 245))
+	state.visual.borderPen = windows.Handle(borderPen)
+	accentPen, _, _ := procSettingsCreatePen.Call(0, 1, settingsRGB(31, 184, 250))
+	state.visual.accentPen = windows.Handle(accentPen)
+	glowPen, _, _ := procSettingsCreatePen.Call(0, 2, settingsRGB(5, 97, 219))
+	state.visual.glowPen = windows.Handle(glowPen)
 	checkPen, _, _ := procSettingsCreatePen.Call(0, 4, settingsRGB(255, 255, 255))
 	state.visual.checkPen = windows.Handle(checkPen)
-	state.visual.titleFont = createSettingsFont(-20, settingsFWSemibold)
-	state.visual.headlineFont = createSettingsFont(-26, settingsFWBold)
-	state.visual.subtitleFont = createSettingsFont(-14, settingsFWNormal)
-	state.visual.cardTitleFont = createSettingsFont(-13, settingsFWSemibold)
-	state.visual.cardValueFont = createSettingsFont(-15, settingsFWSemibold)
+
+	state.visual.titleFont = createSettingsFont(-22, settingsFWBold)
+	state.visual.headlineFont = createSettingsFont(-20, settingsFWBold)
+	state.visual.subtitleFont = createSettingsFont(-11, settingsFWNormal)
+	state.visual.cardTitleFont = createSettingsFont(-10, settingsFWSemibold)
+	state.visual.cardValueFont = createSettingsFont(-15, settingsFWBold)
+
 	if state.visual.mainBrush == 0 || state.visual.sidebarBrush == 0 ||
 		state.visual.heroBrush == 0 || state.visual.cardBrush == 0 ||
-		state.visual.successBrush == 0 || state.visual.statusBrush == 0 ||
+		state.visual.navSelectedBrush == 0 || state.visual.successBrush == 0 ||
 		state.visual.accentBrush == 0 || state.visual.accentPressedBrush == 0 ||
-		state.visual.borderPen == 0 || state.visual.checkPen == 0 || state.visual.titleFont == 0 ||
-		state.visual.headlineFont == 0 || state.visual.subtitleFont == 0 ||
-		state.visual.cardTitleFont == 0 || state.visual.cardValueFont == 0 {
+		state.visual.cyanBrush == 0 || state.visual.navMutedBrush == 0 ||
+		state.visual.storageTrackBrush == 0 || state.visual.borderPen == 0 || state.visual.accentPen == 0 ||
+		state.visual.glowPen == 0 || state.visual.checkPen == 0 ||
+		state.visual.titleFont == 0 || state.visual.headlineFont == 0 ||
+		state.visual.subtitleFont == 0 || state.visual.cardTitleFont == 0 ||
+		state.visual.cardValueFont == 0 {
 		return fmt.Errorf("create Windows client visual resources")
 	}
 	if state.visualRoles == nil {
@@ -180,11 +229,16 @@ func (state *windowsSettingsUI) releaseVisualResources() {
 		state.visual.sidebarBrush,
 		state.visual.heroBrush,
 		state.visual.cardBrush,
+		state.visual.navSelectedBrush,
 		state.visual.successBrush,
-		state.visual.statusBrush,
 		state.visual.accentBrush,
 		state.visual.accentPressedBrush,
+		state.visual.cyanBrush,
+		state.visual.navMutedBrush,
+		state.visual.storageTrackBrush,
 		state.visual.borderPen,
+		state.visual.accentPen,
+		state.visual.glowPen,
 		state.visual.checkPen,
 		state.visual.titleFont,
 		state.visual.headlineFont,
@@ -218,16 +272,13 @@ func (state *windowsSettingsUI) setControlFont(hwnd, font windows.Handle) {
 
 func (state *windowsSettingsUI) visualBrush(role settingsVisualRole) windows.Handle {
 	switch role {
-	case settingsVisualSidebar:
+	case settingsVisualSidebar, settingsVisualSidebarMuted:
 		return state.visual.sidebarBrush
-	case settingsVisualHero:
+	case settingsVisualHero, settingsVisualHeroMuted:
 		return state.visual.heroBrush
-	case settingsVisualCard:
+	case settingsVisualCard, settingsVisualCardMuted, settingsVisualCardAccent,
+		settingsVisualCardPositive, settingsVisualCardDanger:
 		return state.visual.cardBrush
-	case settingsVisualPositive:
-		return state.visual.successBrush
-	case settingsVisualStatusIcon:
-		return state.visual.heroBrush
 	default:
 		return state.visual.mainBrush
 	}
@@ -236,25 +287,42 @@ func (state *windowsSettingsUI) visualBrush(role settingsVisualRole) windows.Han
 func (state *windowsSettingsUI) handleStaticColor(hdc, hwnd uintptr) uintptr {
 	role := state.visualRoles[windows.Handle(hwnd)]
 	brush := state.visualBrush(role)
-	bg := settingsRGB(248, 250, 252)
-	text := settingsRGB(29, 41, 57)
+	bg := settingsRGB(248, 250, 254)
+	textColor := settingsRGB(19, 28, 46)
+
 	switch role {
+	case settingsVisualMuted:
+		textColor = settingsRGB(97, 115, 143)
 	case settingsVisualSidebar:
-		bg = settingsRGB(246, 249, 253)
+		bg = settingsRGB(7, 11, 20)
+		textColor = settingsRGB(255, 255, 255)
+	case settingsVisualSidebarMuted:
+		bg = settingsRGB(7, 11, 20)
+		textColor = settingsRGB(92, 122, 161)
 	case settingsVisualHero:
-		bg = settingsRGB(232, 244, 255)
+		bg = settingsRGB(5, 44, 91)
+		textColor = settingsRGB(255, 255, 255)
+	case settingsVisualHeroMuted:
+		bg = settingsRGB(5, 44, 91)
+		textColor = settingsRGB(184, 219, 250)
 	case settingsVisualCard:
 		bg = settingsRGB(255, 255, 255)
-	case settingsVisualMuted:
-		text = settingsRGB(103, 116, 137)
-	case settingsVisualPositive:
-		bg = settingsRGB(230, 247, 238)
-		text = settingsRGB(23, 122, 72)
-	case settingsVisualStatusIcon:
-		bg = settingsRGB(232, 244, 255)
-		text = settingsRGB(255, 255, 255)
+		textColor = settingsRGB(19, 28, 46)
+	case settingsVisualCardMuted:
+		bg = settingsRGB(255, 255, 255)
+		textColor = settingsRGB(97, 115, 143)
+	case settingsVisualCardAccent:
+		bg = settingsRGB(255, 255, 255)
+		textColor = settingsRGB(5, 97, 219)
+	case settingsVisualCardPositive:
+		bg = settingsRGB(255, 255, 255)
+		textColor = settingsRGB(20, 145, 92)
+	case settingsVisualCardDanger:
+		bg = settingsRGB(255, 255, 255)
+		textColor = settingsRGB(201, 79, 51)
 	}
-	procSettingsSetTextColor.Call(hdc, text)
+
+	procSettingsSetTextColor.Call(hdc, textColor)
 	procSettingsSetBkColor.Call(hdc, bg)
 	procSettingsSetBkMode.Call(hdc, settingsTransparent)
 	return uintptr(brush)
@@ -272,35 +340,41 @@ func (state *windowsSettingsUI) paintWindow(hwnd uintptr) uintptr {
 	procSettingsGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&client)))
 	procSettingsFillRect.Call(hdc, uintptr(unsafe.Pointer(&client)), uintptr(state.visual.mainBrush))
 
-	sidebar := settingsRect{Left: 0, Top: 0, Right: 205, Bottom: client.Bottom}
+	sidebar := settingsRect{Left: 0, Top: 0, Right: settingsSidebarWidth, Bottom: client.Bottom}
 	procSettingsFillRect.Call(hdc, uintptr(unsafe.Pointer(&sidebar)), uintptr(state.visual.sidebarBrush))
+	state.paintLogoGlow(windows.Handle(hdc))
 
 	if state.page == settingsPageOverview {
 		state.paintOverviewCards(windows.Handle(hdc))
 	} else {
-		state.paintRoundedPanel(windows.Handle(hdc), 220, 18, client.Right-22, client.Bottom-34, state.visual.cardBrush, 18)
+		state.paintRoundedPanel(windows.Handle(hdc), 212, 16, client.Right-16, client.Bottom-16, state.visual.cardBrush, state.visual.borderPen, 16)
 	}
 	return 0
 }
 
+func (state *windowsSettingsUI) paintLogoGlow(hdc windows.Handle) {
+	state.paintRoundedPanel(hdc, 18, 18, 80, 80, state.visual.sidebarBrush, state.visual.glowPen, 16)
+	state.paintRoundedPanel(hdc, 20, 20, 78, 78, state.visual.sidebarBrush, state.visual.accentPen, 14)
+}
+
 func (state *windowsSettingsUI) paintOverviewCards(hdc windows.Handle) {
-	state.paintRoundedPanel(hdc, 225, 64, 1150, 188, state.visual.heroBrush, 20)
-	state.paintStatusCircle(hdc, 246, 91, 292, 137)
+	state.paintHeroGradient(hdc, 224, 88, 932, 200, 16)
+	state.paintStatusCircle(hdc, 244, 108, 286, 150)
 
 	for _, rect := range [][4]int32{
-		{225, 214, 442, 312},
-		{456, 214, 673, 312},
-		{687, 214, 904, 312},
-		{918, 214, 1150, 312},
-		{225, 334, 795, 594},
-		{815, 334, 1150, 452},
-		{815, 474, 1150, 594},
+		{224, 220, 383, 312},
+		{401, 220, 560, 312},
+		{578, 220, 737, 312},
+		{755, 220, 914, 312},
+		{224, 332, 676, 574},
+		{696, 332, 932, 444},
+		{696, 460, 932, 590},
 	} {
-		state.paintRoundedPanel(hdc, rect[0], rect[1], rect[2], rect[3], state.visual.cardBrush, 16)
+		state.paintRoundedPanel(hdc, rect[0], rect[1], rect[2], rect[3], state.visual.cardBrush, state.visual.borderPen, 14)
 	}
 
-	track := settingsRect{Left: 842, Top: 552, Right: 1122, Bottom: 562}
-	procSettingsFillRect.Call(uintptr(hdc), uintptr(unsafe.Pointer(&track)), uintptr(state.visual.heroBrush))
+	track := settingsRect{Left: 714, Top: 547, Right: 914, Bottom: 554}
+	procSettingsFillRect.Call(uintptr(hdc), uintptr(unsafe.Pointer(&track)), uintptr(state.visual.storageTrackBrush))
 	percent := state.overviewStoragePercent
 	if percent < 0 {
 		percent = 0
@@ -315,8 +389,41 @@ func (state *windowsSettingsUI) paintOverviewCards(hdc windows.Handle) {
 	}
 }
 
+func (state *windowsSettingsUI) paintHeroGradient(hdc windows.Handle, left, top, right, bottom, radius int32) {
+	region, _, _ := procSettingsCreateRoundRectRgn.Call(
+		uintptr(left), uintptr(top), uintptr(right+1), uintptr(bottom+1), uintptr(radius*2), uintptr(radius*2),
+	)
+	if region != 0 {
+		procSettingsSelectClipRgn.Call(uintptr(hdc), region)
+	}
+	vertices := [2]settingsTriVertex{
+		{
+			X: left, Y: top,
+			Red: settingsColor16(4), Green: settingsColor16(23), Blue: settingsColor16(46),
+		},
+		{
+			X: right, Y: bottom,
+			Red: settingsColor16(6), Green: settingsColor16(66), Blue: settingsColor16(133),
+		},
+	}
+	gradient := settingsGradientRect{UpperLeft: 0, LowerRight: 1}
+	procSettingsGradientFill.Call(
+		uintptr(hdc),
+		uintptr(unsafe.Pointer(&vertices[0])),
+		uintptr(len(vertices)),
+		uintptr(unsafe.Pointer(&gradient)),
+		1,
+		settingsGradientFillRectH,
+	)
+	if region != 0 {
+		procSettingsSelectClipRgn.Call(uintptr(hdc), 0)
+		procSettingsDeleteObject.Call(region)
+	}
+	state.paintRoundedOutline(hdc, left, top, right, bottom, state.visual.accentPen, radius)
+}
+
 func (state *windowsSettingsUI) paintStatusCircle(hdc windows.Handle, left, top, right, bottom int32) {
-	oldBrush, _, _ := procSettingsSelectObject.Call(uintptr(hdc), uintptr(state.visual.statusBrush))
+	oldBrush, _, _ := procSettingsSelectObject.Call(uintptr(hdc), uintptr(state.visual.successBrush))
 	nullPen, _, _ := procSettingsGetStock.Call(8)
 	oldPen, _, _ := procSettingsSelectObject.Call(uintptr(hdc), nullPen)
 	procSettingsEllipse.Call(uintptr(hdc), uintptr(left), uintptr(top), uintptr(right), uintptr(bottom))
@@ -328,18 +435,39 @@ func (state *windowsSettingsUI) paintStatusCircle(hdc windows.Handle, left, top,
 	}
 
 	oldCheckPen, _, _ := procSettingsSelectObject.Call(uintptr(hdc), uintptr(state.visual.checkPen))
-	procSettingsMoveToEx.Call(uintptr(hdc), uintptr(left+12), uintptr(top+24), 0)
-	procSettingsLineTo.Call(uintptr(hdc), uintptr(left+20), uintptr(top+32))
-	procSettingsLineTo.Call(uintptr(hdc), uintptr(left+35), uintptr(top+14))
+	procSettingsMoveToEx.Call(uintptr(hdc), uintptr(left+11), uintptr(top+22), 0)
+	procSettingsLineTo.Call(uintptr(hdc), uintptr(left+18), uintptr(top+29))
+	procSettingsLineTo.Call(uintptr(hdc), uintptr(left+32), uintptr(top+13))
 	if oldCheckPen != 0 {
 		procSettingsSelectObject.Call(uintptr(hdc), oldCheckPen)
 	}
 }
 
-func (state *windowsSettingsUI) paintRoundedPanel(hdc windows.Handle, left, top, right, bottom int32, brush windows.Handle, radius int32) {
+func (state *windowsSettingsUI) paintRoundedPanel(hdc windows.Handle, left, top, right, bottom int32, brush, pen windows.Handle, radius int32) {
 	oldBrush, _, _ := procSettingsSelectObject.Call(uintptr(hdc), uintptr(brush))
-	oldPen, _, _ := procSettingsSelectObject.Call(uintptr(hdc), uintptr(state.visual.borderPen))
-	procSettingsRoundRect.Call(uintptr(hdc), uintptr(left), uintptr(top), uintptr(right), uintptr(bottom), uintptr(radius), uintptr(radius))
+	oldPen, _, _ := procSettingsSelectObject.Call(uintptr(hdc), uintptr(pen))
+	procSettingsRoundRect.Call(
+		uintptr(hdc),
+		uintptr(left), uintptr(top), uintptr(right), uintptr(bottom),
+		uintptr(radius*2), uintptr(radius*2),
+	)
+	if oldBrush != 0 {
+		procSettingsSelectObject.Call(uintptr(hdc), oldBrush)
+	}
+	if oldPen != 0 {
+		procSettingsSelectObject.Call(uintptr(hdc), oldPen)
+	}
+}
+
+func (state *windowsSettingsUI) paintRoundedOutline(hdc windows.Handle, left, top, right, bottom int32, pen windows.Handle, radius int32) {
+	hollowBrush, _, _ := procSettingsGetStock.Call(5)
+	oldBrush, _, _ := procSettingsSelectObject.Call(uintptr(hdc), hollowBrush)
+	oldPen, _, _ := procSettingsSelectObject.Call(uintptr(hdc), uintptr(pen))
+	procSettingsRoundRect.Call(
+		uintptr(hdc),
+		uintptr(left), uintptr(top), uintptr(right), uintptr(bottom),
+		uintptr(radius*2), uintptr(radius*2),
+	)
 	if oldBrush != 0 {
 		procSettingsSelectObject.Call(uintptr(hdc), oldBrush)
 	}
@@ -355,22 +483,24 @@ func (state *windowsSettingsUI) drawButton(lParam uintptr) uintptr {
 	item := (*settingsDrawItemStruct)(unsafe.Pointer(lParam))
 	role := state.buttonRoles[item.HwndItem]
 	brush := state.visual.cardBrush
-	textColor := settingsRGB(29, 41, 57)
+	textColor := settingsRGB(19, 28, 46)
 	border := state.visual.borderPen
+	selected := false
 
-	selectedNav := false
 	if role == settingsButtonNavigation {
 		for page, hwnd := range state.navButtons {
 			if hwnd == item.HwndItem && page == state.page {
-				selectedNav = true
+				selected = true
 				break
 			}
 		}
-		if selectedNav {
-			brush = state.visual.heroBrush
-			textColor = settingsRGB(24, 89, 169)
+		if selected {
+			brush = state.visual.navSelectedBrush
+			textColor = settingsRGB(255, 255, 255)
+			border = state.visual.accentPen
 		} else {
 			brush = state.visual.sidebarBrush
+			textColor = settingsRGB(184, 204, 227)
 			border = 0
 		}
 	} else if role == settingsButtonPrimary {
@@ -393,8 +523,28 @@ func (state *windowsSettingsUI) drawButton(lParam uintptr) uintptr {
 		uintptr(item.HDC),
 		uintptr(item.Rect.Left), uintptr(item.Rect.Top),
 		uintptr(item.Rect.Right), uintptr(item.Rect.Bottom),
-		12, 12,
+		20, 20,
 	)
+	if role == settingsButtonNavigation {
+		dotBrush := state.visual.navMutedBrush
+		if selected {
+			dotBrush = state.visual.cyanBrush
+		}
+		oldDotBrush, _, _ := procSettingsSelectObject.Call(uintptr(item.HDC), uintptr(dotBrush))
+		nullPen, _, _ := procSettingsGetStock.Call(8)
+		oldDotPen, _, _ := procSettingsSelectObject.Call(uintptr(item.HDC), nullPen)
+		procSettingsEllipse.Call(
+			uintptr(item.HDC),
+			uintptr(item.Rect.Left+13), uintptr(item.Rect.Top+14),
+			uintptr(item.Rect.Left+19), uintptr(item.Rect.Top+20),
+		)
+		if oldDotBrush != 0 {
+			procSettingsSelectObject.Call(uintptr(item.HDC), oldDotBrush)
+		}
+		if oldDotPen != 0 {
+			procSettingsSelectObject.Call(uintptr(item.HDC), oldDotPen)
+		}
+	}
 	if oldBrush != 0 {
 		procSettingsSelectObject.Call(uintptr(item.HDC), oldBrush)
 	}
@@ -404,7 +554,7 @@ func (state *windowsSettingsUI) drawButton(lParam uintptr) uintptr {
 
 	procSettingsSetBkMode.Call(uintptr(item.HDC), settingsTransparent)
 	if item.ItemState&settingsODSDisabled != 0 {
-		textColor = settingsRGB(150, 159, 172)
+		textColor = settingsRGB(133, 150, 173)
 	}
 	procSettingsSetTextColor.Call(uintptr(item.HDC), textColor)
 	font, _, _ := procSettingsSendMessage.Call(uintptr(item.HwndItem), settingsWMGetFont, 0, 0)
@@ -415,6 +565,9 @@ func (state *windowsSettingsUI) drawButton(lParam uintptr) uintptr {
 	label := state.text(item.HwndItem)
 	labelPtr, _ := windows.UTF16PtrFromString(label)
 	rect := item.Rect
+	if role == settingsButtonNavigation {
+		rect.Left += 22
+	}
 	procSettingsDrawText.Call(
 		uintptr(item.HDC),
 		uintptr(unsafe.Pointer(labelPtr)),
