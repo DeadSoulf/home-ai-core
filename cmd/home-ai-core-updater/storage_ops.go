@@ -462,6 +462,10 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 					if plainMessage == "" {
 						plainMessage = plainErr.Error()
 					}
+					diagnostic := filesystemMountDiagnostic(ctx, device, filesystem)
+					if diagnostic != "" {
+						return "", fmt.Errorf("mount device with quota options: %s; retry without quota options: %s; filesystem diagnostic: %s", quotaMessage, plainMessage, diagnostic)
+					}
 					return "", fmt.Errorf("mount device with quota options: %s; retry without quota options: %s", quotaMessage, plainMessage)
 				}
 			}
@@ -729,6 +733,47 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 	default:
 		return "", errors.New("unsupported storage operation")
 	}
+}
+
+func filesystemMountDiagnostic(ctx context.Context, device, filesystem string) string {
+	command, args := filesystemDiagnosticCommand(device, filesystem)
+	if command == "" {
+		return ""
+	}
+	if _, err := os.Stat(command); err != nil {
+		return "diagnostic tool is unavailable"
+	}
+	output, err := exec.CommandContext(ctx, command, args...).CombinedOutput()
+	message := strings.TrimSpace(string(output))
+	if message == "" && err != nil {
+		message = err.Error()
+	}
+	if message == "" {
+		return "filesystem check returned no details"
+	}
+	return compactFilesystemDiagnostic(message)
+}
+
+func filesystemDiagnosticCommand(device, filesystem string) (string, []string) {
+	switch strings.ToLower(strings.TrimSpace(filesystem)) {
+	case "ext2", "ext3", "ext4":
+		return "/usr/sbin/e2fsck", []string{"-n", device}
+	case "xfs":
+		return "/usr/sbin/xfs_repair", []string{"-n", device}
+	case "vfat", "fat", "fat32":
+		return "/usr/sbin/fsck.fat", []string{"-n", "-v", device}
+	default:
+		return "", nil
+	}
+}
+
+func compactFilesystemDiagnostic(message string) string {
+	message = strings.Join(strings.Fields(message), " ")
+	const maxDiagnosticBytes = 3500
+	if len(message) > maxDiagnosticBytes {
+		return message[:maxDiagnosticBytes] + "…"
+	}
+	return message
 }
 
 func requireDiskType(ctx context.Context, device string) error {

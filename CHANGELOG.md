@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.98-dev
+
+- Add read-only filesystem diagnostics when both quota-enabled and plain storage mounts fail.
+- Diagnose ext2/ext3/ext4 with `e2fsck -n`, XFS with `xfs_repair -n`, and FAT with `fsck.fat -n`.
+- Append the filesystem-check result to the mount error so bad superblocks, journal/inode damage and unsupported filesystem features are visible from the Web UI.
+- Keep diagnostics non-destructive: failed mounts never trigger an automatic filesystem repair or reformat.
+- Bound and normalize diagnostic output so storage errors remain readable in the UI.
+
 ## 0.1.97-dev
 
 - Add a direct Mount action to Files → Storage for assigned filesystems that are present but not mounted.
