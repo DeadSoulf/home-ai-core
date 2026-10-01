@@ -82,6 +82,16 @@ func (r *ToolRegistry) Register(descriptor ToolDescriptor, handler ToolHandler) 
 	return nil
 }
 
+func (r *ToolRegistry) Descriptor(id string) (ToolDescriptor, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	tool, ok := r.tools[id]
+	if !ok {
+		return ToolDescriptor{}, false
+	}
+	return tool.descriptor, true
+}
+
 func (r *ToolRegistry) List() []ToolDescriptor {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -111,16 +121,8 @@ func (r *ToolRegistry) Execute(
 		return nil, ErrPermissionDenied
 	}
 
-	for _, permission := range tool.descriptor.RequiredPermissions {
-		if tool.descriptor.Scope.ResourceType != "" {
-			if !principal.Allows(permission, tool.descriptor.Scope.ResourceType, tool.descriptor.Scope.ResourceID) {
-				return nil, ErrPermissionDenied
-			}
-			continue
-		}
-		if !principal.Has(permission) {
-			return nil, ErrPermissionDenied
-		}
+	if !toolAllowed(principal, tool.descriptor) {
+		return nil, ErrPermissionDenied
 	}
 
 	if tool.descriptor.Sensitivity != SensitivityRead && !approved {
@@ -131,6 +133,24 @@ func (r *ToolRegistry) Execute(
 	}
 
 	return tool.handler(ctx, input)
+}
+
+func toolAllowed(principal Principal, descriptor ToolDescriptor) bool {
+	if principal == nil {
+		return false
+	}
+	for _, permission := range descriptor.RequiredPermissions {
+		if descriptor.Scope.ResourceType != "" {
+			if !principal.Allows(permission, descriptor.Scope.ResourceType, descriptor.Scope.ResourceID) {
+				return false
+			}
+			continue
+		}
+		if !principal.Has(permission) {
+			return false
+		}
+	}
+	return true
 }
 
 func validateToolDescriptor(descriptor ToolDescriptor) error {
