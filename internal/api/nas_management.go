@@ -91,11 +91,6 @@ func (s *server) fileFolderManagement(w http.ResponseWriter, r *http.Request, ac
 		writeAPIError(w, r, 400, "hard_quota_required", "SMB enforcement requires a folder quota of at least 1 MiB", nil)
 		return
 	}
-	root, err := filedata.FolderRoot(folder.PoolRoot, folder.RelativePath)
-	if err != nil {
-		writeAPIError(w, r, 503, "file_folder_unavailable", err.Error(), nil)
-		return
-	}
 	usage, err := s.folderUsage(r.Context(), folder)
 	if err != nil {
 		writeAPIError(w, r, 503, "file_usage_unavailable", err.Error(), nil)
