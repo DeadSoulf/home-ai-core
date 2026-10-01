@@ -54,6 +54,7 @@ The repository currently includes:
   - architecture-specific update bundles;
   - Core + Web UI + privileged helper in one verified bundle;
   - SHA-256 and manifest verification;
+  - detached Ed25519 verification for signed Core releases; non-development releases fail closed without a signature;
   - backup, restart and rollback;
   - helper protocol/version compatibility;
   - cached GitHub release discovery with fallback;
@@ -111,3 +112,8 @@ Core owns shared platform contracts:
 - node/system capability discovery.
 
 Product domains such as NAS, Smart Home, NVR, AI, Voice, WireGuard and Cluster should be modular and reuse these shared contracts rather than bypassing them.
+
+
+## License
+
+Home-AI-Core is licensed under the Apache License 2.0. See [LICENSE](LICENSE).
