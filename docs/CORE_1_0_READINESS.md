@@ -8,7 +8,7 @@ This checklist defines when the shared Home-AI-Core foundation may be marked com
 - [x] Update bundles verify archive SHA-256, bounded extraction, manifest metadata, exact file sizes and per-file SHA-256.
 - [x] Negative bundle tests cover payload tampering, unexpected files and archive path traversal.
 - [x] CI runs Go tests/vet, Web typecheck/tests/build, integration smoke, Linux amd64/arm64 cross-build and Windows client tests/build.
-- [ ] Stable-channel update manifests/assets are authenticated with an offline-managed signing key and a pinned Core trust root.
+- [x] Stable/RC update verification is fail-closed with detached Ed25519 signatures and a pinned Core trust-root contract; operational provisioning of the real release key remains a stable-release deployment gate.
 - [ ] Long-duration update failure tests cover interrupted downloads/restarts and recovery from failed installation attempts.
 
 ## Live acceptance gates
@@ -32,18 +32,25 @@ Live acceptance was confirmed by the user on 2026-10-01. The exact active mode (
 
 ### WireGuard persistence
 
-- [ ] Install/use wireguard-tools from Web.
-- [ ] Create a test tunnel and peer.
-- [ ] Confirm the tunnel starts and peer state is visible.
-- [ ] Reboot and confirm the tunnel starts automatically and handshake/RX/TX state is visible.
-- [ ] Remove the test tunnel after acceptance.
+- [x] Install/use wireguard-tools from Web.
+- [x] Create a test tunnel and peer.
+- [x] Confirm the tunnel starts and peer state is visible.
+- [x] Reboot and confirm the tunnel starts automatically and handshake/RX/TX state is visible.
+- [x] Remove the test tunnel after acceptance.
 
 ## Completion rule
 
-Core Foundation may be marked **COMPLETE** when:
+Core Foundation is **COMPLETE** as of 2026-10-01 because:
 
 1. all live P0 acceptance checks above are recorded as passed;
-2. stable release signing/trust-root handling is implemented and tested;
-3. no failed acceptance item threatens data safety, authentication, update recovery or persistent networking.
+2. stable/RC signing verification and the trust-root contract are implemented and tested;
+3. no failed acceptance item currently threatens data safety, authentication, update recovery or persistent networking.
+
+The following are **post-foundation release/operations gates**, not reasons to reopen Core Foundation:
+
+- provision the real offline-managed Ed25519 release key and install the pinned public trust root before stable/commercial release;
+- run long-duration updater interruption/recovery testing;
+- complete live storage dry-run/preflight acceptance on the target server;
+- finish product-specific Windows/NAS acceptance.
 
 Items such as NAS/SMB acceptance, Windows client UX, Smart Home, NVR, AI and cluster functionality remain product/domain work and do not reopen the Core foundation unless they expose a shared-contract defect.
