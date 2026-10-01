@@ -6,12 +6,20 @@ This checklist tracks live checks that require an installed Home-AI server. CI c
 
 ## Update / rollback
 
-- [ ] Install a newer dev update from Web.
-- [ ] Confirm the new Core version is running.
-- [ ] Run Web rollback.
-- [ ] Confirm the previous version starts successfully.
-- [ ] Confirm login, System page and state database still work after rollback.
+- [x] Install a newer dev update from Web.
+- [x] Confirm the new Core version is running.
+- [x] Run Web rollback.
+- [x] Confirm the previous version starts successfully.
+- [x] Confirm login, System page and state database still work after rollback.
 - [ ] Reinstall the newer version after the rollback test.
+
+### Recorded live run — 2026-10-01
+
+- update to `0.1.109-dev`: passed;
+- Web rollback to the previous installed version: passed;
+- Core/Web/login/state remained operational after rollback: passed by user acceptance;
+- re-update to the newer version: still pending;
+- Debian version/network backend were not recorded for this run.
 
 ## Network persistence
 
