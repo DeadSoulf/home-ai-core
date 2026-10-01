@@ -64,3 +64,17 @@ func TestHostFindmntCommandArgsTargetsPID1MountNamespace(t *testing.T) {
 		t.Fatalf("host findmnt args = %q, want %q", got, want)
 	}
 }
+
+
+func TestHostFilesystemInspectionTargetsPID1MountNamespace(t *testing.T) {
+	got := strings.Join(hostMountCommandArgs(
+		"/usr/bin/lsblk",
+		"--json",
+		"--bytes",
+		"--output", "PATH,TYPE,FSTYPE,FSAVAIL,MOUNTPOINTS",
+	), " ")
+	want := "--mount=/proc/1/ns/mnt -- /usr/bin/lsblk --json --bytes --output PATH,TYPE,FSTYPE,FSAVAIL,MOUNTPOINTS"
+	if got != want {
+		t.Fatalf("host filesystem inspection args = %q, want %q", got, want)
+	}
+}
