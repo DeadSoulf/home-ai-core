@@ -10,13 +10,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
-	"encoding/pem"
 	"runtime"
 	"strconv"
 	"strings"
@@ -39,8 +39,9 @@ const (
 	defaultUserAgent    = "Home-AI-Core"
 	updateCheckCacheTTL = 10 * time.Minute
 	bundleHTTPTimeout   = 2 * time.Minute
-	trustedUpdatePublicKeyPath = "/etc/home-ai-core/update-trusted.pub"
 )
+
+var trustedUpdatePublicKeyPath = "/etc/home-ai-core/update-trusted.pub"
 
 var downloadRetryDelays = []time.Duration{
 	250 * time.Millisecond,
