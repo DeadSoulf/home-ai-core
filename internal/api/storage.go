@@ -113,6 +113,7 @@ func (s *server) storageOperation(
 		writeAPIError(w, r, http.StatusBadGateway, "storage_operation_failed", err.Error(), nil)
 		return
 	}
+	storage.InvalidateInspectionCache()
 
 	response := map[string]any{"message": message}
 	if input.Operation == "mount" {
