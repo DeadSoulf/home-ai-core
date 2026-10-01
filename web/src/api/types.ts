@@ -80,7 +80,7 @@ export type BlockNode = {
   free_known?: boolean;
   unallocated_bytes?: number;
   partition_table?: string;
-  mountpoints?: string[] | null;
+  mountpoints: string[];
   parent_name?: string;
   label?: string;
   uuid?: string;
@@ -309,7 +309,7 @@ export type StoragePurposeAssignment = {
   present: boolean;
   filesystem?: string;
   label?: string;
-  mountpoints: string[];
+  mountpoints?: string[] | null;
   size_bytes?: number;
   free_bytes?: number;
   free_known: boolean;
