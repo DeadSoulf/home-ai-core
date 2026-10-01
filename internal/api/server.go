@@ -98,6 +98,7 @@ func New(
 	s.mux.HandleFunc("POST /api/v1/storage/purposes", s.requireAuth("storage.manage", s.storagePurposes))
 	s.mux.HandleFunc("GET /api/v1/files/pools", s.requireAuth("files.manage", s.filePools))
 	s.mux.HandleFunc("POST /api/v1/files/pools", s.requireAuth("files.manage", s.filePools))
+	s.mux.HandleFunc("PATCH /api/v1/files/pools/{poolID}/capacity-policy", s.requireAuth("files.manage", s.filePoolCapacityPolicy))
 	s.mux.HandleFunc("GET /api/v1/files/smb", s.requireAuth("files.manage", s.smbStatus))
 	s.mux.HandleFunc("POST /api/v1/files/smb/operation", s.requireAuth("files.manage", s.smbOperation))
 	s.mux.HandleFunc("GET /api/v1/files/folders", s.requireAuth("security.self.read", s.fileFolders))
