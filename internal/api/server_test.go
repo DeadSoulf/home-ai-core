@@ -896,14 +896,14 @@ func TestStoragePurposeUsageResponseMarksAssignedStorageBusy(t *testing.T) {
 		Purpose:        state.StoragePurposeFiles,
 	}
 	nodes := []systeminfo.BlockNode{{
-		Path:           "/dev/sdb1",
-		Type:           "part",
-		UUID:           "uuid-files",
-		Filesystem:     "ext4",
-		Mountpoints:    []string{"/mnt/home-ai-core/files"},
-		SizeBytes:      1000,
-		FreeBytes:      400,
-		FreeKnown:      true,
+		Path:        "/dev/sdb1",
+		Type:        "part",
+		UUID:        "uuid-files",
+		Filesystem:  "ext4",
+		Mountpoints: []string{"/mnt/home-ai-core/files"},
+		SizeBytes:   1000,
+		FreeBytes:   400,
+		FreeKnown:   true,
 	}}
 	response := storagePurposeResponseFor(record, nodes)
 	response.UsedBy = storageUsageForMountpoints(response.Mountpoints, []state.NASPoolRecord{{
