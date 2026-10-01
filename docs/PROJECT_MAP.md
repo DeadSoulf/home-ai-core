@@ -6,6 +6,7 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
+**Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.112-dev` — единый copyright/author attribution **TexNik** для репозитория, Web UI, Windows-клиента и Debian packages\
 **Текущий срез:** `0.1.112-dev` опубликован; attribution **TexNik** присутствует в NOTICE/LICENSE/README, Web UI, Windows-клиенте и Debian packages\
 **Следующий engineering milestone:** live acceptance Windows UI/tray `0.1.111-dev` и первоначальной установки опубликованного Debian `.deb`; Core-задачи storage preflight, WireGuard reboot persistence и signing-key provisioning остаются параллельными открытыми acceptance/gates\
@@ -21,6 +22,19 @@
 - ✅ Native Windows client показывает тот же copyright в постоянной боковой панели.
 - ✅ Debian initial installer содержит `/usr/share/doc/home-ai-core/copyright` с attribution `TexNik`.
 - ✅ PR #100 прошёл полный `core-ci`; release workflow опубликовал `v0.1.112-dev` с Core amd64/arm64, Windows `.exe` и Debian `.deb` amd64/arm64 + SHA-256.
+- ✅ PR #102 синхронизировал карту проекта с фактом публикации `0.1.112-dev`.
+
+### Сводка завершённых работ 0.1.109–0.1.112
+
+- ✅ **Core update safety:** negative bundle tests, полный live `update → rollback → re-update`, сохранение login/System/state и повторный нормальный запуск.
+- ✅ **Network persistence:** после reboot сеть подтверждена рабочей на живом сервере; отдельная WireGuard persistence-проверка остаётся открытой.
+- ✅ **Security/update signing:** detached Ed25519 verification и fail-closed для stable/RC реализованы; private signing key не хранится в репозитории/на node.
+- ✅ **Storage safety:** destructive storage Web actions получили read-only dry-run/preflight до подтверждённого изменения.
+- ✅ **Windows client:** утверждённый HOME AI dashboard, sidebar navigation, cards, tray popup, сохранённый sync/agent/Credential Manager engine.
+- ✅ **Initial Debian installer:** amd64/arm64 `.deb` теперь собираются/инспектируются в CI и публикуются versioned вместе с релизом.
+- ✅ **Project attribution:** `TexNik` закреплён в NOTICE/LICENSE/README, Web UI, Windows UI и Debian package metadata.
+- ✅ **Release pipeline:** `0.1.109-dev` → `0.1.112-dev` опубликованы с требуемыми Core/Windows/Debian artifacts и SHA-256.
+- 🧪 Открыты только отдельные live/operational gates: Windows visual/DPI/tray acceptance, initial Debian install acceptance, storage preflight live acceptance, WireGuard reboot persistence, signing-key/trust-root provisioning и long-duration updater failure testing.
 
 ### Выпуск 0.1.111-dev — Windows visual UI + initial Debian installer
 
@@ -60,9 +74,10 @@
 - ✅ Сеть после reboot подтверждена рабочей; конкретный активный режим DHCP/static в этом прогоне не зафиксирован и не выводится предположением.
 - 🧪 WireGuard reboot persistence остаётся отдельной открытой live-проверкой.
 - ✅ PR #92 прошёл полный `core-ci`; release workflow опубликовал `v0.1.109-dev` с Core amd64/arm64 bundles и Windows `.exe` + SHA-256.
+- ✅ PR #96 и #99 зафиксировали live acceptance: update/rollback/re-update и network-after-reboot результаты внесены в canonical Core acceptance docs.
 - ✅ Stable-channel Ed25519 verification/fail-closed код реализован в `0.1.110-dev`; до production/stable остаётся operational provisioning dedicated signing key + trust root.
 
-### Кандидат 0.1.108-dev — отображение занятого места папок
+### Выпуск 0.1.108-dev — отображение занятого места папок
 
 - ✅ Для **Занято / лимит** сохраняется текущий точный `UsageOf()` внутри Core как основной путь.
 - ✅ Если Core не может прочитать managed folder из service sandbox, privileged helper считает apparent-size конкретной папки через host `du -B1`.
@@ -537,9 +552,11 @@ Check
 Отдельный **Core 1.0 readiness** gate ведётся в [CORE_1_0_READINESS.md](CORE_1_0_READINESS.md):
 
 - ✅ negative update-bundle tests для tamper/unexpected-file/path-traversal;
-- 🧪 rollback и повторное обновление на установленном сервере;
-- 🧪 DHCP/static/WireGuard reboot acceptance из [CORE_ACCEPTANCE.md](CORE_ACCEPTANCE.md);
-- 🚧 stable-channel signing + pinned trust root до stable/commercial release;
+- ✅ полный `update → rollback → re-update` подтверждён на живом сервере (`0.1.109-dev`);
+- ✅ активная Home-AI network configuration переживает reboot и возвращает connectivity; точный режим DHCP/static в этом прогоне не фиксировался;
+- 🧪 WireGuard reboot/autostart/handshake acceptance остаётся отдельным live gate из [CORE_ACCEPTANCE.md](CORE_ACCEPTANCE.md);
+- ✅ stable/RC fail-closed Ed25519 verification реализован в `0.1.110-dev`;
+- 🔐 operational provisioning signing key + pinned trust root остаётся до stable/commercial release;
 - ⏭ targeted tests для privileged routing/validation при следующем package-level refactor.
 
 ### 🚧 Этап F2 — File Storage / NAS
@@ -968,7 +985,7 @@ AI не может расширять собственные права.
 | SQLite single-node | не превращать локальную схему в неявный cluster contract |
 | cluster leadership не определён | сохранить abstraction, решить позже |
 | внешние ifupdown profiles нельзя takeover из UI | позже добавить явный import/takeover с backup/diff/confirmation |
-| stable signing/channel | сделать до stable/commercial release |
+| stable signing/channel | ✅ verification/fail-closed реализован в `0.1.110-dev`; 🔐 осталось operational provisioning signing key + trust root до stable/commercial release |
 | AI self-development может менять систему | только versioned/audited/rollback + approval policy |
 
 ## 9. Контрольные версии
