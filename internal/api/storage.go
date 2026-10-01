@@ -67,11 +67,35 @@ func (s *server) storageOperation(
 	var beforeTree []systeminfo.BlockNode
 	var beforePurposes []state.StoragePurposeRecord
 	switch input.Operation {
-	case "partition.create", "partition.delete", "partition.delete_all", "format":
+	case "unmount", "partition.create", "partition.delete", "partition.delete_all", "format":
 		beforeTree = systeminfo.Collect(s.nodeID).BlockTree
 	}
 	if input.Operation == "format" {
 		beforePurposes, _ = s.state.ListStoragePurposes(r.Context())
+	}
+
+	switch input.Operation {
+	case "unmount", "format", "partition.delete", "partition.delete_all":
+		node, ok := blockNodeByPath(beforeTree, input.Device)
+		if ok {
+			pools, listErr := s.state.ListNASPools(r.Context())
+			if listErr != nil {
+				writeAPIError(w, r, http.StatusInternalServerError, "storage_usage_unavailable", "storage usage is unavailable", nil)
+				return
+			}
+			usage := storageUsageForNode(node, pools)
+			if len(usage) > 0 {
+				writeAPIError(
+					w,
+					r,
+					http.StatusConflict,
+					"storage_in_use",
+					"storage is used by a Home-AI file pool and cannot be unmounted, formatted or deleted",
+					map[string]any{"used_by": usage},
+				)
+				return
+			}
+		}
 	}
 
 	message, err := storage.Execute(r.Context(), storage.Request{
