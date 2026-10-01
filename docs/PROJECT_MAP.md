@@ -5,11 +5,28 @@
 > Аудит уже сделанного: [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
-**Последний опубликованный релиз:** `0.1.91-dev` — пользователи, права папок и квоты\
-**Текущий срез:** `0.1.91-dev` — опубликован; CI и локальные проверки пройдены, эксплуатационная приёмка на сервере остаётся\
-**Следующий engineering milestone:** эксплуатационная приёмка пользователей, папок, SMB/квот, перезагрузки и Windows-клиента на сервере; затем controlled legacy quota migration\
-**Состояние:** Пользователи и управление NAS реализованы; эксплуатационная приёмка остаётся. F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.\
+**Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
+**Последний опубликованный релиз:** `0.1.103-dev` — fallback ёмкости Files pool для «Свободно / Всего» и reserve logic\
+**Текущий срез:** `0.1.103-dev` — опубликован; mount и создание pool подтверждены на живом сервере, отображение free/total после нового fallback ожидает пользовательской проверки\
+**Следующий engineering milestone:** подтвердить free/total и reserve на реальном Files pool; затем продолжить live acceptance папок, SMB/квот, reboot persistence и Windows-клиента\
+**Состояние:** основной Files/Storage workflow работает на живом сервере: назначение Files, mount, выбор storage и создание pool подтверждены. F2 NAS остаётся в эксплуатационной приёмке по capacity, SMB, quotas и reboot persistence.\
 **Обновлено:** 2026-10-01
+
+### Выпуски 0.1.92–0.1.103-dev — стабилизация Files / Storage на живом сервере
+
+- **0.1.92-dev** — добавлена первая адресация подразделов Files через hash-route для **Хранилище** и **Доступ Windows**.
+- **0.1.93-dev** — hash-route заменён на реальные SPA-маршруты `/files/storage` и `/files/windows`; добавлены route tests и integration smoke.
+- **0.1.94-dev** — updater получил retry transient HTTP 408/429/502/503/504 и network errors, увеличенный timeout и сохранение SHA-256/size verification.
+- **0.1.95-dev** — исправлен blank screen **Файлы → Хранилище** при `mountpoints: null`; API теперь стабильно сериализует пустые mountpoints как `[]`, Web терпит legacy/null.
+- **0.1.96-dev** — исправлена битая UTF-8/Windows mojibake-кодировка в Files storage UI (`вЂ—`, `В·` и аналогичные символы).
+- **0.1.97-dev** — добавлена кнопка **Монтировать** прямо в **Файлы → Хранилище**, автоподстановка mountpoint в создание pool; mount сначала пробует quota options и при несовместимости повторяет обычный mount.
+- **0.1.98-dev** — после провала mount добавлена read-only диагностика filesystem: ext2/3/4 через `e2fsck -n`, XFS через `xfs_repair -n`, FAT через `fsck.fat -n`; automatic repair/reformat запрещён.
+- **0.1.99-dev** — mount стал идемпотентным, helper ждёт видимость результата через `findmnt`, API возвращает canonical mountpoint, Web сразу отражает его и локализует типовые storage-сообщения на русский.
+- **0.1.100-dev** — усилена проверка backing storage при создании Files pool: root должен быть реальной mount boundary и соответствовать назначенному block device.
+- **0.1.101-dev** — проверка mount backing переведена на Linux `/proc/self/mountinfo` с major:minor device ID вместо зависимости только от `lsblk`/stat heuristics.
+- **0.1.102-dev** — исправлен корень mount-проблемы: privileged updater helper работал в отдельном systemd mount namespace. `mount`, `umount`, `findmnt` теперь выполняются через PID 1 host mount namespace с `nsenter`. На живом сервере пользователь подтвердил успешное создание Files storage pool.
+- **0.1.103-dev** — для Files pool добавлен fallback ёмкости: сначала live `statfs(root_path)`, при недоступности — сохранённый backing device/UUID, block-device size и privileged storage inspection для free space. Тот же fallback используется в reserve enforcement. Пользовательская проверка **«Свободно / Всего»** остаётся открытой.
+- ✅ Для всей цепочки сохранены CI, Go/Web tests, Linux amd64/arm64 cross-build и versioned release assets.
 
 ### Выпуск 0.1.91-dev — завершение пользователей и управления файлами
 
@@ -132,27 +149,31 @@
 - ADR-0031 фиксирует каноническую identity/access модель.
 - PR #56 прошёл полный CI; live проверка на сервере остаётся acceptance step.
 
-### Текущий F2 slice — назначение дисков для файлов и видео
+### Текущий F2 slice — Files / Storage после 0.1.103-dev
 
-- 🚧 У физического data-раздела/LVM появляется явное назначение `files` или `video`.
-- 🚧 При создании нового раздела в **Система → Хранилище** пользователь выбирает: **Файлы** или **Видео**.
-- 🚧 Для существующих несистемных разделов/LVM назначение можно установить, изменить или снять.
-- 🚧 Назначение хранится независимо от NAS pool/folder и переживает смену `/dev/...` имени через filesystem UUID, когда UUID доступен.
-- 🚧 Форматирование сохраняет назначение и перепривязывает новый filesystem UUID; удаление раздела очищает назначение.
-- 🚧 Раздел **Файлы** показывает storage с назначением `files`, включая состояния: отсутствует / нужно форматировать / нужно смонтировать / готов / уже используется file pool.
-- 🚧 Только `files` storage предлагается при создании нового NAS pool; `video` storage зарезервирован для будущего NVR/media data plane.
-- 🚧 ADR-0030 фиксирует physical-purpose boundary и отделяет назначение ёмкости от логических NAS folders.
-- 🚧 Занятый NAS pool физический storage получает usage-lock: нельзя снять/сменить purpose, размонтировать, форматировать или удалить backing partition/disk; Web показывает причину блокировки.
-- 🚧 Новые NAS pools сохраняют backing device path + filesystem UUID; создание pool разрешено только на точном mounted storage с purpose=`files`, а usage-lock продолжает работать после размонтирования/смены `/dev/...` имени.
-- 🚧 Миграция `016_nas_pool_capacity_policy.sql`: каждый NAS pool получает hard reserve 5% и warning 10% по умолчанию; администратор может менять пороги в **Файлы**.
-- 🚧 Ёмкость pool читается через live Linux `statfs`; Web показывает free/total и состояния OK / warning / reserve reached.
-- 🚧 Direct и resumable uploads через Core/Windows client проверяют reserve на сервере; при нарушении возвращается HTTP 507 `file_pool_reserve_reached`.
-- 🚧 Direct SMB writes получают kernel hard quota на service UID `home-ai-core`, потому что managed Samba shares уже используют `force user = home-ai-core`.
-- 🚧 Hard limit рассчитывается из текущего Home-AI usage + только свободного места выше pool reserve, поэтому существующие данные вне `.home-ai` учитываются.
-- 🚧 Новые ext4 создаются с embedded user quota и монтируются с `usrquota`; XFS монтируется с `uquota`.
-- 🚧 `smb.apply` fail-closed: конфигурация Samba не активируется, если non-zero reserve нельзя закрепить kernel quota.
-- 🚧 Legacy ext4/XFS автоматически не remount/reformat: Web показывает hard-quota readiness и причину controlled migration.
-- 🚧 ADR-0033 фиксирует capacity-policy boundary; ADR-0034 — kernel SMB enforcement. Per-folder/per-user quotas остаются следующим уровнем.
+- ✅ У физического data-раздела/LVM есть явное назначение `files` или `video`.
+- ✅ При создании нового раздела в **Система → Хранилище** пользователь выбирает **Файлы** или **Видео**; существующее назначение можно изменить или снять с учётом safety locks.
+- ✅ Назначение хранится отдельно от NAS pool/folder и использует filesystem UUID как устойчивую identity, когда UUID доступен.
+- ✅ Форматирование сохраняет purpose и перепривязывает новый filesystem UUID; удаление storage очищает assignment.
+- ✅ **Файлы → Хранилище** показывает только storage с purpose=`files` и состояния: отсутствует / форматирование / mount / готов / используется pool.
+- ✅ Files storage можно смонтировать прямо из раздела **Файлы**; canonical managed path — `/mnt/home-ai-core/<device>`.
+- ✅ Mount идемпотентен, имеет quota-option fallback, read-only filesystem diagnostics и проверку результата.
+- ✅ Storage mount выполняется в host mount namespace PID 1, поэтому результат виден privileged helper, Home-AI-Core и системе.
+- ✅ Только `files` storage предлагается при создании NAS pool; `video` остаётся зарезервированным для будущего NVR/media data plane.
+- ✅ Новый NAS pool сохраняет backing device path + filesystem UUID и создаётся только на точном mounted storage с purpose=`files`.
+- ✅ Проверка backing filesystem использует normal inventory fast path и Linux `/proc/self/mountinfo`/major:minor validation.
+- ✅ Занятый Files storage получает usage-lock: нельзя безопасно снять/сменить purpose, размонтировать, форматировать или удалить backing storage без явного освобождения.
+- ✅ Pool capacity policy: hard reserve 5% и warning 10% по умолчанию; пороги настраиваются в **Файлы**.
+- ✅ Ёмкость pool читается через live Linux `statfs`; с 0.1.103-dev при его недоступности используется fallback по backing device/UUID + privileged storage inspection.
+- ✅ Direct/resumable uploads и Windows client учитывают pool reserve; при нарушении Core возвращает HTTP 507.
+- ✅ Managed SMB shares защищены kernel quota policy; ext4/XFS quota path реализован и per-folder/per-user quotas добавлены в 0.1.91-dev.
+- ✅ Web-раздел **Файлы** имеет реальные маршруты `/files`, `/files/storage`, `/files/windows`.
+- ✅ Blank storage page из-за `mountpoints:null`, mojibake и race после mount исправлены.
+- 🧪 На живом сервере подтверждены mount и создание Files pool в 0.1.102-dev.
+- 🧪 В 0.1.103-dev требуется подтвердить показ **Свободно / Всего** и reserve state на созданном pool.
+- 🧪 Live acceptance SMB, quota enforcement, reboot persistence и Windows/NAS остаётся отдельным эксплуатационным этапом.
+- 🚧 Controlled migration для legacy filesystems без готовых quota features остаётся отдельной maintenance-задачей.
+
 ### Выпуск 0.1.82-dev — русский и английский Windows-клиент
 
 - Один Windows `.exe` поддерживает русский и английский интерфейс без отдельной сборки.
@@ -876,6 +897,19 @@ AI не может расширять собственные права.
 | `0.1.77-dev` | 🧪 Windows Credential Manager | опубликован; secure same-user password storage + auth fallback; пользовательская приёмка остаётся |
 | `0.1.78-dev` | 🧪 Windows background sync agent | HKCU Run autostart, lock/logging; reboot/logon acceptance остаётся |
 | `0.1.79-dev` | 🧪 Windows stable install + tray | `%LOCALAPPDATA%` install, native tray controls; real Windows acceptance остаётся |
+| `0.1.91-dev` | ✅ Unified users + NAS quotas | пользователи, folder access/quotas, project quotas, Files tabs; live acceptance продолжается |
+| `0.1.92-dev` | Files hash navigation | первый переход к отдельным storage/windows subsection |
+| `0.1.93-dev` | ✅ Real Files routes | `/files/storage`, `/files/windows`, SPA fallback + smoke |
+| `0.1.94-dev` | ✅ Updater 504 recovery | retry transient GitHub/CDN download failures |
+| `0.1.95-dev` | ✅ Files storage blank-page fix | `mountpoints:null` → стабильный `[]` + Web guard |
+| `0.1.96-dev` | ✅ Files UTF-8 fix | исправлены mojibake/битые символы |
+| `0.1.97-dev` | ✅ Direct Files mount action | mount из Files, quota fallback, auto-select mountpoint |
+| `0.1.98-dev` | ✅ Read-only filesystem diagnostics | `e2fsck -n` / XFS / FAT diagnostics без auto-repair |
+| `0.1.99-dev` | ✅ Mounted-state + RU messages | idempotent mount, findmnt wait, immediate UI mountpoint |
+| `0.1.100-dev` | Pool backing validation | mount-boundary/device validation |
+| `0.1.101-dev` | ✅ mountinfo validation | `/proc/self/mountinfo` + major:minor |
+| `0.1.102-dev` | ✅ Host mount namespace | mount/umount/findmnt через PID 1; создание Files pool подтверждено пользователем |
+| `0.1.103-dev` | 🧪 Pool free/total fallback | backing device/UUID + privileged inspection; live UI confirmation pending |
 
 ## 10. Правило ведения карты
 
