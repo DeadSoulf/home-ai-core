@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.85-dev
+
+- Hardened physical storage that backs active Home-AI file pools against accidental destructive operations.
+- Storage-purpose responses now expose whether a device is in use and which file pools depend on it.
+- Block purpose clearing/reassignment, unmount, formatting and partition deletion while the target storage backs a Home-AI file pool.
+- Added explicit Web status for storage used by Files and disabled destructive controls while it is active.
+- Added migration 015 so new NAS pools persist their backing device path and filesystem UUID.
+- New file pools can only be created on the exact mounted filesystem explicitly assigned to the `files` purpose.
+- Prefer filesystem UUID over Linux device path for pool ownership and usage locks, preserving protection across unmounts and `/dev/...` renumbering.
+- Keep a mount-path fallback for pools created before migration 015.
+- Added storage identity, legacy compatibility and reformatted-filesystem safety tests; full CI passed for PRs #60 and #61.
+
 ## 0.1.84-dev
 
 - Added `client update` to discover the newest compatible Home-AI Windows client release automatically.
