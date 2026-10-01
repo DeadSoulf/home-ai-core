@@ -178,7 +178,7 @@ func (s *server) fileFolders(
 			if !canRead {
 				continue
 			}
-			folders = append(folders, folderView(record, actor))
+			folders = append(folders, s.folderView(r.Context(), record, actor))
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"folders": folders})
 	case http.MethodPost:
