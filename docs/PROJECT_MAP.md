@@ -6,10 +6,23 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.83-dev` — единые пользователи и настраиваемые права доступа\
-**Текущий срез:** `0.1.83-dev` — published; live unified-users acceptance pending\
-**Следующий engineering milestone:** live acceptance unified users и storage-purpose slice; automatic Windows release discovery/download + SHA-256 verified install handoff реализуется следующим F2-срезом\
+**Текущий срез:** `0.1.84-dev` — release candidate; automatic Windows client release update\
+**Следующий engineering milestone:** live acceptance unified users, storage-purpose и Windows update; затем F2 quotas/policies и дальнейшая стабилизация NAS\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
-**Обновлено:** 2026-09-30
+**Обновлено:** 2026-10-01
+
+### Выпуск 0.1.84-dev — автоматическое обновление Windows-клиента
+
+- Добавлена команда `client update`, которая сама получает список Home-AI GitHub releases.
+- Выбирается только релиз с точной парой versioned Windows amd64 assets: `.exe` и `.sha256`.
+- Release metadata, checksum и executable имеют жёсткие size limits; внешние URL требуют HTTPS.
+- Скачанный executable сначала проверяется по опубликованному SHA-256, затем повторно проверяется после помещения в per-user update cache.
+- Запускается только проверенный новый executable, который передаёт установку существующему `client install` handoff.
+- Старый установленный процесс может завершиться после запуска child updater; bounded retry ждёт освобождения executable.
+- Если работает tray-agent, сохраняется существующий штатный WM_CLOSE → replace → restart flow.
+- Пароли, bearer tokens и Home-AI credentials в update process arguments/state не передаются.
+- ADR-0032 и PR #58 прошли полный CI, включая native Windows tests и Windows cross-build.
+- Практическая проверка `0.1.83-dev → 0.1.84-dev` на реальном Windows остаётся acceptance step.
 
 ### Выпуск 0.1.83-dev — единые пользователи и права доступа
 

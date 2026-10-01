@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.84-dev
+
+- Added `client update` to discover the newest compatible Home-AI Windows client release automatically.
+- Require the exact versioned amd64 `.exe` and `.sha256` release asset pair before an update is accepted.
+- Bound release metadata, checksum and executable downloads and require HTTPS outside loopback-only tests.
+- Verify the published SHA-256 before activating the cached executable and verify the cached file again afterward.
+- Launch only the verified downloaded executable into the existing per-user `client install` handoff.
+- Allow the bounded Windows replacement handoff to wait for the old parent process to exit while preserving tray-agent stop/restart behavior.
+- Cache verified update payloads under the current user's Home-AI cache directory without storing credentials.
+- Added ADR-0032, release/download tests, native Windows tests and full cross-platform CI coverage.
+
 ## 0.1.83-dev
 
 - Unified Home-AI household identities across the Core instead of module-specific user models.
