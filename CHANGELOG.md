@@ -5,6 +5,8 @@
 - Add a direct Mount action to Files → Storage for assigned filesystems that are present but not mounted.
 - Mount file storage into the managed /mnt/home-ai-core path without requiring a detour through System → Storage.
 - Automatically select the newly mounted filesystem in the Create storage pool form.
+- Retry ext4/XFS mounting without quota mount options when the host kernel or an existing filesystem rejects those options, while keeping the first quota-enabled attempt.
+- Report both quota-enabled and plain-mount failures when neither attempt succeeds, making filesystem problems easier to distinguish from mount-option compatibility.
 - Keep the storage selector limited to mounted, managed filesystems so pool roots always reference usable storage.
 
 ## 0.1.96-dev
