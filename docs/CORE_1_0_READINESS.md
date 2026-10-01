@@ -22,12 +22,13 @@ These checks require an installed HOME AI server and may interrupt connectivity.
 - [x] Roll back from Web.
 - [x] Confirm the previous Core version starts.
 - [x] Confirm login, System page and the existing SQLite state database still work.
-- [ ] Reinstall the newer version and confirm normal operation.
+- [x] Reinstall the newer version and confirm normal operation.
 
 ### Network persistence
 
-- [ ] Apply a Home-AI-owned DHCP profile on a non-critical interface, reboot, and confirm the profile/address return.
-- [ ] Apply a test static IPv4/CIDR plus gateway/DNS, reboot, and confirm the profile/connectivity return.
+- [x] Confirm the active Home-AI-managed network configuration survives reboot and connectivity returns.
+
+Live acceptance was confirmed by the user on 2026-10-01. The exact active mode (DHCP or static IPv4) was not recorded; mode-specific DHCP/static regression coverage remains documented in [CORE_ACCEPTANCE.md](CORE_ACCEPTANCE.md) without being inferred.
 
 ### WireGuard persistence
 
