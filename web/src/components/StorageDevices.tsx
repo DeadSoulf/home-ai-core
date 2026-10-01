@@ -132,6 +132,11 @@ export function StorageDevices({
     return purposes.find((item) => item.device === node.path);
   }
 
+  function nodeOrDescendantInUse(node: BlockNode): boolean {
+    if (purposeForNode(node)?.in_use) return true;
+    return (node.children || []).some((child) => nodeOrDescendantInUse(child));
+  }
+
   async function changePurpose(node: BlockNode, purpose: "" | StoragePurpose) {
     if (!node.path) return;
     setBusy(node.path);
@@ -152,7 +157,8 @@ export function StorageDevices({
     const detail = reason instanceof Error ? reason.message : t("requestFailed");
     const normalized = detail.toLowerCase();
     let friendly = "";
-    if (normalized.includes("system disk")) friendly = t("storageErrorSystemDisk");
+    if (normalized.includes("used by a home-ai file pool")) friendly = t("storageInUseBlocked");
+    else if (normalized.includes("system disk")) friendly = t("storageErrorSystemDisk");
     else if (normalized.includes("deactivate lvm") || normalized.includes("volume group")) friendly = t("storageErrorLvmBusy");
     else if (normalized.includes("swap")) friendly = t("storageErrorSwap");
     else if (normalized.includes("kernel could not reload") || normalized.includes("still reports partition")) friendly = t("storageErrorKernelReload");
@@ -567,6 +573,8 @@ export function StorageDevices({
               const formatting = !!node.path && formatDevice === node.path;
               const creating = !!node.path && createDisk === node.path;
               const purposeAssignment = purposeForNode(node);
+              const storageInUse = purposeAssignment?.in_use === true;
+              const containsInUseStorage = nodeOrDescendantInUse(node);
               const collapseKey = node.path || node.name;
               const isCollapsed = collapsed.includes(collapseKey);
               const mountable =
@@ -579,11 +587,13 @@ export function StorageDevices({
               const formattable =
                 !!node.path &&
                 node.type === "part" &&
-                !node.system;
+                !node.system &&
+                !storageInUse;
               const deletable =
                 !!node.path &&
                 node.type === "part" &&
-                !node.system;
+                !node.system &&
+                !storageInUse;
               const canCreatePartition =
                 !!node.path &&
                 node.type === "disk" &&
@@ -643,6 +653,14 @@ export function StorageDevices({
                             {purposeAssignment.purpose === "files" ? t("storagePurposeFiles") : t("storagePurposeVideo")}
                           </span>
                         )}
+                        {storageInUse && (
+                          <span
+                            className="status-badge status-success"
+                            title={(purposeAssignment?.used_by || []).map((usage) => usage.name).join(", ")}
+                          >
+                            {t("storageInUseFilePool")}
+                          </span>
+                        )}
                       </div>
                       {depth === 0 && (
                         <div className="storage-tree-model">
@@ -681,7 +699,8 @@ export function StorageDevices({
                           <button
                             type="button"
                             className="button secondary compact"
-                            disabled={operationBusy || root}
+                            disabled={operationBusy || root || storageInUse}
+                            title={storageInUse ? t("storageInUseBlocked") : undefined}
                             onClick={() => perform("unmount", node)}
                           >
                             {operationBusy ? t("working") : t("unmount")}
@@ -734,7 +753,8 @@ export function StorageDevices({
                             <button
                               type="button"
                               className="button danger compact storage-action-button"
-                              disabled={operationBusy || node.system || (node.children?.length || 0) === 0}
+                              disabled={operationBusy || node.system || containsInUseStorage || (node.children?.length || 0) === 0}
+                              title={containsInUseStorage ? t("storageInUseBlocked") : undefined}
                               onClick={() => deleteAllPartitions(node)}
                             >
                               {t("deleteAllPartitions")}
@@ -746,7 +766,8 @@ export function StorageDevices({
                             <span>{t("storagePurpose")}</span>
                             <select
                               value={purposeAssignment?.purpose || ""}
-                              disabled={operationBusy}
+                              disabled={operationBusy || storageInUse}
+                              title={storageInUse ? t("storageInUseBlocked") : undefined}
                               onChange={(event) => void changePurpose(node, event.target.value as "" | StoragePurpose)}
                             >
                               <option value="">{t("storagePurposeNone")}</option>
@@ -761,6 +782,7 @@ export function StorageDevices({
                               type="button"
                               className="button danger compact"
                               disabled={operationBusy || !formattable}
+                              title={storageInUse ? t("storageInUseBlocked") : undefined}
                               onClick={() => {
                                 setFormatDevice(formatting ? "" : (node.path || ""));
                                 setCreateDisk("");
@@ -773,6 +795,7 @@ export function StorageDevices({
                               type="button"
                               className="button danger compact"
                               disabled={operationBusy || !deletable}
+                              title={storageInUse ? t("storageInUseBlocked") : undefined}
                               onClick={() => deletePartition(node)}
                             >
                               {t("deletePartition")}
