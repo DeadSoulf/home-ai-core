@@ -417,5 +417,7 @@ export type SMBStatus = {
   workgroup: string;
   users: SMBUser[];
   shares: SMBShare[];
+  hard_quota_ready: boolean;
+  hard_quota_error?: string;
 };
 

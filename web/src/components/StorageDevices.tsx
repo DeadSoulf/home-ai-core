@@ -17,30 +17,30 @@ type StorageColumn =
   | "actions";
 
 const defaultColumnWidths: Record<StorageColumn, number> = {
-  name: 290,
-  type: 95,
-  filesystem: 135,
-  partitionTable: 125,
-  size: 115,
-  free: 145,
-  mount: 190,
-  parent: 115,
-  actions: 330,
-};
-
-const minimumColumnWidths: Record<StorageColumn, number> = {
-  name: 150,
-  type: 70,
-  filesystem: 90,
-  partitionTable: 90,
-  size: 85,
-  free: 100,
-  mount: 120,
-  parent: 85,
+  name: 210,
+  type: 72,
+  filesystem: 100,
+  partitionTable: 105,
+  size: 90,
+  free: 105,
+  mount: 145,
+  parent: 90,
   actions: 180,
 };
 
-const storageColumnWidthKey = "home-ai-core.storage.column-widths";
+const minimumColumnWidths: Record<StorageColumn, number> = {
+  name: 140,
+  type: 60,
+  filesystem: 75,
+  partitionTable: 88,
+  size: 72,
+  free: 82,
+  mount: 105,
+  parent: 68,
+  actions: 132,
+};
+
+const storageColumnWidthKey = "home-ai-core.storage.column-widths.v2";
 
 function initialColumnWidths(): Record<StorageColumn, number> {
   try {
@@ -83,10 +83,16 @@ export function StorageDevices({
   devices,
   onChanged,
   canManage = false,
+  expandedByDefault = false,
+  showDiskToolbar = true,
+  mode = "tree",
 }: {
   devices: BlockNode[];
   onChanged: () => void;
   canManage?: boolean;
+  expandedByDefault?: boolean;
+  showDiskToolbar?: boolean;
+  mode?: "tree" | "diskActions" | "partitions";
 }) {
   const {t} = useI18n();
   const [busy, setBusy] = useState("");
@@ -101,10 +107,19 @@ export function StorageDevices({
   const [partitionPurpose, setPartitionPurpose] = useState<StoragePurpose>("files");
   const [purposes, setPurposes] = useState<StoragePurposeAssignment[]>([]);
   const [collapsed, setCollapsed] = useState<string[]>(() =>
-    devices
-      .filter((node) => node.type === "disk")
-      .map((node) => node.path || node.name),
+    expandedByDefault
+      ? []
+      : devices
+          .filter((node) => node.type === "disk")
+          .map((node) => node.path || node.name),
   );
+  const [expandedActionRows, setExpandedActionRows] = useState<string[]>(() => {
+    if (mode !== "partitions") return [];
+    const first = devices
+      .flatMap((node) => node.type === "disk" ? (node.children || []) : [node])
+      .find((node) => node.type === "part" || node.type === "lvm");
+    return first ? [first.path || first.name] : [];
+  });
   const [partitionProgress, setPartitionProgress] = useState<{device: string; text: string} | null>(null);
   const [columnWidths, setColumnWidths] = useState<Record<StorageColumn, number>>(initialColumnWidths);
 
@@ -237,6 +252,15 @@ export function StorageDevices({
   function toggleDisk(node: BlockNode) {
     const key = node.path || node.name;
     setCollapsed((current) =>
+      current.includes(key)
+        ? current.filter((item) => item !== key)
+        : [...current, key],
+    );
+  }
+
+  function toggleActionRow(node: BlockNode) {
+    const key = node.path || node.name;
+    setExpandedActionRows((current) =>
       current.includes(key)
         ? current.filter((item) => item !== key)
         : [...current, key],
@@ -501,10 +525,141 @@ export function StorageDevices({
     return <div className="empty-state">{t("noBlockDevices")}</div>;
   }
 
-  const rows = flatten(devices, collapsed);
+  if (mode === "diskActions") {
+    const node = devices.find((item) => item.type === "disk");
+    if (!node) return null;
+    const operationBusy = !!node.path && busy === node.path;
+    const creating = !!node.path && createDisk === node.path;
+    const containsInUseStorage = nodeOrDescendantInUse(node);
+    const canCreatePartition = !!node.path && !node.system;
+
+    return (
+      <div className="storage-tree-wrap storage-disk-actions-wrap">
+        {error && <div className="form-error">{error}</div>}
+        {message && <div className="storage-success">{message}</div>}
+        {partitionProgress && (
+          <div className="storage-operation-progress" role="status" aria-live="polite">
+            <div className="storage-operation-progress-head">
+              <strong>{partitionProgress.text}</strong>
+              <span className="mono">{partitionProgress.device}</span>
+            </div>
+            <div className="storage-operation-progress-track">
+              <div className="storage-operation-progress-bar" />
+            </div>
+          </div>
+        )}
+
+        {canManage && (
+          <div className="storage-disk-action-bar">
+            <button
+              type="button"
+              className="button secondary"
+              disabled={operationBusy}
+              onClick={() => renamePhysicalDisk(node)}
+            >
+              {t("renamePhysicalDisk")}
+            </button>
+            <button
+              type="button"
+              className="button primary"
+              disabled={operationBusy || !canCreatePartition}
+              onClick={() => {
+                const opening = !creating;
+                setCreateDisk(opening ? (node.path || "") : "");
+                setDiskName(opening ? (node.display_name || "") : "");
+                setFormatDevice("");
+                setError("");
+              }}
+            >
+              {t("createPartition")}
+            </button>
+            <button
+              type="button"
+              className="button danger"
+              disabled={operationBusy || node.system || containsInUseStorage || (node.children?.length || 0) === 0}
+              title={containsInUseStorage ? t("storageInUseBlocked") : undefined}
+              onClick={() => deleteAllPartitions(node)}
+            >
+              {t("deleteAllPartitions")}
+            </button>
+          </div>
+        )}
+
+        {canManage && creating && (
+          <div className="storage-format storage-disk-create-form">
+            <div>
+              <label>
+                {t("diskDisplayName")}
+                <input
+                  value={diskName}
+                  maxLength={64}
+                  onChange={(event) => setDiskName(event.target.value)}
+                  placeholder={t("diskDisplayNamePlaceholder")}
+                />
+              </label>
+              <label>
+                {t("partitionSizeGiB")}
+                <input
+                  inputMode="decimal"
+                  value={partitionSizeGiB}
+                  onChange={(event) => setPartitionSizeGiB(event.target.value)}
+                  placeholder={t("allRemainingSpace")}
+                />
+              </label>
+              <label>
+                {t("storagePurpose")}
+                <select
+                  value={partitionPurpose}
+                  onChange={(event) => setPartitionPurpose(event.target.value as StoragePurpose)}
+                >
+                  <option value="files">{t("storagePurposeFiles")}</option>
+                  <option value="video">{t("storagePurposeVideo")}</option>
+                </select>
+              </label>
+            </div>
+            <div className="storage-capacity-summary">
+              <strong>{t("unallocated")}:</strong> {bytes(node.unallocated_bytes || 0)}
+            </div>
+            <div className="storage-format-warning">{t("createPartitionWarning")}</div>
+            <div className="storage-format-actions">
+              <button
+                type="button"
+                className="button secondary"
+                disabled={operationBusy}
+                onClick={() => {
+                  setCreateDisk("");
+                  setPartitionSizeGiB("");
+                  setDiskName("");
+                  setPartitionPurpose("files");
+                }}
+              >
+                {t("cancel")}
+              </button>
+              <button
+                type="button"
+                className="button primary"
+                disabled={operationBusy}
+                onClick={() => createPartition(node)}
+              >
+                {operationBusy ? t("working") : t("createPartition")}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const rows = mode === "partitions"
+    ? flatten(devices.flatMap((node) => node.type === "disk" ? (node.children || []) : [node]), collapsed)
+    : flatten(devices, collapsed);
+  const tableColumns: StorageColumn[] = mode === "partitions"
+    ? ["name", "type", "filesystem", "partitionTable", "size", "free", "mount", "parent"]
+    : ["name", "type", "filesystem", "partitionTable", "size", "free", "mount", "parent", "actions"];
+  const tableColSpan = tableColumns.length;
 
   return (
-    <div className="storage-tree-wrap">
+    <div className={mode === "partitions" ? "storage-tree-wrap storage-partitions-view" : "storage-tree-wrap"}>
       {error && <div className="form-error">{error}</div>}
       {message && <div className="storage-success">{message}</div>}
       {partitionProgress && (
@@ -519,27 +674,29 @@ export function StorageDevices({
         </div>
       )}
 
-      <div className="storage-tree-toolbar">
-        <button
-          type="button"
-          className="button secondary compact"
-          onClick={collapseAll}
-        >
-          {t("collapseAllDisks")}
-        </button>
-        <button
-          type="button"
-          className="button secondary compact"
-          onClick={expandAll}
-        >
-          {t("expandAllDisks")}
-        </button>
-      </div>
+      {mode === "tree" && showDiskToolbar && (
+        <div className="storage-tree-toolbar">
+          <button
+            type="button"
+            className="button secondary compact"
+            onClick={collapseAll}
+          >
+            {t("collapseAllDisks")}
+          </button>
+          <button
+            type="button"
+            className="button secondary compact"
+            onClick={expandAll}
+          >
+            {t("expandAllDisks")}
+          </button>
+        </div>
+      )}
 
       <div className="table-wrap">
         <table
           className="storage-tree-table"
-          style={{width: Object.values(columnWidths).reduce((sum, width) => sum + width, 0)}}
+          style={{width: tableColumns.reduce((sum, column) => sum + columnWidths[column], 0)}}
         >
           <colgroup>
             <col style={{width: columnWidths.name}} />
@@ -550,7 +707,7 @@ export function StorageDevices({
             <col style={{width: columnWidths.free}} />
             <col style={{width: columnWidths.mount}} />
             <col style={{width: columnWidths.parent}} />
-            <col style={{width: columnWidths.actions}} />
+            {mode === "tree" && <col style={{width: columnWidths.actions}} />}
           </colgroup>
           <thead>
             <tr>
@@ -562,7 +719,7 @@ export function StorageDevices({
               {storageHeader("free", t("freeSpace"))}
               {storageHeader("mount", t("mountPoints"))}
               {storageHeader("parent", t("parentDisk"))}
-              {storageHeader("actions", t("actions"))}
+              {mode === "tree" && storageHeader("actions", t("actions"))}
             </tr>
           </thead>
           <tbody>
@@ -613,7 +770,16 @@ export function StorageDevices({
                         style={{paddingLeft: `${depth * 22}px`}}
                         title={[node.vendor, node.model, node.serial].filter(Boolean).join(" · ")}
                       >
-                        {node.type === "disk" && (node.children?.length || 0) > 0 ? (
+                        {mode === "partitions" && canManage && (node.type === "part" || node.type === "lvm") ? (
+                          <button
+                            type="button"
+                            className="storage-collapse-button"
+                            onClick={() => toggleActionRow(node)}
+                            title={expandedActionRows.includes(node.path || node.name) ? t("collapsePartitions") : t("expandPartitions")}
+                          >
+                            {expandedActionRows.includes(node.path || node.name) ? "▼" : "▶"}
+                          </button>
+                        ) : node.type === "disk" && (node.children?.length || 0) > 0 ? (
                           <button
                             type="button"
                             className="storage-collapse-button"
@@ -662,7 +828,7 @@ export function StorageDevices({
                           </span>
                         )}
                       </div>
-                      {depth === 0 && (
+                      {mode === "tree" && depth === 0 && (
                         <div className="storage-tree-model">
                           {[node.vendor, node.model].filter(Boolean).join(" ") || node.path || ""}
                           {node.temperature_c !== undefined ? " · " + node.temperature_c + "°C" : ""}
@@ -693,7 +859,7 @@ export function StorageDevices({
                     </td>
                     <td className="mono">{node.mountpoints.join(", ") || "—"}</td>
                     <td className="mono">{node.parent_name || "—"}</td>
-                    <td>
+                    {mode === "tree" && <td>
                       {canManage && <div className="storage-tree-actions">
                         {mounted && mountable && (
                           <button
@@ -804,12 +970,96 @@ export function StorageDevices({
                         )}
                         {!mountable && !renameable && node.type !== "part" && node.type !== "disk" && <span className="muted">—</span>}
                       </div>}
-                    </td>
+                    </td>}
                   </tr>
+
+                  {mode === "partitions" && canManage && (node.type === "part" || node.type === "lvm") &&
+                    expandedActionRows.includes(node.path || node.name) && (
+                    <tr className="storage-inline-actions-row">
+                      <td colSpan={tableColSpan}>
+                        <div className="storage-inline-actions-panel">
+                          <div className="storage-inline-actions-main">
+                            {mounted && mountable && (
+                              <button
+                                type="button"
+                                className="button secondary compact"
+                                disabled={operationBusy || root || storageInUse}
+                                title={storageInUse ? t("storageInUseBlocked") : undefined}
+                                onClick={() => perform("unmount", node)}
+                              >
+                                {operationBusy ? t("working") : t("unmount")}
+                              </button>
+                            )}
+                            {!mounted && mountable && (
+                              <button
+                                type="button"
+                                className="button secondary compact"
+                                disabled={operationBusy}
+                                onClick={() => perform("mount", node)}
+                              >
+                                {operationBusy ? t("working") : t("mount")}
+                              </button>
+                            )}
+                            {renameable && (
+                              <button
+                                type="button"
+                                className="button secondary compact"
+                                disabled={operationBusy}
+                                onClick={() => renameFilesystem(node)}
+                              >
+                                {t("renameDisk")}
+                              </button>
+                            )}
+                            {!node.system && (
+                              <label className="storage-purpose-control">
+                                <span>{t("storagePurpose")}</span>
+                                <select
+                                  value={purposeAssignment?.purpose || ""}
+                                  disabled={operationBusy || storageInUse}
+                                  title={storageInUse ? t("storageInUseBlocked") : undefined}
+                                  onChange={(event) => void changePurpose(node, event.target.value as "" | StoragePurpose)}
+                                >
+                                  <option value="">{t("storagePurposeNone")}</option>
+                                  <option value="files">{t("storagePurposeFiles")}</option>
+                                  <option value="video">{t("storagePurposeVideo")}</option>
+                                </select>
+                              </label>
+                            )}
+                          </div>
+                          {node.type === "part" && (
+                            <div className="storage-inline-actions-danger">
+                              <button
+                                type="button"
+                                className="button danger compact"
+                                disabled={operationBusy || !formattable}
+                                title={storageInUse ? t("storageInUseBlocked") : undefined}
+                                onClick={() => {
+                                  setFormatDevice(formatting ? "" : (node.path || ""));
+                                  setCreateDisk("");
+                                  setError("");
+                                }}
+                              >
+                                {t("format")}
+                              </button>
+                              <button
+                                type="button"
+                                className="button danger compact"
+                                disabled={operationBusy || !deletable}
+                                title={storageInUse ? t("storageInUseBlocked") : undefined}
+                                onClick={() => deletePartition(node)}
+                              >
+                                {t("deletePartition")}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
 
                   {canManage && creating && (
                     <tr className="storage-format-row">
-                      <td colSpan={9}>
+                      <td colSpan={tableColSpan}>
                         <div className="storage-format">
                           <div>
                             <label>
@@ -875,7 +1125,7 @@ export function StorageDevices({
 
                   {canManage && formatting && (
                     <tr className="storage-format-row">
-                      <td colSpan={9}>
+                      <td colSpan={tableColSpan}>
                         <div className="storage-format">
                           <div>
                             <label>

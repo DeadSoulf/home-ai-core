@@ -5,11 +5,73 @@
 > Аудит уже сделанного: [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
-**Последний опубликованный релиз:** `0.1.86-dev` — NAS free-space reserve и capacity warnings\
-**Текущий срез:** `0.1.86-dev` — published; live capacity-reserve acceptance pending\
-**Следующий engineering milestone:** live acceptance capacity reserve; затем hard SMB/filesystem enforcement и per-folder/per-user quotas\
-**Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
+**Последний опубликованный релиз:** `0.1.90-dev` — relocated disk and partition actions\
+**Текущий срез:** `0.1.91-dev` — завершены пользователи, права папок и квоты; проверка и выпуск сборки\
+**Следующий engineering milestone:** эксплуатационная приёмка пользователей, папок, SMB/квот, перезагрузки и Windows-клиента на сервере; затем controlled legacy quota migration\
+**Состояние:** Пользователи и управление NAS реализованы; эксплуатационная приёмка остаётся. F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.\
 **Обновлено:** 2026-10-01
+
+### Подготовлен 0.1.91-dev — завершение пользователей и управления файлами
+
+- ✅ Один стабильный user ID, редактирование логина/имени, пароль своей учётной записи и административный сброс пароля.
+- ✅ Смена пароля/логина завершает старые входы; отключение пользователя отзывает все сессии. Последний включённый администратор защищён внутри транзакции.
+- ✅ Папки: отдельный редактор имени, доступа и лимита; личный владелец сохраняет свои права, остальные grants назначаются явно.
+- ✅ Лимит папки и общий лимит личных папок пользователя; корзина и незавершённые загрузки входят в учёт. Одновременные загрузки не могут занять одну квоту дважды.
+- ✅ Файловые project quotas ext4/XFS ограничивают SMB-запись в папку. Личный лимит распределяется конечными лимитами всех личных папок; общий kernel reserve из 0.1.87-dev сохранён.
+- ✅ Папки без личного/папочного лимита сохраняют прежнюю SMB-запись с защитой резерва. Конечный лимит без подтверждённой файловой квоты делает соответствующую SMB-папку read-only.
+- ✅ Отзыв прав останавливает Samba и активные подключения до записи новых прав, затем автоматически перестраивает конфигурацию. При сбое доступ остаётся приостановленным; состояние видно в Web. При старте производится сверка.
+- ✅ Web: **Файлы → Папки / Хранилище / Доступ Windows**, **Ваша учётная запись**, компактный редактор пользователей. Новый интерфейс физических дисков 0.1.90-dev сохранён.
+- ✅ Приватные события фильтруются по актуальным grants; старые WebSocket-сессии закрываются; число подписок ограничено суммарно. Загруженный HTML/SVG выдаётся безопасным скачиванием.
+- ✅ Миграция `017_nas_quotas.sql`; ADR-0035. Изолированный kernel test ext4 подтвердил запрет записи сверх квоты от обычного пользователя и снятие лимита.
+- 🧪 Установка на реальный сервер, открытые SMB-подключения, перезагрузка и Windows/NAS acceptance остаются эксплуатационной проверкой. NFS/snapshots остаются опциональными последующими этапами.
+
+### Выпуск 0.1.90-dev — действия вне таблицы
+
+- Действия физического диска перенесены из правой колонки в верхнюю карточку выбранного диска.
+- Колонка **Действия** удалена из таблицы разделов/LVM выбранного диска.
+- Для раздела/LVM добавлена раскрываемая панель управления непосредственно под его строкой.
+- В панели собраны mount/unmount, изменение метки, назначение files/video и destructive actions.
+- System-disk protection и usage-lock для занятого Files storage продолжают использовать прежние серверные проверки.
+- Storage API не менялся; переработан только Web layout поверх существующей safety-логики.
+- PR #70 прошёл полный CI; release workflow опубликовал `v0.1.90-dev` с amd64/arm64 Core bundles и Windows `.exe` + SHA-256.
+- Практическая проверка нового расположения действий на установленном сервере остаётся acceptance step.
+
+### Выпуск 0.1.89-dev — компактная таблица диска
+
+- Таблица разделов/LVM внутри выбранного физического диска стала заметно компактнее.
+- Суммарная default width уменьшена примерно с 1540 px до 1100 px.
+- Колонка **Действия** уменьшена с 330 px до 180 px; остальные колонки также сжаты.
+- Заголовки колонок могут переноситься на несколько строк, не растягивая всю таблицу.
+- Уменьшены padding, размеры compact-кнопок и selector назначения.
+- Ключ сохранённых ширин колонок переведён на v2, чтобы старые широкие значения localStorage не перекрывали новый default.
+- PR #69 прошёл полный CI; release workflow опубликовал `v0.1.89-dev` с amd64/arm64 Core bundles и Windows `.exe` + SHA-256.
+- Практическая проверка компактной таблицы на установленном сервере остаётся acceptance step.
+
+### Выпуск 0.1.88-dev — новый интерфейс управления дисками
+
+- **Система → Хранилище** больше не смешивает обзор всех устройств с destructive actions в одной широкой таблице.
+- Первый экран показывает только физические диски с именем, моделью/transport, размером, partition table, unallocated space, system/SMART status.
+- Выбор диска открывает отдельный focused view конкретного physical disk.
+- Внутри выбранного диска остаются существующие разделы/LVM и все операции: purpose files/video, mount/unmount, rename, create, format и delete.
+- Существующие server-side usage-lock и system-disk protections не меняются и продолжают блокировать опасные операции.
+- Новый слой реализован поверх текущего StorageDevices, чтобы не дублировать storage API и проверенную safety-логику.
+- PR #68 прошёл полный CI; release workflow опубликовал `v0.1.88-dev` с amd64/arm64 Core bundles и Windows `.exe` + SHA-256.
+- Практическая проверка нового storage UI на установленном сервере остаётся acceptance step.
+
+### Выпуск 0.1.87-dev — kernel hard reserve для SMB
+
+- Managed Samba shares уже используют `force user = home-ai-core`; этот UID становится kernel quota boundary для прямых SMB-записей.
+- Helper protocol v3 передаёт pool root и reserve policy в privileged helper.
+- Hard limit рассчитывается как текущее quota-usage Home-AI + только свободное место выше configured reserve.
+- Существующие данные вне `.home-ai` учитываются через live free-space, поэтому Home-AI не предполагает, что владеет всем диском.
+- `setquota` применяет block hard limit, `repquota` проверяет фактическое usage/limit после записи.
+- `smb.apply` fail-closed для non-zero reserve: Samba config не активируется, если kernel protection не готов.
+- Изменение reserve пытается немедленно синхронизировать quota; Web отдельно показывает **Kernel enforced / Not ready** и конкретную причину.
+- Samba installation устанавливает также пакет `quota`.
+- Новые ext4 создаются с embedded user quota и `-m 0`, ext4 mounts получают `usrquota`, XFS — `uquota`.
+- Legacy ext4/XFS автоматически не переформатируются и не live-remount: для них нужен controlled maintenance path.
+- ADR-0034 и PR #65 прошли полный CI; release workflow опубликовал `v0.1.87-dev` с amd64/arm64 Core bundles и Windows `.exe` + SHA-256.
+- Практическая проверка SMB quota на установленном сервере остаётся acceptance step.
 
 ### Выпуск 0.1.86-dev — резерв свободного места NAS
 
@@ -84,8 +146,12 @@
 - 🚧 Миграция `016_nas_pool_capacity_policy.sql`: каждый NAS pool получает hard reserve 5% и warning 10% по умолчанию; администратор может менять пороги в **Файлы**.
 - 🚧 Ёмкость pool читается через live Linux `statfs`; Web показывает free/total и состояния OK / warning / reserve reached.
 - 🚧 Direct и resumable uploads через Core/Windows client проверяют reserve на сервере; при нарушении возвращается HTTP 507 `file_pool_reserve_reached`.
-- 🚧 SMB пока пишет напрямую в filesystem и не покрыт hard reserve; следующий слой — filesystem/Samba quota enforcement.
-- 🚧 ADR-0033 фиксирует capacity-policy boundary; per-folder/per-user quotas остаются следующим уровнем.
+- 🚧 Direct SMB writes получают kernel hard quota на service UID `home-ai-core`, потому что managed Samba shares уже используют `force user = home-ai-core`.
+- 🚧 Hard limit рассчитывается из текущего Home-AI usage + только свободного места выше pool reserve, поэтому существующие данные вне `.home-ai` учитываются.
+- 🚧 Новые ext4 создаются с embedded user quota и монтируются с `usrquota`; XFS монтируется с `uquota`.
+- 🚧 `smb.apply` fail-closed: конфигурация Samba не активируется, если non-zero reserve нельзя закрепить kernel quota.
+- 🚧 Legacy ext4/XFS автоматически не remount/reformat: Web показывает hard-quota readiness и причину controlled migration.
+- 🚧 ADR-0033 фиксирует capacity-policy boundary; ADR-0034 — kernel SMB enforcement. Per-folder/per-user quotas остаются следующим уровнем.
 ### Выпуск 0.1.82-dev — русский и английский Windows-клиент
 
 - Один Windows `.exe` поддерживает русский и английский интерфейс без отдельной сборки.
@@ -305,7 +371,7 @@ Check
 
 Следующий сетевой долг: explicit import/takeover внешнего ifupdown-профиля (отдельным подтверждаемым действием), затем VLAN/bridges/bonds.
 
-### 🚧 Unified multi-user access
+### ✅ Unified multi-user access
 
 Базовый multi-user фундамент уже работал, теперь он превращается в единую систему пользователей всего Home-AI:
 
@@ -353,7 +419,7 @@ Check
    - resource-scoped grants;
    - миграция `010_household_users.sql`;
    - ADR-0015.
-6. 🚧 Unified user access:
+6. ✅ Unified user access:
    - профили Administrator / Parent / Child / Guest / Friend;
    - единый permission catalog всего Core;
    - direct per-user global permissions;
@@ -381,7 +447,7 @@ Check
 4. ✅ `files.read/files.write/files.manage`;
 5. ✅ scoped grants на конкретную папку;
 6. ✅ private folder → выбранный пользователь;
-7. 🚧 shared folder → explicit per-user access через общий редактор пользователей;
+7. ✅ shared folder → explicit per-user access через общий редактор пользователей;
 8. ✅ API list/create pools и folders;
 9. ✅ Web-раздел **Файлы** с фильтрацией по effective permissions;
 10. ✅ ADR-0016 и тесты.
@@ -446,8 +512,8 @@ Check
 1. ✅ explicit Samba installation;
 2. ✅ managed SMB shares только для Home-AI logical folders;
 3. ✅ private folder → владелец + Administrator;
-4. 🚧 shared folder → только пользователи с explicit files.read/files.write grant;
-5. 🚧 Administrator получает RW ко всем managed shares через files.manage;
+4. ✅ shared folder → только пользователи с explicit files.read/files.write grant;
+5. ✅ Administrator получает RW ко всем managed shares через files.manage;
 6. ✅ анонимный SMB guest access запрещён, SMB2.10 minimum;
 7. ✅ отдельные SMB credentials без хранения пароля в Core;
 8. ✅ managed /etc/samba/home-ai.conf + backup/include/testparm/reload;

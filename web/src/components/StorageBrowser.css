@@ -1,0 +1,254 @@
+.storage-browser {
+  display: grid;
+  gap: 12px;
+}
+
+.storage-browser-list {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid #252d38;
+  border-radius: 12px;
+  background: #141920;
+}
+
+.storage-disk-row {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px solid #222933;
+  padding: 15px 16px;
+  display: grid;
+  grid-template-columns: minmax(300px, 1.5fr) minmax(120px, .55fr) minmax(150px, .7fr) minmax(120px, .55fr) 24px;
+  gap: 16px;
+  align-items: center;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+}
+
+.storage-disk-row:last-child {
+  border-bottom: 0;
+}
+
+.storage-disk-row:hover,
+.storage-disk-row:focus-visible {
+  background: #18212b;
+  outline: none;
+}
+
+.storage-disk-row:focus-visible {
+  box-shadow: inset 0 0 0 2px #4f7cff;
+}
+
+.storage-disk-identity {
+  min-width: 0;
+  display: flex;
+  gap: 11px;
+  align-items: center;
+}
+
+.storage-disk-icon {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #344152;
+  border-radius: 9px;
+  background: #202936;
+  color: #9db7e7;
+}
+
+.storage-disk-copy {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.storage-disk-title {
+  min-width: 0;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.storage-disk-title strong {
+  color: #eef4fb;
+  font-size: 13px;
+}
+
+.storage-disk-meta {
+  overflow: hidden;
+  color: #7f8b9d;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.storage-disk-stat {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.storage-disk-stat > span,
+.storage-disk-stat small {
+  color: #7f8b9d;
+  font-size: 10px;
+}
+
+.storage-disk-stat strong {
+  overflow: hidden;
+  color: #dfe7f2;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.storage-disk-chevron {
+  color: #6f7d90;
+  font-size: 22px;
+  text-align: right;
+}
+
+.storage-browser-protection {
+  margin: 0;
+}
+
+.storage-disk-page {
+  display: grid;
+  gap: 14px;
+}
+
+.storage-disk-page-header {
+  display: grid;
+  gap: 12px;
+}
+
+.storage-disk-page-title {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.storage-disk-page-title > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.storage-disk-page-title strong {
+  overflow-wrap: anywhere;
+  color: #f2f6fb;
+  font-size: 18px;
+}
+
+.storage-disk-page-title .mono {
+  color: #7f8b9d;
+}
+
+.storage-disk-page-badges {
+  display: flex;
+  gap: 7px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.storage-disk-summary {
+  border: 1px solid #252d38;
+  border-radius: 11px;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  background: #141920;
+}
+
+.storage-disk-health {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-content: start;
+}
+
+.storage-disk-health > span {
+  min-width: 76px;
+  border: 1px solid #303946;
+  border-radius: 9px;
+  padding: 9px 10px;
+  display: grid;
+  gap: 4px;
+  background: #11161d;
+}
+
+.storage-disk-health small {
+  color: #7f8b9d;
+  font-size: 10px;
+}
+
+.storage-disk-health strong {
+  color: #e8eef6;
+  font-size: 13px;
+}
+
+.storage-disk-manager {
+  border-top: 1px solid #252d38;
+  padding-top: 14px;
+}
+
+@media (max-width: 1000px) {
+  .storage-disk-row {
+    grid-template-columns: minmax(250px, 1.4fr) minmax(110px, .5fr) minmax(130px, .65fr) 24px;
+  }
+
+  .storage-disk-row > .storage-disk-stat:nth-of-type(4) {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .storage-disk-row {
+    grid-template-columns: minmax(0, 1fr) 24px;
+    gap: 10px;
+  }
+
+  .storage-disk-row > .storage-disk-stat {
+    display: none;
+  }
+
+  .storage-disk-meta {
+    white-space: normal;
+  }
+
+  .storage-disk-page-title,
+  .storage-disk-summary {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .storage-disk-page-badges,
+  .storage-disk-health {
+    justify-content: flex-start;
+  }
+}
+
+
+.storage-disk-summary-actions {
+  grid-column: 1 / -1;
+  border-top: 1px solid #252d38;
+  padding-top: 14px;
+}
+
+.storage-disk-summary-actions .storage-tree-wrap {
+  gap: 10px;
+}
+
+@media (max-width: 760px) {
+  .storage-disk-summary-actions {
+    grid-column: 1;
+  }
+}

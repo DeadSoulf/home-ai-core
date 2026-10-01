@@ -429,18 +429,23 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		if err := os.Chmod(target, 0o755); err != nil {
 			return "", fmt.Errorf("set mount point permissions: %w", err)
 		}
-		mountArgs := []string{"--", device, target}
-		if output, err := exec.CommandContext(ctx, "/usr/sbin/blkid", "-o", "value", "-s", "TYPE", device).Output(); err == nil {
-			filesystem := strings.TrimSpace(string(output))
-			if filesystem == "xfs" {
-				mountArgs = []string{"-o", "prjquota", "--", device, target}
-			}
-			if filesystem == "ext4" {
-				if features, err := exec.CommandContext(ctx, "/usr/sbin/dumpe2fs", "-h", device).CombinedOutput(); err == nil && strings.Contains(string(features), "Project quota inode:") {
-					mountArgs = []string{"-o", "prjquota", "--", device, target}
-				}
-			}
+		filesystemOutput, err := exec.CommandContext(ctx, "/usr/bin/lsblk", "-ndo", "FSTYPE", device).CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("inspect filesystem before mount: %s", strings.TrimSpace(string(filesystemOutput)))
 		}
+		filesystem := strings.ToLower(strings.TrimSpace(string(filesystemOutput)))
+		mountArgs := []string{}
+		switch filesystem {
+		case "ext4":
+			options := "usrquota"
+			if features, err := exec.CommandContext(ctx, "/usr/sbin/dumpe2fs", "-h", device).CombinedOutput(); err == nil && strings.Contains(string(features), "Project quota inode:") {
+				options += ",prjquota"
+			}
+			mountArgs = append(mountArgs, "-o", options)
+		case "xfs":
+			mountArgs = append(mountArgs, "-o", "uquota,prjquota")
+		}
+		mountArgs = append(mountArgs, "--", device, target)
 		if output, err := exec.CommandContext(ctx, "/usr/bin/mount", mountArgs...).CombinedOutput(); err != nil {
 			return "", fmt.Errorf("mount device: %s", strings.TrimSpace(string(output)))
 		}
@@ -645,7 +650,7 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		switch strings.ToLower(strings.TrimSpace(request.Filesystem)) {
 		case "ext4":
 			command = "/usr/sbin/mkfs.ext4"
-			args = []string{"-F", "-O", "quota,project", "-E", "quotatype=prjquota"}
+			args = []string{"-F", "-m", "0", "-O", "quota,project", "-E", "quotatype=usrquota:prjquota"}
 			if label != "" {
 				args = append(args, "-L", label)
 			}

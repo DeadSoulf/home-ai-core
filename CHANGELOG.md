@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.1.91-dev
+
+- Complete user identity editing, administrative password reset and self-service password changes; credential changes and account disable revoke previous sessions. Protect the last enabled administrator in the same state transaction.
+- Add migration 017, folder names/access/usage and folder/private-user quotas, including trash and pending transfers. Serialize reservations across pools; preserve private ownership and independent grants.
+- Add verified ext4/XFS filesystem project quotas for folder caps and personal SMB allocations, retaining the existing kernel pool reserve. Unlimited folders retain existing SMB behavior; finite limits without verified filesystem caps are read-only over SMB.
+- Reconcile managed Samba access after account, folder and capacity changes and at startup. Suspend active SMB handles before revocation; expose failures instead of retaining old access.
+- Separate Files into Folders, Storage and Windows access; add a dedicated Account page and simplify the user editor. Preserve the disk-first storage UI from 0.1.90-dev.
+- Protect uploaded content with download headers and filter private realtime/history events; refresh WebSocket authentication and bound cumulative subscriptions.
+- Add real-session, concurrent quota/admin and Samba transition regressions, plus opt-in disposable-browser and kernel quota acceptance fixtures.
+
+## 0.1.90-dev
+
+- Moved physical-disk actions out of the partition table and into the selected disk summary card.
+- Removed the Actions column from the selected-disk partition/LVM table.
+- Added expandable per-partition management rows directly beneath each partition/LVM entry.
+- Kept mount/unmount, label, purpose, format and delete controls together inside the expanded partition management panel.
+- Preserved the existing system-disk and in-use Files storage protections without changing storage API behavior.
+- Reduced the selected-disk table width further by removing the dedicated actions column.
+
+## 0.1.89-dev
+
+- Made the selected-disk partition/LVM table substantially more compact.
+- Reduced the default table width from roughly 1540 px to roughly 1100 px.
+- Reduced the Actions column from 330 px to 180 px and tightened the remaining storage columns.
+- Reduced table cell, button and purpose-selector spacing while preserving all existing controls.
+- Allow long table headings to wrap instead of forcing the whole storage table wider.
+- Versioned the saved column-width preference so existing browsers receive the new compact defaults.
+
+## 0.1.88-dev
+
+- Reworked **System → Storage** into a disk-first workflow: the overview now shows only physical disks and their high-level state.
+- Selecting a physical disk opens a focused disk page while preserving the existing partition/LVM management controls underneath.
+- Removed destructive storage actions from the all-disks overview so formatting, deletion, mounting and purpose changes are scoped to one selected disk.
+- Added a responsive disk summary with model, transport, capacity, partition table, unallocated space and SMART state.
+- Reused the existing storage operation APIs and usage-lock protections without changing the server-side storage safety model.
+
+## 0.1.87-dev
+
+- Added kernel-enforced free-space reserve protection for direct SMB writes on quota-ready Home-AI storage.
+- Extended privileged helper protocol v3 so managed Samba shares carry their NAS pool root and reserve policy.
+- Reused the existing `force user = home-ai-core` Samba boundary so filesystem user quotas cover every managed SMB write.
+- Compute the service-UID hard limit from current Home-AI usage plus only live free space above the configured pool reserve, accounting for pre-existing data outside `.home-ai`.
+- Verify quota usage and hard limits through `repquota` and apply changes through `setquota`.
+- Make `smb.apply` fail closed before Samba configuration activation when a non-zero reserve cannot be kernel-enforced.
+- Synchronize kernel quota best-effort whenever an administrator changes a pool reserve and expose explicit SMB hard-quota readiness/error state in the Files UI.
+- Install Linux quota tools alongside Samba.
+- Prepare newly created ext4 storage with embedded user quotas and no separate ext4 root reserve; mount ext4 with `usrquota` and XFS with `uquota`.
+- Keep legacy ext4/XFS conversion non-destructive: existing filesystems are not automatically reformatted or live-remounted when quota accounting is unavailable.
+- Added ADR-0034 plus quota calculation, parser and SMB metadata tests; PR #65 passed the full CI suite.
+
 ## 0.1.86-dev
 
 - Added per-NAS-pool free-space capacity policies with migration 016.

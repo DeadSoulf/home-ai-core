@@ -747,6 +747,12 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
               <dd className="mono">{smbStatus.hostname || "вЂ”"}</dd>
               <dt>{t("smbWorkgroup")}</dt>
               <dd>{smbStatus.workgroup || "WORKGROUP"}</dd>
+              <dt>{t("smbHardQuota")}</dt>
+              <dd>
+                <span className={smbStatus.hard_quota_ready ? "status-badge status-success" : "status-badge status-failed"}>
+                  {smbStatus.hard_quota_ready ? t("smbHardQuotaReady") : t("smbHardQuotaNotReady")}
+                </span>
+              </dd>
             </dl>
             {!smbStatus.available ? (
               <div className="smb-install">
@@ -781,6 +787,21 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
               </div>
             )}
           </div>
+
+          {smbStatus.available && !smbStatus.hard_quota_ready && (
+            <div className="notice">
+              <strong>{t("smbHardQuotaNotReady")}</strong>
+              <div>{smbStatus.hard_quota_error || t("smbHardQuotaMigrationNotice")}</div>
+              <button
+                type="button"
+                className="button compact secondary"
+                disabled={busy !== ""}
+                onClick={() => void installSMB()}
+              >
+                {busy === "smb-install" ? t("working") : t("smbInstallQuotaSupport")}
+              </button>
+            </div>
+          )}
 
           {smbStatus.available && (
             <>
@@ -1077,7 +1098,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                   <option value="">{t("fileChoosePool")}</option>
                   {pools.map((pool) => (
                     <option key={pool.id} value={pool.id}>
-                      {pool.name} В· {pool.root_path}
+                      {pool.name}
                     </option>
                   ))}
                 </select>

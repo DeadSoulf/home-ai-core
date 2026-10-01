@@ -184,8 +184,13 @@ func TestSMBWritesRequireVerifiedPoolAndUserBudgets(t *testing.T) {
 	}
 	extra.HardQuotaBytes = 0
 	allowed = smbWritableFolders(context.Background(), []state.NASFolderRecord{folder, extra}, nil)
-	if allowed[folder.ID] {
-		t.Fatal("unbounded folder can bypass pool reserve")
+	if !allowed[folder.ID] || !allowed[extra.ID] {
+		t.Fatal("unlimited folder lost the existing broker pool quota protection")
+	}
+	extra.QuotaBytes = 64 << 20
+	allowed = smbWritableFolders(context.Background(), []state.NASFolderRecord{folder, extra}, nil)
+	if allowed[extra.ID] {
+		t.Fatal("finite folder limit can be bypassed without a project quota")
 	}
 }
 
