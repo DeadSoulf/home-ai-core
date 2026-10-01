@@ -48,11 +48,16 @@ const (
 	settingsVKTab        = 0x09
 	settingsVKShift      = 0x10
 	settingsVKControl    = 0x11
+	settingsVKLeft       = 0x25
+	settingsVKUp         = 0x26
+	settingsVKRight      = 0x27
+	settingsVKDown       = 0x28
 )
 
 var (
 	procSettingsIsDialogMessage = settingsUser32.NewProc("IsDialogMessageW")
 	procSettingsGetKeyState     = settingsUser32.NewProc("GetKeyState")
+	procSettingsGetFocus        = settingsUser32.NewProc("GetFocus")
 	procSettingsSetFocus        = settingsUser32.NewProc("SetFocus")
 )
 
@@ -79,10 +84,16 @@ func (state *windowsSettingsUI) createLightControls(module windows.Handle) error
 		return hwnd
 	}
 	button := func(name string, id uint16, key string, x, y, w, h int32, page int) windows.Handle {
-		hwnd := state.createControl(module, "BUTTON", state.tr(key), settingsWSChild|settingsWSVisible|settingsWSTabStop|settingsBSFlat, x, y, w, h, id, windows.Handle(font))
+		hwnd := state.createControl(module, "BUTTON", state.tr(key), settingsWSChild|settingsWSVisible|settingsWSTabStop|settingsBSOwnerDraw, x, y, w, h, id, windows.Handle(font))
 		if name != "" {
 			state.localized[name] = hwnd
 		}
+		role := settingsButtonSecondary
+		switch name {
+		case "overview_sync_button", "connect_button", "save_button", "sync_button", "schedule_save_button", "agent_enable":
+			role = settingsButtonPrimary
+		}
+		state.buttonRoles[hwnd] = role
 		if page >= 0 {
 			state.trackPage(page, hwnd)
 		}
@@ -104,14 +115,16 @@ func (state *windowsSettingsUI) createLightControls(module windows.Handle) error
 	}
 	brand := static("brand_name", "brand_name", 72, 27, 110, 28, -1, settingsVisualSidebar)
 	state.setControlFont(brand, state.visual.titleFont)
+	staticText("", "© 2026 TexNik", 18, 692, 170, 22, -1, settingsVisualSidebar)
 
 	nav := func(page int, id uint16, key string, y int32, first bool) {
-		style := uint32(settingsWSChild | settingsWSVisible | settingsWSTabStop | settingsBSAutoRadio | settingsBSPushLike | settingsBSFlat)
+		style := uint32(settingsWSChild | settingsWSVisible | settingsWSTabStop | settingsBSOwnerDraw)
 		if first {
 			style |= settingsWSGroup
 		}
 		hwnd := state.createControl(module, "BUTTON", state.tr(key), style, 18, y, 170, 38, id, windows.Handle(font))
 		state.navButtons[page] = hwnd
+		state.buttonRoles[hwnd] = settingsButtonNavigation
 		state.localized[fmt.Sprintf("nav_%d", page)] = hwnd
 	}
 	nav(settingsPageOverview, settingsIDNavOverview, "nav_overview", 92, true)
@@ -119,17 +132,14 @@ func (state *windowsSettingsUI) createLightControls(module windows.Handle) error
 	nav(settingsPageSync, settingsIDNavSync, "nav_sync", 180, false)
 	nav(settingsPageBackup, settingsIDNavBackup, "nav_backup", 224, false)
 	nav(settingsPageGeneral, settingsIDNavGeneral, "nav_settings", 268, false)
-	staticText("", "© 2026 TexNik", 18, 692, 170, 22, -1, settingsVisualSidebar)
 
 	// Overview — visually mirrors the approved HOME AI dashboard mockup.
 	title := static("overview_title", "nav_overview", 225, 24, 360, 30, settingsPageOverview, settingsVisualMain)
 	state.setControlFont(title, state.visual.titleFont)
 
-	heroIcon := staticText("", "✓", 250, 94, 42, 42, settingsPageOverview, settingsVisualStatusIcon)
-	state.setControlFont(heroIcon, state.visual.headlineFont)
-	state.overviewHeadline = static("", "overview_not_configured", 305, 84, 555, 38, settingsPageOverview, settingsVisualHero)
+	state.overviewHeadline = static("", "overview_not_configured", 310, 86, 545, 34, settingsPageOverview, settingsVisualHero)
 	state.setControlFont(state.overviewHeadline, state.visual.headlineFont)
-	state.overviewSubtitle = static("", "overview_hint", 305, 126, 555, 26, settingsPageOverview, settingsVisualHero)
+	state.overviewSubtitle = static("", "overview_hint", 310, 125, 545, 24, settingsPageOverview, settingsVisualHero)
 	state.setControlFont(state.overviewSubtitle, state.visual.subtitleFont)
 	button("overview_sync_button", settingsIDSyncNow, "sync_now", 906, 88, 218, 38, settingsPageOverview)
 	button("overview_open_button", settingsIDOpenLocal, "open_home_folder", 906, 136, 218, 32, settingsPageOverview)
@@ -299,8 +309,16 @@ func (state *windowsSettingsUI) showPage(page int) {
 		procSettingsSendMessage.Call(uintptr(state.profileList), settingsLBSetCurSel, 0, 0)
 		procSettingsSendMessage.Call(uintptr(state.backupProfileCombo), settingsCBSetCurSel, 0, 0)
 	}
+	statusCommand := uintptr(settingsSWShow)
 	if page == settingsPageOverview {
+		statusCommand = 0
 		state.refreshOverview()
+	}
+	if hwnd := state.localized["status_title"]; hwnd != 0 {
+		procSettingsShowWindow.Call(uintptr(hwnd), statusCommand)
+	}
+	if state.statusLabel != 0 {
+		procSettingsShowWindow.Call(uintptr(state.statusLabel), statusCommand)
 	}
 	if hwnd := state.initialFocusForPage(page); hwnd != 0 {
 		procSettingsSetFocus.Call(uintptr(hwnd))
@@ -361,19 +379,45 @@ func (state *windowsSettingsUI) handlePageCommand(id, notify uint16) bool {
 }
 
 func (state *windowsSettingsUI) handlePageShortcut(message *settingsMessage) bool {
-	if message == nil || message.Message != settingsWMKeyDown || message.WParam != settingsVKTab {
+	if message == nil || message.Message != settingsWMKeyDown {
 		return false
 	}
-	ctrl, _, _ := procSettingsGetKeyState.Call(settingsVKControl)
-	if uint16(ctrl)&0x8000 == 0 {
+	if message.WParam == settingsVKTab {
+		ctrl, _, _ := procSettingsGetKeyState.Call(settingsVKControl)
+		if uint16(ctrl)&0x8000 == 0 {
+			return false
+		}
+		shift, _, _ := procSettingsGetKeyState.Call(settingsVKShift)
+		delta := 1
+		if uint16(shift)&0x8000 != 0 {
+			delta = -1
+		}
+		state.cyclePage(delta)
+		return true
+	}
+
+	if message.WParam != settingsVKUp && message.WParam != settingsVKDown &&
+		message.WParam != settingsVKLeft && message.WParam != settingsVKRight {
 		return false
 	}
-	shift, _, _ := procSettingsGetKeyState.Call(settingsVKShift)
+	focus, _, _ := procSettingsGetFocus.Call()
+	page := -1
+	for candidate, hwnd := range state.navButtons {
+		if uintptr(hwnd) == focus {
+			page = candidate
+			break
+		}
+	}
+	if page < 0 {
+		return false
+	}
 	delta := 1
-	if uint16(shift)&0x8000 != 0 {
+	if message.WParam == settingsVKUp || message.WParam == settingsVKLeft {
 		delta = -1
 	}
-	state.cyclePage(delta)
+	page = (page + delta + settingsPageCount) % settingsPageCount
+	state.showPage(page)
+	procSettingsSetFocus.Call(uintptr(state.navButtons[page]))
 	return true
 }
 
@@ -465,13 +509,12 @@ func (state *windowsSettingsUI) refreshOverview() {
 	}
 
 	server := strings.TrimSpace(state.text(state.serverEdit))
-	user := strings.TrimSpace(state.text(state.usernameEdit))
 	if server == "" {
 		state.setText(state.overviewConnection, state.tr("overview_not_configured"))
 	} else if state.connected {
-		state.setText(state.overviewConnection, state.trf("overview_connected_short", server))
+		state.setText(state.overviewConnection, state.trf("overview_connected_short", dashboardServerLabel(server)))
 	} else {
-		state.setText(state.overviewConnection, state.trf("overview_configured_short", server, user))
+		state.setText(state.overviewConnection, state.trf("overview_configured_short", dashboardServerLabel(server)))
 	}
 
 	if folder := state.primaryLocalFolder(); folder != "" {
@@ -540,8 +583,12 @@ func (state *windowsSettingsUI) refreshRecentActivity() {
 		state.setText(state.overviewRecent[row], state.trf("recent_activity_row", name, result, dashboardTime(profile.LastAttemptAt.Local(), state.language)))
 		row++
 	}
+	if row == 0 {
+		state.setText(state.overviewRecent[0], state.tr("recent_activity_empty"))
+		row = 1
+	}
 	for ; row < len(state.overviewRecent); row++ {
-		state.setText(state.overviewRecent[row], state.tr("recent_activity_empty"))
+		state.setText(state.overviewRecent[row], "")
 	}
 }
 
@@ -561,7 +608,11 @@ func (state *windowsSettingsUI) refreshStorageSummary() {
 	state.overviewStoragePercent = 0
 	if !known {
 		state.setText(state.overviewStorage, state.tr("storage_unknown"))
-		state.setText(state.overviewStorageHint, state.tr("storage_connect_hint"))
+		hint := state.tr("storage_connect_hint")
+		if state.connected {
+			hint = state.tr("storage_server_hint")
+		}
+		state.setText(state.overviewStorageHint, hint)
 		return
 	}
 	if quota > 0 {
@@ -576,6 +627,18 @@ func (state *windowsSettingsUI) refreshStorageSummary() {
 	}
 	state.setText(state.overviewStorage, dashboardBytes(used))
 	state.setText(state.overviewStorageHint, state.tr("storage_unlimited"))
+}
+
+func dashboardServerLabel(server string) string {
+	server = strings.TrimSpace(server)
+	server = strings.TrimPrefix(server, "https://")
+	server = strings.TrimPrefix(server, "http://")
+	server = strings.TrimRight(server, "/")
+	if len([]rune(server)) > 24 {
+		runes := []rune(server)
+		server = string(runes[:23]) + "…"
+	}
+	return server
 }
 
 func dashboardBytes(value int64) string {

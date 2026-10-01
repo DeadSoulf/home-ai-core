@@ -11,8 +11,21 @@ import (
 
 const (
 	settingsWMPaint          = 0x000F
+	settingsWMDrawItem       = 0x002B
+	settingsWMGetFont        = 0x0031
 	settingsWMCTLColorStatic = 0x0138
 	settingsTransparent      = 1
+
+	settingsBSOwnerDraw = 0x0000000B
+
+	settingsODSSelected = 0x0001
+	settingsODSDisabled = 0x0004
+	settingsODSFocus    = 0x0010
+
+	settingsDTCenter      = 0x0001
+	settingsDTVCenter     = 0x0004
+	settingsDTSingleLine  = 0x0020
+	settingsDTEndEllipsis = 0x8000
 
 	settingsFWNormal   = 400
 	settingsFWSemibold = 600
@@ -36,6 +49,26 @@ type settingsRect struct {
 	Bottom int32
 }
 
+type settingsDrawItemStruct struct {
+	CtlType    uint32
+	CtlID      uint32
+	ItemID     uint32
+	ItemAction uint32
+	ItemState  uint32
+	HwndItem   windows.Handle
+	HDC        windows.Handle
+	Rect       settingsRect
+	ItemData   uintptr
+}
+
+type settingsButtonRole int
+
+const (
+	settingsButtonSecondary settingsButtonRole = iota
+	settingsButtonPrimary
+	settingsButtonNavigation
+)
+
 type settingsPaintStruct struct {
 	HDC       windows.Handle
 	Erase     int32
@@ -46,19 +79,21 @@ type settingsPaintStruct struct {
 }
 
 type settingsVisualResources struct {
-	mainBrush     windows.Handle
-	sidebarBrush  windows.Handle
-	heroBrush     windows.Handle
-	cardBrush     windows.Handle
-	successBrush  windows.Handle
-	statusBrush   windows.Handle
-	accentBrush   windows.Handle
-	borderPen     windows.Handle
-	titleFont     windows.Handle
-	headlineFont  windows.Handle
-	subtitleFont  windows.Handle
-	cardTitleFont windows.Handle
-	cardValueFont windows.Handle
+	mainBrush          windows.Handle
+	sidebarBrush       windows.Handle
+	heroBrush          windows.Handle
+	cardBrush          windows.Handle
+	successBrush       windows.Handle
+	statusBrush        windows.Handle
+	accentBrush        windows.Handle
+	accentPressedBrush windows.Handle
+	borderPen          windows.Handle
+	checkPen           windows.Handle
+	titleFont          windows.Handle
+	headlineFont       windows.Handle
+	subtitleFont       windows.Handle
+	cardTitleFont      windows.Handle
+	cardValueFont      windows.Handle
 }
 
 var (
@@ -77,6 +112,10 @@ var (
 	procSettingsRoundRect      = settingsGDI32.NewProc("RoundRect")
 	procSettingsEllipse        = settingsGDI32.NewProc("Ellipse")
 	procSettingsCreateFont     = settingsGDI32.NewProc("CreateFontW")
+	procSettingsMoveToEx       = settingsGDI32.NewProc("MoveToEx")
+	procSettingsLineTo         = settingsGDI32.NewProc("LineTo")
+	procSettingsDrawText       = settingsUser32.NewProc("DrawTextW")
+	procSettingsDrawFocusRect  = settingsUser32.NewProc("DrawFocusRect")
 )
 
 func settingsRGB(r, g, b byte) uintptr {
@@ -105,17 +144,21 @@ func (state *windowsSettingsUI) initVisualResources() error {
 	state.visual.successBrush = windows.Handle(mustCreateBrush(230, 247, 238))
 	state.visual.statusBrush = windows.Handle(mustCreateBrush(47, 184, 113))
 	state.visual.accentBrush = windows.Handle(mustCreateBrush(36, 111, 220))
+	state.visual.accentPressedBrush = windows.Handle(mustCreateBrush(27, 91, 185))
 	pen, _, _ := procSettingsCreatePen.Call(0, 1, settingsRGB(224, 230, 238))
 	state.visual.borderPen = windows.Handle(pen)
-	state.visual.titleFont = createSettingsFont(-22, settingsFWSemibold)
-	state.visual.headlineFont = createSettingsFont(-30, settingsFWBold)
-	state.visual.subtitleFont = createSettingsFont(-16, settingsFWNormal)
-	state.visual.cardTitleFont = createSettingsFont(-14, settingsFWSemibold)
-	state.visual.cardValueFont = createSettingsFont(-17, settingsFWBold)
+	checkPen, _, _ := procSettingsCreatePen.Call(0, 4, settingsRGB(255, 255, 255))
+	state.visual.checkPen = windows.Handle(checkPen)
+	state.visual.titleFont = createSettingsFont(-20, settingsFWSemibold)
+	state.visual.headlineFont = createSettingsFont(-26, settingsFWBold)
+	state.visual.subtitleFont = createSettingsFont(-14, settingsFWNormal)
+	state.visual.cardTitleFont = createSettingsFont(-13, settingsFWSemibold)
+	state.visual.cardValueFont = createSettingsFont(-15, settingsFWSemibold)
 	if state.visual.mainBrush == 0 || state.visual.sidebarBrush == 0 ||
 		state.visual.heroBrush == 0 || state.visual.cardBrush == 0 ||
 		state.visual.successBrush == 0 || state.visual.statusBrush == 0 ||
-		state.visual.accentBrush == 0 || state.visual.borderPen == 0 || state.visual.titleFont == 0 ||
+		state.visual.accentBrush == 0 || state.visual.accentPressedBrush == 0 ||
+		state.visual.borderPen == 0 || state.visual.checkPen == 0 || state.visual.titleFont == 0 ||
 		state.visual.headlineFont == 0 || state.visual.subtitleFont == 0 ||
 		state.visual.cardTitleFont == 0 || state.visual.cardValueFont == 0 {
 		return fmt.Errorf("create Windows client visual resources")
@@ -140,7 +183,9 @@ func (state *windowsSettingsUI) releaseVisualResources() {
 		state.visual.successBrush,
 		state.visual.statusBrush,
 		state.visual.accentBrush,
+		state.visual.accentPressedBrush,
 		state.visual.borderPen,
+		state.visual.checkPen,
 		state.visual.titleFont,
 		state.visual.headlineFont,
 		state.visual.subtitleFont,
@@ -281,6 +326,14 @@ func (state *windowsSettingsUI) paintStatusCircle(hdc windows.Handle, left, top,
 	if oldPen != 0 {
 		procSettingsSelectObject.Call(uintptr(hdc), oldPen)
 	}
+
+	oldCheckPen, _, _ := procSettingsSelectObject.Call(uintptr(hdc), uintptr(state.visual.checkPen))
+	procSettingsMoveToEx.Call(uintptr(hdc), uintptr(left+12), uintptr(top+24), 0)
+	procSettingsLineTo.Call(uintptr(hdc), uintptr(left+20), uintptr(top+32))
+	procSettingsLineTo.Call(uintptr(hdc), uintptr(left+35), uintptr(top+14))
+	if oldCheckPen != 0 {
+		procSettingsSelectObject.Call(uintptr(hdc), oldCheckPen)
+	}
 }
 
 func (state *windowsSettingsUI) paintRoundedPanel(hdc windows.Handle, left, top, right, bottom int32, brush windows.Handle, radius int32) {
@@ -293,6 +346,94 @@ func (state *windowsSettingsUI) paintRoundedPanel(hdc windows.Handle, left, top,
 	if oldPen != 0 {
 		procSettingsSelectObject.Call(uintptr(hdc), oldPen)
 	}
+}
+
+func (state *windowsSettingsUI) drawButton(lParam uintptr) uintptr {
+	if lParam == 0 {
+		return 0
+	}
+	item := (*settingsDrawItemStruct)(unsafe.Pointer(lParam))
+	role := state.buttonRoles[item.HwndItem]
+	brush := state.visual.cardBrush
+	textColor := settingsRGB(29, 41, 57)
+	border := state.visual.borderPen
+
+	selectedNav := false
+	if role == settingsButtonNavigation {
+		for page, hwnd := range state.navButtons {
+			if hwnd == item.HwndItem && page == state.page {
+				selectedNav = true
+				break
+			}
+		}
+		if selectedNav {
+			brush = state.visual.heroBrush
+			textColor = settingsRGB(24, 89, 169)
+		} else {
+			brush = state.visual.sidebarBrush
+			border = 0
+		}
+	} else if role == settingsButtonPrimary {
+		brush = state.visual.accentBrush
+		textColor = settingsRGB(255, 255, 255)
+		if item.ItemState&settingsODSSelected != 0 {
+			brush = state.visual.accentPressedBrush
+		}
+	}
+
+	oldBrush, _, _ := procSettingsSelectObject.Call(uintptr(item.HDC), uintptr(brush))
+	var oldPen uintptr
+	if border != 0 {
+		oldPen, _, _ = procSettingsSelectObject.Call(uintptr(item.HDC), uintptr(border))
+	} else {
+		nullPen, _, _ := procSettingsGetStock.Call(8)
+		oldPen, _, _ = procSettingsSelectObject.Call(uintptr(item.HDC), nullPen)
+	}
+	procSettingsRoundRect.Call(
+		uintptr(item.HDC),
+		uintptr(item.Rect.Left), uintptr(item.Rect.Top),
+		uintptr(item.Rect.Right), uintptr(item.Rect.Bottom),
+		12, 12,
+	)
+	if oldBrush != 0 {
+		procSettingsSelectObject.Call(uintptr(item.HDC), oldBrush)
+	}
+	if oldPen != 0 {
+		procSettingsSelectObject.Call(uintptr(item.HDC), oldPen)
+	}
+
+	procSettingsSetBkMode.Call(uintptr(item.HDC), settingsTransparent)
+	if item.ItemState&settingsODSDisabled != 0 {
+		textColor = settingsRGB(150, 159, 172)
+	}
+	procSettingsSetTextColor.Call(uintptr(item.HDC), textColor)
+	font, _, _ := procSettingsSendMessage.Call(uintptr(item.HwndItem), settingsWMGetFont, 0, 0)
+	var oldFont uintptr
+	if font != 0 {
+		oldFont, _, _ = procSettingsSelectObject.Call(uintptr(item.HDC), font)
+	}
+	label := state.text(item.HwndItem)
+	labelPtr, _ := windows.UTF16PtrFromString(label)
+	rect := item.Rect
+	procSettingsDrawText.Call(
+		uintptr(item.HDC),
+		uintptr(unsafe.Pointer(labelPtr)),
+		^uintptr(0),
+		uintptr(unsafe.Pointer(&rect)),
+		settingsDTCenter|settingsDTVCenter|settingsDTSingleLine|settingsDTEndEllipsis,
+	)
+	if oldFont != 0 {
+		procSettingsSelectObject.Call(uintptr(item.HDC), oldFont)
+	}
+	if item.ItemState&settingsODSFocus != 0 {
+		focus := item.Rect
+		focus.Left += 4
+		focus.Top += 4
+		focus.Right -= 4
+		focus.Bottom -= 4
+		procSettingsDrawFocusRect.Call(uintptr(item.HDC), uintptr(unsafe.Pointer(&focus)))
+	}
+	return 1
 }
 
 func (state *windowsSettingsUI) invalidateVisual() {
