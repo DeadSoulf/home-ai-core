@@ -564,6 +564,10 @@ func (s *Store) SetUserAccess(
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	if err := checkEnabledAdministrator(ctx, tx, userID, roleID, disabled); err != nil {
+		return err
+	}
+
 	result, err := tx.ExecContext(ctx, `
 		UPDATE users
 		SET disabled = ?, updated_at = ?
@@ -574,6 +578,11 @@ func (s *Store) SetUserAccess(
 	}
 	if count, _ := result.RowsAffected(); count == 0 {
 		return sql.ErrNoRows
+	}
+	if disabled {
+		if _, err := tx.ExecContext(ctx, "UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL", now.UTC().Format(time.RFC3339Nano), userID); err != nil {
+			return err
+		}
 	}
 
 	if _, err := tx.ExecContext(ctx, "DELETE FROM user_roles WHERE user_id = ?", userID); err != nil {
@@ -607,6 +616,16 @@ func (s *Store) SetUserAccess(
 		}
 	}
 
+	// Private-folder ownership survives replacing a user's explicit grants.
+	// Disabled accounts retain ownership but authentication denies all access.
+	for _, permission := range []string{"files.read", "files.write"} {
+		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO user_resource_permissions
+			(user_id, permission_name, resource_type, resource_id)
+			SELECT owner_user_id, ?, 'file_folder', id FROM nas_folders
+			WHERE kind = 'private' AND owner_user_id = ?`, permission, userID); err != nil {
+			return fmt.Errorf("preserve private folder ownership: %w", err)
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit user access update: %w", err)
 	}

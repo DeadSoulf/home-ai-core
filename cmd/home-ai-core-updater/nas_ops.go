@@ -27,6 +27,9 @@ func performNASOperation(
 	dataRoot := filepath.Join(root, ".home-ai")
 
 	switch request.Operation {
+	case "storage.nas.quota.set":
+		return setNASQuota(ctx, request, uid, gid)
+
 	case "storage.nas.prepare_pool":
 		if err := ensureOwnedDir(dataRoot, uid, gid, 0o750); err != nil {
 			return "", err

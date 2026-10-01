@@ -78,6 +78,14 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	policyCtx, policyCancel := context.WithTimeout(ctx, 30*time.Second)
+	if err := ensureNASServicePolicy(policyCtx); err != nil {
+		logger.Error("reconcile NAS service policy", "error", err)
+	}
+	if _, err := performSMBOperation(policyCtx, updaterhelper.Request{Operation: "smb.suspend"}, uid, gid); err != nil {
+		logger.Error("suspend stale SMB access", "error", err)
+	}
+	policyCancel()
 	go func() {
 		<-ctx.Done()
 		_ = listener.Close()
@@ -166,6 +174,17 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 			DiskHealth:      health,
 			LVM:             lvm,
 		})
+		return
+	}
+	if request.Operation == "storage.nas.quota.inspect" {
+		ctx, cancel := context.WithTimeout(parent, 40*time.Second)
+		defer cancel()
+		quota, err := inspectNASQuota(ctx, request)
+		if err != nil {
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})
+			return
+		}
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{OK: true, QuotaLimitBytes: quota.BlockHardLimit * 1024, QuotaUsedBytes: quota.CurrentSpace})
 		return
 	}
 	if strings.HasPrefix(request.Operation, "storage.nas.") {

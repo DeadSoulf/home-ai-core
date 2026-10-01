@@ -43,6 +43,7 @@ type ResourceDefinition struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description,omitempty"`
 	Permissions []string `json:"permissions"`
+	OwnerUserID string   `json:"owner_user_id,omitempty"`
 }
 
 type AccessCatalog struct {
@@ -175,6 +176,7 @@ func (s *Service) AccessCatalog(ctx context.Context) (AccessCatalog, error) {
 			Name:        folder.Name,
 			Description: folder.PoolName,
 			Permissions: []string{"files.read", "files.write"},
+			OwnerUserID: folder.OwnerUserID,
 		})
 	}
 
@@ -336,6 +338,9 @@ func (s *Service) UpdateUserAccess(
 		access.Disabled,
 		s.now().UTC(),
 	); err != nil {
+		if errors.Is(err, state.ErrLastEnabledAdministrator) {
+			return User{}, ErrLastAdministrator
+		}
 		return User{}, err
 	}
 
@@ -393,6 +398,9 @@ func (s *Service) normalizeAccess(
 		}
 		permissionSet[permission] = true
 	}
+	if permissionSet["files.write"] {
+		permissionSet["files.read"] = true
+	}
 	permissions := make([]string, 0, len(permissionSet))
 	for permission := range permissionSet {
 		permissions = append(permissions, permission)
@@ -435,6 +443,11 @@ func (s *Service) normalizeAccess(
 		}
 		key := scope.Permission + "\x00" + scope.ResourceType + "\x00" + scope.ResourceID
 		scopeSet[key] = scope
+		if scope.Permission == "files.write" {
+			read := scope
+			read.Permission = "files.read"
+			scopeSet[read.Permission+"\x00"+read.ResourceType+"\x00"+read.ResourceID] = read
+		}
 	}
 	scopes := make([]PermissionScope, 0, len(scopeSet))
 	for _, scope := range scopeSet {

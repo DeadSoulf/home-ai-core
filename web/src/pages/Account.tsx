@@ -1,9 +1,10 @@
 import type { Actor } from "../api/types";
+import { PasswordChange } from "../components/PasswordChange";
 import { Panel } from "../components/Panel";
 import { useI18n } from "../i18n";
 import { PageHeading } from "./Dashboard";
 
-export function AccountPage({actor}: {actor: Actor}) {
+export function AccountPage({actor, onPasswordChanged}: {actor: Actor; onPasswordChanged: () => void}) {
   const {t} = useI18n();
   return (
     <div className="page">
@@ -19,6 +20,7 @@ export function AccountPage({actor}: {actor: Actor}) {
         </dl>
         <p className="muted account-access-note">{t("limitedAccessNotice")}</p>
       </Panel>
+      <Panel title={t("changePassword")}><PasswordChange onChanged={onPasswordChanged}/></Panel>
     </div>
   );
 }

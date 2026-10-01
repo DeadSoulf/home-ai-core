@@ -46,6 +46,20 @@ func performSMBOperation(
 	uid, gid int,
 ) (string, error) {
 	switch request.Operation {
+	case "smb.suspend":
+		if _, err := os.Stat(smbManagedConfig); errors.Is(err, os.ErrNotExist) {
+			return "SMB is not configured", nil
+		} else if err != nil {
+			return "", err
+		}
+		// Stop the service first, ending open handles as well as fresh sessions.
+		if err := systemctl(ctx, "stop", "smbd.service"); err != nil {
+			return "", err
+		}
+		if err := os.WriteFile(smbManagedConfig, []byte(renderSMBConfig("WORKGROUP", nil)), 0o600); err != nil {
+			return "", err
+		}
+		return "SMB access suspended", nil
 	case "smb.install":
 		return installSamba(ctx)
 	case "smb.user.set_password":

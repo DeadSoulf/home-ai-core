@@ -31,6 +31,8 @@ type Request struct {
 	NetworkMethod   string            `json:"network_method,omitempty"`
 	DNS             []string          `json:"dns,omitempty"`
 	RootPath        string            `json:"root_path,omitempty"`
+	ProjectID       uint32            `json:"project_id,omitempty"`
+	QuotaBytes      int64             `json:"quota_bytes,omitempty"`
 	RelativePath    string            `json:"relative_path,omitempty"`
 	SMBWorkgroup    string            `json:"smb_workgroup,omitempty"`
 	SMBUser         string            `json:"smb_user,omitempty"`
@@ -111,6 +113,8 @@ type NetworkProfileStat struct {
 }
 
 type Response struct {
+	QuotaLimitBytes    uint64                `json:"quota_limit_bytes,omitempty"`
+	QuotaUsedBytes     uint64                `json:"quota_used_bytes,omitempty"`
 	OK                 bool                  `json:"ok"`
 	Message            string                `json:"message,omitempty"`
 	Error              string                `json:"error,omitempty"`

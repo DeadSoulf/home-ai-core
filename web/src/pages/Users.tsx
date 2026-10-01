@@ -21,12 +21,13 @@ const administratorOnlyPermissions = new Set([
   "security.roles.manage",
 ]);
 
-export function UsersPage({revision, canManage}: {revision: number; canManage: boolean}) {
+export function UsersPage({revision, canManage, currentUserID}: {revision: number; canManage: boolean; currentUserID?: string}) {
   const {t, date} = useI18n();
   const load = useCallback(async () => {
     const users = await api.users();
     const access = canManage ? await api.userAccessCatalog() : undefined;
-    return {users, access};
+    const quotas = canManage ? await api.fileUserQuotas().catch(() => []) : [];
+    return {users, access, quotas};
   }, [canManage]);
   const resource = useResource(load, revision);
 
@@ -83,8 +84,8 @@ export function UsersPage({revision, canManage}: {revision: number; canManage: b
 
   function editUser(user: UserAccount) {
     setSelectedUserID(user.id);
-    setUsername("");
-    setDisplayName("");
+    setUsername(user.username);
+    setDisplayName(user.display_name);
     setPassword("");
     setProfile(user.profile || "friend");
     setPermissions(
@@ -134,6 +135,34 @@ export function UsersPage({revision, canManage}: {revision: number; canManage: b
     });
   }
 
+  async function saveIdentity(event: FormEvent) {
+    event.preventDefault(); if (!selectedUser) return;
+    setSaving(true); setFormError(""); setNotice("");
+    try {
+      await api.updateUserIdentity(selectedUser.id, username, displayName);
+      setNotice(t("userIdentitySaved")); resource.reload();
+      window.dispatchEvent(new CustomEvent("home-ai-core:user-access-changed"));
+    } catch (reason) {setFormError(reason instanceof Error ? reason.message : t("requestFailed"));}
+    finally {setSaving(false);}
+  }
+  async function resetPassword(event: FormEvent) {
+    event.preventDefault(); if (!selectedUser) return;
+    setSaving(true); setFormError(""); setNotice("");
+    try {await api.resetUserPassword(selectedUser.id, password); setPassword(""); setNotice(t("userPasswordReset"));}
+    catch (reason) {setFormError(reason instanceof Error ? reason.message : t("requestFailed"));}
+    finally {setSaving(false);}
+  }
+  async function saveQuota(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if (!selectedUser) return;
+    const value = new FormData(event.currentTarget).get("quota_gib");
+    setSaving(true); setFormError(""); setNotice("");
+    try {
+      const result = await api.updateUserQuota(selectedUser.id, value ? Math.floor(Number(value) * 2 ** 30) : 0);
+      setNotice(result.warning || t("quotaSaved")); resource.reload();
+    } catch (reason) {setFormError(reason instanceof Error ? reason.message : t("requestFailed"));}
+    finally {setSaving(false);}
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!catalog) return;
@@ -142,13 +171,13 @@ export function UsersPage({revision, canManage}: {revision: number; canManage: b
     setNotice("");
     try {
       if (selectedUser) {
-        await api.updateUserAccess(selectedUser.id, {
+        const updated = await api.updateUserAccess(selectedUser.id, {
           profile,
           permissions,
           resourcePermissions,
           disabled,
         });
-        setNotice(t("userAccessSaved"));
+        setNotice(updated.warning || t("userAccessSaved"));
       } else {
         await api.createUser({
           username,
@@ -180,6 +209,8 @@ export function UsersPage({revision, canManage}: {revision: number; canManage: b
   return (
     <div className="page">
       <PageHeading title={t("users")} subtitle={t("usersSubtitle")} />
+      {formError && <div role="alert" className="form-error">{formError}</div>}
+      {notice && <div role="status" className="notice">{notice}</div>}
 
       <Panel title={t("userAccounts")} className="wide">
         <div className="table-wrap">
@@ -226,6 +257,29 @@ export function UsersPage({revision, canManage}: {revision: number; canManage: b
           </table>
         </div>
       </Panel>
+
+      {canManage && selectedUser && <Panel title={selectedUser.display_name} className="wide">
+        <form className="user-form" onSubmit={saveIdentity}>
+          <label>{t("username")}<input required minLength={3} maxLength={64} value={username} onChange={(event) => setUsername(event.target.value)}/></label>
+          <label>{t("displayName")}<input required maxLength={128} value={displayName} onChange={(event) => setDisplayName(event.target.value)}/></label>
+          <button className="button secondary" disabled={saving}>{t("saveIdentity")}</button>
+        </form>
+        {selectedUser.id !== currentUserID && <details><summary>{t("resetUserPassword")}</summary>
+          <form className="user-form" onSubmit={resetPassword}>
+            <label>{t("newPassword")}<input type="password" autoComplete="new-password" required minLength={12} maxLength={256} value={password} onChange={(event) => setPassword(event.target.value)}/></label>
+            <p className="muted small">{t("passwordSessionsNotice")}</p>
+            <button className="button secondary" disabled={saving}>{t("resetUserPassword")}</button>
+          </form>
+        </details>}
+        <details><summary>{t("personalQuota")}</summary>
+          <p className="muted small">{t("personalQuotaNotice")}</p>
+          <form key={`${selectedUser.id}-${resource.data?.quotas.find((item) => item.user_id === selectedUser.id)?.quota_bytes}`} className="user-form" onSubmit={saveQuota}>
+            <label>{t("quotaGiB")}<input name="quota_gib" type="number" min={0} step="any" placeholder={t("quotaUnlimited")} defaultValue={(resource.data?.quotas.find((item) => item.user_id === selectedUser.id)?.quota_bytes || 0) / 2 ** 30 || ""}/></label>
+            <p className="muted small">{t("quotaAccountingNotice")}</p>
+            <button className="button secondary" disabled={saving}>{t("save")}</button>
+          </form>
+        </details>
+      </Panel>}
 
       {canManage && catalog && (
         <Panel
@@ -307,7 +361,8 @@ export function UsersPage({revision, canManage}: {revision: number; canManage: b
                 : t("userCustomAccessNotice")}
             </div>
 
-            <section className="user-access-section">
+            <details className="user-access-section">
+              <summary>{t("userCapabilities")}</summary>
               <div className="user-access-section-head">
                 <div>
                   <h3>{t("userCapabilities")}</h3>
@@ -356,7 +411,7 @@ export function UsersPage({revision, canManage}: {revision: number; canManage: b
                   </fieldset>
                 ))}
               </div>
-            </section>
+            </details>
 
             <section className="user-access-section">
               <h3>{t("userResourceAccess")}</h3>
@@ -373,8 +428,8 @@ export function UsersPage({revision, canManage}: {revision: number; canManage: b
                         <label key={permission}>
                           <input
                             type="checkbox"
-                            checked={profile === "administrator" || hasResourcePermission(item.type, item.id, permission)}
-                            disabled={profile === "administrator"}
+                            checked={profile === "administrator" || item.owner_user_id === selectedUserID || hasResourcePermission(item.type, item.id, permission)}
+                            disabled={profile === "administrator" || item.owner_user_id === selectedUserID}
                             onChange={() => toggleResourcePermission(item.type, item.id, permission)}
                           />
                           <span>{resourcePermissionLabel(permission, t)}</span>
@@ -389,8 +444,7 @@ export function UsersPage({revision, canManage}: {revision: number; canManage: b
               </div>
             </section>
 
-            {formError && <div className="form-error">{formError}</div>}
-            {notice && <div className="storage-success">{notice}</div>}
+
 
             <div className="user-access-actions">
               {selectedUser && (

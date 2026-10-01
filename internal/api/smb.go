@@ -27,11 +27,13 @@ type smbUserResponse struct {
 }
 
 type smbShareResponse struct {
-	FolderID   string `json:"folder_id"`
-	FolderName string `json:"folder_name"`
-	Kind       string `json:"kind"`
-	ShareName  string `json:"share_name"`
-	UNC        string `json:"unc"`
+	FolderID         string `json:"folder_id"`
+	FolderName       string `json:"folder_name"`
+	Kind             string `json:"kind"`
+	ShareName        string `json:"share_name"`
+	Writable         bool   `json:"writable"`
+	WriteRestriction string `json:"write_restriction,omitempty"`
+	UNC              string `json:"unc"`
 }
 
 type smbModel struct {
@@ -80,6 +82,12 @@ func (s *server) smbStatus(
 		})
 	}
 
+	workgroup := defaultSMBWorkgroup
+	if store, ok := s.state.(nasManagementState); ok {
+		if value, err := store.NASSetting(r.Context(), "smb_workgroup"); err == nil && value != "" {
+			workgroup = value
+		}
+	}
 	hostname, _ := os.Hostname()
 	writeJSON(w, http.StatusOK, map[string]any{
 		"smb": map[string]any{
@@ -87,7 +95,7 @@ func (s *server) smbStatus(
 			"active":    status.Active,
 			"error":     status.Error,
 			"hostname":  hostname,
-			"workgroup": defaultSMBWorkgroup,
+			"workgroup": workgroup,
 			"users":     users,
 			"shares":    model.ShareViews,
 		},
@@ -105,6 +113,13 @@ func (s *server) smbOperation(
 		return
 	}
 
+	fileMutationMu.Lock()
+	defer fileMutationMu.Unlock()
+	currentActor, authorized := s.refreshMutationActor(w, r, "files.manage")
+	if !authorized {
+		return
+	}
+	actor = currentActor
 	var input struct {
 		Operation string `json:"operation"`
 		UserID    string `json:"user_id,omitempty"`
@@ -163,6 +178,11 @@ func (s *server) smbOperation(
 			workgroup = defaultSMBWorkgroup
 		}
 		message, err = smb.Apply(r.Context(), workgroup, model.Shares)
+		if err == nil {
+			if store, ok := s.state.(nasManagementState); ok {
+				err = store.SetNASSetting(r.Context(), "smb_workgroup", workgroup)
+			}
+		}
 		target = "samba"
 		meta = map[string]any{"workgroup": workgroup, "share_count": len(model.Shares)}
 	default:
@@ -212,6 +232,14 @@ func (s *server) buildSMBModel(r *http.Request) (smbModel, error) {
 		userNames[user.ID] = smbSystemUsername(user.ID)
 	}
 
+	quotas := map[string]int64{}
+	if store, ok := s.state.(nasManagementState); ok {
+		quotas, err = store.NASUserQuotas(r.Context())
+		if err != nil {
+			return smbModel{}, err
+		}
+	}
+	writable := smbWritableFolders(r.Context(), folders, quotas)
 	hostname, _ := os.Hostname()
 	shares := make([]smb.Share, 0, len(folders))
 	views := make([]smbShareResponse, 0, len(folders))
@@ -231,7 +259,7 @@ func (s *server) buildSMBModel(r *http.Request) (smbModel, error) {
 			if userAllowsFileFolder(user, "files.read", folder.ID) || userHasPermission(user, "files.manage") {
 				readUsers = append(readUsers, name)
 			}
-			if userAllowsFileFolder(user, "files.write", folder.ID) || userHasPermission(user, "files.manage") {
+			if writable[folder.ID] && (userAllowsFileFolder(user, "files.write", folder.ID) || userHasPermission(user, "files.manage")) {
 				writeUsers = append(writeUsers, name)
 			}
 		}
@@ -246,7 +274,12 @@ func (s *server) buildSMBModel(r *http.Request) (smbModel, error) {
 			ReadUsers:  readUsers,
 			WriteUsers: writeUsers,
 		})
+		restriction := ""
+		if !writable[folder.ID] {
+			restriction = "SMB is read-only until finite filesystem quotas cover the pool reserve and personal quota; use Home-AI uploads for writes"
+		}
 		views = append(views, smbShareResponse{
+			Writable: writable[folder.ID], WriteRestriction: restriction,
 			FolderID:   folder.ID,
 			FolderName: folder.Name,
 			Kind:       folder.Kind,

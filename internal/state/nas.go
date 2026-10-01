@@ -45,6 +45,9 @@ type NASFolderRecord struct {
 	PoolReservePercent int
 	PoolWarningPercent int
 	Name               string
+	QuotaBytes         int64
+	HardQuotaBytes     int64
+	ProjectID          uint32
 	Kind               string
 	OwnerUserID        string
 	RelativePath       string
@@ -239,6 +242,9 @@ func (s *Store) CreateNASFolder(
 		}
 	}
 
+	if _, err := tx.ExecContext(ctx, "INSERT INTO nas_quota_projects(folder_id) VALUES (?)", id); err != nil {
+		return NASFolderRecord{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return NASFolderRecord{}, fmt.Errorf("commit NAS folder creation: %w", err)
 	}
@@ -266,6 +272,7 @@ func (s *Store) NASFolder(ctx context.Context, folderID string) (NASFolderRecord
 	err := s.db.QueryRowContext(ctx, `
 		SELECT f.id, f.pool_id, p.name, p.root_path, p.reserve_percent, p.warning_percent,
 		       f.name, f.kind, COALESCE(f.owner_user_id, ''), f.relative_path,
+               f.quota_bytes, f.hard_quota_bytes, COALESCE((SELECT project_id FROM nas_quota_projects WHERE folder_id = f.id), 0),
 		       COALESCE(f.created_by, ''), f.created_at, f.updated_at
 		FROM nas_folders f
 		JOIN nas_pools p ON p.id = f.pool_id
@@ -281,6 +288,9 @@ func (s *Store) NASFolder(ctx context.Context, folderID string) (NASFolderRecord
 		&record.Kind,
 		&record.OwnerUserID,
 		&record.RelativePath,
+		&record.QuotaBytes,
+		&record.HardQuotaBytes,
+		&record.ProjectID,
 		&record.CreatedBy,
 		&createdAt,
 		&updatedAt,
@@ -306,6 +316,7 @@ func (s *Store) ListNASFolders(ctx context.Context) ([]NASFolderRecord, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT f.id, f.pool_id, p.name, p.root_path, p.reserve_percent, p.warning_percent,
 		       f.name, f.kind, COALESCE(f.owner_user_id, ''), f.relative_path,
+               f.quota_bytes, f.hard_quota_bytes, COALESCE((SELECT project_id FROM nas_quota_projects WHERE folder_id = f.id), 0),
 		       COALESCE(f.created_by, ''), f.created_at, f.updated_at
 		FROM nas_folders f
 		JOIN nas_pools p ON p.id = f.pool_id
@@ -331,6 +342,9 @@ func (s *Store) ListNASFolders(ctx context.Context) ([]NASFolderRecord, error) {
 			&record.Kind,
 			&record.OwnerUserID,
 			&record.RelativePath,
+			&record.QuotaBytes,
+			&record.HardQuotaBytes,
+			&record.ProjectID,
 			&record.CreatedBy,
 			&createdAt,
 			&updatedAt,

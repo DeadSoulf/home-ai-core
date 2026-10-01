@@ -18,7 +18,7 @@ type Phase = "loading" | "setup" | "login" | "app";
 
 function currentPath(): string {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
-  return ["/", "/files", "/system", "/modules", "/jobs", "/audit", "/users"].includes(path) ? path + (path === "/system" ? window.location.hash : "") : "/";
+  return ["/", "/files", "/system", "/modules", "/jobs", "/audit", "/users", "/account"].includes(path) ? path + (path === "/system" ? window.location.hash : "") : "/";
 }
 
 export default function App() {
@@ -160,11 +160,14 @@ export default function App() {
 
   const has = (permission: string) => actor.permissions.includes(permission);
   const dashboardAllowed = has("system.read") || has("modules.read") || has("jobs.read");
-  const accountPage = <AccountPage actor={actor} />;
+  const accountPage = <AccountPage actor={actor} onPasswordChanged={() => {setActor(undefined); setPhase("login");}} />;
 
   const allowedPath = accessiblePath(actor, path);
   let page;
   switch (allowedPath.split("#")[0]) {
+    case "/account":
+      page = accountPage;
+      break;
     case "/files":
       page = has("security.self.read")
         ? <FilesPage revision={revision} canManage={has("files.manage")} />
@@ -197,7 +200,7 @@ export default function App() {
       break;
     case "/users":
       page = has("security.users.read")
-        ? <UsersPage revision={revision} canManage={has("security.users.manage")} />
+        ? <UsersPage revision={revision} canManage={has("security.users.manage")} currentUserID={actor.id} />
         : accountPage;
       break;
     default:

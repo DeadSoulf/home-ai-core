@@ -18,7 +18,7 @@ type EventHistoryService interface {
 func (s *server) eventHistory(
 	w http.ResponseWriter,
 	r *http.Request,
-	_ security.Actor,
+	actor security.Actor,
 	_ authSource,
 ) {
 	if r.Method != http.MethodGet {
@@ -54,8 +54,14 @@ func (s *server) eventHistory(
 		return
 	}
 
+	visible := make([]state.EventRecord, 0, len(events))
+	for _, event := range events {
+		if actorAllowsEvent(actor, event.Type, event.Data) {
+			visible = append(visible, event)
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"events":        events,
+		"events":        visible,
 		"latest_cursor": latest,
 	})
 }

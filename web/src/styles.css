@@ -886,6 +886,9 @@ tbody tr:last-child td { border-bottom: 0; }
   .smb-password-form p { grid-column: auto; }
 }
 
+.file-section-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.file-section-tabs .button { min-height: 42px; }
+.folder-settings { max-width: 900px; }
 /* Grouped navigation and progressive disclosure. */
 button:focus-visible, summary:focus-visible { outline: 2px solid #8bb0ff; outline-offset: 3px; }
 .nav-group { display: grid; gap: 4px; }

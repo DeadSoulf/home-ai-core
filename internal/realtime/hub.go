@@ -1,6 +1,7 @@
 package realtime
 
 import (
+	"fmt"
 	"log/slog"
 	"sort"
 	"strings"
@@ -177,13 +178,22 @@ func (c *client) matches(eventType string) bool {
 	return false
 }
 
-func (c *client) subscribe(topics []string) []string {
+func (c *client) subscribe(topics []string) ([]string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	additional := map[string]struct{}{}
+	for _, topic := range topics {
+		if _, exists := c.topics[topic]; !exists {
+			additional[topic] = struct{}{}
+		}
+	}
+	if len(c.topics)+len(additional) > MaxTopics {
+		return nil, fmt.Errorf("at most %d subscriptions are allowed", MaxTopics)
+	}
 	for _, topic := range topics {
 		c.topics[topic] = struct{}{}
 	}
-	return c.topicListLocked()
+	return c.topicListLocked(), nil
 }
 
 func (c *client) unsubscribe(topics []string) []string {

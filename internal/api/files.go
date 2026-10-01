@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"mime"
 	"net/http"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/filedata"
@@ -43,15 +45,20 @@ type filePoolResponse struct {
 }
 
 type fileFolderResponse struct {
-	ID           string `json:"id"`
-	PoolID       string `json:"pool_id"`
-	PoolName     string `json:"pool_name"`
-	Name         string `json:"name"`
-	Kind         string `json:"kind"`
-	OwnerUserID  string `json:"owner_user_id,omitempty"`
-	RelativePath string `json:"relative_path"`
-	CanRead      bool   `json:"can_read"`
-	CanWrite     bool   `json:"can_write"`
+	ID             string `json:"id"`
+	PoolID         string `json:"pool_id"`
+	PoolName       string `json:"pool_name"`
+	Name           string `json:"name"`
+	Kind           string `json:"kind"`
+	OwnerUserID    string `json:"owner_user_id,omitempty"`
+	RelativePath   string `json:"relative_path"`
+	CanRead        bool   `json:"can_read"`
+	QuotaBytes     int64  `json:"quota_bytes"`
+	HardQuotaBytes int64  `json:"hard_quota_bytes"`
+	UsedBytes      int64  `json:"used_bytes"`
+	ReservedBytes  int64  `json:"reserved_bytes"`
+	UsageKnown     bool   `json:"usage_known"`
+	CanWrite       bool   `json:"can_write"`
 }
 
 func (s *server) filePools(
@@ -145,6 +152,15 @@ func (s *server) fileFolders(
 	actor security.Actor,
 	source authSource,
 ) {
+	if r.Method != http.MethodGet {
+		fileMutationMu.Lock()
+		defer fileMutationMu.Unlock()
+		currentActor, authorized := s.refreshMutationActor(w, r, "files.manage")
+		if !authorized {
+			return
+		}
+		actor = currentActor
+	}
 	switch r.Method {
 	case http.MethodGet:
 		records, err := s.state.ListNASFolders(r.Context())
@@ -158,17 +174,7 @@ func (s *server) fileFolders(
 			if !canRead {
 				continue
 			}
-			folders = append(folders, fileFolderResponse{
-				ID:           record.ID,
-				PoolID:       record.PoolID,
-				PoolName:     record.PoolName,
-				Name:         record.Name,
-				Kind:         record.Kind,
-				OwnerUserID:  record.OwnerUserID,
-				RelativePath: record.RelativePath,
-				CanRead:      true,
-				CanWrite:     actor.Has("files.manage") || actor.Allows("files.write", "file_folder", record.ID),
-			})
+			folders = append(folders, folderView(record, actor))
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"folders": folders})
 	case http.MethodPost:
@@ -184,6 +190,11 @@ func (s *server) fileFolders(
 		}
 		if err := decodeJSON(w, r, &input); err != nil {
 			writeAPIError(w, r, http.StatusBadRequest, "invalid_file_folder", err.Error(), nil)
+			return
+		}
+		active, suspendErr := s.beginSMBAccessChange(r)
+		if suspendErr != nil {
+			writeAPIError(w, r, 502, "smb_access_suspend_failed", suspendErr.Error(), nil)
 			return
 		}
 		record, err := s.state.CreateNASFolder(
@@ -227,7 +238,8 @@ func (s *server) fileFolders(
 				},
 			)
 			s.realtime.Publish("files.folder.created", map[string]any{"folder_id": record.ID}, requestIDFromContext(r.Context()))
-			writeJSON(w, http.StatusCreated, map[string]any{"folder": fileFolderResponse{
+			warning := s.finishSMBAccessChange(r, active)
+			writeJSON(w, http.StatusCreated, map[string]any{"warning": warning, "folder": fileFolderResponse{
 				ID:           record.ID,
 				PoolID:       record.PoolID,
 				PoolName:     record.PoolName,
@@ -276,6 +288,8 @@ func (s *server) fileFolderDirectory(
 	actor security.Actor,
 	source authSource,
 ) {
+	fileMutationMu.Lock()
+	defer fileMutationMu.Unlock()
 	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
 		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
 		return
@@ -320,6 +334,10 @@ func (s *server) fileFolderContent(
 	actor security.Actor,
 	source authSource,
 ) {
+	if r.Method != http.MethodGet {
+		fileMutationMu.Lock()
+		defer fileMutationMu.Unlock()
+	}
 	write := r.Method == http.MethodPut
 	if write && source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
 		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
@@ -343,9 +361,14 @@ func (s *server) fileFolderContent(
 			return
 		}
 		defer file.Close()
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": info.Name()}))
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'")
+		w.Header().Set("Cache-Control", "private, no-store")
 		http.ServeContent(w, r, info.Name(), info.ModTime(), file)
 	case http.MethodPut:
-		allowance, ok := filePoolWriteAllowance(w, r, folder)
+		allowance, ok := s.fileWriteAllowance(w, r, folder, "")
 		if !ok {
 			return
 		}
@@ -357,8 +380,8 @@ func (s *server) fileFolderContent(
 				writeAPIError(w, r, http.StatusRequestEntityTooLarge, "file_too_large", "file exceeds upload limit", nil)
 				return
 			}
-			if errors.Is(err, filedata.ErrCapacityLimit) {
-				writeFilePoolReserveError(w, r, folder)
+			if errors.Is(err, filedata.ErrCapacityLimit) || errors.Is(err, syscall.EDQUOT) || errors.Is(err, syscall.ENOSPC) {
+				s.writeFileLimitError(w, r, folder)
 				return
 			}
 			writeAPIError(w, r, http.StatusBadRequest, "file_upload_failed", err.Error(), nil)
@@ -394,6 +417,10 @@ func (s *server) fileFolderUploads(
 	actor security.Actor,
 	source authSource,
 ) {
+	if r.Method != http.MethodGet {
+		fileMutationMu.Lock()
+		defer fileMutationMu.Unlock()
+	}
 	folder, root, ok := s.authorizedFileFolder(w, r, actor, true)
 	if !ok {
 		return
@@ -422,12 +449,12 @@ func (s *server) fileFolderUploads(
 			writeAPIError(w, r, http.StatusBadRequest, "invalid_file_upload", err.Error(), nil)
 			return
 		}
-		allowance, ok := filePoolWriteAllowance(w, r, folder)
+		allowance, ok := s.fileWriteAllowance(w, r, folder, "")
 		if !ok {
 			return
 		}
 		if input.TotalBytes > allowance {
-			writeFilePoolReserveError(w, r, folder)
+			s.writeFileLimitError(w, r, folder)
 			return
 		}
 		session, err := filedata.CreateUpload(
@@ -472,6 +499,10 @@ func (s *server) fileFolderUpload(
 	actor security.Actor,
 	source authSource,
 ) {
+	if r.Method != http.MethodGet {
+		fileMutationMu.Lock()
+		defer fileMutationMu.Unlock()
+	}
 	folder, root, ok := s.authorizedFileFolder(w, r, actor, true)
 	if !ok {
 		return
@@ -526,6 +557,8 @@ func (s *server) fileFolderUploadChunk(
 	actor security.Actor,
 	source authSource,
 ) {
+	fileMutationMu.Lock()
+	defer fileMutationMu.Unlock()
 	if r.Method != http.MethodPut {
 		w.Header().Set("Allow", http.MethodPut)
 		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
@@ -539,12 +572,12 @@ func (s *server) fileFolderUploadChunk(
 	if !ok {
 		return
 	}
-	allowance, ok := filePoolWriteAllowance(w, r, folder)
+	allowance, ok := s.fileWriteAllowance(w, r, folder, strings.TrimSpace(r.PathValue("uploadID")))
 	if !ok {
 		return
 	}
 	if allowance <= 0 {
-		writeFilePoolReserveError(w, r, folder)
+		s.writeFileLimitError(w, r, folder)
 		return
 	}
 	chunkLimit := filedata.MaxUploadChunkBytes
@@ -573,8 +606,10 @@ func (s *server) fileFolderUploadChunk(
 		writeAPIError(w, r, http.StatusConflict, "file_upload_offset_mismatch", err.Error(), nil)
 	case errors.Is(err, filedata.ErrUploadChecksumMismatch):
 		writeAPIError(w, r, http.StatusUnprocessableEntity, "file_upload_checksum_mismatch", err.Error(), nil)
+	case errors.Is(err, syscall.EDQUOT), errors.Is(err, syscall.ENOSPC):
+		s.writeFileLimitError(w, r, folder)
 	case errors.Is(err, filedata.ErrUploadChunkTooLarge) && chunkLimit < filedata.MaxUploadChunkBytes:
-		writeFilePoolReserveError(w, r, folder)
+		s.writeFileLimitError(w, r, folder)
 	case errors.Is(err, filedata.ErrUploadChunkTooLarge):
 		writeAPIError(w, r, http.StatusRequestEntityTooLarge, "file_upload_chunk_too_large", err.Error(), nil)
 	case err != nil:
@@ -591,6 +626,8 @@ func (s *server) fileFolderUploadComplete(
 	actor security.Actor,
 	source authSource,
 ) {
+	fileMutationMu.Lock()
+	defer fileMutationMu.Unlock()
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
 		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
@@ -651,6 +688,8 @@ func (s *server) fileFolderEntry(
 	actor security.Actor,
 	source authSource,
 ) {
+	fileMutationMu.Lock()
+	defer fileMutationMu.Unlock()
 	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
 		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
 		return
@@ -693,6 +732,8 @@ func (s *server) fileFolderMove(
 	actor security.Actor,
 	source authSource,
 ) {
+	fileMutationMu.Lock()
+	defer fileMutationMu.Unlock()
 	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
 		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
 		return
@@ -764,6 +805,8 @@ func (s *server) fileFolderTrashRestore(
 	actor security.Actor,
 	source authSource,
 ) {
+	fileMutationMu.Lock()
+	defer fileMutationMu.Unlock()
 	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
 		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
 		return
@@ -802,6 +845,8 @@ func (s *server) fileFolderTrashPurge(
 	actor security.Actor,
 	source authSource,
 ) {
+	fileMutationMu.Lock()
+	defer fileMutationMu.Unlock()
 	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
 		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
 		return
@@ -840,6 +885,13 @@ func (s *server) authorizedFileFolder(
 	actor security.Actor,
 	write bool,
 ) (state.NASFolderRecord, string, bool) {
+	if write {
+		current, ok := s.refreshMutationActor(w, r, "")
+		if !ok {
+			return state.NASFolderRecord{}, "", false
+		}
+		actor = current
+	}
 	folderID := strings.TrimSpace(r.PathValue("folderID"))
 	if folderID == "" {
 		writeAPIError(w, r, http.StatusBadRequest, "file_folder_required", "file folder is required", nil)
@@ -995,6 +1047,15 @@ func (s *server) filePoolCapacityPolicy(
 	actor security.Actor,
 	source authSource,
 ) {
+	if r.Method != http.MethodGet {
+		fileMutationMu.Lock()
+		defer fileMutationMu.Unlock()
+		currentActor, authorized := s.refreshMutationActor(w, r, "files.manage")
+		if !authorized {
+			return
+		}
+		actor = currentActor
+	}
 	if r.Method != http.MethodPatch {
 		w.Header().Set("Allow", http.MethodPatch)
 		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
@@ -1010,6 +1071,11 @@ func (s *server) filePoolCapacityPolicy(
 	}
 	if err := decodeJSON(w, r, &input); err != nil {
 		writeAPIError(w, r, http.StatusBadRequest, "invalid_file_pool_policy", err.Error(), nil)
+		return
+	}
+	active, suspendErr := s.beginSMBAccessChange(r)
+	if suspendErr != nil {
+		writeAPIError(w, r, 502, "smb_access_suspend_failed", suspendErr.Error(), nil)
 		return
 	}
 	record, err := s.state.UpdateNASPoolCapacityPolicy(
@@ -1043,7 +1109,8 @@ func (s *server) filePoolCapacityPolicy(
 			map[string]any{"pool_id": record.ID},
 			requestIDFromContext(r.Context()),
 		)
-		writeJSON(w, http.StatusOK, map[string]any{"pool": filePoolResponseFor(record)})
+		warning := s.finishSMBAccessChange(r, active)
+		writeJSON(w, http.StatusOK, map[string]any{"pool": filePoolResponseFor(record), "warning": warning})
 	}
 }
 
