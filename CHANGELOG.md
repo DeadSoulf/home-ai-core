@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.101-dev
+
+- Fix file-pool creation when the Files storage mount is real but the previous stat-based device check cannot correlate it with the assigned block device.
+- Read Linux `/proc/self/mountinfo` to verify that the selected pool root is an exact mount point and obtain its kernel-reported major:minor device ID.
+- Compare that mount ID with the assigned block device using Linux device-number helpers, while retaining the existing `lsblk` fast path.
+- Decode escaped mount-point paths from mountinfo so spaces and special characters do not break validation.
+- Keep the requirement that the storage device is explicitly assigned to Files.
+
 ## 0.1.100-dev
 
 - Fix file-pool creation immediately after mounting storage when `lsblk` has not yet refreshed its MOUNTPOINTS field.
