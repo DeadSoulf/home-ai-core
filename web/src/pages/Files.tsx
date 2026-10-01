@@ -134,6 +134,25 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
     }
   }
 
+  async function updatePoolCapacityPolicy(event: FormEvent<HTMLFormElement>, poolId: string) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const reservePercent = Number(data.get("reserve_percent"));
+    const warningPercent = Number(data.get("warning_percent"));
+    setBusy(`pool-policy-${poolId}`);
+    setFormError("");
+    setNotice("");
+    try {
+      await api.updateFilePoolCapacityPolicy(poolId, {reservePercent, warningPercent});
+      setNotice(t("filePoolPolicySaved"));
+      resource.reload();
+    } catch (reason) {
+      setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function createFolder(event: FormEvent) {
     event.preventDefault();
     if (!folderPoolID) {
@@ -831,6 +850,110 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
               </form>
             </>
           )}
+        </Panel>
+      )}
+
+      {canManage && (
+        <Panel title={t("filePoolsTitle")} className="wide">
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>{t("name")}</th>
+                  <th>{t("filePoolCapacity")}</th>
+                  <th>{t("state")}</th>
+                  <th>{t("filePoolCapacityPolicy")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pools.map((pool) => {
+                  const stateLabel =
+                    pool.capacity_state === "reserve"
+                      ? t("filePoolCapacityReserve")
+                      : pool.capacity_state === "warning"
+                        ? t("filePoolCapacityWarning")
+                        : pool.capacity_state === "ok"
+                          ? t("filePoolCapacityOK")
+                          : t("filePoolCapacityUnknown");
+                  const stateClass =
+                    pool.capacity_state === "reserve"
+                      ? "status-badge status-failed"
+                      : pool.capacity_state === "ok"
+                        ? "status-badge status-success"
+                        : "status-badge";
+                  return (
+                    <tr key={pool.id}>
+                      <td>
+                        <strong>{pool.name}</strong>
+                        <div className="muted small mono">{pool.root_path}</div>
+                      </td>
+                      <td>
+                        {pool.capacity_known
+                          ? `${formatFileSize(pool.free_bytes || 0)} / ${formatFileSize(pool.size_bytes || 0)}`
+                          : "—"}
+                      </td>
+                      <td>
+                        <span className={stateClass}>{stateLabel}</span>
+                      </td>
+                      <td>
+                        <form
+                          key={`${pool.id}-${pool.reserve_percent}-${pool.warning_percent}`}
+                          className="network-actions"
+                          onSubmit={(event) => void updatePoolCapacityPolicy(event, pool.id)}
+                        >
+                          <label>
+                            {t("filePoolReservePercent")}
+                            <input
+                              name="reserve_percent"
+                              type="number"
+                              min={0}
+                              max={50}
+                              step={1}
+                              required
+                              defaultValue={pool.reserve_percent}
+                            />
+                          </label>
+                          <label>
+                            {t("filePoolWarningPercent")}
+                            <input
+                              name="warning_percent"
+                              type="number"
+                              min={0}
+                              max={95}
+                              step={1}
+                              required
+                              defaultValue={pool.warning_percent}
+                            />
+                          </label>
+                          <button
+                            className="button compact secondary"
+                            type="submit"
+                            disabled={busy !== ""}
+                          >
+                            {busy === `pool-policy-${pool.id}` ? t("working") : t("save")}
+                          </button>
+                        </form>
+                        {pool.capacity_known && (
+                          <div className="muted small">
+                            {t("filePoolReserveDetails")
+                              .replace("{reserve}", formatFileSize(pool.reserve_bytes || 0))
+                              .replace("{warning}", formatFileSize(pool.warning_bytes || 0))}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {pools.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="muted">{t("fileNoPools")}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <p className="muted small">{t("filePoolCapacityNotice")}</p>
+          <p className="muted small">{t("filePoolSMBReserveNotice")}</p>
         </Panel>
       )}
 
