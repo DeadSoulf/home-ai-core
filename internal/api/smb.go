@@ -57,7 +57,7 @@ func (s *server) smbStatus(
 	for _, user := range model.Users {
 		smbUsers = append(smbUsers, model.UserNames[user.ID])
 	}
-	status, err := smb.Inspect(r.Context(), smbUsers)
+	status, err := smb.Inspect(r.Context(), smbUsers, model.Shares)
 	if err != nil {
 		writeAPIError(w, r, http.StatusBadGateway, "smb_status_unavailable", err.Error(), nil)
 		return
@@ -88,8 +88,10 @@ func (s *server) smbStatus(
 			"error":     status.Error,
 			"hostname":  hostname,
 			"workgroup": defaultSMBWorkgroup,
-			"users":     users,
-			"shares":    model.ShareViews,
+			"users":             users,
+			"shares":            model.ShareViews,
+			"hard_quota_ready":  status.HardQuotaReady,
+			"hard_quota_error":  status.HardQuotaError,
 		},
 	})
 }
@@ -241,10 +243,12 @@ func (s *server) buildSMBModel(r *http.Request) (smbModel, error) {
 
 		shareName := smbShareName(folder)
 		shares = append(shares, smb.Share{
-			Name:       shareName,
-			Path:       root,
-			ReadUsers:  readUsers,
-			WriteUsers: writeUsers,
+			Name:           shareName,
+			Path:           root,
+			PoolRoot:       folder.PoolRoot,
+			ReservePercent: folder.PoolReservePercent,
+			ReadUsers:      readUsers,
+			WriteUsers:     writeUsers,
 		})
 		views = append(views, smbShareResponse{
 			FolderID:   folder.ID,
