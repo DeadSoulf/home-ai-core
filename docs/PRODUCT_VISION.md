@@ -1,8 +1,8 @@
 # Home-AI — Product Vision
 
 **Status:** canonical product direction  
-**Updated:** 2026-09-29  
-**Current implementation baseline:** Home-AI-Core `0.1.58-dev`
+**Updated:** 2026-10-01  
+**Current implementation baseline:** Home-AI-Core `0.1.114-dev`; AI Agent Foundation implementation started for `0.1.115-dev`
 
 ## 1. Mission
 
