@@ -82,7 +82,6 @@ func TestDownloadArchiveDoesNotRetryPermanentHTTPError(t *testing.T) {
 	}
 }
 
-
 func TestRequiresSignedUpdate(t *testing.T) {
 	if requiresSignedUpdate("0.2.0-dev") {
 		t.Fatal("development release unexpectedly requires a signature")
