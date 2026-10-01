@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.103-dev
+
+- Fix empty “Free / Total” capacity for Files storage pools when the unprivileged core process cannot read capacity with statfs.
+- Fall back to the pool's saved backing device and filesystem UUID, using block-device size plus privileged storage inspection for free space.
+- Keep statfs as the preferred live capacity source when it is available.
+- Use the same fallback for file-pool reserve enforcement so uploads are not blocked solely because statfs is unavailable.
+- Preserve reserve and warning state calculations with the recovered capacity values.
+
 ## 0.1.102-dev
 
 - Fix the root cause of storage mounts being visible to the privileged updater helper but not to Home-AI-Core.

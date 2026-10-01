@@ -1,6 +1,13 @@
 package api
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/DeadSoulf/home-ai-core/internal/state"
+	"github.com/DeadSoulf/home-ai-core/internal/storage"
+	"github.com/DeadSoulf/home-ai-core/internal/systeminfo"
+	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
+)
 
 func TestMountInfoDeviceForPath(t *testing.T) {
 	data := []byte(
@@ -31,5 +38,67 @@ func TestMountInfoDeviceForPathDecodesEscapes(t *testing.T) {
 	major, minor, ok := mountInfoDeviceForPath(data, "/mnt/home-ai-core/data disk")
 	if !ok || major != 8 || minor != 17 {
 		t.Fatalf("escaped mount point = %d:%d ok=%v, want 8:17 true", major, minor, ok)
+	}
+}
+
+func TestFilePoolCapacityFallsBackToBackingStorageInventory(t *testing.T) {
+	record := state.NASPoolRecord{
+		StorageDevicePath:     "/dev/sdb1",
+		StorageFilesystemUUID: "fs-test-uuid",
+	}
+	nodes := []systeminfo.BlockNode{
+		{
+			Path: "/dev/sdb",
+			Type: "disk",
+			Children: []systeminfo.BlockNode{
+				{
+					Path:       "/dev/sdb1",
+					Type:       "part",
+					Filesystem: "ext4",
+					UUID:       "fs-test-uuid",
+					SizeBytes:  1_000,
+					FreeKnown:  false,
+				},
+			},
+		},
+	}
+	inspection := storage.Inspection{
+		Filesystems: []updaterhelper.FilesystemStat{
+			{
+				Device:     "/dev/sdb1",
+				Filesystem: "ext4",
+				FreeBytes:  640,
+				FreeKnown:  true,
+			},
+		},
+	}
+
+	capacity, ok := filePoolCapacityFromInventory(record, nodes, inspection)
+	if !ok {
+		t.Fatal("expected backing-storage capacity fallback to succeed")
+	}
+	if capacity.TotalBytes != 1_000 || capacity.FreeBytes != 640 {
+		t.Fatalf("capacity = %#v, want total=1000 free=640", capacity)
+	}
+}
+
+func TestFilePoolCapacityFallbackRequiresKnownFreeSpace(t *testing.T) {
+	record := state.NASPoolRecord{
+		StorageDevicePath:     "/dev/sdb1",
+		StorageFilesystemUUID: "fs-test-uuid",
+	}
+	nodes := []systeminfo.BlockNode{
+		{
+			Path:       "/dev/sdb1",
+			Type:       "part",
+			Filesystem: "ext4",
+			UUID:       "fs-test-uuid",
+			SizeBytes:  1_000,
+			FreeKnown:  false,
+		},
+	}
+
+	if capacity, ok := filePoolCapacityFromInventory(record, nodes, storage.Inspection{}); ok {
+		t.Fatalf("unexpected capacity fallback success: %#v", capacity)
 	}
 }
