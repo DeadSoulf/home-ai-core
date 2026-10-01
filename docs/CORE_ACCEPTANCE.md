@@ -44,7 +44,7 @@ Use a non-critical physical interface when possible.
 - [ ] Configure a test static IPv4/CIDR.
 - [ ] Configure gateway/DNS if needed.
 - [ ] Confirm connectivity.
-- [x] Reboot.
+- [ ] Reboot.
 - [ ] Confirm the static profile survives and connectivity returns.
 
 ## WireGuard
@@ -53,7 +53,7 @@ Use a non-critical physical interface when possible.
 - [x] Create a test `wg0` tunnel.
 - [x] Add a peer.
 - [x] Confirm the tunnel starts.
-- [ ] Reboot.
+- [x] Reboot.
 - [x] Confirm `wg0` starts automatically.
 - [x] Confirm peer state/handshake data is visible in Web.
 - [x] Remove the test tunnel when finished.
