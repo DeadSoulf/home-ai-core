@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.83-dev
+
+- Unified Home-AI household identities across the Core instead of module-specific user models.
+- Added household profiles: Administrator, Parent, Child, Guest and Friend.
+- Administrator retains full access; the final enabled Administrator cannot be disabled or demoted.
+- Added direct per-user global permissions in addition to existing role permissions.
+- Added a central access catalog so the Users Web page can show and edit current Core capabilities.
+- Added exact per-user resource grants for NAS file folders, with separate read/write access.
+- Converted shared-folder access from the legacy member-role behavior to explicit per-user assignment while preserving existing grants during migration.
+- Aligned SMB share ACL generation with the same effective Core permissions and scoped file-folder grants used by Web/API.
+- Added protection against self-escalation and against assigning administrator-only user-management permissions to non-administrator profiles.
+- Added migration 014, ADR-0031, RU/EN Web UI, security/state/API tests and full CI coverage.
+
 ## 0.1.82-dev
 
 - Added Russian and English localization to the native Windows settings client in one executable.

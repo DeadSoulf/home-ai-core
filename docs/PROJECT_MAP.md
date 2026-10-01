@@ -6,10 +6,26 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.82-dev` — Russian/English native Windows client UI\
-**Текущий срез:** F2 storage purpose routing — `files` / `video` для физических разделов и LVM\
-**Следующий engineering milestone:** release storage-purpose slice, live storage acceptance, затем automatic Windows release discovery/download + SHA-256 verified install handoff\
+**Текущий срез:** `0.1.83-dev` release candidate — единые пользователи и настраиваемые права доступа\
+**Следующий engineering milestone:** live acceptance unified users, затем возврат к storage-purpose slice и automatic Windows release discovery/download + SHA-256 verified install handoff\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-09-30
+
+### Выпуск 0.1.83-dev — единые пользователи и права доступа
+
+- Один пользователь Home-AI действует во всём Core: Web, NAS/SMB и будущие Smart Home, камеры/NVR и AI-модули.
+- Профили: **Administrator / Parent / Child / Guest / Friend**.
+- Administrator имеет полный доступ; последнего активного Administrator нельзя отключить или понизить.
+- Parent / Child / Guest / Friend — стартовые шаблоны, после выбора которых администратор настраивает права вручную.
+- Добавлены direct per-user global permissions поверх существующего RBAC.
+- Web **Пользователи** получает общий каталог возможностей Core и редактор прав.
+- Для NAS-папок уже доступны точечные grants чтения/записи конкретным пользователям.
+- Shared folders больше не выдаются всей роли автоматически; старые grants мигрируют в персональные, новые назначаются вручную.
+- SMB использует те же effective permissions и scoped folder grants, что и Web/API.
+- Защищены self-escalation и выдача administrator-only security permissions не-администраторам.
+- Миграция: `014_unified_user_access.sql`.
+- ADR-0031 фиксирует каноническую identity/access модель.
+- PR #56 прошёл полный CI; live проверка на сервере остаётся acceptance step.
 
 ### Текущий F2 slice — назначение дисков для файлов и видео
 
