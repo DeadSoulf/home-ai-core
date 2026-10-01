@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.107-dev
+
+- Rework the native Windows client into a lighter cloud-drive-style interface with **Overview**, **Connection**, **Synchronization**, **Backups** and **Settings** sections.
+- Fix keyboard navigation by routing the Win32 message loop through dialog navigation, so **Tab / Shift+Tab** move between controls; add **Ctrl+Tab / Ctrl+Shift+Tab** for section switching and keep arrow-key navigation for the sidebar radio group.
+- Reuse the existing HOME AI brand icon in the main window and system tray instead of the generic Windows application icon.
+- Simplify the tray menu, allow opening it with a normal left click, and add direct access to the primary synchronized local folder in Windows Explorer.
+- Preserve the existing sync-profile format, Credential Manager authentication, background agent, manual sync, queue/copy engine and update path.
+- Keep the current scheduler interval-based in this slice; exact clock/day scheduling and Explorer virtual-drive integration are not claimed yet.
+- Native Windows tests and the full pull-request CI cover the code slice; real Windows visual/keyboard/tray acceptance remains pending.
+
 ## 0.1.106-dev
 
 - Replace indirect Files capacity discovery with host-level `df -B1` for mounted filesystems.

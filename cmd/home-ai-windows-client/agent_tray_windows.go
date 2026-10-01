@@ -22,6 +22,7 @@ const (
 	wmCommand       = 0x0111
 	wmDestroy       = 0x0002
 	wmClose         = 0x0010
+	wmLButtonUp     = 0x0202
 	wmRButtonUp     = 0x0205
 	wmLButtonDblClk = 0x0203
 
@@ -45,6 +46,7 @@ const (
 	trayOpenConfig = 1003
 	trayExit       = 1004
 	traySettings   = 1005
+	trayOpenFolder = 1006
 
 	niifInfo  = 0x00000001
 	niifError = 0x00000003
@@ -199,7 +201,15 @@ func (state *windowsAgentTray) loop(ready chan<- error) {
 		ready <- fmt.Errorf("get tray module handle: %w", moduleErr)
 		return
 	}
-	icon, _, _ := procLoadIconW.Call(0, idiApplication)
+	brandIcon, brandIconErr := loadHomeAIIcon(32)
+	icon := uintptr(brandIcon)
+	ownedBrandIcon := brandIconErr == nil && brandIcon != 0
+	if !ownedBrandIcon {
+		icon, _, _ = procLoadIconW.Call(0, idiApplication)
+	}
+	if ownedBrandIcon {
+		defer destroyHomeAIIcon(brandIcon)
+	}
 	cursor, _, _ := procLoadCursorW.Call(0, idcArrow)
 	class := trayWndClassEx{
 		CbSize:        uint32(unsafe.Sizeof(trayWndClassEx{})),
@@ -285,7 +295,7 @@ func trayWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintpt
 			break
 		}
 		switch uint32(lParam) {
-		case wmRButtonUp:
+		case wmLButtonUp, wmRButtonUp:
 			state.showMenu()
 			return 0
 		case wmLButtonDblClk:
@@ -311,6 +321,10 @@ func trayWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintpt
 			state.openPath(state.logPath)
 		case trayOpenConfig:
 			state.openPath(state.configPath)
+		case trayOpenFolder:
+			if path := primaryLocalFolderForConfig(state.configPath); path != "" {
+				state.openPath(path)
+			}
 		case traySettings:
 			_ = startSettingsProcess(state.configPath)
 		case trayExit:
@@ -418,10 +432,12 @@ func (state *windowsAgentTray) showMenu() {
 	appendTrayMenu(menu, mfString|mfGrayed, 0, summary)
 	appendTrayMenu(menu, mfSeparator, 0, "")
 	appendTrayMenu(menu, mfString, traySyncNow, textForLanguage(language, "sync_now"))
+	if primaryLocalFolderForConfig(state.configPath) != "" {
+		appendTrayMenu(menu, mfString, trayOpenFolder, textForLanguage(language, "open_home_folder"))
+	}
 	appendTrayMenu(menu, mfString, traySettings, textForLanguage(language, "settings"))
 	appendTrayMenu(menu, mfSeparator, 0, "")
 	appendTrayMenu(menu, mfString, trayOpenLog, textForLanguage(language, "open_log"))
-	appendTrayMenu(menu, mfString, trayOpenConfig, textForLanguage(language, "open_sync_profiles"))
 	appendTrayMenu(menu, mfSeparator, 0, "")
 	appendTrayMenu(menu, mfString, trayExit, textForLanguage(language, "exit"))
 	var point trayPoint
