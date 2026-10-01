@@ -119,6 +119,7 @@ func (state *windowsSettingsUI) createLightControls(module windows.Handle) error
 	nav(settingsPageSync, settingsIDNavSync, "nav_sync", 180, false)
 	nav(settingsPageBackup, settingsIDNavBackup, "nav_backup", 224, false)
 	nav(settingsPageGeneral, settingsIDNavGeneral, "nav_settings", 268, false)
+	staticText("", "© 2026 TexNik", 18, 692, 170, 22, -1, settingsVisualSidebar)
 
 	// Overview — visually mirrors the approved HOME AI dashboard mockup.
 	title := static("overview_title", "nav_overview", 225, 24, 360, 30, settingsPageOverview, settingsVisualMain)

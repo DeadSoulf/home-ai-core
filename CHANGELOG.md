@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.112-dev
+
+- Add project-wide copyright/author attribution for **TexNik**.
+- Add a root `NOTICE` file and align the Apache-2.0 copyright notice with `Copyright 2026 TexNik`.
+- Add `TexNik` author/license metadata to the Web package and show `© 2026 TexNik` in the authenticated Web shell and authentication screens.
+- Show the same copyright attribution in the native Windows client sidebar.
+- Add Debian copyright metadata and ship it as `/usr/share/doc/home-ai-core/copyright` in initial installer packages.
+- Preserve the existing Apache-2.0 licensing terms and all runtime behavior.
+
 ## 0.1.111-dev
 
 - Implement the approved HOME AI Windows dashboard design with a Windows 11-style light layout, left navigation, rounded status/cards, recent synchronization activity, backup status and HOME AI storage usage.
