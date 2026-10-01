@@ -40,7 +40,6 @@ func TestCompactFilesystemDiagnosticNormalizesAndBoundsOutput(t *testing.T) {
 	}
 }
 
-
 func TestMountTargetPresentNormalizesPaths(t *testing.T) {
 	if !mountTargetPresent([]string{"/mnt/home-ai-core/sdb1"}, "/mnt/home-ai-core/sdb1/") {
 		t.Fatal("expected normalized mount target to match")
