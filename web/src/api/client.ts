@@ -252,6 +252,27 @@ export const api = {
     return result.pool;
   },
 
+  updateFilePoolCapacityPolicy: async (
+    poolId: string,
+    input: {reservePercent: number; warningPercent: number},
+  ) => {
+    const headers = new Headers({"Content-Type": "application/json"});
+    const token = csrfToken();
+    if (token) headers.set("X-CSRF-Token", token);
+    const result = await request<{pool: FilePool}>(
+      `/api/v1/files/pools/${encodeURIComponent(poolId)}/capacity-policy`,
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          reserve_percent: input.reservePercent,
+          warning_percent: input.warningPercent,
+        }),
+      },
+    );
+    return result.pool;
+  },
+
   smbStatus: async () => {
     const result = await request<{smb: SMBStatus}>("/api/v1/files/smb");
     return result.smb;
