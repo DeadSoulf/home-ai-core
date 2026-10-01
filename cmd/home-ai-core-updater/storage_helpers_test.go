@@ -65,7 +65,6 @@ func TestHostFindmntCommandArgsTargetsPID1MountNamespace(t *testing.T) {
 	}
 }
 
-
 func TestHostFilesystemInspectionTargetsPID1MountNamespace(t *testing.T) {
 	got := strings.Join(hostMountCommandArgs(
 		"/usr/bin/lsblk",
