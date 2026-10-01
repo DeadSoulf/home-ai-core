@@ -5,7 +5,7 @@ import { useResource } from "../hooks/useResource";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
 import { useI18n } from "../i18n";
 import { PageHeading } from "./Dashboard";
-import { StorageDevices } from "../components/StorageDevices";
+import { StorageBrowser } from "../components/StorageBrowser";
 import { NetworkManagement } from "../components/NetworkManagement";
 import type { SystemSection } from "../navigation";
 
@@ -383,7 +383,7 @@ export function SystemPage({
 
         }
         {activeSection === "storage" && <Panel title={t("blockDevices")} className="wide">
-          <StorageDevices
+          <StorageBrowser
             devices={value.system.block_tree}
             canManage={canManageStorage}
             onChanged={() => setMetricsTick((current) => current + 1)}
