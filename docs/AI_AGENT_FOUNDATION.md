@@ -1,6 +1,6 @@
 # AI Agent Foundation
 
-**Status:** active foundation plan  
+**Status:** implementation started  
 **Started:** 2026-10-01  
 **Target first implementation slice:** `0.1.115-dev`
 
@@ -109,14 +109,18 @@ No single model vendor becomes a Core dependency.
 
 ### 0.1.115-dev — Agent contracts
 
-- first-party `ai.agent` module identity/capability;
-- typed Tool Registry;
-- permission/sensitivity metadata;
-- provider adapter interface;
-- deterministic test provider;
-- read-only Core tools for system status, jobs and module inventory;
-- audit events for AI session/tool execution;
-- API foundation and tests.
+- ✅ first-party `ai.agent` module identity/capability;
+- ✅ Core startup registration through the existing Module Registry;
+- ✅ typed Tool Registry;
+- ✅ permission/sensitivity metadata;
+- ✅ exact resource-scope authorization hook;
+- ✅ `read / change / sensitive` approval boundary;
+- ✅ provider adapter interface;
+- ✅ deterministic test provider;
+- ✅ contract/regression tests for allow/deny/scope/approval/cancellation;
+- 🚧 read-only Core tools for system status, jobs and module inventory;
+- 🚧 audit events for AI session/tool execution;
+- 🚧 AI API foundation.
 
 ### Next slice — Local conversation
 
