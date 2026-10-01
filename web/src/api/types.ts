@@ -309,7 +309,7 @@ export type StoragePurposeAssignment = {
   present: boolean;
   filesystem?: string;
   label?: string;
-  mountpoints: string[];
+  mountpoints?: string[] | null;
   size_bytes?: number;
   free_bytes?: number;
   free_known: boolean;

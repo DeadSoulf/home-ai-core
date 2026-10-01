@@ -1020,14 +1020,15 @@ export function FilesPage({
               </thead>
               <tbody>
                 {fileStorage.map((storage) => {
-                  const usableMounts = storage.mountpoints.filter((path) => path.startsWith("/mnt/home-ai-core/"));
+                  const mountpoints = storage.mountpoints || [];
+                  const usableMounts = mountpoints.filter((path) => path.startsWith("/mnt/home-ai-core/"));
                   const alreadyPool = storage.in_use || usableMounts.some((path) => poolRoots.has(path));
                   return (
                     <tr key={storage.filesystem_uuid || storage.device}>
                       <td className="mono">{storage.device}</td>
                       <td>{storage.label || "вЂ”"}</td>
                       <td>{storage.filesystem || "вЂ”"}</td>
-                      <td className="mono">{storage.mountpoints.join(", ") || "вЂ”"}</td>
+                      <td className="mono">{mountpoints.join(", ") || "вЂ”"}</td>
                       <td>{storage.free_known ? formatFileSize(storage.free_bytes || 0) : "вЂ”"}</td>
                       <td>
                         {!storage.present

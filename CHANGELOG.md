@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.95-dev
+
+- Fix a blank Files → Storage page when an assigned storage device has no active mountpoints.
+- Keep the storage-purpose API contract stable by serializing missing mountpoints as an empty array instead of null.
+- Make the Web storage view tolerate legacy/null mountpoint responses so older persisted device states cannot crash React rendering.
+- Preserve the existing pool, assigned-storage and pool-creation controls for unmounted storage.
+
 ## 0.1.94-dev
 
 - Make update-bundle downloads resilient to transient GitHub/CDN failures such as HTTP 502, 503 and 504, plus HTTP 408 and 429.
