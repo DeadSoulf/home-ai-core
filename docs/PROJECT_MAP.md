@@ -6,11 +6,24 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
-**Последний опубликованный релиз:** `0.1.107-dev` — лёгкий Windows-клиент HOME AI: новый cloud-drive-style UI, клавиатурная навигация, фирменный icon/tray и Explorer-open\
-**Текущий срез:** `0.1.108-dev` — исправление **Занято / лимит** для Files folders через privileged host `du` fallback\
-**Следующий engineering milestone:** подтвердить реальное **Занято / лимит** на папке **Фото**; параллельно остаётся live acceptance Windows-клиента `0.1.107-dev`, SMB/квот и reboot persistence\
-**Состояние:** Files/Storage pool capacity подтверждена на живом сервере в `0.1.106-dev`; Windows UI опубликован в `0.1.107-dev`; в `0.1.108-dev` закрывается отдельный folder-usage path, который ранее показывал «Объём недоступен».\
+**Последний опубликованный релиз:** `0.1.108-dev` — исправлен folder **Занято / лимит** через privileged host `du` fallback  
+**Текущий срез:** `0.1.109-dev` — repository/security hardening: Apache-2.0, signed Core updates, storage dry-run/preflight и cleanup старых PR  
+**Следующий engineering milestone:** live acceptance `0.1.109-dev` на реальном сервере; затем продолжить Windows-клиент и F2 эксплуатационную проверку SMB/квот/reboot persistence  
+**Состояние:** `0.1.108-dev` опубликован; `0.1.109-dev` усиливает supply-chain и destructive-storage safety без изменения основной продуктовой архитектуры.  
 **Обновлено:** 2026-10-01
+
+### Кандидат 0.1.109-dev — security / repository hardening
+
+- ✅ Добавлена лицензия Apache-2.0 для публичного репозитория.
+- ✅ Core updater получил detached Ed25519 verification checksum metadata; stable/RC release без подписи больше не принимается.
+- ✅ Release workflow умеет подписывать Core checksum-файлы через GitHub Actions secret `HOME_AI_UPDATE_SIGNING_KEY`; приватный ключ не хранится в репозитории и на Home-AI node.
+- ✅ Зафиксирован trust root `/etc/home-ai-core/update-trusted.pub` и отдельный operational document по генерации/ротации ключа.
+- ✅ Исправлен stale `helper_protocol: 2` в генераторе update bundle; текущий helper contract — protocol v5.
+- ✅ Добавлен read-only storage dry-run/preflight для mount/unmount/partition/format/label paths; destructive preflight отдельно проверяет system disk, mounts, active swap, LVM и доступность filesystem tools.
+- ✅ Web перед format/create/delete/delete-all сначала выполняет dry-run и только после успешного preflight запускает подтверждённую операцию.
+- ✅ Старые PR #34, #55 и #67 проверены против актуального `main` и закрыты как superseded; PR #91 уже слит в `main`.
+- 🧪 Требуется CI + live acceptance storage preflight на реальном сервере.
+- 🔐 Для фактической подписи dev-релизов администратор репозитория должен один раз загрузить dedicated private key в GitHub Actions secret; stable/RC без него release workflow завершится ошибкой.
 
 ### Кандидат 0.1.108-dev — отображение занятого места папок
 
