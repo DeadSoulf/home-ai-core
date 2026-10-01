@@ -6,10 +6,20 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.87-dev` — kernel-enforced SMB free-space reserve\
-**Текущий срез:** `0.1.87-dev` — published; live SMB/quota acceptance pending\
-**Следующий engineering milestone:** live SMB/quota acceptance; затем controlled legacy quota migration и per-folder/per-user quotas\
+**Текущий срез:** `0.1.88-dev` — release candidate; disk-first Web storage workflow\
+**Следующий engineering milestone:** live acceptance нового storage UI и SMB/quota; затем controlled legacy quota migration и per-folder/per-user quotas\
 **Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
 **Обновлено:** 2026-10-01
+
+### Выпуск 0.1.88-dev — новый интерфейс управления дисками
+
+- **Система → Хранилище** больше не смешивает обзор всех устройств с destructive actions в одной широкой таблице.
+- Первый экран показывает только физические диски с именем, моделью/transport, размером, partition table, unallocated space, system/SMART status.
+- Выбор диска открывает отдельный focused view конкретного physical disk.
+- Внутри выбранного диска остаются существующие разделы/LVM и все операции: purpose files/video, mount/unmount, rename, create, format и delete.
+- Существующие server-side usage-lock и system-disk protections не меняются и продолжают блокировать опасные операции.
+- Новый слой реализован поверх текущего StorageDevices, чтобы не дублировать storage API и проверенную safety-логику.
+- Release candidate: требуется полный CI и live UI acceptance.
 
 ### Выпуск 0.1.87-dev — kernel hard reserve для SMB
 
