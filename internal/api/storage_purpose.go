@@ -207,7 +207,7 @@ func storagePurposeResponseFor(record state.StoragePurposeRecord, nodes []system
 	result.Present = true
 	result.Filesystem = node.Filesystem
 	result.Label = node.Label
-	result.Mountpoints = append([]string(nil), node.Mountpoints...)
+	result.Mountpoints = append([]string{}, node.Mountpoints...)
 	result.SizeBytes = node.SizeBytes
 	result.FreeBytes = node.FreeBytes
 	result.FreeKnown = node.FreeKnown
