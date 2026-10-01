@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/DeadSoulf/home-ai-core/internal/aiagent"
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/storage"
@@ -21,6 +22,7 @@ type server struct {
 	jobs                JobService
 	eventHistoryService EventHistoryService
 	modules             ModuleService
+	ai                  *aiagent.Service
 	updater             UpdaterService
 	realtime            *realtime.Hub
 	mux                 *http.ServeMux
@@ -45,6 +47,7 @@ func New(
 		jobs:                jobService,
 		eventHistoryService: eventHistoryService,
 		modules:             moduleService,
+		ai:                  aiagent.NewService(nodeID, state, jobService, moduleService, securityService),
 		updater:             updaterService,
 		realtime:            realtimeHub,
 		mux:                 http.NewServeMux(),
@@ -86,6 +89,9 @@ func New(
 	s.mux.HandleFunc("/api/v1/modules", s.requireAuth("modules.read", s.modulesCollection))
 	s.mux.HandleFunc("/api/v1/modules/capabilities", s.requireAuth("modules.read", s.moduleCapabilities))
 	s.mux.HandleFunc("/api/v1/modules/", s.requireAuth("modules.read", s.moduleResource))
+	s.mux.HandleFunc("/api/v1/ai/status", s.requireAuth("", s.aiStatus))
+	s.mux.HandleFunc("/api/v1/ai/tools", s.requireAuth("", s.aiTools))
+	s.mux.HandleFunc("/api/v1/ai/tools/", s.requireAuth("", s.aiToolResource))
 	s.mux.HandleFunc("/api/v1/update", s.requireAuth("updates.read", func(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
 		s.updateStatus(w, r)
 	}))

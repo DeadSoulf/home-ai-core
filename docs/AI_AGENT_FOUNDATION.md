@@ -120,9 +120,21 @@ Published in `v0.1.115-dev` after full Core/Web, Windows and Debian CI/release c
 - ✅ provider adapter interface;
 - ✅ deterministic test provider;
 - ✅ contract/regression tests for allow/deny/scope/approval/cancellation;
-- 🚧 read-only Core tools for system status, jobs and module inventory;
-- 🚧 audit events for AI session/tool execution;
-- 🚧 AI API foundation.
+- ✅ read-only Core tools for system status, jobs and module inventory (`0.1.117-dev`);
+- ✅ audit events for AI tool execution (`ai.tool.execute`) without raw input payloads;
+- ✅ authenticated AI status/tools/execute API foundation with permission filtering and bounded execution.
+
+### 0.1.117-dev — Read-only Core tools + API
+
+- ✅ `core.system.status` returns current Core/schema/system/hardware status;
+- ✅ `core.jobs.list` exposes bounded recent job summaries without raw input/result payloads;
+- ✅ `core.modules.list` exposes registered modules and capabilities;
+- ✅ `/api/v1/ai/status` reports AI Agent readiness;
+- ✅ `/api/v1/ai/tools` returns only tools allowed by the current user's effective permissions;
+- ✅ `/api/v1/ai/tools/<tool>/execute` executes the permitted tool through the same Tool Registry contract;
+- ✅ tool calls are bounded by server-side timeout and audited on success/deny/failure;
+- ✅ cookie-session POSTs preserve Core CSRF enforcement;
+- ✅ API/service regression tests cover discovery, authorization, execution, audit and payload redaction.
 
 ### Next slice — Local conversation
 
