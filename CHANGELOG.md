@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.109-dev
+
+- Add Apache-2.0 licensing for the public repository.
+- Add detached Ed25519 authentication for Core update checksum metadata; non-development releases require a signature and fail closed when it is absent.
+- Add release-workflow signing from the `HOME_AI_UPDATE_SIGNING_KEY` GitHub Actions secret without storing the private key in the repository or on Home-AI nodes.
+- Document the trusted public-key path, signing-key provisioning and rotation contract.
+- Align generated update manifests with updater-helper protocol v5 instead of the stale protocol v2 value.
+- Add read-only storage dry-run/preflight support through the Core/helper protocol.
+- Run dry-run preflight before Web format, partition create/delete and delete-all operations; preflight checks system-disk protection, mounts, active swap, cross-disk LVM, filesystem tools and partition capacity without mutating the host.
+- Close obsolete PRs #34, #55 and #67 after confirming their functionality is superseded by newer implementations already on `main`.
+
 ## 0.1.108-dev
 
 - Fix Files folder **Used / limit** staying unavailable even when pool capacity is already known.
