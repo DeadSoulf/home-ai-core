@@ -103,6 +103,7 @@ export function Shell(props: {
           </div>
           {hasPermission(props.actor, "events.read") && props.realtime !== "connected" &&
             <span className="connection-state">{t("connectionLost")}</span>}
+          <button type="button" className="button secondary" onClick={() => {props.onNavigate("/account"); if (menuOpen) closeMenu();}}>{t("yourAccount")}</button>
           <div className="account-actions">
             <LanguageSwitch />
             <button type="button" className="button secondary" onClick={props.onLogout}>{t("signOut")}</button>

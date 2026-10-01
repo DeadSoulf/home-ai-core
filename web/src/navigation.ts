@@ -42,7 +42,7 @@ export function systemSection(path: string): SystemSection {
 export function accessiblePath(actor: Actor, path: string): string {
   const [raw, hash] = path.split("#");
   const route = raw.replace(/\/+$/, "") || "/";
-  const allowed = visibleNavigation(actor).some((group) => group.items.some((item) => item.path === route));
+  const allowed = route === "/account" || visibleNavigation(actor).some((group) => group.items.some((item) => item.path === route));
   if (!allowed) return "/";
   if (route !== "/system" || !hash) return route;
   const section = systemSection(path);

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
@@ -49,6 +50,11 @@ func Inspect(ctx context.Context, users []string, shares []Share) (Status, error
 		HardQuotaReady:  response.SMBHardQuotaReady,
 		HardQuotaError:  response.SMBHardQuotaError,
 	}, nil
+}
+
+func Suspend(ctx context.Context) (bool, error) {
+	response, err := callHelper(ctx, updaterhelper.Request{Operation: "smb.suspend", ProtocolVersion: updaterhelper.ProtocolVersion})
+	return response.Message == "SMB access suspended", err
 }
 
 func Install(ctx context.Context) (string, error) {
@@ -102,6 +108,14 @@ func callHelper(ctx context.Context, request updaterhelper.Request) (updaterhelp
 		return updaterhelper.Response{}, fmt.Errorf("connect SMB helper: %w", err)
 	}
 	defer conn.Close()
+	deadline := time.Now().Add(45 * time.Second)
+	if request.Operation == "smb.install" {
+		deadline = time.Now().Add(12 * time.Minute)
+	}
+	if value, ok := ctx.Deadline(); ok && value.Before(deadline) {
+		deadline = value
+	}
+	_ = conn.SetDeadline(deadline)
 
 	if err := json.NewEncoder(conn).Encode(request); err != nil {
 		return updaterhelper.Response{}, err

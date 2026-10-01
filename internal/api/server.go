@@ -61,10 +61,13 @@ func New(
 		},
 	))
 	s.mux.HandleFunc("/api/v1/auth/logout", s.requireAuth("", s.logout))
+	s.mux.HandleFunc("PUT /api/v1/auth/password", s.requireAuth("security.self.read", s.accountPassword))
 	s.mux.HandleFunc("GET /api/v1/security/users", s.requireAuth("security.users.read", s.usersCollection))
 	s.mux.HandleFunc("POST /api/v1/security/users", s.requireAuth("security.users.manage", s.usersCollection))
 	s.mux.HandleFunc("GET /api/v1/security/access-catalog", s.requireAuth("security.users.manage", s.accessCatalog))
 	s.mux.HandleFunc("PUT /api/v1/security/users/{userID}/access", s.requireAuth("security.users.manage", s.userAccess))
+	s.mux.HandleFunc("PUT /api/v1/security/users/{userID}/identity", s.requireAuth("security.users.manage", s.userIdentity))
+	s.mux.HandleFunc("PUT /api/v1/security/users/{userID}/password", s.requireAuth("security.users.manage", s.userPassword))
 	s.mux.HandleFunc("/api/v1/system", s.requireAuth(
 		"system.read",
 		func(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
@@ -96,6 +99,11 @@ func New(
 	s.mux.HandleFunc("/api/v1/storage/name", s.requireAuth("storage.manage", s.storageName))
 	s.mux.HandleFunc("GET /api/v1/storage/purposes", s.requireAuth("system.read", s.storagePurposes))
 	s.mux.HandleFunc("POST /api/v1/storage/purposes", s.requireAuth("storage.manage", s.storagePurposes))
+	s.mux.HandleFunc("GET /api/v1/files/owners", s.requireAuth("files.manage", s.fileOwners))
+	s.mux.HandleFunc("GET /api/v1/files/quotas", s.requireAuth("files.manage", s.fileUserQuotas))
+	s.mux.HandleFunc("PUT /api/v1/files/users/{userID}/quota", s.requireAuth("files.manage", s.fileUserQuotas))
+	s.mux.HandleFunc("GET /api/v1/files/folders/{folderID}/settings", s.requireAuth("files.manage", s.fileFolderManagement))
+	s.mux.HandleFunc("PUT /api/v1/files/folders/{folderID}/settings", s.requireAuth("files.manage", s.fileFolderManagement))
 	s.mux.HandleFunc("GET /api/v1/files/pools", s.requireAuth("files.manage", s.filePools))
 	s.mux.HandleFunc("POST /api/v1/files/pools", s.requireAuth("files.manage", s.filePools))
 	s.mux.HandleFunc("PATCH /api/v1/files/pools/{poolID}/capacity-policy", s.requireAuth("files.manage", s.filePoolCapacityPolicy))
@@ -205,7 +213,22 @@ func (s *server) eventsRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) events(w http.ResponseWriter, r *http.Request) {
-	s.realtime.ServeHTTP(w, r, requestIDFromContext(r.Context()))
+	token, _ := sessionToken(r)
+	var current security.Actor
+	s.realtime.ServeHTTPAuthorized(w, r, requestIDFromContext(r.Context()), realtime.AccessPolicy{
+		Authenticate: func(ctx context.Context) error {
+			actor, err := s.security.Authenticate(ctx, token)
+			if err != nil {
+				return err
+			}
+			if !actor.Has("events.read") {
+				return security.ErrUnauthorized
+			}
+			current = actor
+			return nil
+		},
+		Allows: func(eventType string, data any) bool { return actorAllowsEvent(current, eventType, data) },
+	})
 }
 
 func (s *server) notFound(w http.ResponseWriter, r *http.Request) {

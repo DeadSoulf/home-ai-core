@@ -282,6 +282,18 @@ func (s *server) userAccess(
 		return
 	}
 
+	fileMutationMu.Lock()
+	defer fileMutationMu.Unlock()
+	currentActor, authorized := s.refreshMutationActor(w, r, "security.users.manage")
+	if !authorized {
+		return
+	}
+	actor = currentActor
+	active, suspendErr := s.beginSMBAccessChange(r)
+	if suspendErr != nil {
+		writeAPIError(w, r, 502, "smb_access_suspend_failed", suspendErr.Error(), nil)
+		return
+	}
 	user, err := s.security.UpdateUserAccess(
 		r.Context(),
 		actor,
@@ -294,6 +306,11 @@ func (s *server) userAccess(
 		},
 		s.securityRequestContext(r),
 	)
+	if err != nil {
+		// Validation/transaction failures did not change authoritative access.
+		// Restore that access instead of leaving an invalid edit suspended.
+		_ = s.finishSMBAccessChange(r, active)
+	}
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		writeAPIError(w, r, http.StatusNotFound, "user_not_found", "user not found", nil)
@@ -309,7 +326,8 @@ func (s *server) userAccess(
 			map[string]any{"user_id": user.ID, "profile": user.Profile},
 			requestIDFromContext(r.Context()),
 		)
-		writeJSON(w, http.StatusOK, map[string]any{"user": user})
+		warning := s.finishSMBAccessChange(r, active)
+		writeJSON(w, http.StatusOK, map[string]any{"user": user, "warning": warning})
 	}
 }
 

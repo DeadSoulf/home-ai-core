@@ -107,6 +107,7 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	go api.ReconcileFileAccess(ctx, logger, store, securityService)
 
 	errCh := make(chan error, 1)
 	go func() {

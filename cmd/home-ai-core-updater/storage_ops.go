@@ -437,9 +437,13 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		mountArgs := []string{}
 		switch filesystem {
 		case "ext4":
-			mountArgs = append(mountArgs, "-o", "usrquota")
+			options := "usrquota"
+			if features, err := exec.CommandContext(ctx, "/usr/sbin/dumpe2fs", "-h", device).CombinedOutput(); err == nil && strings.Contains(string(features), "Project quota inode:") {
+				options += ",prjquota"
+			}
+			mountArgs = append(mountArgs, "-o", options)
 		case "xfs":
-			mountArgs = append(mountArgs, "-o", "uquota")
+			mountArgs = append(mountArgs, "-o", "uquota,prjquota")
 		}
 		mountArgs = append(mountArgs, "--", device, target)
 		if output, err := exec.CommandContext(ctx, "/usr/bin/mount", mountArgs...).CombinedOutput(); err != nil {
@@ -646,7 +650,7 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		switch strings.ToLower(strings.TrimSpace(request.Filesystem)) {
 		case "ext4":
 			command = "/usr/sbin/mkfs.ext4"
-			args = []string{"-F", "-m", "0", "-O", "quota", "-E", "quotatype=usrquota"}
+			args = []string{"-F", "-m", "0", "-O", "quota,project", "-E", "quotatype=usrquota:prjquota"}
 			if label != "" {
 				args = append(args, "-L", label)
 			}

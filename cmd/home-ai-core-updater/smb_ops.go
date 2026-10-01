@@ -46,6 +46,20 @@ func performSMBOperation(
 	uid, gid int,
 ) (string, error) {
 	switch request.Operation {
+	case "smb.suspend":
+		if _, err := os.Stat(smbManagedConfig); errors.Is(err, os.ErrNotExist) {
+			return "SMB is not configured", nil
+		} else if err != nil {
+			return "", err
+		}
+		// Stop the service first, ending open handles as well as fresh sessions.
+		if err := systemctl(ctx, "stop", "smbd.service"); err != nil {
+			return "", err
+		}
+		if err := os.WriteFile(smbManagedConfig, []byte(renderSMBConfig("WORKGROUP", nil)), 0o600); err != nil {
+			return "", err
+		}
+		return "SMB access suspended", nil
 	case "smb.install":
 		return installSamba(ctx)
 	case "smb.user.set_password":
@@ -210,7 +224,16 @@ func applySMBConfig(
 	sort.Slice(normalized, func(i, j int) bool {
 		return strings.ToLower(normalized[i].Name) < strings.ToLower(normalized[j].Name)
 	})
-	if err := enforceSMBHardQuota(ctx, normalized, uid); err != nil {
+	if _, err := smbPoolQuotaPolicies(normalized); err != nil {
+		return "", err
+	}
+	writable := make([]updaterhelper.SMBShareRequest, 0, len(normalized))
+	for _, share := range normalized {
+		if len(share.WriteUsers) > 0 {
+			writable = append(writable, share)
+		}
+	}
+	if err := enforceSMBHardQuota(ctx, writable, uid); err != nil {
 		return "", fmt.Errorf("prepare SMB hard quota: %w", err)
 	}
 

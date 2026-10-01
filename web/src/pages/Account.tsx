@@ -1,13 +1,14 @@
 import type { Actor } from "../api/types";
+import { PasswordChange } from "../components/PasswordChange";
 import { Panel } from "../components/Panel";
 import { useI18n } from "../i18n";
 import { PageHeading } from "./Dashboard";
 
-export function AccountPage({actor}: {actor: Actor}) {
+export function AccountPage({actor, onPasswordChanged}: {actor: Actor; onPasswordChanged: () => void}) {
   const {t} = useI18n();
   return (
     <div className="page">
-      <PageHeading title={t("home")} subtitle={t("limitedHomeSubtitle")} />
+      <PageHeading title={t("yourAccount")} subtitle={t("limitedHomeSubtitle")} />
       <Panel title={t("yourAccount")}>
         <dl className="details">
           <dt>{t("displayName")}</dt>
@@ -15,10 +16,10 @@ export function AccountPage({actor}: {actor: Actor}) {
           <dt>{t("username")}</dt>
           <dd className="mono">{actor.username || "—"}</dd>
           <dt>{t("roles")}</dt>
-          <dd>{actor.roles.join(", ") || "—"}</dd>
+          <dd>{actor.roles.map((role) => role === "administrator" || role === "owner" ? t("userProfileAdministrator") : role).join(", ") || "—"}</dd>
         </dl>
-        <p className="muted account-access-note">{t("limitedAccessNotice")}</p>
       </Panel>
+      <Panel title={t("changePassword")}><PasswordChange onChanged={onPasswordChanged}/></Panel>
     </div>
   );
 }

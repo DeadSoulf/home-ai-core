@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.91-dev
+
+- Complete user identity editing, administrative password reset and self-service password changes; credential changes and account disable revoke previous sessions. Protect the last enabled administrator in the same state transaction.
+- Add migration 017, folder names/access/usage and folder/private-user quotas, including trash and pending transfers. Serialize reservations across pools; preserve private ownership and independent grants.
+- Add verified ext4/XFS filesystem project quotas for folder caps and personal SMB allocations, retaining the existing kernel pool reserve. Unlimited folders retain existing SMB behavior; finite limits without verified filesystem caps are read-only over SMB.
+- Reconcile managed Samba access after account, folder and capacity changes and at startup. Suspend active SMB handles before revocation; expose failures instead of retaining old access.
+- Separate Files into Folders, Storage and Windows access; add a dedicated Account page and simplify the user editor. Preserve the disk-first storage UI from 0.1.90-dev.
+- Protect uploaded content with download headers and filter private realtime/history events; refresh WebSocket authentication and bound cumulative subscriptions.
+- Add real-session, concurrent quota/admin and Samba transition regressions, plus opt-in disposable-browser and kernel quota acceptance fixtures.
+
 ## 0.1.90-dev
 
 - Moved physical-disk actions out of the partition table and into the selected disk summary card.

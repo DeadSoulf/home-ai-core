@@ -48,6 +48,7 @@ export type AccessResource = {
   name: string;
   description?: string;
   permissions: string[];
+  owner_user_id?: string;
 };
 
 export type AccessCatalog = {
@@ -333,6 +334,11 @@ export type FilePool = {
 };
 
 export type FileFolder = {
+  quota_bytes: number;
+  hard_quota_bytes: number;
+  used_bytes: number;
+  reserved_bytes: number;
+  usage_known: boolean;
   id: string;
   pool_id: string;
   pool_name: string;
@@ -394,6 +400,8 @@ export type SMBUser = {
 };
 
 export type SMBShare = {
+  writable: boolean;
+  write_restriction?: string;
   folder_id: string;
   folder_name: string;
   kind: "private" | "shared";

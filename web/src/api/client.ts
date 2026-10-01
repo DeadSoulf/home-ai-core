@@ -52,6 +52,13 @@ export class APIError extends Error {
   }
 }
 
+async function mutateJSON<T>(path: string, method: string, value: unknown): Promise<T> {
+  const headers = new Headers({"Content-Type": "application/json"});
+  const token = getCSRFToken();
+  if (token) headers.set("X-CSRF-Token", token);
+  return request<T>(path, {method, headers, body: JSON.stringify(value)});
+}
+
 const csrfStorageKey = "home-ai-core.csrf";
 
 export function getCSRFToken(): string {
@@ -171,6 +178,22 @@ export const api = {
     setCSRFToken();
   },
 
+  changePassword: async (currentPassword: string, password: string) => {
+    await mutateJSON<void>("/api/v1/auth/password", "PUT", {current_password: currentPassword, password});
+    setCSRFToken();
+  },
+  updateUserIdentity: async (id: string, username: string, displayName: string) => {
+    return mutateJSON<{user: UserAccount}>(`/api/v1/security/users/${encodeURIComponent(id)}/identity`, "PUT", {username, display_name: displayName});
+  },
+  resetUserPassword: async (id: string, password: string) => {
+    await mutateJSON<void>(`/api/v1/security/users/${encodeURIComponent(id)}/password`, "PUT", {password});
+  },
+  fileOwners: async () => (await request<{users: {id: string; username: string; display_name: string}[]}>("/api/v1/files/owners")).users,
+  fileFolderSettings: async (id: string) => request<{folder: FileFolder; access: {user_id: string; read: boolean; write: boolean}[]}>(`/api/v1/files/folders/${encodeURIComponent(id)}/settings`),
+  updateFileFolderSettings: async (id: string, value: {name: string; quota_bytes: number; enforce_smb: boolean; access: {user_id: string; read: boolean; write: boolean}[]}) => mutateJSON<{warning?: string}>(`/api/v1/files/folders/${encodeURIComponent(id)}/settings`, "PUT", value),
+  fileUserQuotas: async () => (await request<{quotas: {user_id: string; username: string; display_name: string; quota_bytes: number; used_bytes: number; reserved_bytes: number; usage_known: boolean}[]}>("/api/v1/files/quotas")).quotas,
+  updateUserQuota: async (id: string, quotaBytes: number) => mutateJSON<{warning?: string}>(`/api/v1/files/users/${encodeURIComponent(id)}/quota`, "PUT", {quota_bytes: quotaBytes}),
+
   users: async () => {
     const result = await request<{users: UserAccount[]}>("/api/v1/security/users");
     return result.users;
@@ -209,7 +232,7 @@ export const api = {
     const headers = new Headers({"Content-Type": "application/json"});
     const token = getCSRFToken();
     if (token) headers.set("X-CSRF-Token", token);
-    const result = await request<{user: UserAccount}>(
+    const result = await request<{user: UserAccount; warning?: string}>(
       `/api/v1/security/users/${encodeURIComponent(userId)}/access`,
       {
         method: "PUT",
@@ -222,7 +245,7 @@ export const api = {
         }),
       },
     );
-    return result.user;
+    return {...result.user, warning: result.warning};
   },
 
   storagePurposes: async () => {
@@ -301,13 +324,13 @@ export const api = {
     kind: "private" | "shared";
     ownerUserId?: string;
   }) => {
-    const result = await postJSON<{folder: FileFolder}>("/api/v1/files/folders", {
+    const result = await postJSON<{folder: FileFolder; warning?: string}>("/api/v1/files/folders", {
       pool_id: input.poolId,
       name: input.name,
       kind: input.kind,
       owner_user_id: input.ownerUserId,
     }, true);
-    return result.folder;
+    return {...result.folder, warning: result.warning};
   },
 
   fileEntries: async (folderId: string, path = "") => {

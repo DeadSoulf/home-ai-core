@@ -6,10 +6,24 @@
 
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последний опубликованный релиз:** `0.1.90-dev` — relocated disk and partition actions\
-**Текущий срез:** `0.1.90-dev` — published; live storage UI and SMB/quota acceptance pending\
-**Следующий engineering milestone:** live acceptance нового storage UI и SMB/quota; затем controlled legacy quota migration и per-folder/per-user quotas\
-**Состояние:** F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.  
+**Текущий срез:** `0.1.91-dev` — завершены пользователи, права папок и квоты; проверка и выпуск сборки\
+**Следующий engineering milestone:** эксплуатационная приёмка пользователей, папок, SMB/квот, перезагрузки и Windows-клиента на сервере; затем controlled legacy quota migration\
+**Состояние:** Пользователи и управление NAS реализованы; эксплуатационная приёмка остаётся. F2 NAS продолжается; logical pools, private/shared folders, scoped file permissions, Web-раздел **Файлы** и Windows-клиент уже есть в репозитории. Их наличие не заменяет проверку на сервере.\
 **Обновлено:** 2026-10-01
+
+### Подготовлен 0.1.91-dev — завершение пользователей и управления файлами
+
+- ✅ Один стабильный user ID, редактирование логина/имени, пароль своей учётной записи и административный сброс пароля.
+- ✅ Смена пароля/логина завершает старые входы; отключение пользователя отзывает все сессии. Последний включённый администратор защищён внутри транзакции.
+- ✅ Папки: отдельный редактор имени, доступа и лимита; личный владелец сохраняет свои права, остальные grants назначаются явно.
+- ✅ Лимит папки и общий лимит личных папок пользователя; корзина и незавершённые загрузки входят в учёт. Одновременные загрузки не могут занять одну квоту дважды.
+- ✅ Файловые project quotas ext4/XFS ограничивают SMB-запись в папку. Личный лимит распределяется конечными лимитами всех личных папок; общий kernel reserve из 0.1.87-dev сохранён.
+- ✅ Папки без личного/папочного лимита сохраняют прежнюю SMB-запись с защитой резерва. Конечный лимит без подтверждённой файловой квоты делает соответствующую SMB-папку read-only.
+- ✅ Отзыв прав останавливает Samba и активные подключения до записи новых прав, затем автоматически перестраивает конфигурацию. При сбое доступ остаётся приостановленным; состояние видно в Web. При старте производится сверка.
+- ✅ Web: **Файлы → Папки / Хранилище / Доступ Windows**, **Ваша учётная запись**, компактный редактор пользователей. Новый интерфейс физических дисков 0.1.90-dev сохранён.
+- ✅ Приватные события фильтруются по актуальным grants; старые WebSocket-сессии закрываются; число подписок ограничено суммарно. Загруженный HTML/SVG выдаётся безопасным скачиванием.
+- ✅ Миграция `017_nas_quotas.sql`; ADR-0035. Изолированный kernel test ext4 подтвердил запрет записи сверх квоты от обычного пользователя и снятие лимита.
+- 🧪 Установка на реальный сервер, открытые SMB-подключения, перезагрузка и Windows/NAS acceptance остаются эксплуатационной проверкой. NFS/snapshots остаются опциональными последующими этапами.
 
 ### Выпуск 0.1.90-dev — действия вне таблицы
 
@@ -357,7 +371,7 @@ Check
 
 Следующий сетевой долг: explicit import/takeover внешнего ifupdown-профиля (отдельным подтверждаемым действием), затем VLAN/bridges/bonds.
 
-### 🚧 Unified multi-user access
+### ✅ Unified multi-user access
 
 Базовый multi-user фундамент уже работал, теперь он превращается в единую систему пользователей всего Home-AI:
 
@@ -405,7 +419,7 @@ Check
    - resource-scoped grants;
    - миграция `010_household_users.sql`;
    - ADR-0015.
-6. 🚧 Unified user access:
+6. ✅ Unified user access:
    - профили Administrator / Parent / Child / Guest / Friend;
    - единый permission catalog всего Core;
    - direct per-user global permissions;
@@ -433,7 +447,7 @@ Check
 4. ✅ `files.read/files.write/files.manage`;
 5. ✅ scoped grants на конкретную папку;
 6. ✅ private folder → выбранный пользователь;
-7. 🚧 shared folder → explicit per-user access через общий редактор пользователей;
+7. ✅ shared folder → explicit per-user access через общий редактор пользователей;
 8. ✅ API list/create pools и folders;
 9. ✅ Web-раздел **Файлы** с фильтрацией по effective permissions;
 10. ✅ ADR-0016 и тесты.
@@ -498,8 +512,8 @@ Check
 1. ✅ explicit Samba installation;
 2. ✅ managed SMB shares только для Home-AI logical folders;
 3. ✅ private folder → владелец + Administrator;
-4. 🚧 shared folder → только пользователи с explicit files.read/files.write grant;
-5. 🚧 Administrator получает RW ко всем managed shares через files.manage;
+4. ✅ shared folder → только пользователи с explicit files.read/files.write grant;
+5. ✅ Administrator получает RW ко всем managed shares через files.manage;
 6. ✅ анонимный SMB guest access запрещён, SMB2.10 minimum;
 7. ✅ отдельные SMB credentials без хранения пароля в Core;
 8. ✅ managed /etc/samba/home-ai.conf + backup/include/testparm/reload;

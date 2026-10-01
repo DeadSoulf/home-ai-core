@@ -2,6 +2,29 @@ import { describe, expect, it, vi } from "vitest";
 import { APIError, api, setCSRFToken } from "./client";
 
 describe("API client", () => {
+	 it("clears only local CSRF state after a successful password change", async () => {
+		const storage = new Map<string, string>();
+		vi.stubGlobal("localStorage", {getItem:(key:string)=>storage.get(key)??null,setItem:(key:string,value:string)=>storage.set(key,value),removeItem:(key:string)=>storage.delete(key)});
+		const fetchMock=vi.fn(async (_input:RequestInfo|URL,_init?:RequestInit)=>new Response(null,{status:204}));
+		vi.stubGlobal("fetch",fetchMock);
+		setCSRFToken("test-csrf");
+		await api.changePassword("old password","replacement password");
+		const [url,init]=fetchMock.mock.calls[0];
+		expect(url).toBe("/api/v1/auth/password");
+		expect(init?.method).toBe("PUT");
+		expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("test-csrf");
+		expect(storage.has("home-ai-core.csrf")).toBe(false);
+		vi.unstubAllGlobals();
+	 });
+
+	 it("preserves a suspended-SMB warning from an access update",async()=>{
+		vi.stubGlobal("localStorage", {getItem:()=>null});
+		vi.stubGlobal("fetch",vi.fn(async()=>new Response(JSON.stringify({user:{id:"usr_friend"},warning:"SMB access remains suspended"}),{status:200,headers:{"Content-Type":"application/json"}})));
+		const user=await api.updateUserAccess("usr_friend",{profile:"friend",permissions:[],disabled:true});
+		expect(user.id).toBe("usr_friend");
+		expect(user.warning).toContain("suspended");
+		vi.unstubAllGlobals();
+	 });
   it("parses the Core error envelope", async () => {
     vi.stubGlobal("fetch", vi.fn(async () =>
       new Response(JSON.stringify({

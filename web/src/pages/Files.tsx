@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import type { StoragePurposeAssignment } from "../api/types";
+import { FolderSettings } from "../components/FolderSettings";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
 import { useResource } from "../hooks/useResource";
 import { useI18n } from "../i18n";
@@ -15,14 +16,16 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
     }
     const [pools, users, storagePurposes, smb] = await Promise.all([
       api.filePools(),
-      api.users(),
-      api.storagePurposes(),
-      api.smbStatus(),
+      api.fileOwners(),
+      api.storagePurposes().catch(() => []),
+      api.smbStatus().catch(() => undefined),
     ]);
     return {folders, pools, users, storagePurposes, smb};
   }, [canManage]);
   const resource = useResource(load, revision);
 
+  const [section, setSection] = useState<"folders" | "storage" | "windows">("folders");
+  const [settingsFolderID, setSettingsFolderID] = useState("");
   const [poolName, setPoolName] = useState("");
   const [poolRoot, setPoolRoot] = useState("");
   const [folderPoolID, setFolderPoolID] = useState("");
@@ -167,14 +170,14 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
     setFormError("");
     setNotice("");
     try {
-      await api.createFileFolder({
+      const created = await api.createFileFolder({
         poolId: folderPoolID,
         name: folderName,
         kind: folderKind,
         ownerUserId: folderKind === "private" ? ownerUserID : undefined,
       });
       setFolderName("");
-      setNotice(t("fileFolderCreated"));
+      setNotice(created.warning || t("fileFolderCreated"));
       resource.reload();
     } catch (reason) {
       setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
@@ -454,7 +457,15 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
       {formError && <div className="form-error">{formError}</div>}
       {notice && <div className="storage-success">{notice}</div>}
 
-      <Panel title={t("fileFolders")} className="wide">
+      {canManage && <nav className="file-section-tabs" aria-label={t("files")}>
+        {(["folders", "storage", "windows"] as const).map((item) => <button key={item} type="button"
+          className={`button ${section === item ? "primary" : "secondary"}`} aria-current={section === item ? "page" : undefined}
+          onClick={() => setSection(item)}>{t(item === "folders" ? "fileFolders" : item === "storage" ? "fileStorageSettings" : "fileWindowsSettings")}</button>)}
+      </nav>}
+      {settingsFolderID && section === "folders" && <FolderSettings folderID={settingsFolderID} users={users}
+        onClose={() => setSettingsFolderID("")} onSaved={() => resource.reload()}/>}
+
+      {section === "folders" && <Panel title={t("fileFolders")} className="wide">
         <div className="table-wrap">
           <table>
             <thead>
@@ -464,7 +475,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                 <th>{t("filePool")}</th>
                 <th>{t("fileOwner")}</th>
                 <th>{t("fileAccess")}</th>
-                {canManage && <th>{t("fileInternalPath")}</th>}
+                <th>{t("fileFolderUsage")}</th>
                 <th>{t("actions")}</th>
               </tr>
             </thead>
@@ -476,11 +487,11 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                   <td>{folder.pool_name}</td>
                   <td>
                     {folder.kind === "private"
-                      ? (userName.get(folder.owner_user_id || "") || folder.owner_user_id || "—")
+                      ? (userName.get(folder.owner_user_id || "") || folder.owner_user_id || "вЂ”")
                       : t("fileAllMembers")}
                   </td>
                   <td>{folder.can_write ? t("fileReadWrite") : t("fileReadOnly")}</td>
-                  {canManage && <td className="mono">{folder.relative_path}</td>}
+                  <td>{folder.usage_known ? `${formatFileSize(folder.used_bytes + folder.reserved_bytes)} / ${folder.quota_bytes ? formatFileSize(folder.quota_bytes) : t("quotaUnlimited")}` : t("usageUnavailable")}</td>
                   <td>
                     <button
                       className="button compact secondary"
@@ -489,20 +500,21 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                     >
                       {t("fileOpen")}
                     </button>
+                    {canManage && <button className="button compact secondary" type="button" onClick={() => setSettingsFolderID(folder.id)}>{t("fileFolderSettings")}</button>}
                   </td>
                 </tr>
               ))}
               {folders.length === 0 && (
                 <tr>
-                  <td colSpan={canManage ? 7 : 6} className="muted">{t("fileNoFolders")}</td>
+                  <td colSpan={7} className="muted">{t("fileNoFolders")}</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-      </Panel>
+      </Panel>}
 
-      {selectedFolder && (
+      {section === "folders" && selectedFolder && (
         <Panel title={selectedFolder.name} className="wide">
           <div className="file-browser-toolbar">
             <button
@@ -576,7 +588,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                       ? 100
                       : Math.floor((uploadProgress.received / uploadProgress.total) * 100)),
                   )}
-                {uploadProgress.resumed ? ` · ${t("fileUploadResumed")}` : ""}
+                {uploadProgress.resumed ? ` В· ${t("fileUploadResumed")}` : ""}
               </span>
             </div>
           )}
@@ -613,7 +625,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                         )}
                       </td>
                       <td>{entry.kind === "directory" ? t("fileDirectory") : entry.kind === "file" ? t("fileRegularFile") : t("fileSymlink")}</td>
-                      <td>{entry.kind === "file" ? formatFileSize(entry.size_bytes || 0) : "—"}</td>
+                      <td>{entry.kind === "file" ? formatFileSize(entry.size_bytes || 0) : "вЂ”"}</td>
                       <td>{new Date(entry.modified_at).toLocaleString()}</td>
                       <td>
                         <div className="network-actions">
@@ -685,7 +697,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                           <td>{entry.name}</td>
                           <td className="mono">{entry.original_path}</td>
                           <td>{entry.kind === "directory" ? t("fileDirectory") : t("fileRegularFile")}</td>
-                          <td>{entry.kind === "file" ? formatFileSize(entry.size_bytes || 0) : "—"}</td>
+                          <td>{entry.kind === "file" ? formatFileSize(entry.size_bytes || 0) : "вЂ”"}</td>
                           <td>{date(entry.deleted_at)}</td>
                           <td>
                             {selectedFolder.can_write && (
@@ -725,14 +737,14 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
         </Panel>
       )}
 
-      {canManage && smbStatus && (
+      {canManage && section === "windows" && smbStatus && (
         <Panel title={t("smbTitle")} className="wide">
           <div className="smb-status-grid">
             <dl className="details">
               <dt>{t("state")}</dt>
               <dd>{smbStatus.available ? (smbStatus.active ? t("smbActive") : t("smbInactive")) : t("smbNotInstalled")}</dd>
               <dt>{t("hostname")}</dt>
-              <dd className="mono">{smbStatus.hostname || "—"}</dd>
+              <dd className="mono">{smbStatus.hostname || "вЂ”"}</dd>
               <dt>{t("smbWorkgroup")}</dt>
               <dd>{smbStatus.workgroup || "WORKGROUP"}</dd>
               <dt>{t("smbHardQuota")}</dt>
@@ -801,6 +813,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                       <th>{t("fileFolders")}</th>
                       <th>{t("smbShareName")}</th>
                       <th>{t("smbWindowsPath")}</th>
+                      <th>{t("fileAccess")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -809,15 +822,17 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                         <td>{share.folder_name}</td>
                         <td className="mono">{share.share_name}</td>
                         <td className="mono">{share.unc}</td>
+                        <td>{share.writable ? t("fileReadWrite") : t("fileReadOnly")}</td>
                       </tr>
                     ))}
                     {smbStatus.shares.length === 0 && (
-                      <tr><td colSpan={3} className="muted">{t("smbNoShares")}</td></tr>
+                      <tr><td colSpan={4} className="muted">{t("smbNoShares")}</td></tr>
                     )}
                   </tbody>
                 </table>
               </div>
 
+              <p className="muted small">{t("filePoolSMBReserveNotice")}</p>
               <h3>{t("smbUsers")}</h3>
               <div className="table-wrap">
                 <table>
@@ -847,7 +862,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                     <option value="">{t("fileChooseUser")}</option>
                     {smbStatus.users.map((user) => (
                       <option key={user.user_id} value={user.user_id}>
-                        {user.display_name || user.username} · {user.smb_username}
+                        {user.display_name || user.username} В· {user.smb_username}
                       </option>
                     ))}
                   </select>
@@ -874,7 +889,8 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
         </Panel>
       )}
 
-      {canManage && (
+      {canManage && section === "windows" && !smbStatus && <div className="notice">{t("fileSMBUnavailable")}</div>}
+      {canManage && section === "storage" && (
         <Panel title={t("filePoolsTitle")} className="wide">
           <div className="table-wrap">
             <table>
@@ -911,7 +927,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                       <td>
                         {pool.capacity_known
                           ? `${formatFileSize(pool.free_bytes || 0)} / ${formatFileSize(pool.size_bytes || 0)}`
-                          : "—"}
+                          : "вЂ”"}
                       </td>
                       <td>
                         <span className={stateClass}>{stateLabel}</span>
@@ -978,7 +994,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
         </Panel>
       )}
 
-      {canManage && (
+      {canManage && section === "storage" && (
         <Panel title={t("fileAssignedStorage")} className="wide">
           <div className="table-wrap">
             <table>
@@ -999,10 +1015,10 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                   return (
                     <tr key={storage.filesystem_uuid || storage.device}>
                       <td className="mono">{storage.device}</td>
-                      <td>{storage.label || "—"}</td>
-                      <td>{storage.filesystem || "—"}</td>
-                      <td className="mono">{storage.mountpoints.join(", ") || "—"}</td>
-                      <td>{storage.free_known ? formatFileSize(storage.free_bytes || 0) : "—"}</td>
+                      <td>{storage.label || "вЂ”"}</td>
+                      <td>{storage.filesystem || "вЂ”"}</td>
+                      <td className="mono">{storage.mountpoints.join(", ") || "вЂ”"}</td>
+                      <td>{storage.free_known ? formatFileSize(storage.free_bytes || 0) : "вЂ”"}</td>
                       <td>
                         {!storage.present
                           ? t("fileStorageMissing")
@@ -1029,9 +1045,8 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
         </Panel>
       )}
 
-      {canManage && (
-        <div className="two-column">
-          <Panel title={t("fileCreatePool")}>
+      {canManage && section === "storage" && (
+<Panel title={t("fileCreatePool")}>
             <form className="user-form" onSubmit={createPool}>
               <label>
                 {t("name")}
@@ -1053,7 +1068,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                   <option value="">{t("fileChooseMountedStorage")}</option>
                   {mountOptions.map((mount) => (
                     <option key={mount.path} value={mount.path}>
-                      {mount.path} · {mount.filesystem || "filesystem"} · {mount.device || "—"}
+                      {mount.path} В· {mount.filesystem || "filesystem"} В· {mount.device || "вЂ”"}
                     </option>
                   ))}
                 </select>
@@ -1069,8 +1084,9 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
               </button>
             </form>
           </Panel>
-
-          <Panel title={t("fileCreateFolder")}>
+      )}
+      {canManage && section === "folders" && (
+<Panel title={t("fileCreateFolder")}>
             <form className="user-form" onSubmit={createFolder}>
               <label>
                 {t("filePool")}
@@ -1082,7 +1098,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
                   <option value="">{t("fileChoosePool")}</option>
                   {pools.map((pool) => (
                     <option key={pool.id} value={pool.id}>
-                      {pool.name} · {pool.root_path}
+                      {pool.name}
                     </option>
                   ))}
                 </select>
@@ -1135,7 +1151,6 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
               </button>
             </form>
           </Panel>
-        </div>
       )}
     </div>
   );

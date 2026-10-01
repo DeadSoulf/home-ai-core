@@ -10,7 +10,17 @@ import (
 	"github.com/coder/websocket/wsjson"
 )
 
+// AccessPolicy refreshes authentication before every delivery and filters events.
+type AccessPolicy struct {
+	Authenticate func(context.Context) error
+	Allows       func(string, any) bool
+}
+
 func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request, requestID string) {
+	h.ServeHTTPAuthorized(w, r, requestID, AccessPolicy{})
+}
+
+func (h *Hub) ServeHTTPAuthorized(w http.ResponseWriter, r *http.Request, requestID string, access AccessPolicy) {
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		CompressionMode: websocket.CompressionDisabled,
 	})
@@ -43,6 +53,8 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request, requestID string
 	go readCommands(ctx, conn, commandCh, readErrCh)
 
 	ticker := time.NewTicker(h.heartbeat)
+	authTicker := time.NewTicker(time.Second)
+	defer authTicker.Stop()
 	defer ticker.Stop()
 
 	for {
@@ -57,11 +69,27 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request, requestID string
 				h.logger.Debug("realtime connection ended", "error", err)
 			}
 			return
+		case <-authTicker.C:
+			if access.Authenticate != nil && access.Authenticate(ctx) != nil {
+				_ = conn.Close(websocket.StatusPolicyViolation, "authentication expired")
+				return
+			}
 		case command := <-commandCh:
+			if access.Authenticate != nil && access.Authenticate(ctx) != nil {
+				_ = conn.Close(websocket.StatusPolicyViolation, "authentication expired")
+				return
+			}
 			if !h.handleCommand(ctx, conn, c, command, requestID) {
 				return
 			}
 		case message := <-c.send:
+			if access.Authenticate != nil && access.Authenticate(ctx) != nil {
+				_ = conn.Close(websocket.StatusPolicyViolation, "authentication expired")
+				return
+			}
+			if access.Allows != nil && !access.Allows(message.Type, message.Data) {
+				continue
+			}
 			if err := h.writeMessage(ctx, conn, c, message); err != nil {
 				return
 			}
@@ -89,7 +117,7 @@ func (h *Hub) handleCommand(
 	case "subscribe":
 		err = validateTopics(command.Topics)
 		if err == nil {
-			topics = c.subscribe(command.Topics)
+			topics, err = c.subscribe(command.Topics)
 		}
 	case "unsubscribe":
 		err = validateTopics(command.Topics)
