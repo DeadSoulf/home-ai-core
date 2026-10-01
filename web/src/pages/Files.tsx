@@ -851,7 +851,7 @@ export function FilesPage({revision, canManage}: {revision: number; canManage: b
               <tbody>
                 {fileStorage.map((storage) => {
                   const usableMounts = storage.mountpoints.filter((path) => path.startsWith("/mnt/home-ai-core/"));
-                  const alreadyPool = usableMounts.some((path) => poolRoots.has(path));
+                  const alreadyPool = storage.in_use || usableMounts.some((path) => poolRoots.has(path));
                   return (
                     <tr key={storage.filesystem_uuid || storage.device}>
                       <td className="mono">{storage.device}</td>
