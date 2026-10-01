@@ -33,7 +33,14 @@ const (
 	maxBundleFiles      = 20000
 	defaultUserAgent    = "Home-AI-Core"
 	updateCheckCacheTTL = 10 * time.Minute
+	bundleHTTPTimeout   = 2 * time.Minute
 )
+
+var downloadRetryDelays = []time.Duration{
+	250 * time.Millisecond,
+	1 * time.Second,
+	2 * time.Second,
+}
 
 var (
 	ErrNoUpdate   = errors.New("no update available")
@@ -70,6 +77,7 @@ type Service struct {
 	architecture   string
 	stateDir       string
 	client         *http.Client
+	bundleClient   *http.Client
 
 	opMu    sync.Mutex
 	stateMu sync.RWMutex
@@ -89,6 +97,7 @@ func New(currentVersion, stateDir string) *Service {
 		architecture:   runtime.GOARCH,
 		stateDir:       stateDir,
 		client:         &http.Client{Timeout: 30 * time.Second},
+		bundleClient:   &http.Client{Timeout: bundleHTTPTimeout},
 		state:          NewState(currentVersion),
 	}
 	service.loadPersistedState()
@@ -685,19 +694,11 @@ func (s *Service) fetchChecksum(ctx context.Context, url, expectedFile string) (
 }
 
 func (s *Service) downloadArchive(ctx context.Context, url, target string, expectedSize int64, expectedHash string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	resp, err := s.downloadBundleResponse(ctx, url)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", defaultUserAgent+"/"+s.currentVersion)
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return fmt.Errorf("download update bundle: %w", err)
-	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download update bundle: HTTP %d", resp.StatusCode)
-	}
 	if resp.ContentLength > maxBundleBytes {
 		return errors.New("update bundle exceeds maximum allowed size")
 	}
@@ -738,6 +739,76 @@ func (s *Service) downloadArchive(ctx context.Context, url, target string, expec
 		return errors.New("update bundle SHA-256 mismatch")
 	}
 	return os.Rename(tmp, target)
+}
+
+func (s *Service) downloadBundleResponse(ctx context.Context, url string) (*http.Response, error) {
+	client := s.bundleClient
+	if client == nil {
+		client = s.client
+	}
+	if client == nil {
+		client = &http.Client{Timeout: bundleHTTPTimeout}
+	}
+
+	attempts := len(downloadRetryDelays) + 1
+	var lastErr error
+	var lastStatus int
+	for attempt := 0; attempt < attempts; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("User-Agent", defaultUserAgent+"/"+s.currentVersion)
+
+		resp, err := client.Do(req)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			return resp, nil
+		}
+		if err != nil {
+			lastErr = err
+			if ctx.Err() != nil {
+				return nil, fmt.Errorf("download update bundle: %w", ctx.Err())
+			}
+		} else {
+			lastStatus = resp.StatusCode
+			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
+			_ = resp.Body.Close()
+			if !retryableDownloadStatus(resp.StatusCode) {
+				return nil, fmt.Errorf("download update bundle: HTTP %d", resp.StatusCode)
+			}
+		}
+
+		if attempt >= len(downloadRetryDelays) {
+			break
+		}
+		timer := time.NewTimer(downloadRetryDelays[attempt])
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return nil, fmt.Errorf("download update bundle: %w", ctx.Err())
+		case <-timer.C:
+		}
+	}
+
+	if lastErr != nil {
+		return nil, fmt.Errorf("download update bundle after %d attempts: %w", attempts, lastErr)
+	}
+	return nil, fmt.Errorf("download update bundle: HTTP %d after %d attempts", lastStatus, attempts)
+}
+
+func retryableDownloadStatus(status int) bool {
+	switch status {
+	case http.StatusRequestTimeout,
+		http.StatusTooManyRequests,
+		http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout:
+		return true
+	default:
+		return false
+	}
 }
 
 func extractAndVerifyBundle(archivePath, targetDir, version, architecture string) error {
