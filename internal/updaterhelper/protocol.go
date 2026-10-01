@@ -121,6 +121,8 @@ type NetworkProfileStat struct {
 type Response struct {
 	QuotaLimitBytes    uint64                `json:"quota_limit_bytes,omitempty"`
 	QuotaUsedBytes     uint64                `json:"quota_used_bytes,omitempty"`
+	UsageUsedBytes     int64                 `json:"usage_used_bytes,omitempty"`
+	UsageReservedBytes int64                 `json:"usage_reserved_bytes,omitempty"`
 	OK                 bool                  `json:"ok"`
 	Message            string                `json:"message,omitempty"`
 	Error              string                `json:"error,omitempty"`
