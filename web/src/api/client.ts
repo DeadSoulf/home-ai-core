@@ -138,6 +138,7 @@ async function streamAISessionMessage(
   sessionId: string,
   content: string,
   onDelta: (content: string) => void,
+  signal?: AbortSignal,
 ): Promise<AISession> {
   const headers = new Headers({"Content-Type": "application/json", "Accept": "text/event-stream"});
   const token = getCSRFToken();
@@ -146,6 +147,7 @@ async function streamAISessionMessage(
     method: "POST",
     headers,
     body: JSON.stringify({content}),
+    signal,
     credentials: "same-origin",
     cache: "no-store",
   });
