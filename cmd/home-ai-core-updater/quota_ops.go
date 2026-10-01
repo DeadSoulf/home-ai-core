@@ -82,53 +82,60 @@ func enforceSMBHardQuota(
 		return err
 	}
 	for _, policy := range policies {
-		if policy.ReservePercent == 0 {
-			continue
-		}
-		info, err := inspectQuotaMount(ctx, policy.RootPath)
-		if err != nil {
+		if err := enforceNASUserQuota(ctx, policy.RootPath, policy.ReservePercent, uid); err != nil {
 			return err
 		}
-		if err := quotaMountReady(ctx, info); err != nil {
-			return err
+	}
+	return nil
+}
+
+func enforceNASUserQuota(ctx context.Context, root string, reservePercent, uid int) error {
+	if reservePercent == 0 {
+		return nil
+	}
+	info, err := inspectQuotaMount(ctx, root)
+	if err != nil {
+		return err
+	}
+	if err := quotaMountReady(ctx, info); err != nil {
+		return err
+	}
+	limitKiB, err := quotaHardLimitKiB(info.RootPath, reservePercent)
+	if err != nil {
+		return err
+	}
+	setquota, err := exec.LookPath("setquota")
+	if err != nil {
+		return errors.New("quota tools are unavailable; install the quota package")
+	}
+	args := []string{
+		"-u",
+		strconv.Itoa(uid),
+		strconv.FormatUint(limitKiB, 10),
+		strconv.FormatUint(limitKiB, 10),
+		"0",
+		"0",
+		info.RootPath,
+	}
+	output, err := exec.CommandContext(ctx, setquota, args...).CombinedOutput()
+	if err != nil {
+		message := strings.TrimSpace(string(output))
+		if message == "" {
+			message = err.Error()
 		}
-		limitKiB, err := quotaHardLimitKiB(info.RootPath, policy.ReservePercent)
-		if err != nil {
-			return err
-		}
-		setquota, err := exec.LookPath("setquota")
-		if err != nil {
-			return errors.New("quota tools are unavailable; install the quota package")
-		}
-		args := []string{
-			"-u",
-			strconv.Itoa(uid),
-			strconv.FormatUint(limitKiB, 10),
-			strconv.FormatUint(limitKiB, 10),
-			"0",
-			"0",
+		return fmt.Errorf("apply hard quota on %s: %s", info.RootPath, message)
+	}
+	actual, err := userQuotaHardLimitKiB(ctx, info.RootPath, uid)
+	if err != nil {
+		return err
+	}
+	if actual != limitKiB {
+		return fmt.Errorf(
+			"verify hard quota on %s: got %d KiB, want %d KiB",
 			info.RootPath,
-		}
-		output, err := exec.CommandContext(ctx, setquota, args...).CombinedOutput()
-		if err != nil {
-			message := strings.TrimSpace(string(output))
-			if message == "" {
-				message = err.Error()
-			}
-			return fmt.Errorf("apply hard quota on %s: %s", info.RootPath, message)
-		}
-		actual, err := userQuotaHardLimitKiB(ctx, info.RootPath, uid)
-		if err != nil {
-			return err
-		}
-		if actual != limitKiB {
-			return fmt.Errorf(
-				"verify hard quota on %s: got %d KiB, want %d KiB",
-				info.RootPath,
-				actual,
-				limitKiB,
-			)
-		}
+			actual,
+			limitKiB,
+		)
 	}
 	return nil
 }
