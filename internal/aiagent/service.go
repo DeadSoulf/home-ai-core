@@ -484,6 +484,26 @@ func (s *Service) Chat(
 	meta security.RequestContext,
 	conversationID, content string,
 ) (state.AIMessageRecord, state.AIMessageRecord, error) {
+	return s.chat(ctx, actor, meta, conversationID, content, nil)
+}
+
+func (s *Service) ChatStream(
+	ctx context.Context,
+	actor security.Actor,
+	meta security.RequestContext,
+	conversationID, content string,
+	onDelta func(string) error,
+) (state.AIMessageRecord, state.AIMessageRecord, error) {
+	return s.chat(ctx, actor, meta, conversationID, content, onDelta)
+}
+
+func (s *Service) chat(
+	ctx context.Context,
+	actor security.Actor,
+	meta security.RequestContext,
+	conversationID, content string,
+	onDelta func(string) error,
+) (state.AIMessageRecord, state.AIMessageRecord, error) {
 	if !s.Enabled() {
 		return state.AIMessageRecord{}, state.AIMessageRecord{}, ErrAgentDisabled
 	}
@@ -515,7 +535,7 @@ func (s *Service) Chat(
 	})
 
 	started := time.Now()
-	answer, generateErr := s.generateAgentResponse(ctx, actor, meta, conversation.ID, history)
+	answer, generateErr := s.generateAgentResponse(ctx, actor, meta, conversation.ID, history, onDelta)
 	if generateErr != nil {
 		s.recordChatAudit(ctx, meta, actor, conversation.ID, content, "", time.Since(started), generateErr)
 		return state.AIMessageRecord{}, state.AIMessageRecord{}, generateErr
@@ -559,6 +579,7 @@ func (s *Service) generateAgentResponse(
 	meta security.RequestContext,
 	conversationID string,
 	history []state.AIMessageRecord,
+	onDelta func(string) error,
 ) (string, error) {
 	runtimeCtx, runtimeCleanup, runtimeErr := s.runtimeContext(ctx)
 	if runtimeErr != nil {
@@ -575,7 +596,16 @@ func (s *Service) generateAgentResponse(
 	}
 	autoCalls := 0
 	for round := 0; round < maxAgentToolRounds; round++ {
-		response, err := s.provider.Generate(chatCtx, request)
+		var response ModelResponse
+		var err error
+		if streaming, ok := s.provider.(StreamingProvider); ok && onDelta != nil {
+			response, err = streaming.GenerateStream(chatCtx, request, onDelta)
+		} else {
+			response, err = s.provider.Generate(chatCtx, request)
+			if err == nil && onDelta != nil && response.Message.Content != "" {
+				err = onDelta(response.Message.Content)
+			}
+		}
 		if err != nil {
 			return "", err
 		}
