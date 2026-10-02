@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.1.123-dev
+
+- Give the local AI Agent controlled access to Home-AI server configuration through typed tools instead of an unrestricted root shell.
+- Add native Ollama tool-calling support: Home-AI tool descriptors are sent as function JSON Schemas and Ollama `tool_calls` are mapped back to stable Core tool IDs.
+- Add a bounded multi-round agent loop: permitted read tools may execute automatically and their results are returned to the model for follow-up reasoning.
+- Add migration 021 with persistent per-user AI server actions and single-use approval state.
+- Convert every `change` or `sensitive` model tool call into a pending server-action card; no server change executes until an authenticated user explicitly approves it.
+- Re-check the user's current effective permissions at approval time and fail closed when access was revoked.
+- Add approval/rejection APIs under `/api/v1/ai/conversations/{conversationID}/actions` with existing session/CSRF boundaries.
+- Add Web approval cards with RU/EN labels, exact bounded action input, result/error state and secret-like field redaction.
+- Add controlled server tools:
+  - read network profiles and WireGuard state;
+  - read storage/helper inspection;
+  - save persistent DHCP/static network profiles with approval;
+  - bring network links up/down with approval;
+  - mount storage under `/mnt/home-ai-core` with approval;
+  - unmount storage with sensitive approval.
+- Reuse existing `network.read/manage` and `storage.read/manage` permissions plus the existing privileged helper validation/audit path.
+- Add explicit limits for model tool rounds, automatic read calls, action input size and stored action result size.
+- Add regression coverage for Ollama tool mapping, persistent action ownership/single-use behavior, automatic read-tool loops, approval-only writes and permission re-check at execution time.
+- Arbitrary shell/root command execution remains intentionally unavailable.
+
 ## 0.1.122-dev
 
 - Add **Finish chat / Завершить чат** to the Web AI Agent conversation header.
