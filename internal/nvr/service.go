@@ -49,6 +49,11 @@ type Service struct {
 	runtimeEvent     func(RuntimeEvent)
 	healthInterval   time.Duration
 	retryDelays      []time.Duration
+
+	liveMu          sync.Mutex
+	liveSource      liveProcessSource
+	liveSessions    map[string]*liveSession
+	liveIdleTimeout time.Duration
 }
 
 type CameraInput struct {
@@ -101,7 +106,10 @@ func newService(
 		workers:        map[string]cameraWorker{},
 		runtime:        map[string]CameraRuntimeStatus{},
 		healthInterval: 30 * time.Second,
-		retryDelays:    []time.Duration{2 * time.Second, 5 * time.Second, 15 * time.Second, 30 * time.Second},
+		retryDelays:     []time.Duration{2 * time.Second, 5 * time.Second, 15 * time.Second, 30 * time.Second},
+		liveSource:      NewFFmpegMJPEGSource(),
+		liveSessions:    map[string]*liveSession{},
+		liveIdleTimeout: 5 * time.Second,
 	}
 }
 
