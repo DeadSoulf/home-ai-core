@@ -6,6 +6,8 @@ import (
 	"errors"
 )
 
+var ErrProviderUnavailable = errors.New("AI provider is unavailable")
+
 type MessageRole string
 
 const (
@@ -16,9 +18,10 @@ const (
 )
 
 type Message struct {
-	Role      MessageRole `json:"role"`
-	Content   string      `json:"content"`
-	ToolCalls []ToolCall  `json:"tool_calls,omitempty"`
+	Role       MessageRole `json:"role"`
+	Content    string      `json:"content"`
+	ToolCalls  []ToolCall  `json:"tool_calls,omitempty"`
+	ToolCallID string      `json:"tool_call_id,omitempty"`
 }
 
 type ToolCall struct {
@@ -28,8 +31,9 @@ type ToolCall struct {
 }
 
 type ModelRequest struct {
-	Messages []Message        `json:"messages"`
-	Tools    []ToolDescriptor `json:"tools,omitempty"`
+	Messages     []Message        `json:"messages"`
+	Tools        []ToolDescriptor `json:"tools,omitempty"`
+	ProviderMode string           `json:"provider_mode,omitempty"`
 }
 
 type ModelResponse struct {

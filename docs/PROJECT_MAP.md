@@ -8,11 +8,25 @@
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.130-dev` — AI chat transport hotfix\
-**Текущий срез:** `0.1.130-dev` опубликован; Web chat использует стабильный JSON transport, Ollama performance tuning сохранён; live acceptance pending\
-**Следующий engineering milestone:** live-проверить `0.1.129-dev` на сервере с `qwen3:4b`/Tesla K80, затем расширить controlled tools на updater/service/NAS/SMB и добавить provider runtime diagnostics.\
+**Текущий срез:** `0.1.131-dev` staged: отдельный `ai.cloud`, Local/Cloud/Auto routing и module-aware navigation; release publication pending\
+**Следующий engineering milestone:** live-проверить локальный/облачный routing и скрытие выключенных модулей; затем расширить controlled tools на updater/service/NAS/SMB и добавить provider runtime diagnostics.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent: contracts `0.1.115`, read tools/API `0.1.117`, local conversation `0.1.119`, runtime control `0.1.120`, controlled model tool-loop `0.1.123`, public web tools `0.1.124`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
 
+### Выпуск 0.1.131-dev — Cloud AI module + module-aware navigation
+
+- ✅ Добавлен отдельный first-party модуль `ai.cloud` с OpenAI-compatible Chat Completions provider.
+- ✅ Cloud AI зарегистрирован **выключенным по умолчанию**; наличие API-настроек само по себе не отправляет переписку в облако.
+- ✅ Конфигурация облака хранится только в service environment: endpoint, model и API key; ключ не выдаётся Web и не сохраняется в chat history.
+- ✅ В ИИ Агенте добавлен выбор **Локально / Облако / Авто**; по умолчанию остаётся локальный режим.
+- ✅ Auto предпочитает включённый Cloud AI и при обычной provider-ошибке откатывается на локальную модель.
+- ✅ Cloud provider использует тот же typed Tool Registry, permissions и approval loop; unrestricted shell/root не добавлен.
+- ✅ `ai.cloud` имеет отдельную страницу `/modules/ai.cloud` с состоянием, моделью, инструкцией и privacy warning.
+- ✅ Главное меню получает module navigation из registry и показывает пункты только модулей со статусом `enabled`.
+- ✅ Выключенный `ai.agent` исчезает из меню; выключенный `ai.cloud` также исчезает из меню.
+- ✅ При выключении `ai.agent` зависимый `ai.cloud` автоматически выключается; включить Cloud AI при выключенном AI Agent нельзя.
+- ✅ PR #130 прошёл функциональный Web/Go/Core/Debian/Windows CI до release bump.
+- 🧪 После публикации требуется live acceptance с реальным OpenAI-compatible endpoint.
 ### Выпуск 0.1.130-dev — AI chat transport hotfix
 
 - ✅ После live-регрессии `0.1.129-dev` production Web UI снова использует стабильный JSON `/messages` transport вместо browser NDJSON stream.

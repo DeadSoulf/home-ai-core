@@ -9,6 +9,9 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("HOME_AI_AI_PROVIDER", "")
 	t.Setenv("HOME_AI_AI_ENDPOINT", "")
 	t.Setenv("HOME_AI_AI_MODEL", "")
+	t.Setenv("HOME_AI_CLOUD_AI_ENDPOINT", "")
+	t.Setenv("HOME_AI_CLOUD_AI_MODEL", "")
+	t.Setenv("HOME_AI_CLOUD_AI_API_KEY", "")
 
 	cfg, err := Load(nil)
 	if err != nil {
@@ -33,6 +36,9 @@ func TestLoadOverrides(t *testing.T) {
 	t.Setenv("HOME_AI_AI_PROVIDER", "ollama")
 	t.Setenv("HOME_AI_AI_ENDPOINT", "http://127.0.0.1:11434")
 	t.Setenv("HOME_AI_AI_MODEL", "qwen3:8b")
+	t.Setenv("HOME_AI_CLOUD_AI_ENDPOINT", "https://api.example.com/v1")
+	t.Setenv("HOME_AI_CLOUD_AI_MODEL", "cloud-model")
+	t.Setenv("HOME_AI_CLOUD_AI_API_KEY", "secret-test-key")
 
 	cfg, err := Load([]string{
 		"-listen", "127.0.0.1:9100",
@@ -56,6 +62,9 @@ func TestLoadOverrides(t *testing.T) {
 	if cfg.AIProvider != "ollama" || cfg.AIEndpoint != "http://127.0.0.1:11434" || cfg.AIModel != "qwen3:14b" {
 		t.Fatalf("AI config = %#v", cfg)
 	}
+	if cfg.CloudAIEndpoint != "https://api.example.com/v1" || cfg.CloudAIModel != "cloud-model" || cfg.CloudAIAPIKey != "secret-test-key" {
+		t.Fatalf("Cloud AI config = %#v", cfg)
+	}
 }
 
 func TestLoadRejectsIncompleteAIConfig(t *testing.T) {
@@ -63,5 +72,17 @@ func TestLoadRejectsIncompleteAIConfig(t *testing.T) {
 	t.Setenv("HOME_AI_AI_MODEL", "")
 	if _, err := Load(nil); err == nil {
 		t.Fatal("missing Ollama model was accepted")
+	}
+}
+
+func TestLoadRejectsIncompleteCloudAIConfig(t *testing.T) {
+	t.Setenv("HOME_AI_AI_PROVIDER", "")
+	t.Setenv("HOME_AI_AI_ENDPOINT", "")
+	t.Setenv("HOME_AI_AI_MODEL", "")
+	t.Setenv("HOME_AI_CLOUD_AI_ENDPOINT", "https://api.example.com/v1")
+	t.Setenv("HOME_AI_CLOUD_AI_MODEL", "cloud-model")
+	t.Setenv("HOME_AI_CLOUD_AI_API_KEY", "")
+	if _, err := Load(nil); err == nil {
+		t.Fatal("incomplete Cloud AI configuration was accepted")
 	}
 }

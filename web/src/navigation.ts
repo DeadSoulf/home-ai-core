@@ -1,7 +1,15 @@
-import type { Actor } from "./api/types";
+import type { Actor, ModuleNavigationState } from "./api/types";
 import type { StringKey } from "./i18n";
 
-type NavigationItem = { path: string; label: StringKey; permission?: string };
+export type NavigationItem = {
+  path: string;
+  label?: StringKey;
+  title?: string;
+  permission?: string;
+  moduleId?: string;
+  order?: number;
+};
+
 type NavigationGroup = { label: StringKey; items: NavigationItem[] };
 
 export const navigationGroups: NavigationGroup[] = [
@@ -10,7 +18,7 @@ export const navigationGroups: NavigationGroup[] = [
     { path: "/system", label: "system", permission: "system.read" },
   ] },
   { label: "serviceGroup", items: [
-    { path: "/ai", label: "aiAgent", permission: "security.self.read" },
+    { path: "/ai", label: "aiAgent", permission: "security.self.read", moduleId: "ai.agent" },
     { path: "/files", label: "files", permission: "security.self.read" },
     { path: "/modules", label: "modules", permission: "modules.read" },
   ] },
@@ -25,11 +33,41 @@ export function hasPermission(actor: Actor, permission: string): boolean {
   return actor.permissions.includes(permission);
 }
 
-export function visibleNavigation(actor: Actor): NavigationGroup[] {
-  return navigationGroups.map((group) => ({
-    ...group,
-    items: group.items.filter((item) => !item.permission || hasPermission(actor, item.permission)),
-  })).filter((group) => group.items.length > 0);
+function moduleIsEnabled(moduleId: string, modules?: ModuleNavigationState[]): boolean {
+  if (!modules) return true;
+  return modules.some((item) => item.module_id === moduleId && item.status === "enabled");
+}
+
+function dynamicModuleItems(modules?: ModuleNavigationState[]): NavigationItem[] {
+  if (!modules) return [];
+  return modules
+    .filter((module) => module.status === "enabled")
+    .flatMap((module) => (module.items || []).map((item) => ({
+      path: item.route,
+      label: module.module_id === "ai.cloud" ? ("cloudAI" as StringKey) : undefined,
+      title: item.title,
+      permission: "security.self.read",
+      moduleId: module.module_id,
+      order: item.order || 0,
+    })))
+    .sort((a, b) => (a.order || 0) - (b.order || 0) || a.path.localeCompare(b.path));
+}
+
+export function visibleNavigation(actor: Actor, modules?: ModuleNavigationState[]): NavigationGroup[] {
+  const dynamic = dynamicModuleItems(modules);
+  return navigationGroups.map((group) => {
+    let items = group.items.filter((item) =>
+      (!item.permission || hasPermission(actor, item.permission)) &&
+      (!item.moduleId || moduleIsEnabled(item.moduleId, modules)),
+    );
+    if (group.label === "serviceGroup") {
+      items = [
+        ...items,
+        ...dynamic.filter((item) => !item.permission || hasPermission(actor, item.permission)),
+      ];
+    }
+    return {...group, items};
+  }).filter((group) => group.items.length > 0);
 }
 
 export const systemSections = ["equipment", "storage", "network", "updates"] as const;
@@ -55,13 +93,13 @@ export function systemSection(path: string): SystemSection {
   return systemSections.find((section) => section === value) || "equipment";
 }
 
-export function accessiblePath(actor: Actor, path: string): string {
+export function accessiblePath(actor: Actor, path: string, modules?: ModuleNavigationState[]): string {
   const [raw, hash] = path.split("#");
   const route = raw.replace(/\/+$/, "") || "/";
   const fileRoute = route === "/files" || route.startsWith("/files/");
   const navigationRoute = fileRoute ? "/files" : route;
   const allowed = navigationRoute === "/account" ||
-    visibleNavigation(actor).some((group) => group.items.some((item) => item.path === navigationRoute));
+    visibleNavigation(actor, modules).some((group) => group.items.some((item) => item.path === navigationRoute));
   if (!allowed) return "/";
 
   if (fileRoute) {

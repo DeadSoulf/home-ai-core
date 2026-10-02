@@ -1120,6 +1120,16 @@ button:focus-visible, summary:focus-visible { outline: 2px solid #8bb0ff; outlin
   gap: 12px;
 }
 .ai-composer-actions span { color: #75849a; font-size: 10px; }
+.ai-provider-selector { display: flex; align-items: center; gap: 7px; }
+.ai-provider-selector label { color: #8c99ab; font-size: 10px; }
+.ai-provider-selector select {
+  border: 1px solid #303a49;
+  background: #10151c;
+  color: #fff;
+  border-radius: 7px;
+  padding: 6px 8px;
+  font-size: 11px;
+}
 
 @media (max-width: 900px) {
   .ai-layout { grid-template-columns: 1fr; min-height: 0; }

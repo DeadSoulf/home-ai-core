@@ -6,6 +6,10 @@ import {useI18n} from "../i18n";
 export function AIPage() {
   const {t, date} = useI18n();
   const [status, setStatus] = useState<AIStatus>();
+  const [providerMode, setProviderMode] = useState<"local" | "cloud" | "auto">(() => {
+    const saved = window.localStorage.getItem("home-ai-ai-provider-mode");
+    return saved === "cloud" || saved === "auto" ? saved : "local";
+  });
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [activeID, setActiveID] = useState("");
   const [messages, setMessages] = useState<AIMessage[]>([]);
@@ -79,6 +83,12 @@ export function AIPage() {
         const [aiStatus, items] = await Promise.all([api.aiStatus(), api.aiConversations()]);
         if (stopped) return;
         setStatus(aiStatus);
+        const modes = aiStatus.provider_modes || [];
+        setProviderMode((current) => {
+          const next = modes.includes(current) ? current : modes.includes("local") ? "local" : modes[0] || "local";
+          window.localStorage.setItem("home-ai-ai-provider-mode", next);
+          return next;
+        });
         setConversations(items);
         const first = items[0]?.id || "";
         setActiveID(first);
@@ -98,6 +108,22 @@ export function AIPage() {
     })();
     return () => { stopped = true; };
   }, [t]);
+
+  useEffect(() => {
+    const changed = () => {
+      void api.aiStatus().then((aiStatus) => {
+        setStatus(aiStatus);
+        const modes = aiStatus.provider_modes || [];
+        setProviderMode((current) => {
+          const next = modes.includes(current) ? current : modes.includes("local") ? "local" : modes[0] || "local";
+          window.localStorage.setItem("home-ai-ai-provider-mode", next);
+          return next;
+        });
+      }).catch(() => undefined);
+    };
+    window.addEventListener("home-ai-core:modules-changed", changed);
+    return () => window.removeEventListener("home-ai-core:modules-changed", changed);
+  }, []);
 
   const createConversation = async () => {
     setError("");
@@ -214,7 +240,7 @@ export function AIPage() {
       };
       setMessages((items) => [...items, localUser]);
 
-      const result = await api.sendAIMessage(id, content);
+      const result = await api.sendAIMessage(id, content, providerMode);
       setMessages((items) => [
         ...items.filter((item) => item.id !== localUser.id),
         result.user_message,
@@ -323,7 +349,13 @@ export function AIPage() {
                 <h2>{active?.title || t("aiNewConversation")}</h2>
                 {active?.closed_at && <span className="badge">{t("aiConversationFinished")}</span>}
               </div>
-              <p>{active?.closed_at ? t("aiFinishedConversationHint") : t("aiLocalOnlyNotice")}</p>
+              <p>
+                {active?.closed_at
+                  ? t("aiFinishedConversationHint")
+                  : providerMode === "local"
+                    ? t("aiLocalOnlyNotice")
+                    : t("aiCloudPrivacyNotice")}
+              </p>
             </div>
             <div className="ai-chat-head-actions">
               <button
@@ -438,6 +470,29 @@ export function AIPage() {
               }}
             />
             <div className="ai-composer-actions">
+              <div className="ai-provider-selector">
+                <label htmlFor="ai-provider-mode">{t("aiProviderMode")}</label>
+                <select
+                  id="ai-provider-mode"
+                  value={providerMode}
+                  disabled={sending || Boolean(active?.closed_at)}
+                  onChange={(event) => {
+                    const next = event.target.value as "local" | "cloud" | "auto";
+                    setProviderMode(next);
+                    window.localStorage.setItem("home-ai-ai-provider-mode", next);
+                  }}
+                >
+                  {(status?.provider_modes || ["local"]).includes("local") && (
+                    <option value="local">{t("aiProviderLocal")}</option>
+                  )}
+                  {(status?.provider_modes || []).includes("cloud") && (
+                    <option value="cloud">{t("aiProviderCloud")}</option>
+                  )}
+                  {(status?.provider_modes || []).includes("auto") && (
+                    <option value="auto">{t("aiProviderAuto")}</option>
+                  )}
+                </select>
+              </div>
               <span>{t("aiEnterHint")}</span>
               <button
                 type="submit"

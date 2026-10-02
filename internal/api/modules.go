@@ -35,6 +35,37 @@ func (s *server) modulesCollection(
 	writeJSON(w, http.StatusOK, map[string]any{"modules": items})
 }
 
+func (s *server) moduleNavigation(
+	w http.ResponseWriter,
+	r *http.Request,
+	_ security.Actor,
+	_ authSource,
+) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w, r, http.MethodGet)
+		return
+	}
+	items, err := s.modules.List(r.Context())
+	if err != nil {
+		writeAPIError(w, r, http.StatusInternalServerError, "modules_unavailable", "module registry is unavailable", nil)
+		return
+	}
+	type navigationItem struct {
+		ModuleID string                   `json:"module_id"`
+		Status   string                   `json:"status"`
+		Items    []modules.NavigationItem `json:"items,omitempty"`
+	}
+	out := make([]navigationItem, 0, len(items))
+	for _, item := range items {
+		entry := navigationItem{ModuleID: item.Manifest.ID, Status: item.Status}
+		if item.Status == "enabled" {
+			entry.Items = append(entry.Items, item.Manifest.UI.Navigation...)
+		}
+		out = append(out, entry)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"modules": out})
+}
+
 func (s *server) moduleCapabilities(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -110,7 +141,7 @@ func (s *server) moduleControl(
 		writeAPIError(w, r, http.StatusInternalServerError, "modules_unavailable", "module registry is unavailable", nil)
 		return
 	}
-	if id != "ai.agent" {
+	if id != "ai.agent" && id != "ai.cloud" {
 		writeAPIError(w, r, http.StatusConflict, "module_control_unsupported", "runtime control is not supported for this module", nil)
 		return
 	}
@@ -125,30 +156,82 @@ func (s *server) moduleControl(
 	request.Operation = strings.ToLower(strings.TrimSpace(request.Operation))
 
 	previous := item.Status
-	switch request.Operation {
-	case "enable":
-		if err := s.modules.SetStatus(r.Context(), id, "enabled", ""); err != nil {
-			writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
+	switch id {
+	case "ai.agent":
+		switch request.Operation {
+		case "enable":
+			if err := s.modules.SetStatus(r.Context(), id, "enabled", ""); err != nil {
+				writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
+				return
+			}
+			s.ai.SetEnabled(true)
+		case "disable":
+			if err := s.modules.SetStatus(r.Context(), id, "disabled", ""); err != nil {
+				writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
+				return
+			}
+			s.ai.SetEnabled(false)
+			if cloud, cloudErr := s.modules.Get(r.Context(), "ai.cloud"); cloudErr == nil && cloud.Status == "enabled" {
+				_ = s.ai.SetCloudProviderEnabled(false)
+				_ = s.modules.SetStatus(r.Context(), "ai.cloud", "disabled", "")
+				if s.realtime != nil {
+					s.realtime.Publish(
+						"module.runtime.changed",
+						map[string]any{"module_id": "ai.cloud", "operation": "disable", "status": "disabled", "reason": "dependency_disabled"},
+						requestIDFromContext(r.Context()),
+					)
+				}
+			}
+		case "restart":
+			if err := s.modules.SetStatus(r.Context(), id, "enabled", ""); err != nil {
+				writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
+				return
+			}
+			s.ai.Restart()
+		default:
+			writeAPIError(w, r, http.StatusBadRequest, "invalid_module_operation", "operation must be enable, disable or restart", nil)
 			return
 		}
-		s.ai.SetEnabled(true)
-	case "disable":
-		if err := s.modules.SetStatus(r.Context(), id, "disabled", ""); err != nil {
-			writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
+	case "ai.cloud":
+		switch request.Operation {
+		case "enable":
+			agent, agentErr := s.modules.Get(r.Context(), "ai.agent")
+			if agentErr != nil || agent.Status != "enabled" {
+				writeAPIError(w, r, http.StatusConflict, "ai_agent_required", "AI Agent must be enabled before Cloud AI", nil)
+				return
+			}
+			if !s.ai.CloudProviderConfigured() {
+				writeAPIError(w, r, http.StatusConflict, "cloud_ai_not_configured", "Cloud AI provider is not configured", nil)
+				return
+			}
+			if err := s.ai.SetCloudProviderEnabled(true); err != nil {
+				writeAPIError(w, r, http.StatusServiceUnavailable, "cloud_ai_unavailable", "Cloud AI provider is unavailable", nil)
+				return
+			}
+			if err := s.modules.SetStatus(r.Context(), id, "enabled", ""); err != nil {
+				_ = s.ai.SetCloudProviderEnabled(false)
+				writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
+				return
+			}
+		case "disable":
+			_ = s.ai.SetCloudProviderEnabled(false)
+			if err := s.modules.SetStatus(r.Context(), id, "disabled", ""); err != nil {
+				writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
+				return
+			}
+		case "restart":
+			if err := s.ai.RestartCloudProvider(); err != nil {
+				writeAPIError(w, r, http.StatusServiceUnavailable, "cloud_ai_unavailable", "Cloud AI provider is unavailable", nil)
+				return
+			}
+			if err := s.modules.SetStatus(r.Context(), id, "enabled", ""); err != nil {
+				writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
+				return
+			}
+		default:
+			writeAPIError(w, r, http.StatusBadRequest, "invalid_module_operation", "operation must be enable, disable or restart", nil)
 			return
 		}
-		s.ai.SetEnabled(false)
-	case "restart":
-		// Restart is a transient runtime operation. Persist only schema-supported
-		// durable states so existing installations do not violate modules.status CHECK.
-		if err := s.modules.SetStatus(r.Context(), id, "enabled", ""); err != nil {
-			writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
-			return
-		}
-		s.ai.Restart()
-	default:
-		writeAPIError(w, r, http.StatusBadRequest, "invalid_module_operation", "operation must be enable, disable or restart", nil)
-		return
 	}
 
 	updated, err := s.modules.Get(r.Context(), id)

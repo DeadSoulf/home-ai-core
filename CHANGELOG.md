@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.131-dev
+
+- Add `ai.cloud` as a separate first-party module backed by an OpenAI-compatible Chat Completions provider.
+- Keep Cloud AI disabled by default; configuration alone never causes conversations to leave the Home-AI node.
+- Read Cloud AI endpoint, model and API key from the Home-AI-Core service environment; never return the API key to Web or store it in chat history.
+- Add **Local / Cloud / Auto** provider selection to AI Agent. Local remains the default; Auto prefers enabled Cloud AI and falls back to local AI on a cloud request failure.
+- Keep cloud models behind the existing typed Home-AI Tool Registry, permission checks and approval boundary; no shell/root bypass is introduced.
+- Add a dedicated Cloud AI module page with configuration, privacy and model-status information.
+- Make main navigation module-aware: menu contributions are shown only for enabled modules.
+- Hide AI Agent from the main menu when `ai.agent` is disabled and hide Cloud AI when `ai.cloud` is disabled.
+- Disabling AI Agent also disables dependent Cloud AI; Cloud AI cannot be enabled while AI Agent is disabled.
+- Add authenticated module-navigation API state plus Web/API/provider/router/config regression coverage.
+- Document the optional Cloud AI environment in the Debian service example.
 ## 0.1.130-dev
 
 - Hotfix the live Web chat regression where the new 0.1.129 browser streaming path could end with `Failed to fetch` and no assistant reply.

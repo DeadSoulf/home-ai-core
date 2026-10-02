@@ -12,6 +12,7 @@ import (
 
 	"github.com/DeadSoulf/home-ai-core/internal/aiagent"
 	"github.com/DeadSoulf/home-ai-core/internal/api"
+	"github.com/DeadSoulf/home-ai-core/internal/cloudai"
 	"github.com/DeadSoulf/home-ai-core/internal/config"
 	"github.com/DeadSoulf/home-ai-core/internal/events"
 	"github.com/DeadSoulf/home-ai-core/internal/identity"
@@ -79,14 +80,49 @@ func main() {
 		logger.Error("failed to register AI Agent module", "error", err)
 		os.Exit(1)
 	}
-	var aiProvider aiagent.Provider
+	if err := moduleRegistry.Register(startupCtx, cloudai.NewModule()); err != nil {
+		logger.Error("failed to register Cloud AI module", "error", err)
+		os.Exit(1)
+	}
+
+	var localProvider aiagent.Provider
 	if cfg.AIProvider == "ollama" {
 		provider, err := aiagent.NewOllamaProvider(cfg.AIEndpoint, cfg.AIModel)
 		if err != nil {
 			logger.Error("failed to initialize local AI provider", "error", err)
 			os.Exit(1)
 		}
-		aiProvider = provider
+		localProvider = provider
+	}
+
+	var cloudProvider aiagent.Provider
+	if cfg.CloudAIEndpoint != "" && cfg.CloudAIModel != "" && cfg.CloudAIAPIKey != "" {
+		provider, err := aiagent.NewOpenAICompatibleProvider(cfg.CloudAIEndpoint, cfg.CloudAIModel, cfg.CloudAIAPIKey)
+		if err != nil {
+			logger.Error("failed to initialize cloud AI provider", "error", err)
+			os.Exit(1)
+		}
+		cloudProvider = provider
+	}
+
+	var aiProvider aiagent.Provider
+	if localProvider != nil || cloudProvider != nil {
+		router := aiagent.NewRoutingProvider(localProvider, cloudProvider)
+		if item, err := moduleRegistry.Get(startupCtx, "ai.cloud"); err == nil {
+			switch item.Status {
+			case "enabled":
+				if cloudProvider != nil {
+					router.SetCloudEnabled(true)
+				} else {
+					_ = moduleRegistry.SetStatus(startupCtx, "ai.cloud", "error", "Cloud AI provider is not configured")
+				}
+			case "registered":
+				_ = moduleRegistry.SetStatus(startupCtx, "ai.cloud", "disabled", "")
+			}
+		}
+		aiProvider = router
+	} else if item, err := moduleRegistry.Get(startupCtx, "ai.cloud"); err == nil && item.Status == "registered" {
+		_ = moduleRegistry.SetStatus(startupCtx, "ai.cloud", "disabled", "")
 	}
 	updaterService := updater.New(version.Version, cfg.StateDir)
 	jobCtx, jobCancel := context.WithCancel(context.Background())

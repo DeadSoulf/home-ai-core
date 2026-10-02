@@ -173,18 +173,20 @@ func (s *server) aiConversationResource(
 			return
 		}
 		var request struct {
-			Content string `json:"content"`
+			Content      string `json:"content"`
+			ProviderMode string `json:"provider_mode,omitempty"`
 		}
 		if err := decodeJSON(w, r, &request); err != nil {
 			writeAPIError(w, r, http.StatusBadRequest, "invalid_request", err.Error(), nil)
 			return
 		}
-		userMessage, assistantMessage, err := s.ai.Chat(
+		userMessage, assistantMessage, err := s.ai.ChatWithProvider(
 			r.Context(),
 			actor,
 			s.securityRequestContext(r),
 			conversationID,
 			request.Content,
+			request.ProviderMode,
 		)
 		if err != nil {
 			s.writeAIChatError(w, r, err)
@@ -436,6 +438,10 @@ func (s *server) writeAIChatError(w http.ResponseWriter, r *http.Request, err er
 		writeAPIError(w, r, http.StatusServiceUnavailable, "ai_chat_unavailable", "AI chat is not configured or unavailable", nil)
 	case errors.Is(err, aiagent.ErrInvalidChatMessage):
 		writeAPIError(w, r, http.StatusBadRequest, "invalid_ai_message", "AI message is empty or too large", nil)
+	case errors.Is(err, aiagent.ErrInvalidProviderMode):
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_ai_provider_mode", "AI provider mode is invalid", nil)
+	case errors.Is(err, aiagent.ErrProviderUnavailable):
+		writeAPIError(w, r, http.StatusServiceUnavailable, "ai_provider_unavailable", "requested AI provider is unavailable", nil)
 	case errors.Is(err, context.DeadlineExceeded):
 		writeAPIError(w, r, http.StatusGatewayTimeout, "ai_provider_timeout", "AI provider timed out", nil)
 	case errors.Is(err, context.Canceled):
