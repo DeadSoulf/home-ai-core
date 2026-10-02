@@ -3,8 +3,10 @@ package api
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/modules"
 	nvrpkg "github.com/DeadSoulf/home-ai-core/internal/nvr"
