@@ -151,7 +151,6 @@ func TestCreateNVRCameraRejectsInvalidCredentialReference(t *testing.T) {
 	}
 }
 
-
 func TestUpdateAndDeleteNVRCamera(t *testing.T) {
 	ctx := context.Background()
 	store, err := Open(ctx, t.TempDir())
