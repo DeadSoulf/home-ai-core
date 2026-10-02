@@ -27,13 +27,7 @@ func (Module) Manifest() modules.Manifest {
 			Requires: []string{"host.linux", "ai.agent"},
 			Provides: []string{"ai.cloud-provider"},
 		},
-		API: modules.APIContribution{Namespace: "ai.cloud"},
-		UI: modules.UIContract{Navigation: []modules.NavigationItem{{
-			ID:    "cloud",
-			Title: "Cloud AI",
-			Route: "/modules/ai.cloud",
-			Order: 25,
-		}}},
+		API:       modules.APIContribution{Namespace: "ai.cloud"},
 		Lifecycle: []string{"backup", "restore"},
 	}
 }
