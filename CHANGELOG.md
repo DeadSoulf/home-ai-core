@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.128-dev
+
+- Add permanent cleanup for finished AI conversations.
+- Add **Delete chat / Удалить чат** for the currently selected finished conversation.
+- Add **Clear finished / Очистить завершённые** to remove all finished conversations owned by the current user.
+- Refuse deletion of an active conversation; it must be finished first.
+- Delete conversation messages and related AI tool-action records through existing SQLite foreign-key cascades.
+- Keep cleanup user-scoped and protected by the existing authenticated session/CSRF boundary.
+- Audit single-chat deletion and bulk finished-chat cleanup without copying chat content into audit metadata.
+- Add state, API and Web client regression coverage for ownership, active-chat protection, CSRF and cascade cleanup.
 ## 0.1.127-dev
 
 - Keep the AI Agent page mounted after its first visit so the current chat does not disappear when navigating between Home-AI sections.

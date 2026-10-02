@@ -9,8 +9,9 @@ import (
 )
 
 var (
-	ErrAIConversationNotFound = errors.New("AI conversation not found")
-	ErrAIConversationClosed   = errors.New("AI conversation is closed")
+	ErrAIConversationNotFound  = errors.New("AI conversation not found")
+	ErrAIConversationClosed    = errors.New("AI conversation is closed")
+	ErrAIConversationNotClosed = errors.New("AI conversation is not closed")
 )
 
 type AIConversationRecord struct {
@@ -137,6 +138,56 @@ func (s *Store) CloseAIConversation(
 		return AIConversationRecord{}, ErrAIConversationNotFound
 	}
 	return s.AIConversation(ctx, id, userID)
+}
+
+func (s *Store) DeleteClosedAIConversation(
+	ctx context.Context,
+	id, userID string,
+) error {
+	result, err := s.db.ExecContext(ctx, `
+		DELETE FROM ai_conversations
+		WHERE id = ? AND user_id = ? AND closed_at IS NOT NULL
+	`, id, userID)
+	if err != nil {
+		return fmt.Errorf("delete closed AI conversation: %w", err)
+	}
+	affected, _ := result.RowsAffected()
+	if affected > 0 {
+		return nil
+	}
+
+	var closedAt sql.NullString
+	err = s.db.QueryRowContext(ctx, `
+		SELECT closed_at FROM ai_conversations WHERE id = ? AND user_id = ?
+	`, id, userID).Scan(&closedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrAIConversationNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("verify AI conversation before delete: %w", err)
+	}
+	if !closedAt.Valid {
+		return ErrAIConversationNotClosed
+	}
+	return ErrAIConversationNotFound
+}
+
+func (s *Store) DeleteClosedAIConversations(
+	ctx context.Context,
+	userID string,
+) (int64, error) {
+	result, err := s.db.ExecContext(ctx, `
+		DELETE FROM ai_conversations
+		WHERE user_id = ? AND closed_at IS NOT NULL
+	`, userID)
+	if err != nil {
+		return 0, fmt.Errorf("delete closed AI conversations: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("count deleted AI conversations: %w", err)
+	}
+	return affected, nil
 }
 
 func (s *Store) AppendAIMessage(

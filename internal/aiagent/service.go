@@ -51,6 +51,8 @@ type ConversationStore interface {
 	AIConversation(context.Context, string, string) (state.AIConversationRecord, error)
 	UpdateAIConversationTitle(context.Context, string, string, string, time.Time) error
 	CloseAIConversation(context.Context, string, string, time.Time) (state.AIConversationRecord, error)
+	DeleteClosedAIConversation(context.Context, string, string) error
+	DeleteClosedAIConversations(context.Context, string) (int64, error)
 	AppendAIMessage(context.Context, string, string, string, string, string, time.Time) (state.AIMessageRecord, error)
 	ListAIMessages(context.Context, string, string, int) ([]state.AIMessageRecord, error)
 }
@@ -269,6 +271,55 @@ func (s *Service) CloseConversation(
 		)
 	}
 	return record, err
+}
+
+func (s *Service) DeleteConversation(
+	ctx context.Context,
+	actor security.Actor,
+	meta security.RequestContext,
+	conversationID string,
+) error {
+	if !s.Enabled() {
+		return ErrAgentDisabled
+	}
+	if s.conversations == nil || actor.ID == "" {
+		return ErrChatUnavailable
+	}
+	if err := s.conversations.DeleteClosedAIConversation(ctx, conversationID, actor.ID); err != nil {
+		return err
+	}
+	if s.audit != nil {
+		s.audit.RecordAudit(
+			context.WithoutCancel(ctx), meta, actor,
+			"ai.conversation.delete", "ai_conversation", conversationID, "success", nil,
+		)
+	}
+	return nil
+}
+
+func (s *Service) ClearClosedConversations(
+	ctx context.Context,
+	actor security.Actor,
+	meta security.RequestContext,
+) (int64, error) {
+	if !s.Enabled() {
+		return 0, ErrAgentDisabled
+	}
+	if s.conversations == nil || actor.ID == "" {
+		return 0, ErrChatUnavailable
+	}
+	deleted, err := s.conversations.DeleteClosedAIConversations(ctx, actor.ID)
+	if err != nil {
+		return 0, err
+	}
+	if s.audit != nil {
+		s.audit.RecordAudit(
+			context.WithoutCancel(ctx), meta, actor,
+			"ai.conversation.clear_closed", "ai_conversation", "", "success",
+			map[string]any{"deleted": deleted},
+		)
+	}
+	return deleted, nil
 }
 
 func (s *Service) Messages(

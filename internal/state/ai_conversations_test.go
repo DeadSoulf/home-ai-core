@@ -78,3 +78,78 @@ func TestAIConversationsAreUserScopedAndPersistent(t *testing.T) {
 		t.Fatalf("conversations = %#v", list)
 	}
 }
+
+func TestDeleteClosedAIConversationsIsScopedAndRequiresClosedState(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	now := time.Unix(200, 0).UTC()
+	if _, err := store.CreateOwner(ctx, "usr-clean", "cleaner", "Cleaner", "test-password-hash", now); err != nil {
+		t.Fatal(err)
+	}
+	active, err := store.CreateAIConversation(ctx, "aic-active", "usr-clean", "Active", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closedOne, err := store.CreateAIConversation(ctx, "aic-closed-1", "usr-clean", "Closed 1", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closedTwo, err := store.CreateAIConversation(ctx, "aic-closed-2", "usr-clean", "Closed 2", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AppendAIMessage(ctx, "aim-clean-1", closedOne.ID, "usr-clean", "user", "history", now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CreateAIToolAction(ctx, "aia-clean-1", closedOne.ID, "usr-clean", "core.system.status", "Status", "change", nil, now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CloseAIConversation(ctx, closedOne.ID, "usr-clean", now.Add(2*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CloseAIConversation(ctx, closedTwo.ID, "usr-clean", now.Add(3*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.DeleteClosedAIConversation(ctx, active.ID, "usr-clean"); !errors.Is(err, ErrAIConversationNotClosed) {
+		t.Fatalf("delete active conversation error = %v, want not closed", err)
+	}
+	if err := store.DeleteClosedAIConversation(ctx, closedOne.ID, "usr-other"); !errors.Is(err, ErrAIConversationNotFound) {
+		t.Fatalf("foreign delete error = %v, want not found", err)
+	}
+	if err := store.DeleteClosedAIConversation(ctx, closedOne.ID, "usr-clean"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AIConversation(ctx, closedOne.ID, "usr-clean"); !errors.Is(err, ErrAIConversationNotFound) {
+		t.Fatalf("deleted conversation lookup error = %v", err)
+	}
+	if _, err := store.ListAIMessages(ctx, closedOne.ID, "usr-clean", 10); !errors.Is(err, ErrAIConversationNotFound) {
+		t.Fatalf("deleted message history lookup error = %v", err)
+	}
+	if _, err := store.AIToolAction(ctx, "aia-clean-1", closedOne.ID, "usr-clean"); !errors.Is(err, ErrAIToolActionNotFound) {
+		t.Fatalf("deleted action lookup error = %v", err)
+	}
+
+	deleted, err := store.DeleteClosedAIConversations(ctx, "usr-clean")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted != 1 {
+		t.Fatalf("bulk deleted = %d, want 1", deleted)
+	}
+	if _, err := store.AIConversation(ctx, active.ID, "usr-clean"); err != nil {
+		t.Fatalf("active conversation was removed: %v", err)
+	}
+	list, err := store.ListAIConversations(ctx, "usr-clean", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0].ID != active.ID {
+		t.Fatalf("remaining conversations = %#v", list)
+	}
+}

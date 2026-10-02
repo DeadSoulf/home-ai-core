@@ -200,6 +200,55 @@ func (s *server) aiConversationResource(
 	}
 }
 
+func (s *server) aiConversationDelete(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if !validMutationCSRF(actor, source, r) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	conversationID := r.PathValue("conversationID")
+	if conversationID == "" {
+		s.notFound(w, r)
+		return
+	}
+	if err := s.ai.DeleteConversation(
+		r.Context(),
+		actor,
+		s.securityRequestContext(r),
+		conversationID,
+	); err != nil {
+		s.writeAIChatError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"deleted": conversationID})
+}
+
+func (s *server) aiClosedConversationsDelete(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if !validMutationCSRF(actor, source, r) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	deleted, err := s.ai.ClearClosedConversations(
+		r.Context(),
+		actor,
+		s.securityRequestContext(r),
+	)
+	if err != nil {
+		s.writeAIChatError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"deleted": deleted})
+}
+
 func (s *server) aiConversationActions(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -272,6 +321,8 @@ func (s *server) writeAIActionError(w http.ResponseWriter, r *http.Request, err 
 		writeAPIError(w, r, http.StatusNotFound, "ai_conversation_not_found", "AI conversation not found", nil)
 	case errors.Is(err, state.ErrAIConversationClosed):
 		writeAPIError(w, r, http.StatusConflict, "ai_conversation_closed", "AI conversation is closed", nil)
+	case errors.Is(err, state.ErrAIConversationNotClosed):
+		writeAPIError(w, r, http.StatusConflict, "ai_conversation_not_closed", "AI conversation must be finished before deletion", nil)
 	case errors.Is(err, aiagent.ErrAgentDisabled):
 		writeAPIError(w, r, http.StatusServiceUnavailable, "ai_agent_disabled", "AI Agent is disabled", nil)
 	case errors.Is(err, aiagent.ErrPermissionDenied):
@@ -299,6 +350,8 @@ func (s *server) writeAIChatError(w http.ResponseWriter, r *http.Request, err er
 		writeAPIError(w, r, http.StatusNotFound, "ai_conversation_not_found", "AI conversation not found", nil)
 	case errors.Is(err, state.ErrAIConversationClosed):
 		writeAPIError(w, r, http.StatusConflict, "ai_conversation_closed", "AI conversation is closed", nil)
+	case errors.Is(err, state.ErrAIConversationNotClosed):
+		writeAPIError(w, r, http.StatusConflict, "ai_conversation_not_closed", "AI conversation must be finished before deletion", nil)
 	case errors.Is(err, aiagent.ErrChatUnavailable):
 		writeAPIError(w, r, http.StatusServiceUnavailable, "ai_chat_unavailable", "AI chat is not configured or unavailable", nil)
 	case errors.Is(err, aiagent.ErrInvalidChatMessage):

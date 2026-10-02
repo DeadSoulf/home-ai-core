@@ -175,6 +175,38 @@ func (s *chatMemoryStore) CloseAIConversation(_ context.Context, id, userID stri
 	return item, nil
 }
 
+func (s *chatMemoryStore) DeleteClosedAIConversation(_ context.Context, id, userID string) error {
+	item, ok := s.conversations[id]
+	if !ok || item.UserID != userID {
+		return state.ErrAIConversationNotFound
+	}
+	if item.ClosedAt == nil {
+		return state.ErrAIConversationNotClosed
+	}
+	delete(s.conversations, id)
+	delete(s.messages, id)
+	for actionID, action := range s.actions {
+		if action.ConversationID == id {
+			delete(s.actions, actionID)
+		}
+	}
+	return nil
+}
+
+func (s *chatMemoryStore) DeleteClosedAIConversations(_ context.Context, userID string) (int64, error) {
+	var deleted int64
+	for id, item := range s.conversations {
+		if item.UserID != userID || item.ClosedAt == nil {
+			continue
+		}
+		if err := s.DeleteClosedAIConversation(context.Background(), id, userID); err != nil {
+			return deleted, err
+		}
+		deleted++
+	}
+	return deleted, nil
+}
+
 func (s *chatMemoryStore) AppendAIMessage(_ context.Context, id, conversationID, userID, role, content string, now time.Time) (state.AIMessageRecord, error) {
 	conversation, err := s.AIConversation(context.Background(), conversationID, userID)
 	if err != nil {
