@@ -69,7 +69,7 @@ func (s *server) nvrStatus(
 				return s.nvr.ActiveLiveStreams()
 			}(),
 			SecretStoreReady: s.nvr != nil && s.nvr.SecretStoreReady(),
-			FoundationStage:   nvrFoundationStage(s.nvr),
+			FoundationStage:  nvrFoundationStage(s.nvr),
 		},
 	})
 }
