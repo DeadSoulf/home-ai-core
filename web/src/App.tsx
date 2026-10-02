@@ -79,6 +79,9 @@ export default function App() {
         if (!event.type.startsWith("core.")) {
           setRevision((value) => value + 1);
         }
+        if (event.type === "module.runtime.changed") {
+          window.dispatchEvent(new CustomEvent("home-ai-core:modules-changed"));
+        }
       },
       setRealtime,
     );
