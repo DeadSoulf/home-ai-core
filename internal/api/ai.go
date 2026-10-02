@@ -200,6 +200,93 @@ func (s *server) aiConversationResource(
 	}
 }
 
+func (s *server) aiConversationActions(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	_ authSource,
+) {
+	items, err := s.ai.Actions(r.Context(), actor, r.PathValue("conversationID"))
+	if err != nil {
+		s.writeAIActionError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"actions": items})
+}
+
+func (s *server) aiConversationActionApprove(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if !validMutationCSRF(actor, source, r) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	action, err := s.ai.ApproveAction(
+		r.Context(),
+		actor,
+		s.securityRequestContext(r),
+		r.PathValue("conversationID"),
+		r.PathValue("actionID"),
+	)
+	if err != nil {
+		s.writeAIActionError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"action": action})
+}
+
+func (s *server) aiConversationActionReject(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if !validMutationCSRF(actor, source, r) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	action, err := s.ai.RejectAction(
+		r.Context(),
+		actor,
+		s.securityRequestContext(r),
+		r.PathValue("conversationID"),
+		r.PathValue("actionID"),
+	)
+	if err != nil {
+		s.writeAIActionError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"action": action})
+}
+
+func (s *server) writeAIActionError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, state.ErrAIToolActionNotFound):
+		writeAPIError(w, r, http.StatusNotFound, "ai_action_not_found", "AI server action not found", nil)
+	case errors.Is(err, state.ErrAIToolActionNotPending):
+		writeAPIError(w, r, http.StatusConflict, "ai_action_not_pending", "AI server action is no longer pending", nil)
+	case errors.Is(err, state.ErrAIConversationNotFound):
+		writeAPIError(w, r, http.StatusNotFound, "ai_conversation_not_found", "AI conversation not found", nil)
+	case errors.Is(err, state.ErrAIConversationClosed):
+		writeAPIError(w, r, http.StatusConflict, "ai_conversation_closed", "AI conversation is closed", nil)
+	case errors.Is(err, aiagent.ErrAgentDisabled):
+		writeAPIError(w, r, http.StatusServiceUnavailable, "ai_agent_disabled", "AI Agent is disabled", nil)
+	case errors.Is(err, aiagent.ErrPermissionDenied):
+		writeAPIError(w, r, http.StatusForbidden, "permission_denied", "permission denied", nil)
+	case errors.Is(err, aiagent.ErrInvalidToolInput):
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_ai_tool_input", "invalid AI tool input", nil)
+	case errors.Is(err, context.DeadlineExceeded):
+		writeAPIError(w, r, http.StatusGatewayTimeout, "ai_tool_timeout", "AI server action timed out", nil)
+	case errors.Is(err, context.Canceled):
+		writeAPIError(w, r, http.StatusRequestTimeout, "ai_action_cancelled", "AI server action was cancelled", nil)
+	default:
+		writeAPIError(w, r, http.StatusBadGateway, "ai_action_failed", "AI server action failed", nil)
+	}
+}
+
 func validMutationCSRF(actor security.Actor, source authSource, r *http.Request) bool {
 	return source != authCookie || actor.ValidCSRF(r.Header.Get("X-CSRF-Token"))
 }
