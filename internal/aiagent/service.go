@@ -285,6 +285,148 @@ func (s *Service) Messages(
 	return s.conversations.ListAIMessages(ctx, conversationID, actor.ID, 100)
 }
 
+func (s *Service) Actions(
+	ctx context.Context,
+	actor security.Actor,
+	conversationID string,
+) ([]state.AIToolActionRecord, error) {
+	if s.actions == nil || actor.ID == "" {
+		return nil, ErrChatUnavailable
+	}
+	return s.actions.ListAIToolActions(ctx, conversationID, actor.ID, 50)
+}
+
+func (s *Service) ApproveAction(
+	ctx context.Context,
+	actor security.Actor,
+	meta security.RequestContext,
+	conversationID, actionID string,
+) (state.AIToolActionRecord, error) {
+	if !s.Enabled() {
+		return state.AIToolActionRecord{}, ErrAgentDisabled
+	}
+	if s.actions == nil || s.conversations == nil || actor.ID == "" {
+		return state.AIToolActionRecord{}, ErrChatUnavailable
+	}
+	conversation, err := s.conversations.AIConversation(ctx, conversationID, actor.ID)
+	if err != nil {
+		return state.AIToolActionRecord{}, err
+	}
+	if conversation.ClosedAt != nil {
+		return state.AIToolActionRecord{}, state.ErrAIConversationClosed
+	}
+
+	action, err := s.actions.ClaimAIToolAction(ctx, actionID, conversationID, actor.ID, time.Now().UTC())
+	if err != nil {
+		return action, err
+	}
+	descriptor, ok := s.registry.Descriptor(action.ToolID)
+	if !ok || descriptor.Sensitivity == SensitivityRead || string(descriptor.Sensitivity) != action.Sensitivity {
+		updated, finishErr := s.actions.FinishAIToolAction(
+			context.WithoutCancel(ctx),
+			action.ID,
+			conversationID,
+			actor.ID,
+			"failed",
+			nil,
+			"tool_contract_changed",
+			time.Now().UTC(),
+		)
+		if finishErr != nil {
+			return action, finishErr
+		}
+		return updated, errors.New("AI tool action no longer matches the registered tool contract")
+	}
+
+	result, runErr := s.Execute(ctx, actor, meta, action.ToolID, action.Input, true)
+	if runErr != nil {
+		updated, finishErr := s.actions.FinishAIToolAction(
+			context.WithoutCancel(ctx),
+			action.ID,
+			conversationID,
+			actor.ID,
+			"failed",
+			nil,
+			toolErrorCode(runErr),
+			time.Now().UTC(),
+		)
+		if finishErr != nil {
+			return action, finishErr
+		}
+		return updated, runErr
+	}
+
+	result = boundedActionResult(result)
+	updated, err := s.actions.FinishAIToolAction(
+		context.WithoutCancel(ctx),
+		action.ID,
+		conversationID,
+		actor.ID,
+		"executed",
+		result,
+		"",
+		time.Now().UTC(),
+	)
+	if err != nil {
+		return action, err
+	}
+	if s.audit != nil {
+		s.audit.RecordAudit(
+			context.WithoutCancel(ctx),
+			meta,
+			actor,
+			"ai.tool.approve",
+			"ai_tool_action",
+			action.ID,
+			"success",
+			map[string]any{"tool_id": action.ToolID, "sensitivity": action.Sensitivity},
+		)
+	}
+	return updated, nil
+}
+
+func (s *Service) RejectAction(
+	ctx context.Context,
+	actor security.Actor,
+	meta security.RequestContext,
+	conversationID, actionID string,
+) (state.AIToolActionRecord, error) {
+	if s.actions == nil || actor.ID == "" {
+		return state.AIToolActionRecord{}, ErrChatUnavailable
+	}
+	action, err := s.actions.RejectAIToolAction(ctx, actionID, conversationID, actor.ID, time.Now().UTC())
+	if err != nil {
+		return action, err
+	}
+	if s.audit != nil {
+		s.audit.RecordAudit(
+			context.WithoutCancel(ctx),
+			meta,
+			actor,
+			"ai.tool.reject",
+			"ai_tool_action",
+			action.ID,
+			"success",
+			map[string]any{"tool_id": action.ToolID, "sensitivity": action.Sensitivity},
+		)
+	}
+	return action, nil
+}
+
+func boundedActionResult(result json.RawMessage) json.RawMessage {
+	if len(result) == 0 {
+		return json.RawMessage(`{}`)
+	}
+	if len(result) <= maxActionResultBytes && json.Valid(result) {
+		return append(json.RawMessage(nil), result...)
+	}
+	fallback, _ := json.Marshal(map[string]any{
+		"truncated": true,
+		"message":   "tool result omitted because it exceeded the stored action-result limit",
+	})
+	return fallback
+}
+
 func (s *Service) Chat(
 	ctx context.Context,
 	actor security.Actor,
