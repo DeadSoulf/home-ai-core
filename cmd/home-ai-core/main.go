@@ -79,6 +79,15 @@ func main() {
 		logger.Error("failed to register AI Agent module", "error", err)
 		os.Exit(1)
 	}
+	var aiProvider aiagent.Provider
+	if cfg.AIProvider == "ollama" {
+		provider, err := aiagent.NewOllamaProvider(cfg.AIEndpoint, cfg.AIModel)
+		if err != nil {
+			logger.Error("failed to initialize local AI provider", "error", err)
+			os.Exit(1)
+		}
+		aiProvider = provider
+	}
 	updaterService := updater.New(version.Version, cfg.StateDir)
 	jobCtx, jobCancel := context.WithCancel(context.Background())
 	defer jobCancel()
@@ -98,6 +107,7 @@ func main() {
 		moduleRegistry,
 		updaterService,
 		realtimeHub,
+		aiProvider,
 	)
 	handler := webui.New(apiHandler, cfg.WebDir)
 
