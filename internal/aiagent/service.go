@@ -21,12 +21,12 @@ import (
 )
 
 const (
-	defaultToolTimeout      = 10 * time.Second
-	defaultChatTimeout      = 90 * time.Second
-	maxChatMessageRunes     = 8000
-	maxChatResponseRunes    = 32000
-	maxChatContextMessages  = 24
-	maxChatContextRunes     = 32000
+	defaultToolTimeout     = 10 * time.Second
+	defaultChatTimeout     = 90 * time.Second
+	maxChatMessageRunes    = 8000
+	maxChatResponseRunes   = 32000
+	maxChatContextMessages = 24
+	maxChatContextRunes    = 32000
 )
 
 var (
