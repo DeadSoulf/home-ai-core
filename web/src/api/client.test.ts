@@ -221,6 +221,50 @@ describe("API client", () => {
     vi.unstubAllGlobals();
   });
 
+  it("loads NVR foundation status and safe camera summaries", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const path = String(input);
+      if (path === "/api/v1/nvr/status") {
+        return new Response(JSON.stringify({
+          nvr: {
+            module_id: "nvr",
+            state: "enabled",
+            version: "0.1.0",
+            camera_count: 1,
+            media_runtime_ready: false,
+            secret_store_ready: false,
+            foundation_stage: "nvr-0",
+          },
+        }), {status: 200, headers: {"Content-Type": "application/json"}});
+      }
+      return new Response(JSON.stringify({
+        cameras: [{
+          id: "cam-1",
+          name: "Driveway",
+          enabled: true,
+          source_type: "rtsp",
+          transport: "tcp",
+          recording_mode: "off",
+          audio_enabled: false,
+          has_credentials: true,
+          created_at: "2026-10-02T12:00:00Z",
+          updated_at: "2026-10-02T12:00:00Z",
+        }],
+      }), {status: 200, headers: {"Content-Type": "application/json"}});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const [status, cameras] = await Promise.all([api.nvrStatus(), api.nvrCameras()]);
+
+    expect(status.foundation_stage).toBe("nvr-0");
+    expect(status.media_runtime_ready).toBe(false);
+    expect(cameras).toHaveLength(1);
+    expect(cameras[0].name).toBe("Driveway");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    vi.unstubAllGlobals();
+  });
+
   it("loads authenticated module navigation state", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({
