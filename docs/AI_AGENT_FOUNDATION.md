@@ -174,6 +174,16 @@ Published in `v0.1.119-dev` after successful Core/Web, Windows, Debian and relea
 - ✅ published in `v0.1.121-dev` after successful Core/Web, Windows, Debian and release workflows.
 - 🧪 live restart re-test on the installed Home-AI server remains pending.
 
+### 0.1.122-dev — Finished conversation lifecycle
+
+- ✅ Web chat has an explicit **Finish chat / Завершить чат** action.
+- ✅ finished state is persisted as `closed_at` and survives Core restart.
+- ✅ finished conversations remain readable in user history.
+- ✅ new messages fail closed with `ai_conversation_closed`.
+- ✅ close operation is user-scoped and audited without conversation text.
+- ✅ Web marks finished chats and offers a direct **New conversation** action.
+- 🧪 automated CI/release pending.
+
 ### Next slice — Streaming + controlled tool loop
 
 - streaming local model responses to Web;
