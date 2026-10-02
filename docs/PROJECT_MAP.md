@@ -8,8 +8,8 @@
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.137-dev` — NVR shared live preview\
-**Текущий срез:** `0.1.137-dev` опубликован; shared live restream, single/multi-camera preview и RTSP argv credential hardening готовы к live acceptance.\
-**Следующий engineering milestone:** live-проверить preview на реальных камерах, затем продолжить **NVR-1**: ONVIF discovery/import и явный выбор main/sub-stream.\
+**Текущий срез:** `0.1.138-dev` staged: explicit main/sub-stream profiles, отдельный probe substream и live-preview через substream; release publication pending.\
+**Следующий engineering milestone:** завершить **NVR-1** через ONVIF discovery/import, затем перейти к **NVR-2 — recording + video storage + segmented archive + ring retention**.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
 
@@ -40,6 +40,20 @@
 - ✅ Релизы `0.1.115-dev` → `0.1.133-dev` прошли соответствующие Web/Go/Core/Debian/Windows CI и публикацию release artifacts.
 - ⏸ AI Agent считается функционально достаточным для текущего этапа; дальнейшее расширение tools, streaming и provider UI отложено до отдельного цикла.
 
+### Выпуск 0.1.138-dev — NVR explicit main/sub streams
+
+- ✅ Camera config получил optional `substream_address`, основной `address` остаётся main/archive-quality source.
+- ✅ Main и substream проверяются `ffprobe` независимо; результат теста показывает metadata обоих потоков.
+- ✅ Substream сохраняется в существующей `nvr_stream_profiles` как роль `sub`.
+- ✅ Camera list не раскрывает stream source URI; substream URL доступен только в management detail с `camera.manage`.
+- ✅ Обычное редактирование сохраняет существующий substream; есть явное удаление substream.
+- ✅ Shared live-preview предпочитает substream и автоматически использует main, если substream не настроен.
+- ✅ Supervisor продолжает проверять main stream независимо от live-preview.
+- ✅ Web editor получил отдельный RTSP substream field и main/sub probe status.
+- ✅ State/service/live regression tests покрывают persist/preserve/remove и выбор live source.
+- ✅ PR #137 прошёл функциональный Web/Go/Core/integration/Linux/Windows/Debian CI до release bump.
+- 🧪 После публикации требуется live acceptance на камере с отдельными main/sub RTSP потоками.
+- ⏭ Следующий NVR-1 slice: ONVIF discovery/import с автоматическим заполнением main/sub profiles.
 ### Выпуск 0.1.137-dev — NVR shared live preview
 
 - ✅ Один enabled camera source использует один shared FFmpeg live-restream независимо от количества Web viewers.
