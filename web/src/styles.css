@@ -1136,3 +1136,23 @@ button:focus-visible, summary:focus-visible { outline: 2px solid #8bb0ff; outlin
 }
 .module-actions .button { min-width: 112px; }
 .module-control-hint { margin: 0 0 10px; font-size: 12px; }
+
+.ai-chat-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ai-chat-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ai-chat-title-row h2 { margin: 0; }
+.ai-chat-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
