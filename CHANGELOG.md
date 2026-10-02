@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.137-dev
+
+- Add the first shared NVR live-preview runtime: one local FFmpeg process per camera is shared by all active Web viewers.
+- Add permission-scoped `GET /api/v1/nvr/cameras/{cameraID}/live.mjpeg`; global or exact `camera.live` authorization is required.
+- Add single-camera and multi-camera live viewing to the Cameras page, including open-all/close-all controls and per-camera live controls.
+- Keep long-lived live responses outside the normal Core HTTP write deadline and stop unused restreams after a short idle grace period.
+- Stop active live restreams when a camera changes, is removed, or the NVR module stops.
+- Expose live-runtime readiness and active shared-restream count through NVR status.
+- Harden RTSP credential privacy: ffprobe/ffmpeg no longer receive credential-bearing RTSP URLs in process argv; protected source descriptors are passed over child stdin instead.
+- Cap initial MJPEG preview at 1280px width and 5 FPS to keep grid CPU/network cost bounded while the final live transport remains replaceable.
+- Add shared-restream, idle-stop, JPEG bounds, exact live-permission and process-argument secret-leak regression coverage.
+- ONVIF discovery and explicit main/sub-stream selection remain the next NVR-1 slice.
 ## 0.1.136-dev
 
 - Add a persistent NVR camera supervisor for every enabled camera.
