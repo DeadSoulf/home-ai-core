@@ -7,11 +7,23 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.121-dev` — hotfix Restart AI Agent для реальной SQLite-схемы\
-**Текущий срез:** `0.1.121-dev` опубликован; Restart AI Agent больше не сохраняет transient `restarting`, повторная live-проверка pending\
+**Последний опубликованный релиз:** `0.1.121-dev`; `0.1.122-dev` добавляет завершение/закрытие AI-диалогов\
+**Текущий срез:** `0.1.122-dev` — **Завершить чат**: persistent closed state, read-only history, API/audit/UI + regression tests\
 **Следующий engineering milestone:** live-проверить управление AI Agent из Модулей и локальный provider; затем перейти к **streaming + controlled model tool-loop**. Windows UI acceptance и release-hardening gates продолжаются параллельно\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent развивается как first-party module: contracts `0.1.115`, read tools/API `0.1.117`, local conversation `0.1.119`, runtime module control `0.1.120`. Automatic AI tool-loop пока намеренно выключен.\
 **Обновлено:** 2026-10-01
+
+### Кандидат 0.1.122-dev — AI finished chat lifecycle
+
+- ✅ В Web AI Agent добавлена кнопка **Завершить чат**.
+- ✅ Migration 020 добавляет persistent `closed_at` для диалога.
+- ✅ Завершённый чат остаётся в истории и доступен для чтения.
+- ✅ Новые сообщения в завершённый чат блокируются server-side с `ai_conversation_closed`.
+- ✅ API: `POST /api/v1/ai/conversations/{id}/close` с обычной auth/CSRF boundary.
+- ✅ Audit: `ai.conversation.close` без текста диалога.
+- ✅ Web показывает метку **Завершён** и кнопку **Новый диалог**.
+- ✅ Tests покрывают persistence, ownership isolation, read-only history и post-close rejection.
+- 🧪 Требуется PR/main CI, release workflow и live acceptance.
 
 ### Выпуск 0.1.121-dev — AI Agent restart persistence hotfix
 
@@ -1213,6 +1225,7 @@ AI не может расширять собственные права.
 | `0.1.119-dev` | 🧪 AI Local Conversation v1 | опубликовано: persistent per-user chat + optional Ollama provider + Web AI page + audit redaction; automated CI/release зелёные, live local-model acceptance pending |
 | `0.1.120-dev` | ⚠️ AI Agent runtime control | опубликовано; live выявлен Restart bug из-за SQLite CHECK на transient `restarting`; исправлено в `0.1.121-dev` |
 | `0.1.121-dev` | 🧪 AI restart hotfix | опубликовано: transient `restarting` не пишется в SQLite; real-registry regression test зелёный; live re-test pending |
+| `0.1.122-dev` | 🚧 AI finish chat | persistent closed chats + read-only history + close API/audit/Web; CI/release pending |
 
 ## 10. Правило ведения карты
 
