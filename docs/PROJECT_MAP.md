@@ -7,8 +7,8 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.136-dev` — NVR camera supervisor + reconnect health\
-**Текущий срез:** `0.1.137-dev` staged: shared live restream, single/multi-camera preview и RTSP argv credential hardening; release publication pending.\
+**Последний опубликованный релиз:** `0.1.137-dev` — NVR shared live preview\
+**Текущий срез:** `0.1.137-dev` опубликован; shared live restream, single/multi-camera preview и RTSP argv credential hardening готовы к live acceptance.\
 **Следующий engineering milestone:** live-проверить preview на реальных камерах, затем продолжить **NVR-1**: ONVIF discovery/import и явный выбор main/sub-stream.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
@@ -53,8 +53,9 @@
 - ✅ RTSP username/password больше не помещаются в argv `ffprobe`/`ffmpeg`; credential-bearing source передаётся child process через stdin descriptor.
 - ✅ Preview намеренно ограничен 1280px / 5 FPS для первого grid transport; archive contract от этого не зависит.
 - ✅ Regression tests покрывают shared fan-out, idle stop, JPEG limit, exact camera.live authorization и отсутствие credentials в process argv.
-- ✅ PR #136 прошёл функциональный Web/Go/Core/integration/Linux/Windows/Debian CI до release bump.
-- 🧪 После публикации требуется live acceptance на реальной RTSP-камере/камерах.
+- ✅ PR #136 и main прошли Web/Go/Core/integration/Linux/Windows/Debian CI.
+- ✅ Release workflow опубликовал `v0.1.137-dev` с update bundles amd64/arm64, Debian `.deb` amd64/arm64, Windows client и SHA-256.
+- 🧪 Требуется live acceptance на реальной RTSP-камере/камерах.
 - ⏭ Следующий срез: ONVIF discovery/import + main/sub stream selection.
 ### Выпуск 0.1.136-dev — NVR camera supervisor + reconnect health
 
