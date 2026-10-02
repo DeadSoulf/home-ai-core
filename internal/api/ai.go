@@ -77,7 +77,6 @@ func (s *server) aiToolResource(w http.ResponseWriter, r *http.Request, actor se
 	}
 }
 
-
 func (s *server) aiConversations(
 	w http.ResponseWriter,
 	r *http.Request,
