@@ -208,7 +208,7 @@ export function AIPage() {
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder={t("aiMessagePlaceholder")}
-              maxLength={16000}
+              maxLength={8000}
               rows={3}
               disabled={sending || !status?.provider_configured}
               onKeyDown={(event) => {
