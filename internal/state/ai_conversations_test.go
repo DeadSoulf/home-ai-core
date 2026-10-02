@@ -16,6 +16,9 @@ func TestAIConversationsAreUserScopedAndPersistent(t *testing.T) {
 	defer store.Close()
 
 	now := time.Unix(100, 0).UTC()
+	if _, err := store.CreateOwner(ctx, "usr-1", "owner", "Owner", "test-password-hash", now); err != nil {
+		t.Fatal(err)
+	}
 	conv, err := store.CreateAIConversation(ctx, "aic-1", "usr-1", "First chat", now)
 	if err != nil {
 		t.Fatal(err)
