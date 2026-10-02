@@ -16,14 +16,15 @@ export function ModulesPage({revision, canManage}: {revision: number; canManage:
   const [controlError, setControlError] = useState("");
   const [controlMessage, setControlMessage] = useState("");
 
-  const controlAI = async (operation: "enable" | "disable" | "restart") => {
+  const controlModule = async (id: string, operation: "enable" | "disable" | "restart") => {
     if (controlBusy) return;
     if (operation === "disable" && !window.confirm(t("moduleDisableConfirm"))) return;
-    setControlBusy(operation);
+    const busyKey = id + ":" + operation;
+    setControlBusy(busyKey);
     setControlError("");
     setControlMessage("");
     try {
-      await api.controlModule("ai.agent", operation);
+      await api.controlModule(id, operation);
       setControlMessage(
         operation === "enable"
           ? t("moduleEnabled")
@@ -32,6 +33,7 @@ export function ModulesPage({revision, canManage}: {revision: number; canManage:
             : t("moduleRestarted"),
       );
       reload();
+      window.dispatchEvent(new CustomEvent("home-ai-core:modules-changed"));
     } catch (reason) {
       setControlError(reason instanceof Error ? reason.message : t("requestFailed"));
     } finally {
@@ -61,40 +63,45 @@ export function ModulesPage({revision, canManage}: {revision: number; canManage:
             </div>
             <p>{module.manifest.description || t("noDescription")}</p>
             {module.error && <div className="form-error">{module.error}</div>}
-            {module.manifest.id === "ai.agent" && canManage && (
+            {(module.manifest.id === "ai.agent" || module.manifest.id === "ai.cloud") && canManage && (
               <div className="module-actions">
-                {module.status === "disabled" ? (
+                {module.status === "disabled" || module.status === "error" || module.status === "registered" ? (
                   <button
                     type="button"
                     className="button primary"
                     disabled={Boolean(controlBusy)}
-                    onClick={() => void controlAI("enable")}
+                    onClick={() => void controlModule(module.manifest.id, "enable")}
                   >
-                    {controlBusy === "enable" ? t("working") : t("moduleEnable")}
+                    {controlBusy === module.manifest.id + ":enable" ? t("working") : t("moduleEnable")}
                   </button>
                 ) : (
                   <button
                     type="button"
                     className="button secondary"
                     disabled={Boolean(controlBusy)}
-                    onClick={() => void controlAI("disable")}
+                    onClick={() => void controlModule(module.manifest.id, "disable")}
                   >
-                    {controlBusy === "disable" ? t("working") : t("moduleDisable")}
+                    {controlBusy === module.manifest.id + ":disable" ? t("working") : t("moduleDisable")}
                   </button>
                 )}
                 <button
                   type="button"
                   className="button secondary"
-                  disabled={Boolean(controlBusy) || module.status === "disabled"}
-                  onClick={() => void controlAI("restart")}
+                  disabled={Boolean(controlBusy) || module.status !== "enabled"}
+                  onClick={() => void controlModule(module.manifest.id, "restart")}
                 >
-                  {controlBusy === "restart" ? t("working") : t("moduleRestart")}
+                  {controlBusy === module.manifest.id + ":restart" ? t("working") : t("moduleRestart")}
                 </button>
               </div>
             )}
             {module.manifest.id === "ai.agent" && (
               <p className="muted module-control-hint">
-                {module.status === "disabled" ? t("moduleAIStoppedHint") : t("moduleAIRunningHint")}
+                {module.status === "enabled" ? t("moduleAIRunningHint") : t("moduleAIStoppedHint")}
+              </p>
+            )}
+            {module.manifest.id === "ai.cloud" && (
+              <p className="muted module-control-hint">
+                {module.status === "enabled" ? t("moduleCloudRunningHint") : t("moduleCloudStoppedHint")}
               </p>
             )}
             <details className="technical-details">
