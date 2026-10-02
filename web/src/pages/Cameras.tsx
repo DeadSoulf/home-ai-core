@@ -273,7 +273,7 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
                           disabled={Boolean(busy)}
                           onClick={() => void openEdit(camera)}
                         >
-                          {busy === "load:" + camera.id ? t("working") : t("edit")}
+                          {busy === "load:" + camera.id ? t("working") : t("nvrEditCamera")}
                         </button>
                         <button
                           type="button"
