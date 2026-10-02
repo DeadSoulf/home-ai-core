@@ -94,14 +94,14 @@ func newService(
 	prober CameraProber,
 ) *Service {
 	return &Service{
-		store:           store,
-		credentials:     credentials,
-		prober:          prober,
-		now:             time.Now,
-		workers:         map[string]cameraWorker{},
-		runtime:         map[string]CameraRuntimeStatus{},
-		healthInterval:  30 * time.Second,
-		retryDelays:     []time.Duration{2 * time.Second, 5 * time.Second, 15 * time.Second, 30 * time.Second},
+		store:          store,
+		credentials:    credentials,
+		prober:         prober,
+		now:            time.Now,
+		workers:        map[string]cameraWorker{},
+		runtime:        map[string]CameraRuntimeStatus{},
+		healthInterval: 30 * time.Second,
+		retryDelays:    []time.Duration{2 * time.Second, 5 * time.Second, 15 * time.Second, 30 * time.Second},
 	}
 }
 
