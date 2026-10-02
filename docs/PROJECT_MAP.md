@@ -7,8 +7,8 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.133-dev` — Cloud AI diagnostics + menu cleanup\
-**Текущий срез:** `0.1.134-dev` staged: **NVR-0 — Contracts and persistence** реализован и прошёл функциональный CI; release publication pending.\
+**Последний опубликованный релиз:** `0.1.134-dev` — NVR-0 contracts and persistence\
+**Текущий срез:** `0.1.134-dev` опубликован; **NVR-0 — Contracts and persistence** завершён, NVR foundation доступен как отдельный выключаемый модуль.\
 **Следующий engineering milestone:** **NVR-1 — Camera onboarding and live**: protected credential store, RTSP probe/test, manual camera CRUD, ONVIF discovery/import, runtime supervisor, main/sub streams, live/grid и reconnect/health.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
@@ -54,7 +54,8 @@
 - ✅ Схема допускает только один активный archive target и заранее содержит `protected` flag для будущего ring-retention.
 - ✅ Создана foundation-страница **Камеры**; `media_runtime_ready=false` и `secret_store_ready=false` честно показывают границу NVR-0.
 - ✅ FFmpeg, RTSP ingest и запись в этом срезе не запускаются.
-- ✅ Web/Go/NVR/security/state/API tests, Go vet, Core/integration, Linux cross-build, Debian installer и Windows client прошли функциональный CI перед release bump.
+- ✅ PR #133 и main прошли Web/Go/NVR/security/state/API tests, Go vet, Core/integration, Linux cross-build, Debian installer и Windows client CI.
+- ✅ Release workflow опубликовал `v0.1.134-dev` с Core amd64/arm64, Debian `.deb` amd64/arm64, Windows client и SHA-256.
 - ⏭ Следующий срез: **NVR-1 — protected secrets + RTSP/ONVIF onboarding + live runtime**.
 ### Выпуск 0.1.133-dev — Cloud AI diagnostics + menu cleanup
 
