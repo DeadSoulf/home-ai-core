@@ -185,7 +185,28 @@ Published in `v0.1.119-dev` after successful Core/Web, Windows, Debian and relea
 - ✅ published in `v0.1.122-dev` after successful Core/Web, Windows, Debian and release workflows.
 - 🧪 live finish-chat acceptance on the installed Home-AI server remains pending.
 
-### Next slice — Streaming + controlled tool loop
+### 0.1.123-dev — Controlled server tools + approval loop
+
+- ✅ Ollama receives typed Home-AI tools and returns native tool calls.
+- ✅ permitted read tools run automatically inside a bounded multi-round agent loop.
+- ✅ change/sensitive tool calls become persistent per-user approval actions instead of executing immediately.
+- ✅ current user permissions are re-checked when approval is submitted.
+- ✅ Web chat renders action parameters, sensitivity, approve/reject and execution result.
+- ✅ first controlled server domains: network profiles/link state and storage inspect/mount/unmount.
+- ✅ privileged operations continue through the existing Home-AI helper; no generic shell/root tool exists.
+- ✅ action inputs/results are size-bounded and audit does not store raw tool input.
+- 🧪 automated CI/release pending.
+
+### Next slice — Streaming + broader controlled server tools
+
+- streaming local model responses to Web;
+- updater/check/install tools;
+- safe service/runtime controls for allow-listed Home-AI dependencies;
+- NAS/SMB configuration tools through domain APIs;
+- richer post-action model follow-up;
+- provider health/reconnect diagnostics.
+
+
 
 - streaming local model responses to Web;
 - model tool-call parsing/orchestration;
