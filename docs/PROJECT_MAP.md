@@ -8,8 +8,8 @@
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.136-dev` — NVR camera supervisor + reconnect health\
-**Текущий срез:** `0.1.136-dev` опубликован; persistent camera supervisor, automatic reconnect/health и permission-scoped runtime events готовы к live-проверке.\
-**Следующий engineering milestone:** продолжить **NVR-1 live runtime**: shared local restream, single live view и multi-camera grid; затем ONVIF/main-sub discovery.\
+**Текущий срез:** `0.1.137-dev` staged: shared live restream, single/multi-camera preview и RTSP argv credential hardening; release publication pending.\
+**Следующий engineering milestone:** live-проверить preview на реальных камерах, затем продолжить **NVR-1**: ONVIF discovery/import и явный выбор main/sub-stream.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
 
@@ -40,6 +40,22 @@
 - ✅ Релизы `0.1.115-dev` → `0.1.133-dev` прошли соответствующие Web/Go/Core/Debian/Windows CI и публикацию release artifacts.
 - ⏸ AI Agent считается функционально достаточным для текущего этапа; дальнейшее расширение tools, streaming и provider UI отложено до отдельного цикла.
 
+### Выпуск 0.1.137-dev — NVR shared live preview
+
+- ✅ Один enabled camera source использует один shared FFmpeg live-restream независимо от количества Web viewers.
+- ✅ Добавлен permission-scoped endpoint `/api/v1/nvr/cameras/{cameraID}/live.mjpeg` с exact/global `camera.live`.
+- ✅ Web **Камеры** получил single live view и responsive multi-camera grid.
+- ✅ Можно открыть доступные камеры одновременно, закрыть все или включать/скрывать live по одной камере.
+- ✅ Долгий MJPEG response снимает обычный Core write deadline только для собственного stream connection.
+- ✅ После закрытия последнего viewer shared restream останавливается после короткого idle grace period.
+- ✅ Camera update/delete и остановка NVR module принудительно останавливают соответствующие live-processes.
+- ✅ NVR status показывает `live_runtime_ready` и число активных shared live streams.
+- ✅ RTSP username/password больше не помещаются в argv `ffprobe`/`ffmpeg`; credential-bearing source передаётся child process через stdin descriptor.
+- ✅ Preview намеренно ограничен 1280px / 5 FPS для первого grid transport; archive contract от этого не зависит.
+- ✅ Regression tests покрывают shared fan-out, idle stop, JPEG limit, exact camera.live authorization и отсутствие credentials в process argv.
+- ✅ PR #136 прошёл функциональный Web/Go/Core/integration/Linux/Windows/Debian CI до release bump.
+- 🧪 После публикации требуется live acceptance на реальной RTSP-камере/камерах.
+- ⏭ Следующий срез: ONVIF discovery/import + main/sub stream selection.
 ### Выпуск 0.1.136-dev — NVR camera supervisor + reconnect health
 
 - ✅ Для каждой включённой камеры добавлен persistent supervisor worker.
