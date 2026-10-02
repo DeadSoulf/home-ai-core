@@ -51,7 +51,7 @@ func (Module) Manifest() modules.Manifest {
 		UI: modules.UIContract{Navigation: []modules.NavigationItem{{
 			ID:    "cameras",
 			Title: "Cameras",
-			Route: "/cameras",
+			Route: "/modules/nvr",
 			Order: 20,
 		}}},
 		Lifecycle: []string{"backup", "restore"},
