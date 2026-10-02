@@ -162,7 +162,8 @@ Published in `v0.1.119-dev` after successful Core/Web, Windows, Debian and relea
 - ✅ Restart recreates only the AI runtime context and cancels active AI requests.
 - ✅ Runtime operations are audited and emitted as realtime module events.
 - ✅ AI chat/tools fail closed while the agent is disabled.
-- 🧪 automated CI/release pending.
+- ✅ published in `v0.1.120-dev` after successful Core/Web, Windows, Debian and release workflows.
+- 🧪 live enable/disable/restart acceptance on the installed Home-AI server remains pending.
 
 ### Next slice — Streaming + controlled tool loop
 
