@@ -3,7 +3,6 @@ package nvr
 import (
 	"context"
 	"errors"
-	"sync"
 	"time"
 )
 
