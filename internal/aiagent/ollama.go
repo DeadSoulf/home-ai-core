@@ -91,6 +91,23 @@ func (p *OllamaProvider) Model() string {
 }
 
 func (p *OllamaProvider) Generate(ctx context.Context, request ModelRequest) (ModelResponse, error) {
+	return p.generate(ctx, request, false, nil)
+}
+
+func (p *OllamaProvider) GenerateStream(
+	ctx context.Context,
+	request ModelRequest,
+	onContent func(string) error,
+) (ModelResponse, error) {
+	return p.generate(ctx, request, true, onContent)
+}
+
+func (p *OllamaProvider) generate(
+	ctx context.Context,
+	request ModelRequest,
+	stream bool,
+	onContent func(string) error,
+) (ModelResponse, error) {
 	if p == nil || p.client == nil {
 		return ModelResponse{}, errors.New("Ollama provider is not initialized")
 	}
@@ -152,7 +169,7 @@ func (p *OllamaProvider) Generate(ctx context.Context, request ModelRequest) (Mo
 	payload := map[string]any{
 		"model":      p.model,
 		"messages":   messages,
-		"stream":     false,
+		"stream":     stream,
 		"think":      p.think,
 		"keep_alive": p.keepAlive,
 		"options": map[string]any{
@@ -179,27 +196,67 @@ func (p *OllamaProvider) Generate(ctx context.Context, request ModelRequest) (Mo
 		return ModelResponse{}, fmt.Errorf("Ollama request failed: %w", err)
 	}
 	defer response.Body.Close()
-
-	raw, err := io.ReadAll(io.LimitReader(response.Body, maxOllamaResponseBytes+1))
-	if err != nil {
-		return ModelResponse{}, fmt.Errorf("read Ollama response: %w", err)
-	}
-	if len(raw) > maxOllamaResponseBytes {
-		return ModelResponse{}, errors.New("Ollama response exceeds size limit")
-	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, maxOllamaResponseBytes))
 		return ModelResponse{}, fmt.Errorf("Ollama returned HTTP %d", response.StatusCode)
 	}
 
-	var decoded struct {
-		Message ollamaMessage `json:"message"`
-	}
-	if err := json.Unmarshal(raw, &decoded); err != nil {
-		return ModelResponse{}, fmt.Errorf("decode Ollama response: %w", err)
+	var decodedMessage ollamaMessage
+	if stream {
+		limited := io.LimitReader(response.Body, maxOllamaResponseBytes+1)
+		decoder := json.NewDecoder(limited)
+		var content strings.Builder
+		var toolCalls []ollamaToolCall
+		for {
+			var chunk struct {
+				Message ollamaMessage `json:"message"`
+				Done    bool          `json:"done"`
+			}
+			if err := decoder.Decode(&chunk); err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				return ModelResponse{}, fmt.Errorf("decode Ollama stream: %w", err)
+			}
+			if chunk.Message.Content != "" {
+				content.WriteString(chunk.Message.Content)
+				if onContent != nil {
+					if err := onContent(chunk.Message.Content); err != nil {
+						return ModelResponse{}, err
+					}
+				}
+			}
+			if len(chunk.Message.ToolCalls) > 0 {
+				toolCalls = append(toolCalls, chunk.Message.ToolCalls...)
+			}
+			if chunk.Done {
+				break
+			}
+		}
+		decodedMessage = ollamaMessage{
+			Role:      string(RoleAssistant),
+			Content:   content.String(),
+			ToolCalls: toolCalls,
+		}
+	} else {
+		raw, err := io.ReadAll(io.LimitReader(response.Body, maxOllamaResponseBytes+1))
+		if err != nil {
+			return ModelResponse{}, fmt.Errorf("read Ollama response: %w", err)
+		}
+		if len(raw) > maxOllamaResponseBytes {
+			return ModelResponse{}, errors.New("Ollama response exceeds size limit")
+		}
+		var decoded struct {
+			Message ollamaMessage `json:"message"`
+		}
+		if err := json.Unmarshal(raw, &decoded); err != nil {
+			return ModelResponse{}, fmt.Errorf("decode Ollama response: %w", err)
+		}
+		decodedMessage = decoded.Message
 	}
 
-	calls := make([]ToolCall, 0, len(decoded.Message.ToolCalls))
-	for index, call := range decoded.Message.ToolCalls {
+	calls := make([]ToolCall, 0, len(decodedMessage.ToolCalls))
+	for index, call := range decodedMessage.ToolCalls {
 		toolID, ok := toolIDByName[call.Function.Name]
 		if !ok {
 			return ModelResponse{}, fmt.Errorf("Ollama returned unknown tool %q", call.Function.Name)
@@ -218,7 +275,7 @@ func (p *OllamaProvider) Generate(ctx context.Context, request ModelRequest) (Mo
 		})
 	}
 
-	content := strings.TrimSpace(decoded.Message.Content)
+	content := strings.TrimSpace(decodedMessage.Content)
 	if content == "" && len(calls) == 0 {
 		return ModelResponse{}, errors.New("Ollama returned an empty response")
 	}
