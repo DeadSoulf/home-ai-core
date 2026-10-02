@@ -6,6 +6,8 @@ import (
 	"errors"
 )
 
+var ErrProviderUnavailable = errors.New("AI provider is unavailable")
+
 type MessageRole string
 
 const (
