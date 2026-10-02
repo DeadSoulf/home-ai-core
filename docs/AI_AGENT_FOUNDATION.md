@@ -215,6 +215,7 @@ Published in `v0.1.119-dev` after successful Core/Web, Windows, Debian and relea
 - ✅ streaming provider/Core endpoint remains implemented for isolated compatibility work and is no longer on the critical user path.
 - ✅ Ollama fast-profile tuning from 0.1.129 remains active.
 - ✅ server-side provider failures now include request/correlation IDs in logs without chat content.
+- ✅ hotfix published in `v0.1.130-dev` after successful PR/main CI and release workflows.
 - 🧪 streaming must return only after a dedicated live transport compatibility pass.
 ### 0.1.129-dev — Streaming + local inference performance
 
