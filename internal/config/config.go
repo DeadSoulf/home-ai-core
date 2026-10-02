@@ -18,6 +18,9 @@ type Config struct {
 	ListenAddress string
 	StateDir      string
 	WebDir        string
+	AIProvider    string
+	AIEndpoint    string
+	AIModel       string
 }
 
 func Load(args []string) (Config, error) {
@@ -25,6 +28,9 @@ func Load(args []string) (Config, error) {
 		ListenAddress: envOrDefault("HOME_AI_LISTEN", defaultListen),
 		StateDir:      envOrDefault("HOME_AI_STATE_DIR", defaultStateDir),
 		WebDir:        envOrDefault("HOME_AI_WEB_DIR", defaultWebDir),
+		AIProvider:    strings.ToLower(strings.TrimSpace(os.Getenv("HOME_AI_AI_PROVIDER"))),
+		AIEndpoint:    strings.TrimSpace(os.Getenv("HOME_AI_AI_ENDPOINT")),
+		AIModel:       strings.TrimSpace(os.Getenv("HOME_AI_AI_MODEL")),
 	}
 
 	fs := flag.NewFlagSet("home-ai-core", flag.ContinueOnError)
@@ -32,6 +38,9 @@ func Load(args []string) (Config, error) {
 	fs.StringVar(&cfg.ListenAddress, "listen", cfg.ListenAddress, "HTTP listen address")
 	fs.StringVar(&cfg.StateDir, "state-dir", cfg.StateDir, "persistent state directory")
 	fs.StringVar(&cfg.WebDir, "web-dir", cfg.WebDir, "built Web UI directory")
+	fs.StringVar(&cfg.AIProvider, "ai-provider", cfg.AIProvider, "AI provider (empty or ollama)")
+	fs.StringVar(&cfg.AIEndpoint, "ai-endpoint", cfg.AIEndpoint, "AI provider endpoint")
+	fs.StringVar(&cfg.AIModel, "ai-model", cfg.AIModel, "AI model name")
 
 	if err := fs.Parse(args); err != nil {
 		return Config{}, err
@@ -47,6 +56,21 @@ func Load(args []string) (Config, error) {
 	}
 	if strings.TrimSpace(cfg.WebDir) == "" {
 		return Config{}, fmt.Errorf("web directory must not be empty")
+	}
+	cfg.AIProvider = strings.ToLower(strings.TrimSpace(cfg.AIProvider))
+	cfg.AIEndpoint = strings.TrimSpace(cfg.AIEndpoint)
+	cfg.AIModel = strings.TrimSpace(cfg.AIModel)
+	switch cfg.AIProvider {
+	case "":
+		if cfg.AIModel != "" || cfg.AIEndpoint != "" {
+			return Config{}, fmt.Errorf("AI provider is required when AI model/endpoint is configured")
+		}
+	case "ollama":
+		if cfg.AIModel == "" {
+			return Config{}, fmt.Errorf("AI model is required for ollama provider")
+		}
+	default:
+		return Config{}, fmt.Errorf("unsupported AI provider %q", cfg.AIProvider)
 	}
 
 	return cfg, nil
