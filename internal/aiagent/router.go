@@ -106,7 +106,7 @@ func (p *RoutingProvider) TestCloud(ctx context.Context) error {
 		return ErrProviderUnavailable
 	}
 	response, err := cloud.Generate(ctx, ModelRequest{
-		Messages: []Message{{Role: RoleUser, Content: "Reply with OK."}},
+		Messages:     []Message{{Role: RoleUser, Content: "Reply with OK."}},
 		ProviderMode: ProviderModeCloud,
 	})
 	if err != nil {
