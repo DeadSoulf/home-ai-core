@@ -93,7 +93,7 @@ Initial first-party module:
 - module ID: `nvr`;
 - name: `Cameras / NVR`;
 - API namespace: `nvr`;
-- Web route: `/cameras`;
+- Web route: `/modules/nvr`;
 - capability provided: `camera.nvr`;
 - host requirement: Linux;
 - package/runtime requirements for the first implementation: FFmpeg/FFprobe;
