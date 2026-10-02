@@ -12,6 +12,7 @@ export function AIPage() {
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [error, setError] = useState("");
 
   const active = useMemo(
@@ -75,10 +76,26 @@ export function AIPage() {
     }
   };
 
+  const finishConversation = async () => {
+    if (!activeID || !active || active.closed_at || closing || sending) return;
+    if (!window.confirm(t("aiFinishConversationConfirm"))) return;
+
+    setClosing(true);
+    setError("");
+    try {
+      const closed = await api.closeAIConversation(activeID);
+      setConversations((items) => items.map((item) => item.id === closed.id ? closed : item));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setClosing(false);
+    }
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const content = draft.trim();
-    if (!content || sending) return;
+    if (!content || sending || active?.closed_at) return;
     setSending(true);
     setError("");
     try {
@@ -170,7 +187,10 @@ export function AIPage() {
                 }}
               >
                 <strong>{item.title || t("aiUntitledConversation")}</strong>
-                <span>{date(item.updated_at)}</span>
+                <span>
+                  {item.closed_at ? t("aiConversationFinished") + " · " : ""}
+                  {date(item.updated_at)}
+                </span>
               </button>
             ))}
           </div>
@@ -179,8 +199,32 @@ export function AIPage() {
         <div className="panel ai-chat">
           <div className="ai-chat-head">
             <div>
-              <h2>{active?.title || t("aiNewConversation")}</h2>
-              <p>{t("aiLocalOnlyNotice")}</p>
+              <div className="ai-chat-title-row">
+                <h2>{active?.title || t("aiNewConversation")}</h2>
+                {active?.closed_at && <span className="badge">{t("aiConversationFinished")}</span>}
+              </div>
+              <p>{active?.closed_at ? t("aiFinishedConversationHint") : t("aiLocalOnlyNotice")}</p>
+            </div>
+            <div className="ai-chat-head-actions">
+              {active && !active.closed_at && (
+                <button
+                  type="button"
+                  className="button secondary compact"
+                  disabled={sending || closing}
+                  onClick={() => void finishConversation()}
+                >
+                  {closing ? t("working") : t("aiFinishConversation")}
+                </button>
+              )}
+              {active?.closed_at && (
+                <button
+                  type="button"
+                  className="button primary compact"
+                  onClick={() => void createConversation()}
+                >
+                  {t("aiNewConversation")}
+                </button>
+              )}
             </div>
           </div>
 
@@ -207,10 +251,10 @@ export function AIPage() {
             <textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder={t("aiMessagePlaceholder")}
+              placeholder={active?.closed_at ? t("aiFinishedConversationPlaceholder") : t("aiMessagePlaceholder")}
               maxLength={8000}
               rows={3}
-              disabled={sending || !status?.provider_configured}
+              disabled={sending || Boolean(active?.closed_at) || !status?.provider_configured}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
@@ -223,7 +267,7 @@ export function AIPage() {
               <button
                 type="submit"
                 className="button primary"
-                disabled={sending || !draft.trim() || !status?.provider_configured}
+                disabled={sending || Boolean(active?.closed_at) || !draft.trim() || !status?.provider_configured}
               >
                 {sending ? t("aiSending") : t("aiSend")}
               </button>
