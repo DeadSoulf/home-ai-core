@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.130-dev
+
+- Hotfix the live Web chat regression where the new 0.1.129 browser streaming path could end with `Failed to fetch` and no assistant reply.
+- Return the production AI page to the proven JSON `/messages` request path while the streaming transport remains available in Core for further compatibility work.
+- Keep all 0.1.129 local-model performance tuning: `think:false`, 16K context, 30-minute Ollama keep-alive and the 120-second Core HTTP write timeout.
+- Normalize browser transport `TypeError` failures so raw `Failed to fetch` is not surfaced to the user.
+- Log AI provider/transport failures on the server with request/correlation IDs but without chat content.
+- Add Web regression coverage for the stable JSON AI message path and CSRF header.
 ## 0.1.129-dev
 
 - Stream local Ollama chat output from Core to the Web AI page as NDJSON so generated text appears while the model is still working.
