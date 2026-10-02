@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -134,5 +135,47 @@ func TestOllamaProviderMapsTypedToolCalls(t *testing.T) {
 	}
 	if len(response.Message.ToolCalls) != 1 {
 		t.Fatalf("message tool calls = %#v", response.Message.ToolCalls)
+	}
+}
+
+
+func TestOllamaProviderGenerateStream(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Stream bool `json:"stream"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if !body.Stream {
+			t.Fatal("streaming request did not enable stream")
+		}
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		_, _ = w.Write([]byte("{\"message\":{\"role\":\"assistant\",\"content\":\"Fast \"},\"done\":false}\n"))
+		_, _ = w.Write([]byte("{\"message\":{\"role\":\"assistant\",\"content\":\"reply\"},\"done\":true}\n"))
+	}))
+	defer server.Close()
+
+	provider, err := NewOllamaProvider(server.URL, "test-model")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var streamed strings.Builder
+	response, err := provider.GenerateStream(
+		context.Background(),
+		ModelRequest{Messages: []Message{{Role: RoleUser, Content: "hello"}}},
+		func(delta string) error {
+			streamed.WriteString(delta)
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if streamed.String() != "Fast reply" {
+		t.Fatalf("streamed = %q", streamed.String())
+	}
+	if response.Message.Content != "Fast reply" {
+		t.Fatalf("response = %#v", response)
 	}
 }
