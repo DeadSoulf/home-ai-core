@@ -124,8 +124,8 @@ func TestOpenAICompatibleProviderReportsAuthenticationFailure(t *testing.T) {
 	if strings.Contains(providerErr.Error(), "test-secret") {
 		t.Fatalf("provider error leaked API key: %q", providerErr.Error())
 	}
-	if !strings.Contains(providerErr.Error(), "[redacted]") {
-		t.Fatalf("provider error did not redact provider detail: %q", providerErr.Error())
+	if strings.Contains(providerErr.Error(), "bad key") {
+		t.Fatalf("provider error exposed authentication detail: %q", providerErr.Error())
 	}
 }
 
