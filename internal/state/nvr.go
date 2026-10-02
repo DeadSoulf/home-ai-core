@@ -425,7 +425,6 @@ func (s *Store) nvrStreamProfile(ctx context.Context, id string) (NVRStreamProfi
 	return record, nil
 }
 
-
 func (s *Store) SetNVRONVIFSource(
 	ctx context.Context,
 	cameraID, deviceEndpoint, mainProfileToken, subProfileToken string,
