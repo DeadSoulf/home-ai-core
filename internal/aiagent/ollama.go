@@ -14,12 +14,19 @@ import (
 	"unicode"
 )
 
-const maxOllamaResponseBytes = 4 << 20
+const (
+	maxOllamaResponseBytes = 4 << 20
+	defaultOllamaKeepAlive = "30m"
+	defaultOllamaContext   = 16384
+)
 
 type OllamaProvider struct {
-	endpoint string
-	model    string
-	client   *http.Client
+	endpoint    string
+	model       string
+	keepAlive   string
+	contextSize int
+	think       bool
+	client      *http.Client
 }
 
 type ollamaFunctionDefinition struct {
@@ -66,9 +73,12 @@ func NewOllamaProvider(endpoint, model string) (*OllamaProvider, error) {
 	}
 	parsed.Path = strings.TrimRight(parsed.Path, "/")
 	return &OllamaProvider{
-		endpoint: parsed.String(),
-		model:    model,
-		client:   &http.Client{Timeout: 90 * time.Second},
+		endpoint:    parsed.String(),
+		model:       model,
+		keepAlive:   defaultOllamaKeepAlive,
+		contextSize: defaultOllamaContext,
+		think:       false,
+		client:      &http.Client{Timeout: 95 * time.Second},
 	}, nil
 }
 
@@ -140,9 +150,14 @@ func (p *OllamaProvider) Generate(ctx context.Context, request ModelRequest) (Mo
 	}
 
 	payload := map[string]any{
-		"model":    p.model,
-		"messages": messages,
-		"stream":   false,
+		"model":      p.model,
+		"messages":   messages,
+		"stream":     false,
+		"think":      p.think,
+		"keep_alive": p.keepAlive,
+		"options": map[string]any{
+			"num_ctx": p.contextSize,
+		},
 	}
 	if len(tools) > 0 {
 		payload["tools"] = tools
