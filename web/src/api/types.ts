@@ -500,6 +500,8 @@ export type NVRStatus = {
   offline_count: number;
   supervisor_running: boolean;
   media_runtime_ready: boolean;
+  live_runtime_ready: boolean;
+  active_live_streams: number;
   secret_store_ready: boolean;
   foundation_stage: string;
 };
