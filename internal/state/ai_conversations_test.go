@@ -79,7 +79,6 @@ func TestAIConversationsAreUserScopedAndPersistent(t *testing.T) {
 	}
 }
 
-
 func TestDeleteClosedAIConversationsIsScopedAndRequiresClosedState(t *testing.T) {
 	ctx := context.Background()
 	store, err := Open(ctx, t.TempDir())
