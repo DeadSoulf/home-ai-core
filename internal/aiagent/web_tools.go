@@ -19,8 +19,8 @@ import (
 
 const (
 	maxAIWebResponseBytes = 512 << 10
-	defaultAIWebMaxChars  = 12000
-	maxAIWebMaxChars      = 30000
+	defaultAIWebMaxChars  = 8000
+	maxAIWebMaxChars      = 12000
 )
 
 var (
