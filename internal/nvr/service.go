@@ -42,14 +42,14 @@ type Service struct {
 }
 
 type CameraInput struct {
-	Name           string `json:"name"`
-	Address        string `json:"address"`
-	Username       string `json:"username,omitempty"`
-	Password       string `json:"password,omitempty"`
-	Transport      string `json:"transport,omitempty"`
-	RecordingMode  string `json:"recording_mode,omitempty"`
-	AudioEnabled   bool   `json:"audio_enabled"`
-	Enabled        *bool  `json:"enabled,omitempty"`
+	Name            string `json:"name"`
+	Address         string `json:"address"`
+	Username        string `json:"username,omitempty"`
+	Password        string `json:"password,omitempty"`
+	Transport       string `json:"transport,omitempty"`
+	RecordingMode   string `json:"recording_mode,omitempty"`
+	AudioEnabled    bool   `json:"audio_enabled"`
+	Enabled         *bool  `json:"enabled,omitempty"`
 	ClearCredential bool   `json:"clear_credentials,omitempty"`
 }
 
