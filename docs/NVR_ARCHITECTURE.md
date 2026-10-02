@@ -1,6 +1,6 @@
 # Home-AI Cameras / NVR Architecture
 
-**Status:** NVR-0/onboarding/supervisor published through `0.1.136-dev`; shared live preview staged in `0.1.137-dev`; ONVIF/main-sub discovery next  
+**Status:** NVR-0/onboarding/supervisor/shared live preview published through `0.1.137-dev`; ONVIF/main-sub discovery next  
 **Baseline:** Home-AI-Core 0.1.137-dev  
 **Date:** 2026-10-02
 
@@ -680,7 +680,7 @@ Implemented in `0.1.134-dev`:
 
 ### NVR-1 — Camera onboarding and live 🚧
 
-Implemented through staged `0.1.137-dev`:
+Implemented and published through `0.1.137-dev`:
 
 - ✅ RTSP test/probe;
 - ✅ manual camera CRUD;
