@@ -1,6 +1,6 @@
 # AI Agent Foundation
 
-**Status:** controlled server tool loop and public web tools published through `0.1.124-dev`; live provider acceptance pending  
+**Status:** controlled server tools/public web published; streaming + local inference performance staged in `0.1.129-dev`; live provider acceptance pending  
 **Started:** 2026-10-01  
 **First implementation slice:** `0.1.115-dev` published
 
@@ -209,9 +209,17 @@ Published in `v0.1.119-dev` after successful Core/Web, Windows, Debian and relea
 - ✅ regression tests cover tool discovery/API counts, SSRF boundary and DuckDuckGo result decoding.
 - ✅ published in `v0.1.124-dev` after successful PR/main Core/Web, Windows, Debian and release workflows.
 - 🧪 live acceptance still required on the installed server: current-info question → `web.search` → optional `web.fetch` → grounded answer.
-### Next slice — Streaming + broader controlled server tools
+### 0.1.129-dev — Streaming + local inference performance
 
-- streaming local model responses to Web;
+- ✅ Ollama streaming provider path decodes incremental `/api/chat` responses while preserving typed tool calls.
+- ✅ Core exposes a CSRF-protected NDJSON chat stream and Web renders assistant deltas immediately.
+- ✅ final chat persistence still happens only after successful generation, so streaming does not reintroduce orphan/duplicate history.
+- ✅ local Ollama defaults are tuned for interactive use: `keep_alive=30m`, `think:false`, `num_ctx=16384`.
+- ✅ Core HTTP write timeout is longer than the AI chat deadline, preventing transport timeout from racing valid generation.
+- ✅ non-streaming provider contract remains supported as a fallback.
+- 🧪 live acceptance required on the installed GPU node.
+### Next slice — Broader controlled server tools
+
 - updater/check/install tools;
 - safe service/runtime controls for allow-listed Home-AI dependencies;
 - NAS/SMB configuration tools through domain APIs;

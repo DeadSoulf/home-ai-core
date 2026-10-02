@@ -109,6 +109,7 @@ func New(
 	s.mux.HandleFunc("DELETE /api/v1/ai/conversations/closed", s.requireAuth("", s.aiClosedConversationsDelete))
 	s.mux.HandleFunc("DELETE /api/v1/ai/conversations/{conversationID}", s.requireAuth("", s.aiConversationDelete))
 	s.mux.HandleFunc("POST /api/v1/ai/conversations/{conversationID}/close", s.requireAuth("", s.aiConversationResource))
+	s.mux.HandleFunc("POST /api/v1/ai/conversations/{conversationID}/messages/stream", s.requireAuth("", s.aiConversationMessageStream))
 	s.mux.HandleFunc("GET /api/v1/ai/conversations/{conversationID}/actions", s.requireAuth("", s.aiConversationActions))
 	s.mux.HandleFunc("POST /api/v1/ai/conversations/{conversationID}/actions/{actionID}/approve", s.requireAuth("", s.aiConversationActionApprove))
 	s.mux.HandleFunc("POST /api/v1/ai/conversations/{conversationID}/actions/{actionID}/reject", s.requireAuth("", s.aiConversationActionReject))

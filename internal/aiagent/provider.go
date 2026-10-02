@@ -42,6 +42,11 @@ type Provider interface {
 	Generate(context.Context, ModelRequest) (ModelResponse, error)
 }
 
+type StreamingProvider interface {
+	Provider
+	GenerateStream(context.Context, ModelRequest, func(string) error) (ModelResponse, error)
+}
+
 type DeterministicProvider struct {
 	ProviderID string
 	Response   ModelResponse

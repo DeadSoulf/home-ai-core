@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.129-dev
+
+- Stream local Ollama chat output from Core to the Web AI page as NDJSON so generated text appears while the model is still working.
+- Keep the final user/assistant turn transactional: streamed text is temporary UI state and durable chat history is written only after successful completion.
+- Preserve typed tool calling during streaming; Ollama tool-call chunks are accumulated and continue through the bounded Home-AI tool loop.
+- Keep the local model warm for 30 minutes with Ollama `keep_alive`, avoiding repeated multi-gigabyte VRAM reloads after short idle periods.
+- Default Qwen3/Ollama requests to fast mode with `think: false`.
+- Request a 16K Ollama context for normal Home-AI chat instead of inheriting the model's 32K runtime context.
+- Raise Core HTTP `WriteTimeout` from 30s to 120s so the transport does not terminate a valid request before the 90s AI chat deadline.
+- Add Ollama stream, HTTP stream, Web NDJSON parser and CSRF regression coverage.
 ## 0.1.128-dev
 
 - Add permanent cleanup for finished AI conversations.
