@@ -253,6 +253,7 @@ export type AIConversation = {
   title: string;
   created_at: string;
   updated_at: string;
+  closed_at?: string;
 };
 
 export type AIMessage = {
