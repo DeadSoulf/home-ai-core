@@ -109,6 +109,22 @@ export function AIPage() {
     return () => { stopped = true; };
   }, [t]);
 
+  useEffect(() => {
+    const changed = () => {
+      void api.aiStatus().then((aiStatus) => {
+        setStatus(aiStatus);
+        const modes = aiStatus.provider_modes || [];
+        setProviderMode((current) => {
+          const next = modes.includes(current) ? current : modes.includes("local") ? "local" : modes[0] || "local";
+          window.localStorage.setItem("home-ai-ai-provider-mode", next);
+          return next;
+        });
+      }).catch(() => undefined);
+    };
+    window.addEventListener("home-ai-core:modules-changed", changed);
+    return () => window.removeEventListener("home-ai-core:modules-changed", changed);
+  }, []);
+
   const createConversation = async () => {
     setError("");
     try {
