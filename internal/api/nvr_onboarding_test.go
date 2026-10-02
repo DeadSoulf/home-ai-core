@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/modules"
 	"github.com/DeadSoulf/home-ai-core/internal/nvr"
@@ -66,6 +67,17 @@ func TestNVRCameraOnboardingAPIKeepsCredentialsPrivate(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
+
+	if _, err := store.CreateOwner(
+		ctx,
+		"usr-test",
+		"owner",
+		"Owner",
+		"test-password-hash",
+		time.Now(),
+	); err != nil {
+		t.Fatal(err)
+	}
 
 	registry := modules.NewRegistry(store)
 	if err := registry.Register(ctx, nvr.NewModule()); err != nil {
