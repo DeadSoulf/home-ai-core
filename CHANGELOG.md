@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.118-dev
+
+- Add the first persistent **local AI conversation** layer on top of the published AI read-tool/API foundation.
+- Add migration 018 with per-user AI conversations and messages; conversation ownership is enforced in the state store.
+- Add an optional local Ollama provider adapter using the standard library HTTP client, bounded response size and server-side request timeout.
+- Keep the AI provider optional: Core starts normally with chat disabled when no provider/model is configured.
+- Add `HOME_AI_AI_PROVIDER`, `HOME_AI_AI_ENDPOINT` and `HOME_AI_AI_MODEL` configuration plus Debian environment examples.
+- Add authenticated conversation list/create/history/message APIs under `/api/v1/ai/conversations`.
+- Persist user and assistant messages, derive a bounded first-message title, and cap model context/message sizes.
+- Audit AI generation metadata as `ai.chat.generate` without storing prompt or response text in audit metadata.
+- Add the Web **AI Agent** section with per-user conversation history, provider/model status and a compact local chat UI.
+- Add RU/EN AI chat localization and responsive styling.
+- Add regression coverage for migration/state isolation, provider HTTP contract, conversation service/audit redaction and API user isolation.
+- Keep automatic AI tool execution disabled in this slice; existing typed tools remain available only through their explicit permission-checked API.
+- Streaming responses and model-driven tool orchestration remain the next controlled AI slice.
+
 ## 0.1.117-dev
 
 - Add the first callable **AI Agent read-tool layer** on top of the `0.1.115-dev` contracts while preserving the published compact Windows UI from `0.1.116-dev`.
