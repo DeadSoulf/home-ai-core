@@ -122,6 +122,61 @@ describe("API client", () => {
     vi.unstubAllGlobals();
   });
 
+  it("deletes one finished AI conversation with CSRF protection", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({deleted: "aic-delete"}), {
+        status: 200,
+        headers: {"Content-Type": "application/json"},
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    });
+
+    setCSRFToken("csrf-ai-delete");
+    const deleted = await api.deleteAIConversation("aic-delete");
+
+    expect(deleted).toBe("aic-delete");
+    const [input, init] = fetchMock.mock.calls[0];
+    expect(String(input)).toBe("/api/v1/ai/conversations/aic-delete");
+    expect(init?.method).toBe("DELETE");
+    expect(init?.credentials).toBe("same-origin");
+    expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-ai-delete");
+
+    vi.unstubAllGlobals();
+  });
+
+  it("clears all finished AI conversations with CSRF protection", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({deleted: 3}), {
+        status: 200,
+        headers: {"Content-Type": "application/json"},
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    });
+
+    setCSRFToken("csrf-ai-clear");
+    const deleted = await api.clearClosedAIConversations();
+
+    expect(deleted).toBe(3);
+    const [input, init] = fetchMock.mock.calls[0];
+    expect(String(input)).toBe("/api/v1/ai/conversations/closed");
+    expect(init?.method).toBe("DELETE");
+    expect(init?.credentials).toBe("same-origin");
+    expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-ai-clear");
+
+    vi.unstubAllGlobals();
+  });
   it("creates a household user with CSRF protection", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({
