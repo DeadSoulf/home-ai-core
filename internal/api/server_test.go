@@ -681,9 +681,12 @@ func TestModulesAPI(t *testing.T) {
 					Name:          "Storage",
 					Version:       "0.1.0",
 					Core:          ">=0.1.0 <1.0.0",
-					Lifecycle:     []string{"install"},
+					UI: modules.UIContract{Navigation: []modules.NavigationItem{{
+						ID: "overview", Title: "Storage", Route: "/modules/storage",
+					}}},
+					Lifecycle: []string{"install"},
 				},
-				Status: "registered",
+				Status: "enabled",
 			},
 		},
 		capabilities: []string{"host.linux", "storage.block"},
@@ -719,6 +722,95 @@ func TestModulesAPI(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("capabilities status = %d", rec.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/modules/navigation", nil)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"/modules/storage"`) {
+		t.Fatalf("module navigation status = %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCloudAIModuleRuntimeControl(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	const nodeID = "00000000-0000-4000-8000-000000000000"
+	moduleService := fakeModules{
+		items: []modules.Registered{
+			{
+				Manifest: modules.Manifest{
+					SchemaVersion: 1, ID: "ai.agent", Name: "AI Agent",
+					Version: "0.8.0", Core: ">=0.1.0 <1.0.0", Lifecycle: []string{"backup"},
+				},
+				Status: "enabled",
+			},
+			{
+				Manifest: modules.Manifest{
+					SchemaVersion: 1, ID: "ai.cloud", Name: "Cloud AI",
+					Version: "0.1.0", Core: ">=0.1.0 <1.0.0", Lifecycle: []string{"backup"},
+				},
+				Status: "disabled",
+			},
+		},
+	}
+	local := aiagent.DeterministicProvider{
+		ProviderID: "local",
+		Response: aiagent.ModelResponse{Message: aiagent.Message{Role: aiagent.RoleAssistant, Content: "local"}},
+	}
+	cloud := aiagent.DeterministicProvider{
+		ProviderID: "cloud",
+		Response: aiagent.ModelResponse{Message: aiagent.Message{Role: aiagent.RoleAssistant, Content: "cloud"}},
+	}
+	router := aiagent.NewRoutingProvider(local, cloud)
+	handler := New(
+		nodeID,
+		logger,
+		fakeState{schemaVersion: 19},
+		defaultFakeSecurity(),
+		nil,
+		nil,
+		moduleService,
+		nil,
+		realtime.New(nodeID, logger),
+		router,
+	)
+
+	post := func(operation string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(
+			http.MethodPost,
+			"/api/v1/modules/ai.cloud/control",
+			strings.NewReader(`{"operation":"`+operation+`"}`),
+		)
+		req.Header.Set("Authorization", "Bearer test")
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec
+	}
+
+	rec := post("enable")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("cloud enable status = %d: %s", rec.Code, rec.Body.String())
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/ai/status", nil)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"cloud_provider_enabled":true`) {
+		t.Fatalf("AI status after cloud enable = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = post("disable")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("cloud disable status = %d: %s", rec.Code, rec.Body.String())
+	}
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/ai/status", nil)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"cloud_provider_enabled":false`) {
+		t.Fatalf("AI status after cloud disable = %d: %s", rec.Code, rec.Body.String())
 	}
 }
 
