@@ -228,7 +228,6 @@ func TestUpdateAndDeleteNVRCamera(t *testing.T) {
 	}
 }
 
-
 func TestNVRONVIFSourcePersistsAndCascades(t *testing.T) {
 	ctx := context.Background()
 	store, err := Open(ctx, t.TempDir())
