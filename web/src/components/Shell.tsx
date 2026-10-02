@@ -22,7 +22,11 @@ export function Shell(props: {
   const sidebar = useRef<HTMLElement>(null);
   const groups = visibleNavigation(props.actor, props.modules);
   const route = props.path.split("#")[0];
-  const isActivePath = (path: string) => path === "/" ? route === "/" : route === path || route.startsWith(path + "/");
+  const isActivePath = (path: string) => {
+    if (path === "/") return route === "/";
+    if (path === "/modules") return route === "/modules";
+    return route === path || route.startsWith(path + "/");
+  };
   const current = groups.flatMap((group) => group.items).find((item) => isActivePath(item.path));
   const closeMenu = () => {
     setMenuOpen(false);
