@@ -96,7 +96,7 @@ func (r *Registry) List(ctx context.Context) ([]Registered, error) {
 
 func (r *Registry) SetStatus(ctx context.Context, id, status, errorMessage string) error {
 	switch status {
-	case "registered", "enabled", "disabled", "restarting", "error":
+	case "registered", "enabled", "disabled", "error":
 	default:
 		return fmt.Errorf("invalid module status %q", status)
 	}
