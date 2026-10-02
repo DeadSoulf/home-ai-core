@@ -418,14 +418,16 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
             )}
 
             <div className="nvr-form-actions">
-              <button
-                type="button"
-                className="button secondary"
-                disabled={Boolean(busy)}
-                onClick={() => void testConnection()}
-              >
-                {busy === "test" ? t("working") : t("nvrTestConnection")}
-              </button>
+              {!editingID && (
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={Boolean(busy)}
+                  onClick={() => void testConnection()}
+                >
+                  {busy === "test" ? t("working") : t("nvrTestConnection")}
+                </button>
+              )}
               <button
                 type="button"
                 className="button secondary"
