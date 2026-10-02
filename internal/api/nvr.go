@@ -59,7 +59,14 @@ func (s *server) nvrStatus(
 			OfflineCount:      offlineCount,
 			SupervisorRunning: s.nvr != nil && s.nvr.SupervisorRunning(),
 			MediaRuntimeReady: s.nvr != nil && s.nvr.MediaProbeReady(),
-			SecretStoreReady:  s.nvr != nil && s.nvr.SecretStoreReady(),
+			LiveRuntimeReady:  s.nvr != nil && s.nvr.LiveReady(),
+			ActiveLiveStreams: func() int {
+				if s.nvr == nil {
+					return 0
+				}
+				return s.nvr.ActiveLiveStreams()
+			}(),
+			SecretStoreReady: s.nvr != nil && s.nvr.SecretStoreReady(),
 			FoundationStage:   nvrFoundationStage(s.nvr),
 		},
 	})
@@ -136,6 +143,9 @@ func (s *server) visibleNVRCameras(ctx context.Context, actor security.Actor) ([
 func nvrFoundationStage(service *nvrpkg.Service) string {
 	if service == nil {
 		return "nvr-0"
+	}
+	if service.LiveReady() {
+		return "nvr-1-live"
 	}
 	if service.SupervisorRunning() {
 		return "nvr-1-supervisor"
