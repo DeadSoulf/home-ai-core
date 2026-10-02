@@ -7,8 +7,8 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.137-dev` — NVR shared live preview\
-**Текущий срез:** `0.1.138-dev` staged: explicit main/sub-stream profiles, отдельный probe substream и live-preview через substream; release publication pending.\
+**Последний опубликованный релиз:** `0.1.138-dev` — NVR explicit main/sub streams\
+**Текущий срез:** `0.1.138-dev` опубликован; explicit main/sub-stream profiles, отдельный probe substream и live-preview через substream готовы к live acceptance.\
 **Следующий engineering milestone:** завершить **NVR-1** через ONVIF discovery/import, затем перейти к **NVR-2 — recording + video storage + segmented archive + ring retention**.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
@@ -51,8 +51,9 @@
 - ✅ Supervisor продолжает проверять main stream независимо от live-preview.
 - ✅ Web editor получил отдельный RTSP substream field и main/sub probe status.
 - ✅ State/service/live regression tests покрывают persist/preserve/remove и выбор live source.
-- ✅ PR #137 прошёл функциональный Web/Go/Core/integration/Linux/Windows/Debian CI до release bump.
-- 🧪 После публикации требуется live acceptance на камере с отдельными main/sub RTSP потоками.
+- ✅ PR #137 и main прошли Web/Go/Core/integration/Linux/Windows/Debian CI.
+- ✅ Release workflow опубликовал `v0.1.138-dev` с update bundles amd64/arm64, Debian `.deb` amd64/arm64, Windows client и SHA-256.
+- 🧪 Требуется live acceptance на камере с отдельными main/sub RTSP потоками.
 - ⏭ Следующий NVR-1 slice: ONVIF discovery/import с автоматическим заполнением main/sub profiles.
 ### Выпуск 0.1.137-dev — NVR shared live preview
 
