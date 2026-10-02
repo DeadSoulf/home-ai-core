@@ -162,9 +162,27 @@ func (s *apiChatState) UpdateAIConversationTitle(_ context.Context, id, userID, 
 	return nil
 }
 
+func (s *apiChatState) CloseAIConversation(_ context.Context, id, userID string, now time.Time) (state.AIConversationRecord, error) {
+	item, ok := s.conversations[id]
+	if !ok || item.UserID != userID {
+		return state.AIConversationRecord{}, state.ErrAIConversationNotFound
+	}
+	if item.ClosedAt == nil {
+		value := now
+		item.ClosedAt = &value
+		item.UpdatedAt = now
+		s.conversations[id] = item
+	}
+	return item, nil
+}
+
 func (s *apiChatState) AppendAIMessage(_ context.Context, id, conversationID, userID, role, content string, now time.Time) (state.AIMessageRecord, error) {
-	if _, err := s.AIConversation(context.Background(), conversationID, userID); err != nil {
+	conversation, err := s.AIConversation(context.Background(), conversationID, userID)
+	if err != nil {
 		return state.AIMessageRecord{}, err
+	}
+	if conversation.ClosedAt != nil {
+		return state.AIMessageRecord{}, state.ErrAIConversationClosed
 	}
 	item := state.AIMessageRecord{ID: id, ConversationID: conversationID, Role: role, Content: content, CreatedAt: now}
 	s.messages[conversationID] = append(s.messages[conversationID], item)
@@ -278,6 +296,60 @@ func TestAIConversationAPIWithLocalProvider(t *testing.T) {
 	foreign.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("foreign messages status = %d, want 404: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAIConversationCloseAPIKeepsHistoryReadOnly(t *testing.T) {
+	chatState := newAPIChatState()
+	sec := defaultFakeSecurity()
+	provider := aiagent.DeterministicProvider{
+		ProviderID: "test-local",
+		Response: aiagent.ModelResponse{
+			Message: aiagent.Message{Role: aiagent.RoleAssistant, Content: "reply"},
+		},
+	}
+	handler := newAIChatHandler(chatState, sec, provider)
+
+	conv, err := chatState.CreateAIConversation(context.Background(), "aic-close", sec.actor.ID, "Close me", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/ai/conversations/"+conv.ID+"/close", strings.NewReader(`{}`))
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("close status = %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "closed_at") {
+		t.Fatalf("close body = %s", rec.Body.String())
+	}
+
+	req = httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/ai/conversations/"+conv.ID+"/messages",
+		strings.NewReader(`{"content":"must fail"}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "ai_conversation_closed") {
+		t.Fatalf("closed chat send status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	other := defaultFakeSecurity()
+	other.actor.ID = "usr-other"
+	foreign := newAIChatHandler(chatState, other, provider)
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/ai/conversations/"+conv.ID+"/close", strings.NewReader(`{}`))
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	foreign.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("foreign close status = %d, want 404: %s", rec.Code, rec.Body.String())
 	}
 }
 
