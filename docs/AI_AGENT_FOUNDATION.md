@@ -1,6 +1,6 @@
 # AI Agent Foundation
 
-**Status:** controlled server tools/public web + local inference published; separate Cloud AI provider module and module-aware navigation staged in `0.1.131-dev`; Web streaming remains pending compatibility rework  
+**Status:** controlled server tools/public web + local inference + separate Cloud AI provider module and module-aware navigation published through `0.1.131-dev`; Web streaming remains pending compatibility rework  
 **Started:** 2026-10-01  
 **First implementation slice:** `0.1.115-dev` published
 
@@ -117,6 +117,7 @@ No single model vendor becomes a Core dependency.
 - ✅ the same Tool Registry, permissions, sensitivity classes and explicit approval policy apply to cloud models.
 - ✅ module UI navigation is derived from runtime module state; disabled modules lose their main-menu contribution.
 - ✅ dependency runtime rule: disabling AI Agent disables Cloud AI and prevents Cloud AI re-enable until AI Agent is active.
+- ✅ published in `v0.1.131-dev` after successful PR/main Core/Web, Windows, Debian and release workflows.
 - 🧪 live acceptance required with a real compatible cloud endpoint before treating provider compatibility as complete.
 ### 0.1.115-dev — Agent contracts
 
