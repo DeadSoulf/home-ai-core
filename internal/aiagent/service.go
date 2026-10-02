@@ -39,6 +39,7 @@ var (
 	ErrAgentDisabled      = errors.New("AI agent is disabled")
 	ErrChatUnavailable    = errors.New("AI chat is unavailable")
 	ErrInvalidChatMessage = errors.New("invalid AI chat message")
+	ErrInvalidProviderMode = errors.New("invalid AI provider mode")
 )
 
 type StateReader interface {
@@ -105,8 +106,12 @@ type Status struct {
 	ToolCount              int    `json:"tool_count"`
 	ProviderConfigured     bool   `json:"provider_configured"`
 	ProviderID             string `json:"provider_id,omitempty"`
-	ProviderModel          string `json:"provider_model,omitempty"`
-	ConversationStoreReady bool   `json:"conversation_store_ready"`
+	ProviderModel           string   `json:"provider_model,omitempty"`
+	ProviderModes           []string `json:"provider_modes,omitempty"`
+	CloudProviderConfigured bool     `json:"cloud_provider_configured"`
+	CloudProviderEnabled    bool     `json:"cloud_provider_enabled"`
+	CloudProviderModel      string   `json:"cloud_provider_model,omitempty"`
+	ConversationStoreReady  bool     `json:"conversation_store_ready"`
 }
 
 func NewService(
@@ -170,6 +175,27 @@ func (s *Service) Restart() {
 	s.enabled = true
 }
 
+func (s *Service) CloudProviderConfigured() bool {
+	router, ok := s.provider.(*RoutingProvider)
+	return ok && router.CloudConfigured()
+}
+
+func (s *Service) SetCloudProviderEnabled(enabled bool) error {
+	router, ok := s.provider.(*RoutingProvider)
+	if !ok || !router.CloudConfigured() {
+		return ErrProviderUnavailable
+	}
+	router.SetCloudEnabled(enabled)
+	return nil
+}
+
+func (s *Service) RestartCloudProvider() error {
+	if err := s.SetCloudProviderEnabled(false); err != nil {
+		return err
+	}
+	return s.SetCloudProviderEnabled(true)
+}
+
 func (s *Service) runtimeContext(parent context.Context) (context.Context, func(), error) {
 	s.runtimeMu.RLock()
 	enabled := s.enabled
@@ -207,6 +233,18 @@ func (s *Service) Status() Status {
 		status.ProviderID = s.provider.ID()
 		if modelProvider, ok := s.provider.(interface{ Model() string }); ok {
 			status.ProviderModel = modelProvider.Model()
+		}
+		if router, ok := s.provider.(*RoutingProvider); ok {
+			status.ProviderModes = router.AvailableModes()
+			status.CloudProviderConfigured = router.CloudConfigured()
+			status.CloudProviderEnabled = router.CloudEnabled()
+			status.CloudProviderModel = router.CloudModel()
+			if router.LocalConfigured() {
+				status.ProviderID = "ollama"
+				status.ProviderModel = router.LocalModel()
+			}
+		} else {
+			status.ProviderModes = []string{ProviderModeLocal}
 		}
 	}
 	return status
@@ -484,7 +522,22 @@ func (s *Service) Chat(
 	meta security.RequestContext,
 	conversationID, content string,
 ) (state.AIMessageRecord, state.AIMessageRecord, error) {
-	return s.chat(ctx, actor, meta, conversationID, content, nil)
+	return s.chat(ctx, actor, meta, conversationID, content, nil, "")
+}
+
+func (s *Service) ChatWithProvider(
+	ctx context.Context,
+	actor security.Actor,
+	meta security.RequestContext,
+	conversationID, content, providerMode string,
+) (state.AIMessageRecord, state.AIMessageRecord, error) {
+	providerMode = strings.ToLower(strings.TrimSpace(providerMode))
+	switch providerMode {
+	case "", ProviderModeLocal, ProviderModeCloud, ProviderModeAuto:
+	default:
+		return state.AIMessageRecord{}, state.AIMessageRecord{}, ErrInvalidProviderMode
+	}
+	return s.chat(ctx, actor, meta, conversationID, content, nil, providerMode)
 }
 
 func (s *Service) ChatStream(
@@ -494,7 +547,7 @@ func (s *Service) ChatStream(
 	conversationID, content string,
 	onDelta func(string) error,
 ) (state.AIMessageRecord, state.AIMessageRecord, error) {
-	return s.chat(ctx, actor, meta, conversationID, content, onDelta)
+	return s.chat(ctx, actor, meta, conversationID, content, onDelta, "")
 }
 
 func (s *Service) chat(
@@ -503,6 +556,7 @@ func (s *Service) chat(
 	meta security.RequestContext,
 	conversationID, content string,
 	onDelta func(string) error,
+	providerMode string,
 ) (state.AIMessageRecord, state.AIMessageRecord, error) {
 	if !s.Enabled() {
 		return state.AIMessageRecord{}, state.AIMessageRecord{}, ErrAgentDisabled
@@ -535,7 +589,7 @@ func (s *Service) chat(
 	})
 
 	started := time.Now()
-	answer, generateErr := s.generateAgentResponse(ctx, actor, meta, conversation.ID, history, onDelta)
+	answer, generateErr := s.generateAgentResponse(ctx, actor, meta, conversation.ID, history, onDelta, providerMode)
 	if generateErr != nil {
 		s.recordChatAudit(ctx, meta, actor, conversation.ID, content, "", time.Since(started), generateErr)
 		return state.AIMessageRecord{}, state.AIMessageRecord{}, generateErr
@@ -580,6 +634,7 @@ func (s *Service) generateAgentResponse(
 	conversationID string,
 	history []state.AIMessageRecord,
 	onDelta func(string) error,
+	providerMode string,
 ) (string, error) {
 	runtimeCtx, runtimeCleanup, runtimeErr := s.runtimeContext(ctx)
 	if runtimeErr != nil {
@@ -591,8 +646,9 @@ func (s *Service) generateAgentResponse(
 	defer cancel()
 
 	request := ModelRequest{
-		Messages: buildChatContext(history),
-		Tools:    s.AvailableTools(actor),
+		Messages:     buildChatContext(history),
+		Tools:        s.AvailableTools(actor),
+		ProviderMode: providerMode,
 	}
 	autoCalls := 0
 	for round := 0; round < maxAgentToolRounds; round++ {
@@ -633,7 +689,8 @@ func (s *Service) generateAgentResponse(
 			descriptor, ok := s.registry.Descriptor(call.ToolID)
 			if !ok || !toolAllowed(actor, descriptor) {
 				request.Messages = append(request.Messages, Message{
-					Role:    RoleTool,
+					Role:       RoleTool,
+					ToolCallID: call.ID,
 					Content: toolContextError(call.ToolID, "tool is unavailable or not permitted"),
 				})
 				continue
@@ -644,7 +701,8 @@ func (s *Service) generateAgentResponse(
 			}
 			if !json.Valid(input) || len(input) > maxActionInputBytes {
 				request.Messages = append(request.Messages, Message{
-					Role:    RoleTool,
+					Role:       RoleTool,
+					ToolCallID: call.ID,
 					Content: toolContextError(call.ToolID, "tool arguments are invalid or too large"),
 				})
 				continue
@@ -656,7 +714,8 @@ func (s *Service) generateAgentResponse(
 				}
 				result, runErr := s.Execute(chatCtx, actor, meta, call.ToolID, input, false)
 				request.Messages = append(request.Messages, Message{
-					Role:    RoleTool,
+					Role:       RoleTool,
+					ToolCallID: call.ID,
 					Content: toolContextResult(call.ToolID, result, runErr),
 				})
 				autoCalls++
@@ -665,7 +724,8 @@ func (s *Service) generateAgentResponse(
 
 			if pendingCreated {
 				request.Messages = append(request.Messages, Message{
-					Role:    RoleTool,
+					Role:       RoleTool,
+					ToolCallID: call.ID,
 					Content: toolContextError(call.ToolID, "only one state-changing server action can be proposed per turn"),
 				})
 				continue
