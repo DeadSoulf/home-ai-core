@@ -467,6 +467,8 @@ func (s *server) writeAIChatError(w http.ResponseWriter, r *http.Request, err er
 			case "unavailable":
 				status = http.StatusServiceUnavailable
 				code = "cloud_ai_unavailable"
+			case "invalid_response":
+				code = "cloud_ai_incompatible_response"
 			}
 			writeAPIError(w, r, status, code, providerErr.Error(), nil)
 			return
