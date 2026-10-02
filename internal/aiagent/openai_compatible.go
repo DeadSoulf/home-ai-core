@@ -92,6 +92,76 @@ func (p *OpenAICompatibleProvider) Model() string {
 	return p.model
 }
 
+
+func cloudProviderErrorKind(status int) string {
+	switch status {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return "authentication"
+	case http.StatusNotFound:
+		return "not_found"
+	case http.StatusTooManyRequests:
+		return "rate_limit"
+	case http.StatusBadRequest, http.StatusUnprocessableEntity:
+		return "invalid_request"
+	default:
+		if status >= 500 {
+			return "unavailable"
+		}
+		return "http_error"
+	}
+}
+
+func cloudProviderErrorMessage(status int, detail string) string {
+	var message string
+	switch status {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		message = "Cloud AI authentication failed. Check the API key"
+	case http.StatusNotFound:
+		message = "Cloud AI endpoint or model was not found. Check endpoint and model"
+	case http.StatusTooManyRequests:
+		message = "Cloud AI rate limit or quota was reached"
+	case http.StatusBadRequest, http.StatusUnprocessableEntity:
+		message = "Cloud AI rejected the request. Check model and provider compatibility"
+	default:
+		if status >= 500 {
+			message = "Cloud AI provider is temporarily unavailable"
+		} else {
+			message = fmt.Sprintf("Cloud AI returned HTTP %d", status)
+		}
+	}
+	if detail != "" {
+		message += ": " + detail
+	}
+	return message
+}
+
+func cloudProviderErrorDetail(raw []byte, apiKey string) string {
+	var decoded struct {
+		Error struct {
+			Message string `json:"message"`
+			Type    string `json:"type"`
+			Code    any    `json:"code"`
+		} `json:"error"`
+	}
+	detail := ""
+	if json.Unmarshal(raw, &decoded) == nil {
+		detail = strings.TrimSpace(decoded.Error.Message)
+	}
+	if detail == "" {
+		return ""
+	}
+	detail = strings.ReplaceAll(detail, "\r", " ")
+	detail = strings.ReplaceAll(detail, "\n", " ")
+	detail = strings.Join(strings.Fields(detail), " ")
+	if apiKey != "" {
+		detail = strings.ReplaceAll(detail, apiKey, "[redacted]")
+	}
+	if len(detail) > 300 {
+		detail = detail[:300] + "…"
+	}
+	return detail
+}
+
 func (p *OpenAICompatibleProvider) Generate(ctx context.Context, request ModelRequest) (ModelResponse, error) {
 	if p == nil || p.client == nil {
 		return ModelResponse{}, ErrProviderUnavailable
@@ -185,7 +255,12 @@ func (p *OpenAICompatibleProvider) Generate(ctx context.Context, request ModelRe
 
 	response, err := p.client.Do(httpRequest)
 	if err != nil {
-		return ModelResponse{}, fmt.Errorf("cloud AI request failed: %w", err)
+		return ModelResponse{}, &ProviderRequestError{
+			Provider: "cloud",
+			Kind:     "network",
+			Message:  "Cloud AI connection failed",
+			Err:      err,
+		}
 	}
 	defer response.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(response.Body, maxOpenAICompatibleResponseBytes+1))
@@ -196,7 +271,13 @@ func (p *OpenAICompatibleProvider) Generate(ctx context.Context, request ModelRe
 		return ModelResponse{}, errors.New("cloud AI response exceeds size limit")
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return ModelResponse{}, fmt.Errorf("cloud AI returned HTTP %d", response.StatusCode)
+		detail := cloudProviderErrorDetail(raw, p.apiKey)
+		return ModelResponse{}, &ProviderRequestError{
+			Provider:   "cloud",
+			Kind:       cloudProviderErrorKind(response.StatusCode),
+			StatusCode: response.StatusCode,
+			Message:    cloudProviderErrorMessage(response.StatusCode, detail),
+		}
 	}
 
 	var decoded struct {
