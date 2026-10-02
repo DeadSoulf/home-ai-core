@@ -155,9 +155,27 @@ func (s *chatMemoryStore) UpdateAIConversationTitle(_ context.Context, id, userI
 	return nil
 }
 
+func (s *chatMemoryStore) CloseAIConversation(_ context.Context, id, userID string, now time.Time) (state.AIConversationRecord, error) {
+	item, ok := s.conversations[id]
+	if !ok || item.UserID != userID {
+		return state.AIConversationRecord{}, state.ErrAIConversationNotFound
+	}
+	if item.ClosedAt == nil {
+		value := now
+		item.ClosedAt = &value
+		item.UpdatedAt = now
+		s.conversations[id] = item
+	}
+	return item, nil
+}
+
 func (s *chatMemoryStore) AppendAIMessage(_ context.Context, id, conversationID, userID, role, content string, now time.Time) (state.AIMessageRecord, error) {
-	if _, err := s.AIConversation(context.Background(), conversationID, userID); err != nil {
+	conversation, err := s.AIConversation(context.Background(), conversationID, userID)
+	if err != nil {
 		return state.AIMessageRecord{}, err
+	}
+	if conversation.ClosedAt != nil {
+		return state.AIMessageRecord{}, state.ErrAIConversationClosed
 	}
 	item := state.AIMessageRecord{
 		ID: id, ConversationID: conversationID, Role: role, Content: content, CreatedAt: now,
@@ -244,6 +262,53 @@ func TestServicePersistentChatUsesProviderAndRedactsAuditText(t *testing.T) {
 	}
 	if bytes.Contains(raw, []byte("How is Home AI?")) || bytes.Contains(raw, []byte("Local assistant reply")) {
 		t.Fatalf("chat text leaked into audit metadata: %s", raw)
+	}
+}
+
+func TestServiceCloseConversationMakesHistoryReadOnly(t *testing.T) {
+	store := newChatMemoryStore()
+	audit := &serviceAudit{}
+	provider := DeterministicProvider{
+		ProviderID: "test-local",
+		Response:   ModelResponse{Message: Message{Role: RoleAssistant, Content: "reply"}},
+	}
+	service := NewService("node-1", store, serviceJobs{}, serviceModules{}, audit, provider)
+	actor := security.Actor{Type: "user", ID: "usr-1"}
+
+	conversation, err := service.CreateConversation(context.Background(), actor, security.RequestContext{}, "Close me")
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed, err := service.CloseConversation(
+		context.Background(),
+		actor,
+		security.RequestContext{RequestID: "req-close"},
+		conversation.ID,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if closed.ClosedAt == nil {
+		t.Fatal("closed_at was not set")
+	}
+	if _, _, err := service.Chat(context.Background(), actor, security.RequestContext{}, conversation.ID, "after close"); !errors.Is(err, state.ErrAIConversationClosed) {
+		t.Fatalf("Chat() error = %v, want conversation closed", err)
+	}
+	messages, err := service.Messages(context.Background(), actor, conversation.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(messages) != 0 {
+		t.Fatalf("messages = %#v", messages)
+	}
+	foundAudit := false
+	for _, call := range audit.calls {
+		if call.action == "ai.conversation.close" && call.targetID == conversation.ID && call.outcome == "success" {
+			foundAudit = true
+		}
+	}
+	if !foundAudit {
+		t.Fatalf("close audit missing: %#v", audit.calls)
 	}
 }
 
