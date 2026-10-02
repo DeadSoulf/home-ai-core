@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.133-dev
+
+- Remove the standalone Cloud AI section from the Home-AI main menu. Cloud AI is managed only from **Modules** and selected inside **AI Agent**.
+- Remove the active `/modules/ai.cloud` App route while keeping the Cloud AI module runtime and provider integration.
+- Add **Test connection / Проверить соединение** to the Cloud AI module card.
+- Run the connection test with a synthetic prompt only: no user conversation history and no Home-AI tools are sent.
+- Replace generic Cloud AI failures with actionable categories for authentication, endpoint/model not found, rate limit/quota, invalid request/provider compatibility, network failure and provider unavailability.
+- Preserve bounded non-auth provider error detail to make wrong model/endpoint/quota failures diagnosable.
+- Never return provider response detail on 401/403; redact the configured API key if it appears in other provider error text.
+- Classify incompatible HTTP-200 responses instead of surfacing the generic `AI provider request failed`.
+- Add provider secret-safety, connection-test API/CSRF and menu-removal regression coverage.
 ## 0.1.132-dev
 
 - Make Cloud AI enablement automatically start its required AI Agent runtime when that dependency is simply disabled or registered.
