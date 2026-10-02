@@ -31,6 +31,7 @@ const (
 	maxAgentToolRounds     = 4
 	maxAgentAutoToolCalls  = 6
 	maxToolContextBytes    = 64 << 10
+	maxActionInputBytes    = 32 << 10
 	maxActionResultBytes   = 64 << 10
 )
 
@@ -330,26 +331,11 @@ func (s *Service) Chat(
 	if err != nil {
 		return userMessage, state.AIMessageRecord{}, err
 	}
-	request := ModelRequest{Messages: buildChatContext(history)}
 	started := time.Now()
-	runtimeCtx, runtimeCleanup, runtimeErr := s.runtimeContext(ctx)
-	if runtimeErr != nil {
-		return userMessage, state.AIMessageRecord{}, runtimeErr
-	}
-	defer runtimeCleanup()
-	chatCtx, cancel := context.WithTimeout(runtimeCtx, s.chatTimeout)
-	response, generateErr := s.provider.Generate(chatCtx, request)
-	cancel()
+	answer, generateErr := s.generateAgentResponse(ctx, actor, meta, conversation.ID, history)
 	if generateErr != nil {
 		s.recordChatAudit(ctx, meta, actor, conversation.ID, content, "", time.Since(started), generateErr)
 		return userMessage, state.AIMessageRecord{}, generateErr
-	}
-
-	answer := strings.TrimSpace(response.Message.Content)
-	if response.Message.Role != RoleAssistant || answer == "" || utf8.RuneCountInString(answer) > maxChatResponseRunes {
-		err := errors.New("AI provider returned an invalid assistant response")
-		s.recordChatAudit(ctx, meta, actor, conversation.ID, content, answer, time.Since(started), err)
-		return userMessage, state.AIMessageRecord{}, err
 	}
 	assistantMessageID, err := newAgentID("aim_")
 	if err != nil {
@@ -364,6 +350,182 @@ func (s *Service) Chat(
 	}
 	s.recordChatAudit(ctx, meta, actor, conversation.ID, content, answer, time.Since(started), nil)
 	return userMessage, assistantMessage, nil
+}
+
+func (s *Service) generateAgentResponse(
+	ctx context.Context,
+	actor security.Actor,
+	meta security.RequestContext,
+	conversationID string,
+	history []state.AIMessageRecord,
+) (string, error) {
+	runtimeCtx, runtimeCleanup, runtimeErr := s.runtimeContext(ctx)
+	if runtimeErr != nil {
+		return "", runtimeErr
+	}
+	defer runtimeCleanup()
+
+	chatCtx, cancel := context.WithTimeout(runtimeCtx, s.chatTimeout)
+	defer cancel()
+
+	request := ModelRequest{
+		Messages: buildChatContext(history),
+		Tools:    s.AvailableTools(actor),
+	}
+	autoCalls := 0
+	for round := 0; round < maxAgentToolRounds; round++ {
+		response, err := s.provider.Generate(chatCtx, request)
+		if err != nil {
+			return "", err
+		}
+		calls := response.ToolCalls
+		if len(calls) == 0 {
+			calls = response.Message.ToolCalls
+		}
+		if len(calls) == 0 {
+			answer := strings.TrimSpace(response.Message.Content)
+			if response.Message.Role != RoleAssistant || answer == "" || utf8.RuneCountInString(answer) > maxChatResponseRunes {
+				return "", errors.New("AI provider returned an invalid assistant response")
+			}
+			return answer, nil
+		}
+		if len(calls) > 4 {
+			return "", errors.New("AI provider returned too many tool calls in one turn")
+		}
+
+		response.Message.Role = RoleAssistant
+		response.Message.ToolCalls = calls
+		request.Messages = append(request.Messages, response.Message)
+
+		pendingCreated := false
+		for _, call := range calls {
+			descriptor, ok := s.registry.Descriptor(call.ToolID)
+			if !ok || !toolAllowed(actor, descriptor) {
+				request.Messages = append(request.Messages, Message{
+					Role:    RoleTool,
+					Content: toolContextError(call.ToolID, "tool is unavailable or not permitted"),
+				})
+				continue
+			}
+			input := call.Input
+			if len(input) == 0 {
+				input = json.RawMessage(`{}`)
+			}
+			if !json.Valid(input) || len(input) > maxActionInputBytes {
+				request.Messages = append(request.Messages, Message{
+					Role:    RoleTool,
+					Content: toolContextError(call.ToolID, "tool arguments are invalid or too large"),
+				})
+				continue
+			}
+
+			if descriptor.Sensitivity == SensitivityRead {
+				if autoCalls >= maxAgentAutoToolCalls {
+					return "", errors.New("AI automatic tool-call limit exceeded")
+				}
+				result, runErr := s.Execute(chatCtx, actor, meta, call.ToolID, input, false)
+				request.Messages = append(request.Messages, Message{
+					Role:    RoleTool,
+					Content: toolContextResult(call.ToolID, result, runErr),
+				})
+				autoCalls++
+				continue
+			}
+
+			if pendingCreated {
+				request.Messages = append(request.Messages, Message{
+					Role:    RoleTool,
+					Content: toolContextError(call.ToolID, "only one state-changing server action can be proposed per turn"),
+				})
+				continue
+			}
+			if s.actions == nil {
+				return "", errors.New("AI action store is unavailable")
+			}
+			if _, err := s.createPendingAction(ctx, actor, meta, conversationID, descriptor, input); err != nil {
+				return "", err
+			}
+			pendingCreated = true
+		}
+
+		if pendingCreated {
+			answer := strings.TrimSpace(response.Message.Content)
+			if answer == "" {
+				answer = "A server change is ready for approval in Home-AI."
+			}
+			if utf8.RuneCountInString(answer) > maxChatResponseRunes {
+				return "", errors.New("AI provider returned an oversized approval message")
+			}
+			return answer, nil
+		}
+	}
+	return "", errors.New("AI tool loop exceeded the maximum number of rounds")
+}
+
+func toolContextResult(toolID string, result json.RawMessage, runErr error) string {
+	if runErr != nil {
+		return toolContextError(toolID, runErr.Error())
+	}
+	if len(result) > maxToolContextBytes {
+		return toolContextError(toolID, "tool result exceeded the model context limit")
+	}
+	if len(result) == 0 {
+		result = json.RawMessage(`{}`)
+	}
+	payload, _ := json.Marshal(map[string]any{
+		"tool_id": toolID,
+		"result":  json.RawMessage(result),
+	})
+	return string(payload)
+}
+
+func toolContextError(toolID, message string) string {
+	payload, _ := json.Marshal(map[string]any{
+		"tool_id": toolID,
+		"error":   message,
+	})
+	return string(payload)
+}
+
+func (s *Service) createPendingAction(
+	ctx context.Context,
+	actor security.Actor,
+	meta security.RequestContext,
+	conversationID string,
+	descriptor ToolDescriptor,
+	input json.RawMessage,
+) (state.AIToolActionRecord, error) {
+	id, err := newAgentID("aia_")
+	if err != nil {
+		return state.AIToolActionRecord{}, err
+	}
+	action, err := s.actions.CreateAIToolAction(
+		ctx,
+		id,
+		conversationID,
+		actor.ID,
+		descriptor.ID,
+		descriptor.Name,
+		string(descriptor.Sensitivity),
+		input,
+		time.Now().UTC(),
+	)
+	if err == nil && s.audit != nil {
+		s.audit.RecordAudit(
+			context.WithoutCancel(ctx),
+			meta,
+			actor,
+			"ai.tool.propose",
+			"ai_tool_action",
+			action.ID,
+			"success",
+			map[string]any{
+				"tool_id":     descriptor.ID,
+				"sensitivity": descriptor.Sensitivity,
+			},
+		)
+	}
+	return action, err
 }
 
 func buildChatContext(history []state.AIMessageRecord) []Message {
