@@ -8,10 +8,37 @@
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.133-dev` — Cloud AI diagnostics + menu cleanup\
-**Текущий срез:** `0.1.133-dev` опубликован; Cloud AI убран из главного меню, добавлена безопасная проверка соединения и provider diagnostics; live acceptance pending\
-**Следующий engineering milestone:** live-проверить Cloud AI connection test и реальный cloud chat; затем расширить controlled tools на updater/service/NAS/SMB.\
-**Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent: contracts `0.1.115`, read tools/API `0.1.117`, local conversation `0.1.119`, runtime control `0.1.120`, controlled model tool-loop `0.1.123`, public web tools `0.1.124`. Generic shell/root bypass отсутствует.\
+**Текущий срез:** `0.1.133-dev` опубликован; этап разработки **AI Agent** зафиксирован и временно завершён. Локальный Ollama, controlled tools, persistent chat, Cloud AI и диагностика провайдеров реализованы.\
+**Следующий engineering milestone:** перейти к следующему модулю Home-AI; дальнейшие изменения AI Agent выполнять только по результатам эксплуатации или при появлении новых требований.\
+**Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
+
+### Итог этапа AI Agent — зафиксировано на 0.1.133-dev
+
+Этап разработки ИИ Агента на текущем цикле **завершён и поставлен на паузу**. Дальнейшая работа по AI выполняется только по результатам реальной эксплуатации либо при появлении новых требований.
+
+- ✅ Создан first-party модуль `ai.agent` с отдельным lifecycle, runtime control и интеграцией в Module Registry.
+- ✅ Реализован локальный Ollama provider; live-проверка подтвердила `qwen3:4b` с полной GPU-offload на Tesla K80.
+- ✅ Для локального inference добавлен fast profile: `think:false`, `num_ctx=16384`, `keep_alive=30m`; HTTP timeout согласован с AI deadline.
+- ✅ Реализованы persistent per-user conversations/messages, создание/завершение/удаление диалогов и очистка завершённых разговоров.
+- ✅ Исправлены orphan/duplicate user turns при provider failure/cancel/restart.
+- ✅ AI page сохраняет состояние диалога и in-flight request при переходах по SPA-разделам.
+- ✅ Реализован typed Tool Registry с permission re-check перед выполнением.
+- ✅ Read-only tools могут выполняться автоматически; change/sensitive actions проходят через persistent approval workflow.
+- ✅ Добавлены controlled server tools для system/jobs/modules, network и storage; unrestricted shell/root для модели отсутствует.
+- ✅ Добавлены безопасные public web tools `web.search` / `web.fetch` с SSRF-защитой, DNS revalidation, bounded response и untrusted-content boundary.
+- ✅ Реализован первый streaming pipeline Ollama → Core → Web; после live-регрессии browser streaming убран из production path, а стабильный JSON chat transport сохранён.
+- ✅ Добавлен отдельный модуль `ai.cloud` с OpenAI-compatible Chat Completions provider.
+- ✅ В AI Agent реализованы режимы **Локально / Облако / Авто**; локальный режим остаётся default, Auto умеет fallback на локальную модель.
+- ✅ Cloud AI использует тот же Tool Registry, permissions, sensitivity/approval boundary и не получает прямого shell/root доступа.
+- ✅ API key Cloud AI хранится только server-side в service environment и не возвращается Web/истории чата.
+- ✅ Включение Cloud AI автоматически включает требуемый базовый AI Agent runtime; частичные ошибки откатывают dependency state.
+- ✅ Cloud AI убран из общего меню по требованию: управление остаётся в **Модули**, а выбор провайдера — внутри **ИИ Агент**.
+- ✅ Главное меню стало module-aware: пункты модулей показываются только при их включённом runtime status.
+- ✅ Добавлена безопасная кнопка **Проверить соединение** для Cloud AI с синтетическим prompt без user history и без Home-AI tools.
+- ✅ Диагностика Cloud AI различает authentication, endpoint/model, rate/quota, compatibility, network и provider-unavailable ошибки; auth details не раскрываются, API key редактируется из error text.
+- ✅ Релизы `0.1.115-dev` → `0.1.133-dev` прошли соответствующие Web/Go/Core/Debian/Windows CI и публикацию release artifacts.
+- ⏸ AI Agent считается функционально достаточным для текущего этапа; дальнейшее расширение tools, streaming и provider UI отложено до отдельного цикла.
 
 ### Выпуск 0.1.133-dev — Cloud AI diagnostics + menu cleanup
 
