@@ -7,8 +7,8 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.126-dev` — Finish chat network hardening\
-**Текущий срез:** `0.1.127-dev` staged: AI chat сохраняет UI-state и in-flight generation при переходах между страницами; release publication pending\
+**Последний опубликованный релиз:** `0.1.127-dev` — persistent AI chat across navigation\
+**Текущий срез:** `0.1.127-dev` опубликован; AI chat сохраняет UI-state и in-flight generation при переходах между страницами; live acceptance pending\
 **Следующий engineering milestone:** live-проверить `0.1.124-dev` на установленном сервере: завершение диалога, web search/fetch и controlled server actions; затем добавить streaming и расширить tools на updater/service/NAS/SMB.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent: contracts `0.1.115`, read tools/API `0.1.117`, local conversation `0.1.119`, runtime control `0.1.120`, controlled model tool-loop `0.1.123`, public web tools `0.1.124`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
@@ -20,8 +20,9 @@
 - ✅ На других страницах AI UI скрыт через `hidden`, но React state и выполняющийся запрос остаются живыми.
 - ✅ До первого посещения `/ai` компонент не монтируется и лишние AI API-запросы не выполняются.
 - ✅ Добавлен regression test политики persistent mount.
-- ✅ PR #126 прошёл Web/Go/Core/Debian; Windows job после единичного unrelated timing failure успешно прошёл повторный запуск.
-- 🧪 После публикации требуется live-проверка: отправить сообщение, во время генерации перейти в **Система**, затем вернуться в **ИИ Агент** — тот же диалог должен остаться на месте.
+- ✅ PR #126 и main прошли Web/Go/Core/Debian/Windows CI; единичный unrelated timing failure Windows copy test успешно прошёл повторный запуск.
+- ✅ Release workflow опубликовал `v0.1.127-dev` с Core amd64/arm64, Windows `.exe`, Debian `.deb` amd64/arm64 и SHA-256.
+- 🧪 Требуется live-проверка: отправить сообщение, во время генерации перейти в **Система**, затем вернуться в **ИИ Агент** — тот же диалог должен остаться на месте.
 ### Выпуск 0.1.126-dev — Finish chat network hardening
 
 - ✅ Для завершения AI-диалога зарегистрирован явный `POST /api/v1/ai/conversations/{conversationID}/close` route.
