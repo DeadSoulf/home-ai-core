@@ -162,11 +162,11 @@ func (s *Service) SubscribeLive(ctx context.Context, cameraID string) (*LiveSubs
 		return nil, err
 	}
 	session := &liveSession{
-		cameraID:     cameraID,
-		cancel:       cancel,
-		done:         make(chan struct{}),
-		notify:       make(chan struct{}),
-		subscribers:  1,
+		cameraID:    cameraID,
+		cancel:      cancel,
+		done:        make(chan struct{}),
+		notify:      make(chan struct{}),
+		subscribers: 1,
 	}
 	s.liveSessions[cameraID] = session
 	s.liveMu.Unlock()
@@ -233,12 +233,16 @@ func (s *Service) runLiveSession(
 		session.publish(frame)
 	}
 
+	// A parser/output failure must also stop the underlying FFmpeg process.
+	// Otherwise a malformed/oversized stream could leave an orphan restream
+	// running after every subscriber has already lost the session.
+	session.cancel()
 	select {
 	case err := <-processDone:
-		if err != nil && !errors.Is(err, context.Canceled) {
+		if streamErr == nil && err != nil && !errors.Is(err, context.Canceled) {
 			streamErr = err
 		}
-	default:
+	case <-time.After(2 * time.Second):
 	}
 	session.finish(streamErr)
 
