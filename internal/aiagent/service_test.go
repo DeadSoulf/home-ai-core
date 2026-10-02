@@ -247,6 +247,85 @@ func TestServicePersistentChatUsesProviderAndRedactsAuditText(t *testing.T) {
 	}
 }
 
+type blockingProvider struct {
+	started chan struct{}
+}
+
+func (p blockingProvider) ID() string { return "blocking" }
+
+func (p blockingProvider) Generate(ctx context.Context, _ ModelRequest) (ModelResponse, error) {
+	select {
+	case p.started <- struct{}{}:
+	default:
+	}
+	<-ctx.Done()
+	return ModelResponse{}, ctx.Err()
+}
+
+func TestServiceDisableBlocksToolsAndChat(t *testing.T) {
+	store := newChatMemoryStore()
+	service := NewService("node-1", store, serviceJobs{}, serviceModules{}, nil)
+	actor := security.Actor{Type: "user", ID: "usr-1", Permissions: []string{"system.read"}}
+
+	service.SetEnabled(false)
+	if service.Enabled() {
+		t.Fatal("service remained enabled")
+	}
+	if service.Status().State != "disabled" {
+		t.Fatalf("status = %#v", service.Status())
+	}
+	if tools := service.AvailableTools(actor); len(tools) != 0 {
+		t.Fatalf("disabled tools = %#v", tools)
+	}
+	if _, err := service.Conversations(context.Background(), actor); !errors.Is(err, ErrAgentDisabled) {
+		t.Fatalf("Conversations() error = %v, want agent disabled", err)
+	}
+	if _, err := service.Execute(context.Background(), actor, security.RequestContext{}, "core.system.status", nil, false); !errors.Is(err, ErrAgentDisabled) {
+		t.Fatalf("Execute() error = %v, want agent disabled", err)
+	}
+
+	service.SetEnabled(true)
+	if !service.Enabled() || service.Status().State == "disabled" {
+		t.Fatalf("service did not re-enable: %#v", service.Status())
+	}
+}
+
+func TestServiceRestartCancelsActiveGeneration(t *testing.T) {
+	store := newChatMemoryStore()
+	started := make(chan struct{}, 1)
+	service := NewService("node-1", store, serviceJobs{}, serviceModules{}, nil, blockingProvider{started: started})
+	actor := security.Actor{Type: "user", ID: "usr-1"}
+
+	conversation, err := service.CreateConversation(context.Background(), actor, security.RequestContext{}, "restart test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, _, err := service.Chat(context.Background(), actor, security.RequestContext{}, conversation.ID, "wait")
+		done <- err
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("provider did not start")
+	}
+
+	service.Restart()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("Chat() error = %v, want context canceled", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("restart did not cancel active generation")
+	}
+	if !service.Enabled() {
+		t.Fatal("service disabled after restart")
+	}
+}
+
 func TestServiceChatUnavailableWithoutProvider(t *testing.T) {
 	store := newChatMemoryStore()
 	service := NewService("node-1", store, serviceJobs{}, serviceModules{}, nil)
