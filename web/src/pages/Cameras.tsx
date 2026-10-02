@@ -9,6 +9,7 @@ import {PageHeading, Status} from "./Dashboard";
 type CameraEditor = {
   name: string;
   address: string;
+  substreamAddress: string;
   username: string;
   password: string;
   transport: "tcp" | "udp";
@@ -16,11 +17,13 @@ type CameraEditor = {
   audioEnabled: boolean;
   enabled: boolean;
   clearCredentials: boolean;
+  clearSubstream: boolean;
 };
 
 const emptyEditor = (): CameraEditor => ({
   name: "",
   address: "",
+  substreamAddress: "",
   username: "",
   password: "",
   transport: "tcp",
@@ -28,12 +31,14 @@ const emptyEditor = (): CameraEditor => ({
   audioEnabled: false,
   enabled: true,
   clearCredentials: false,
+  clearSubstream: false,
 });
 
 function cameraInput(editor: CameraEditor): NVRCameraInput {
   return {
     name: editor.name.trim(),
     address: editor.address.trim(),
+    substream_address: editor.substreamAddress.trim() || undefined,
     username: editor.username.trim() || undefined,
     password: editor.password || undefined,
     transport: editor.transport,
@@ -41,12 +46,14 @@ function cameraInput(editor: CameraEditor): NVRCameraInput {
     audio_enabled: editor.audioEnabled,
     enabled: editor.enabled,
     clear_credentials: editor.clearCredentials,
+    clear_substream: editor.clearSubstream,
   };
 }
 
 function probeFingerprint(editor: CameraEditor): string {
   return [
     editor.address.trim(),
+    editor.substreamAddress.trim(),
     editor.username.trim(),
     editor.password,
     editor.transport,
@@ -124,6 +131,7 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
       setEditor({
         name: config.name,
         address: config.address,
+        substreamAddress: config.substream_address || "",
         username: "",
         password: "",
         transport: config.transport,
@@ -131,6 +139,7 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
         audioEnabled: config.audio_enabled,
         enabled: config.enabled,
         clearCredentials: false,
+        clearSubstream: false,
       });
       setProbe(undefined);
       setTestedFingerprint("");
@@ -454,6 +463,25 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
               />
               <small>{t("nvrCredentialsSeparateHint")}</small>
             </label>
+            <label className="nvr-address-field">
+              {t("nvrSubstreamAddress")}
+              <input
+                inputMode="url"
+                placeholder="rtsp://192.168.1.100:554/stream2"
+                value={editor.substreamAddress}
+                disabled={editor.clearSubstream}
+                onChange={(event) => {
+                  setEditor({
+                    ...editor,
+                    substreamAddress: event.target.value,
+                    clearSubstream: false,
+                  });
+                  setProbe(undefined);
+                  setTestedFingerprint("");
+                }}
+              />
+              <small>{t("nvrSubstreamHint")}</small>
+            </label>
             <label>
               {t("username")}
               <input
@@ -540,14 +568,33 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
                   />
                   <span>{t("nvrClearCredentials")}</span>
                 </label>
+                <label className="nvr-inline-check">
+                  <input
+                    type="checkbox"
+                    checked={editor.clearSubstream}
+                    onChange={(event) => {
+                      setEditor({
+                        ...editor,
+                        clearSubstream: event.target.checked,
+                        substreamAddress: event.target.checked ? "" : editor.substreamAddress,
+                      });
+                      setProbe(undefined);
+                      setTestedFingerprint("");
+                    }}
+                  />
+                  <span>{t("nvrClearSubstream")}</span>
+                </label>
               </>
             )}
 
             {probe && (
               <div className="notice nvr-probe-result">
                 <strong>{t("nvrTestSuccess")}</strong>
-                <span>{probeText(probe)}</span>
+                <span>{t("nvrMainStream")}: {probeText(probe)}</span>
                 <span>{probe.has_audio ? t("nvrAudioDetected") : t("nvrNoAudioDetected")}</span>
+                {probe.substream && (
+                  <span>{t("nvrSubstream")}: {probeText(probe.substream)}</span>
+                )}
               </div>
             )}
 
