@@ -16,9 +16,14 @@ func TestOllamaProviderGenerate(t *testing.T) {
 			t.Fatalf("path = %q", r.URL.Path)
 		}
 		var body struct {
-			Model    string           `json:"model"`
-			Messages []map[string]any `json:"messages"`
-			Stream   bool             `json:"stream"`
+			Model     string           `json:"model"`
+			Messages  []map[string]any `json:"messages"`
+			Stream    bool             `json:"stream"`
+			Think     bool             `json:"think"`
+			KeepAlive string           `json:"keep_alive"`
+			Options   struct {
+				NumCtx int `json:"num_ctx"`
+			} `json:"options"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatal(err)
@@ -27,6 +32,15 @@ func TestOllamaProviderGenerate(t *testing.T) {
 		gotMessages = body.Messages
 		if body.Stream {
 			t.Fatal("stream unexpectedly enabled")
+		}
+		if body.Think {
+			t.Fatal("thinking should be disabled in the default fast mode")
+		}
+		if body.KeepAlive != defaultOllamaKeepAlive {
+			t.Fatalf("keep_alive = %q, want %q", body.KeepAlive, defaultOllamaKeepAlive)
+		}
+		if body.Options.NumCtx != defaultOllamaContext {
+			t.Fatalf("num_ctx = %d, want %d", body.Options.NumCtx, defaultOllamaContext)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"Local answer"}}`))
