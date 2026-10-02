@@ -42,7 +42,7 @@ func TestAIStatusAndPermissionFilteredTools(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status endpoint = %d: %s", rec.Code, rec.Body.String())
 	}
-	if !strings.Contains(rec.Body.String(), `"module_id":"ai.agent"`) || !strings.Contains(rec.Body.String(), `"tool_count":3`) {
+	if !strings.Contains(rec.Body.String(), `"module_id":"ai.agent"`) || !strings.Contains(rec.Body.String(), `"tool_count":10`) {
 		t.Fatalf("status body = %s", rec.Body.String())
 	}
 
