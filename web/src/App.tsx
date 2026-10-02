@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, APIError, connectRealtime, setCSRFToken, type RealtimeStatus } from "./api/client";
-import type { Actor } from "./api/types";
+import type { Actor, ModuleNavigationState } from "./api/types";
 import { Shell } from "./components/Shell";
 import { useI18n } from "./i18n";
 import { accessiblePath, fileSection, fileSectionPath, systemSection } from "./navigation";
@@ -9,6 +9,7 @@ import { AccountPage } from "./pages/Account";
 import { AIPage } from "./pages/AI";
 import { AuditPage } from "./pages/Audit";
 import { Dashboard } from "./pages/Dashboard";
+import { CloudAIPage } from "./pages/CloudAI";
 import { FilesPage } from "./pages/Files";
 import { JobsPage } from "./pages/Jobs";
 import { ModulesPage } from "./pages/Modules";
@@ -20,7 +21,8 @@ type Phase = "loading" | "setup" | "login" | "app";
 function currentPath(): string {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
   const known = ["/", "/ai", "/files", "/files/storage", "/files/windows", "/system", "/modules", "/jobs", "/audit", "/users", "/account"];
-  if (!known.includes(path)) return "/";
+  const moduleRoute = /^\/modules\/[a-z][a-z0-9.-]*$/.test(path);
+  if (!known.includes(path) && !moduleRoute) return "/";
   return path + (path === "/system" || path === "/files" ? window.location.hash : "");
 }
 
@@ -36,6 +38,7 @@ export default function App() {
   const [realtime, setRealtime] = useState<RealtimeStatus>("disconnected");
   const [revision, setRevision] = useState(0);
   const [availableUpdate, setAvailableUpdate] = useState<string>();
+  const [moduleNavigation, setModuleNavigation] = useState<ModuleNavigationState[]>();
   const [aiMounted, setAIMounted] = useState(() => currentPath().split("#")[0] === "/ai");
 
   useEffect(() => {
@@ -125,21 +128,44 @@ export default function App() {
   }, [phase, actor]);
 
   useEffect(() => {
-    if (phase !== "app" || !actor) return;
-    const allowedPath = accessiblePath(actor, path);
+    if (phase !== "app" || !actor) {
+      setModuleNavigation(undefined);
+      return;
+    }
+    let stopped = false;
+    const refresh = async () => {
+      try {
+        const items = await api.moduleNavigation();
+        if (!stopped) setModuleNavigation(items);
+      } catch {
+        // Keep the previous navigation snapshot if the registry is temporarily unavailable.
+      }
+    };
+    void refresh();
+    const changed = () => { void refresh(); };
+    window.addEventListener("home-ai-core:modules-changed", changed);
+    return () => {
+      stopped = true;
+      window.removeEventListener("home-ai-core:modules-changed", changed);
+    };
+  }, [phase, actor, revision]);
+
+  useEffect(() => {
+    if (phase !== "app" || !actor || !moduleNavigation) return;
+    const allowedPath = accessiblePath(actor, path, moduleNavigation);
     if (allowedPath !== path) {
       window.history.replaceState({}, "", allowedPath);
       setPath(allowedPath);
     }
-  }, [phase, actor, path]);
+  }, [phase, actor, path, moduleNavigation]);
 
   useEffect(() => {
-    if (phase !== "app" || !actor) return;
-    const allowedPath = accessiblePath(actor, path);
+    if (phase !== "app" || !actor || !moduleNavigation) return;
+    const allowedPath = accessiblePath(actor, path, moduleNavigation);
     if (allowedPath.split("#")[0] === "/ai") {
       setAIMounted(true);
     }
-  }, [phase, actor, path]);
+  }, [phase, actor, path, moduleNavigation]);
 
   const authenticated = (nextActor: Actor) => {
     setActor(nextActor);
@@ -157,7 +183,7 @@ export default function App() {
   };
 
   const navigate = (nextPath: string) => {
-    const allowed = actor ? accessiblePath(actor, nextPath) : "/";
+    const allowed = actor ? accessiblePath(actor, nextPath, moduleNavigation) : "/";
     if (allowed !== path) {
       window.history.pushState({}, "", allowed);
       setPath(allowed);
@@ -178,7 +204,7 @@ export default function App() {
   const dashboardAllowed = has("system.read") || has("modules.read") || has("jobs.read");
   const accountPage = <AccountPage actor={actor} onPasswordChanged={() => {setActor(undefined); setPhase("login");}} />;
 
-  const allowedPath = accessiblePath(actor, path);
+  const allowedPath = accessiblePath(actor, path, moduleNavigation);
   let page;
   switch (allowedPath.split("#")[0]) {
     case "/ai":
@@ -224,6 +250,9 @@ export default function App() {
         ? <ModulesPage revision={revision} canManage={has("modules.manage")} />
         : accountPage;
       break;
+    case "/modules/ai.cloud":
+      page = <CloudAIPage onOpenAgent={() => navigate("/ai")} />;
+      break;
     case "/jobs":
       page = has("jobs.read") ? <JobsPage revision={revision} canManage={has("jobs.cancel")} /> : accountPage;
       break;
@@ -243,7 +272,7 @@ export default function App() {
   const mountAI = keepAIPageMounted(aiMounted, allowedPath);
 
   return (
-    <Shell actor={actor} path={allowedPath} realtime={realtime} availableUpdate={availableUpdate} onNavigate={navigate} onLogout={logout}>
+    <Shell actor={actor} path={allowedPath} realtime={realtime} availableUpdate={availableUpdate} modules={moduleNavigation} onNavigate={navigate} onLogout={logout}>
       {mountAI && <div hidden={!aiVisible}><AIPage /></div>}
       {!aiVisible && page}
     </Shell>
