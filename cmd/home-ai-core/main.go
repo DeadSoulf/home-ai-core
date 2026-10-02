@@ -118,8 +118,8 @@ func main() {
 		ReadTimeout:       30 * time.Second,
 		// AI chat may legitimately run close to the 90s provider deadline,
 		// especially on older GPUs or during a bounded tool loop.
-		WriteTimeout:      120 * time.Second,
-		IdleTimeout:       120 * time.Second,
+		WriteTimeout: 120 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
