@@ -156,6 +156,15 @@ export const api = {
     return result.conversation;
   },
 
+  closeAIConversation: async (conversationId: string) => {
+    const result = await postJSON<{conversation: AIConversation}>(
+      `/api/v1/ai/conversations/${encodeURIComponent(conversationId)}/close`,
+      {},
+      true,
+    );
+    return result.conversation;
+  },
+
   aiMessages: async (conversationId: string) => {
     const result = await request<{messages: AIMessage[]}>(
       `/api/v1/ai/conversations/${encodeURIComponent(conversationId)}/messages`,
