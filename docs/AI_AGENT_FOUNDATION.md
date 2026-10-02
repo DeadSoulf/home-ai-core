@@ -1,6 +1,6 @@
 # AI Agent Foundation
 
-**Status:** controlled server tools/public web published; local inference tuning published; Web streaming temporarily disabled after live transport regression and pending compatibility rework  
+**Status:** controlled server tools/public web + local inference published; separate Cloud AI provider module and module-aware navigation staged in `0.1.131-dev`; Web streaming remains pending compatibility rework  
 **Started:** 2026-10-01  
 **First implementation slice:** `0.1.115-dev` published
 
@@ -107,6 +107,17 @@ No single model vendor becomes a Core dependency.
 
 ## First implementation slices
 
+### 0.1.131-dev — Separate Cloud AI provider module
+
+- ✅ `ai.cloud` is an independent first-party module with an OpenAI-compatible provider adapter.
+- ✅ Cloud use is explicit opt-in at two levels: the module must be enabled and the user must choose Cloud/Auto; Local remains the default.
+- ✅ the API key stays in the Core service environment and is never returned through status/navigation APIs.
+- ✅ Local / Cloud / Auto routing lives behind the provider contract; Auto falls back to local on ordinary cloud-provider failure.
+- ✅ OpenAI-compatible tool-call IDs are preserved across assistant/tool messages so the existing bounded tool loop remains valid.
+- ✅ the same Tool Registry, permissions, sensitivity classes and explicit approval policy apply to cloud models.
+- ✅ module UI navigation is derived from runtime module state; disabled modules lose their main-menu contribution.
+- ✅ dependency runtime rule: disabling AI Agent disables Cloud AI and prevents Cloud AI re-enable until AI Agent is active.
+- 🧪 live acceptance required with a real compatible cloud endpoint before treating provider compatibility as complete.
 ### 0.1.115-dev — Agent contracts
 
 Published in `v0.1.115-dev` after full Core/Web, Windows and Debian CI/release checks.
