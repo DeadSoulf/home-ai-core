@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { RealtimeStatus } from "../api/client";
-import type { Actor } from "../api/types";
+import type { Actor, ModuleNavigationState } from "../api/types";
 import { COPYRIGHT_NOTICE } from "../branding";
 import { LanguageSwitch, useI18n } from "../i18n";
 import { hasPermission, visibleNavigation } from "../navigation";
@@ -10,6 +10,7 @@ export function Shell(props: {
   path: string;
   realtime: RealtimeStatus;
   availableUpdate?: string;
+  modules?: ModuleNavigationState[];
   onNavigate: (path: string) => void;
   onLogout: () => void;
   children: ReactNode;
@@ -19,7 +20,7 @@ export function Shell(props: {
   const wasOpen = useRef(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   const sidebar = useRef<HTMLElement>(null);
-  const groups = visibleNavigation(props.actor);
+  const groups = visibleNavigation(props.actor, props.modules);
   const route = props.path.split("#")[0];
   const isActivePath = (path: string) => path === "/" ? route === "/" : route === path || route.startsWith(path + "/");
   const current = groups.flatMap((group) => group.items).find((item) => isActivePath(item.path));
@@ -72,7 +73,7 @@ export function Shell(props: {
       <header className="mobile-header" inert={menuOpen}>
         <button ref={menuButton} type="button" className="button secondary" aria-expanded={menuOpen}
           aria-controls="main-sidebar" onClick={() => setMenuOpen(true)}>{t("menu")}</button>
-        <strong>{t(current?.label || "home")}</strong>
+        <strong>{current?.label ? t(current.label) : current?.title || t("home")}</strong>
         <img className="brand-logo" src="/brand/logo-mark.webp" alt="Home-AI-Core" />
       </header>
       {menuOpen && <button type="button" className="menu-backdrop" aria-label={t("closeMenu")} onClick={closeMenu} />}
@@ -87,11 +88,11 @@ export function Shell(props: {
           {groups.map((group) => (
             <div className="nav-group" key={group.label}>
               {group.label !== "home" && <span className="nav-group-label">{t(group.label)}</span>}
-              {group.items.map(({path, label}) => (
+              {group.items.map(({path, label, title}) => (
                 <button type="button" key={path} className={isActivePath(path) ? "nav-item active" : "nav-item"}
                   aria-current={isActivePath(path) ? "page" : undefined}
                   onClick={() => { props.onNavigate(path); if (menuOpen) closeMenu(); }}>
-                  <span>{t(label)}</span>
+                  <span>{label ? t(label) : title}</span>
                   {path === "/system" && props.availableUpdate && hasPermission(props.actor, "updates.read") &&
                     <span className="nav-update-badge" aria-label={t("newUpdateAvailable")}>↑</span>}
                 </button>
