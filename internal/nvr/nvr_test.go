@@ -28,7 +28,7 @@ func TestNVRModuleManifest(t *testing.T) {
 	if manifest.ID != ModuleID || manifest.Version != ModuleVersion {
 		t.Fatalf("manifest = %#v", manifest)
 	}
-	if len(manifest.UI.Navigation) != 1 || manifest.UI.Navigation[0].Route != "/cameras" {
+	if len(manifest.UI.Navigation) != 1 || manifest.UI.Navigation[0].Route != "/modules/nvr" {
 		t.Fatalf("navigation = %#v", manifest.UI.Navigation)
 	}
 	if len(manifest.Host.Packages) != 1 || manifest.Host.Packages[0] != "ffmpeg" {
