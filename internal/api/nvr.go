@@ -297,7 +297,8 @@ func (s *server) nvrCameraResource(
 		)
 		writeJSON(w, http.StatusOK, map[string]any{"deleted": cameraID})
 	default:
-		methodNotAllowed(w, r, http.MethodGet, http.MethodPut, http.MethodDelete)
+		w.Header().Set("Allow", "GET, PUT, DELETE")
+		writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 	}
 }
 
