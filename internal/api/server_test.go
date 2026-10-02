@@ -19,6 +19,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 
+	"github.com/DeadSoulf/home-ai-core/internal/aiagent"
 	"github.com/DeadSoulf/home-ai-core/internal/filedata"
 	"github.com/DeadSoulf/home-ai-core/internal/modules"
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
@@ -784,6 +785,55 @@ func TestAIModuleRuntimeControl(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"state":"ready"`) {
 		t.Fatalf("AI status after restart = %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAIModuleRestartUsesSQLiteSupportedStatus(t *testing.T) {
+	ctx := context.Background()
+	store, err := state.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	registry := modules.NewRegistry(store)
+	if err := registry.Register(ctx, aiagent.NewModule()); err != nil {
+		t.Fatal(err)
+	}
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	const nodeID = "00000000-0000-4000-8000-000000000000"
+	handler := New(
+		nodeID,
+		logger,
+		fakeState{schemaVersion: 19},
+		defaultFakeSecurity(),
+		nil,
+		nil,
+		registry,
+		nil,
+		realtime.New(nodeID, logger),
+	)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/modules/ai.agent/control",
+		strings.NewReader(`{"operation":"restart"}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("restart status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	record, err := store.Module(ctx, "ai.agent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if record.Status != "enabled" {
+		t.Fatalf("persisted status = %q, want enabled", record.Status)
 	}
 }
 
