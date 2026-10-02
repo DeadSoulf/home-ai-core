@@ -255,16 +255,14 @@ export function AIPage() {
               <p>{active?.closed_at ? t("aiFinishedConversationHint") : t("aiLocalOnlyNotice")}</p>
             </div>
             <div className="ai-chat-head-actions">
-              {active && !active.closed_at && (
-                <button
-                  type="button"
-                  className="button secondary compact"
-                  disabled={sending || closing}
-                  onClick={() => void finishConversation()}
-                >
-                  {closing ? t("working") : t("aiFinishConversation")}
-                </button>
-              )}
+              <button
+                type="button"
+                className="button secondary compact"
+                disabled={!active || Boolean(active.closed_at) || sending || closing}
+                onClick={() => void finishConversation()}
+              >
+                {closing ? t("working") : t("aiFinishConversation")}
+              </button>
               {active?.closed_at && (
                 <button
                   type="button"
