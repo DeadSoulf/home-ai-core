@@ -322,7 +322,7 @@ func TestServiceModelAutomaticallyUsesReadTool(t *testing.T) {
 		{Message: Message{Role: RoleAssistant, Content: "The module list was inspected."}},
 	}}
 	service := NewService("node-1", store, serviceJobs{}, serviceModules{
-		items: []modules.Registered{{Manifest: modules.Manifest{ID: "ai.agent", Name: "AI Agent", Version: "0.4.0"}}},
+		items:        []modules.Registered{{Manifest: modules.Manifest{ID: "ai.agent", Name: "AI Agent", Version: "0.4.0"}}},
 		capabilities: []string{"ai.agent"},
 	}, nil, provider)
 	actor := security.Actor{Type: "user", ID: "usr-1", Permissions: []string{"modules.read"}}
@@ -369,10 +369,10 @@ func TestServiceChangeToolWaitsForApprovalThenExecutesOnce(t *testing.T) {
 	executions := 0
 	if err := service.registry.Register(ToolDescriptor{
 		ID: "test.server.change", ModuleID: "ai.agent", Name: "Test server change",
-		Description: "Controlled test change",
-		InputSchema: json.RawMessage(`{"type":"object","properties":{"value":{"type":"string"}},"required":["value"],"additionalProperties":false}`),
+		Description:         "Controlled test change",
+		InputSchema:         json.RawMessage(`{"type":"object","properties":{"value":{"type":"string"}},"required":["value"],"additionalProperties":false}`),
 		RequiredPermissions: []string{"modules.manage"},
-		Sensitivity: SensitivityChange,
+		Sensitivity:         SensitivityChange,
 	}, func(_ context.Context, input json.RawMessage) (json.RawMessage, error) {
 		executions++
 		return json.RawMessage(`{"ok":true}`), nil
@@ -428,7 +428,7 @@ func TestServiceApprovalRechecksCurrentPermission(t *testing.T) {
 	executions := 0
 	if err := service.registry.Register(ToolDescriptor{
 		ID: "test.permission.change", ModuleID: "ai.agent", Name: "Permission change test",
-		InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false}`),
+		InputSchema:         json.RawMessage(`{"type":"object","additionalProperties":false}`),
 		RequiredPermissions: []string{"modules.manage"}, Sensitivity: SensitivityChange,
 	}, func(context.Context, json.RawMessage) (json.RawMessage, error) {
 		executions++
