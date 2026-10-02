@@ -1,6 +1,6 @@
 # AI Agent Foundation
 
-**Status:** local conversation v1 published; live provider acceptance pending  
+**Status:** controlled server tool loop published; live tool-capable provider acceptance pending  
 **Started:** 2026-10-01  
 **First implementation slice:** `0.1.115-dev` published
 
@@ -195,7 +195,8 @@ Published in `v0.1.119-dev` after successful Core/Web, Windows, Debian and relea
 - ✅ first controlled server domains: network profiles/link state and storage inspect/mount/unmount.
 - ✅ privileged operations continue through the existing Home-AI helper; no generic shell/root tool exists.
 - ✅ action inputs/results are size-bounded and audit does not store raw tool input.
-- 🧪 automated CI/release pending.
+- ✅ published in `v0.1.123-dev` after successful Core/Web, Windows, Debian and release workflows.
+- 🧪 live tool-capable local-model acceptance remains pending.
 
 ### Next slice — Streaming + broader controlled server tools
 
@@ -206,14 +207,6 @@ Published in `v0.1.119-dev` after successful Core/Web, Windows, Debian and relea
 - richer post-action model follow-up;
 - provider health/reconnect diagnostics.
 
-
-
-- streaming local model responses to Web;
-- model tool-call parsing/orchestration;
-- read tools may execute only through current permission checks;
-- change/sensitive tools enter approval workflow instead of executing directly;
-- cancellation and partial-response behavior;
-- provider health/reconnect diagnostics.
 
 ### Later slice — Approval and controlled actions
 
