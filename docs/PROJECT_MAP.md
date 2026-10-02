@@ -7,8 +7,8 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.123-dev` — AI Agent controlled server-tools + approval loop\
-**Текущий срез:** `0.1.124-dev` staged в PR #123: видимая кнопка завершения чата + read-only `web.search` / `web.fetch` для локальной модели; release publication pending\
+**Последний опубликованный релиз:** `0.1.124-dev` — AI public web access + visible finish-chat action\
+**Текущий срез:** `0.1.124-dev` опубликован; локальная модель получила read-only `web.search` / `web.fetch`, а действие **Завершить чат** остаётся видимым в AI UI; live acceptance pending\
 **Следующий engineering milestone:** live-проверить `0.1.124-dev` на установленном сервере: завершение диалога, web search/fetch и controlled server actions; затем добавить streaming и расширить tools на updater/service/NAS/SMB.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent: contracts `0.1.115`, read tools/API `0.1.117`, local conversation `0.1.119`, runtime control `0.1.120`, controlled model tool-loop `0.1.123`, public web tools `0.1.124`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
@@ -23,8 +23,10 @@
 - ✅ DNS проверяется непосредственно перед dial; response/model context ограничены по размеру и timeout.
 - ✅ Web content помечается в system prompt как недоверенные данные и не должен интерпретироваться как инструкции агенту.
 - ✅ Regression tests покрывают permission filtering, SSRF boundary и search-result parsing.
-- ✅ PR #123: Core/Web CI, Go tests/vet/build/smoke, Debian installer и Windows client checks прошли перед release bump.
-- 🧪 После публикации требуется live acceptance на HOME AI сервере.
+- ✅ PR #123 прошёл полный Core/Web, Go tests/vet/build/smoke, Debian installer и Windows client CI; main CI также зелёный.
+- ✅ Release workflow опубликовал `v0.1.124-dev` с Core amd64/arm64, Windows `.exe`, Debian `.deb` amd64/arm64 и SHA-256.
+- 🧪 Требуется live acceptance на HOME AI сервере: завершение диалога, `web.search` / `web.fetch` и controlled server actions.
+
 ### Выпуск 0.1.123-dev — AI controlled server tools
 
 - ✅ Ollama native tool calling: descriptors → function schemas, response `tool_calls` → Home-AI tool IDs.
@@ -1257,7 +1259,7 @@ AI не может расширять собственные права.
 | `0.1.121-dev` | 🧪 AI restart hotfix | опубликовано: transient `restarting` не пишется в SQLite; real-registry regression test зелёный; live re-test pending |
 | `0.1.122-dev` | 🧪 AI finish chat | опубликовано: persistent closed chats + read-only history + close API/audit/Web; automated CI/release зелёные, live acceptance pending |
 | `0.1.123-dev` | 🧪 AI controlled server tools | опубликовано: Ollama tool-calling + auto read loop + approval-gated network/storage changes; automated CI/release зелёные, live acceptance pending |
-| `0.1.124-dev` | 🚧 AI public web + finish-chat visibility | PR #123: public `web.search`/`web.fetch`, SSRF boundary, always-visible finish-chat action; release publication pending |
+| `0.1.124-dev` | 🧪 AI public web + finish-chat visibility | опубликовано: public `web.search`/`web.fetch`, SSRF boundary, always-visible finish-chat action; automated CI/release зелёные, live acceptance pending |
 
 ## 10. Правило ведения карты
 

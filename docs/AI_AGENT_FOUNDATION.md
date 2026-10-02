@@ -1,6 +1,6 @@
 # AI Agent Foundation
 
-**Status:** controlled server tool loop published; public web tools staged in `0.1.124-dev`; live provider acceptance pending  
+**Status:** controlled server tool loop and public web tools published through `0.1.124-dev`; live provider acceptance pending  
 **Started:** 2026-10-01  
 **First implementation slice:** `0.1.115-dev` published
 
@@ -207,6 +207,7 @@ Published in `v0.1.119-dev` after successful Core/Web, Windows, Debian and relea
 - ✅ web tools are read-only and inherit the current user's `system.read` permission.
 - ✅ **Finish chat / Завершить чат** remains visibly discoverable in the AI chat header; the existing close API/state contract is unchanged.
 - ✅ regression tests cover tool discovery/API counts, SSRF boundary and DuckDuckGo result decoding.
+- ✅ published in `v0.1.124-dev` after successful PR/main Core/Web, Windows, Debian and release workflows.
 - 🧪 live acceptance still required on the installed server: current-info question → `web.search` → optional `web.fetch` → grounded answer.
 ### Next slice — Streaming + broader controlled server tools
 
