@@ -167,6 +167,15 @@ export type RegisteredModule = {
       requires?: string[];
       provides?: string[];
     };
+    ui?: {
+      navigation?: Array<{
+        id: string;
+        title: string;
+        route: string;
+        icon?: string;
+        order?: number;
+      }>;
+    };
     lifecycle: string[];
   };
   status: "registered" | "enabled" | "disabled" | "error";
@@ -244,7 +253,23 @@ export type AIStatus = {
   provider_configured: boolean;
   provider_id?: string;
   provider_model?: string;
+  provider_modes?: Array<"local" | "cloud" | "auto">;
+  cloud_provider_configured: boolean;
+  cloud_provider_enabled: boolean;
+  cloud_provider_model?: string;
   conversation_store_ready: boolean;
+};
+
+export type ModuleNavigationState = {
+  module_id: string;
+  status: "registered" | "enabled" | "disabled" | "error";
+  items?: Array<{
+    id: string;
+    title: string;
+    route: string;
+    icon?: string;
+    order?: number;
+  }>;
 };
 
 export type AIConversation = {
