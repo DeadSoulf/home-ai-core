@@ -14,6 +14,8 @@ export function AIPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [actionBusy, setActionBusy] = useState("");
   const [error, setError] = useState("");
 
@@ -30,6 +32,10 @@ export function AIPage() {
   const active = useMemo(
     () => conversations.find((item) => item.id === activeID),
     [conversations, activeID],
+  );
+  const closedCount = useMemo(
+    () => conversations.filter((item) => Boolean(item.closed_at)).length,
+    [conversations],
   );
 
   const loadMessages = async (id: string) => {
@@ -135,6 +141,41 @@ export function AIPage() {
     }
   };
 
+  const deleteConversation = async () => {
+    if (!activeID || !active?.closed_at || deleting || clearing) return;
+    if (!window.confirm(t("aiDeleteConversationConfirm"))) return;
+
+    setDeleting(true);
+    setError("");
+    try {
+      await api.deleteAIConversation(activeID);
+      const next = await refreshConversations();
+      await Promise.all([loadMessages(next), loadActions(next)]);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const clearFinishedConversations = async () => {
+    if (closedCount === 0 || deleting || clearing) return;
+    if (!window.confirm(t("aiClearFinishedConfirm"))) return;
+
+    setClearing(true);
+    setError("");
+    try {
+      await api.clearClosedAIConversations();
+      const preferred = active && !active.closed_at ? active.id : undefined;
+      const next = await refreshConversations(preferred);
+      await Promise.all([loadMessages(next), loadActions(next)]);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setClearing(false);
+    }
+  };
+
   const decideAction = async (action: AIAction, decision: "approve" | "reject") => {
     if (!activeID || actionBusy || active?.closed_at) return;
     setActionBusy(action.id);
@@ -229,9 +270,26 @@ export function AIPage() {
               <h2>{t("aiConversations")}</h2>
               <p>{t("aiConversationsHint")}</p>
             </div>
-            <button type="button" className="button primary compact" onClick={() => void createConversation()}>
-              {t("aiNewConversation")}
-            </button>
+            <div className="ai-conversation-header-actions">
+              {closedCount > 0 && (
+                <button
+                  type="button"
+                  className="button secondary compact"
+                  disabled={clearing || deleting || sending || closing}
+                  onClick={() => void clearFinishedConversations()}
+                >
+                  {clearing ? t("working") : t("aiClearFinished")}
+                </button>
+              )}
+              <button
+                type="button"
+                className="button primary compact"
+                disabled={clearing || deleting}
+                onClick={() => void createConversation()}
+              >
+                {t("aiNewConversation")}
+              </button>
+            </div>
           </div>
           <div className="ai-conversation-list">
             {conversations.length === 0 && <p className="muted">{t("aiNoConversations")}</p>}
@@ -275,13 +333,24 @@ export function AIPage() {
                 {closing ? t("working") : t("aiFinishConversation")}
               </button>
               {active?.closed_at && (
-                <button
-                  type="button"
-                  className="button primary compact"
-                  onClick={() => void createConversation()}
-                >
-                  {t("aiNewConversation")}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="button danger compact"
+                    disabled={deleting || clearing}
+                    onClick={() => void deleteConversation()}
+                  >
+                    {deleting ? t("working") : t("aiDeleteConversation")}
+                  </button>
+                  <button
+                    type="button"
+                    className="button primary compact"
+                    disabled={deleting || clearing}
+                    onClick={() => void createConversation()}
+                  >
+                    {t("aiNewConversation")}
+                  </button>
+                </>
               )}
             </div>
           </div>
