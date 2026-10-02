@@ -27,7 +27,7 @@ const (
 	settingsDTSingleLine  = 0x0020
 	settingsDTEndEllipsis = 0x8000
 
-	settingsGradientFillRectH = 0
+	settingsGradientFillRectH  = 0
 	settingsButtonCornerRadius = 10
 
 	settingsFWNormal   = 400
