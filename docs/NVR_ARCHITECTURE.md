@@ -1,7 +1,7 @@
 # Home-AI Cameras / NVR Architecture
 
-**Status:** NVR-0 published in `0.1.134-dev`; secure RTSP onboarding implemented in `0.1.135-dev`; live/runtime supervisor next  
-**Baseline:** Home-AI-Core 0.1.135-dev  
+**Status:** NVR-0/onboarding/supervisor published through `0.1.136-dev`; shared live preview staged in `0.1.137-dev`; ONVIF/main-sub discovery next  
+**Baseline:** Home-AI-Core 0.1.137-dev  
 **Date:** 2026-10-02
 
 ## 1. Goal
@@ -678,15 +678,25 @@ Implemented in `0.1.134-dev`:
 - Cameras foundation Web page and module-aware navigation;
 - privacy, scoped-access, schema and navigation regression tests.
 
-### NVR-1 — Camera onboarding and live
+### NVR-1 — Camera onboarding and live 🚧
 
-- RTSP test/probe;
-- manual camera CRUD;
+Implemented through staged `0.1.137-dev`:
+
+- ✅ RTSP test/probe;
+- ✅ manual camera CRUD;
+- ✅ encrypted server-side camera credentials;
+- ✅ runtime supervisor;
+- ✅ reconnect/health;
+- ✅ shared local live restream;
+- ✅ single/grid live preview;
+- ✅ exact `camera.live` authorization;
+- ✅ RTSP credentials kept out of ffprobe/ffmpeg argv.
+
+Remaining in NVR-1:
+
 - ONVIF discovery/import;
-- runtime supervisor;
-- main/sub stream;
-- single/grid live;
-- reconnect/health.
+- explicit main/sub stream discovery and selection;
+- live acceptance/tuning on real camera hardware.
 
 ### NVR-2 — Recording and storage
 
