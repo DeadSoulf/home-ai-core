@@ -114,7 +114,6 @@ func (s *server) visibleNVRCameras(ctx context.Context, actor security.Actor) ([
 	return out, nil
 }
 
-
 func nvrFoundationStage(service *nvrpkg.Service) string {
 	if service == nil {
 		return "nvr-0"
