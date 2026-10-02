@@ -62,6 +62,8 @@ func (s *server) aiToolResource(w http.ResponseWriter, r *http.Request, actor se
 		request.Approved,
 	)
 	switch {
+	case errors.Is(err, aiagent.ErrAgentDisabled):
+		writeAPIError(w, r, http.StatusServiceUnavailable, "ai_agent_disabled", "AI Agent is disabled", nil)
 	case errors.Is(err, aiagent.ErrToolNotFound):
 		writeAPIError(w, r, http.StatusNotFound, "ai_tool_not_found", "AI tool not found", nil)
 	case errors.Is(err, aiagent.ErrPermissionDenied):
@@ -176,6 +178,8 @@ func validMutationCSRF(actor security.Actor, source authSource, r *http.Request)
 
 func (s *server) writeAIChatError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
+	case errors.Is(err, aiagent.ErrAgentDisabled):
+		writeAPIError(w, r, http.StatusServiceUnavailable, "ai_agent_disabled", "AI Agent is disabled", nil)
 	case errors.Is(err, state.ErrAIConversationNotFound):
 		writeAPIError(w, r, http.StatusNotFound, "ai_conversation_not_found", "AI conversation not found", nil)
 	case errors.Is(err, aiagent.ErrChatUnavailable):
