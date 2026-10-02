@@ -51,8 +51,8 @@ func (s *server) moduleNavigation(
 		return
 	}
 	type navigationItem struct {
-		ModuleID string                 `json:"module_id"`
-		Status   string                 `json:"status"`
+		ModuleID string                   `json:"module_id"`
+		Status   string                   `json:"status"`
 		Items    []modules.NavigationItem `json:"items,omitempty"`
 	}
 	out := make([]navigationItem, 0, len(items))
