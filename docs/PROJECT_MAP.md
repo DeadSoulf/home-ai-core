@@ -7,13 +7,13 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.120-dev`; hotfix `0.1.121-dev` исправляет Restart AI Agent на реальной SQLite-схеме\
-**Текущий срез:** `0.1.121-dev` — hotfix Restart AI Agent: transient `restarting` больше не сохраняется в SQLite; live re-test pending\
+**Последний опубликованный релиз:** `0.1.121-dev` — hotfix Restart AI Agent для реальной SQLite-схемы\
+**Текущий срез:** `0.1.121-dev` опубликован; Restart AI Agent больше не сохраняет transient `restarting`, повторная live-проверка pending\
 **Следующий engineering milestone:** live-проверить управление AI Agent из Модулей и локальный provider; затем перейти к **streaming + controlled model tool-loop**. Windows UI acceptance и release-hardening gates продолжаются параллельно\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent развивается как first-party module: contracts `0.1.115`, read tools/API `0.1.117`, local conversation `0.1.119`, runtime module control `0.1.120`. Automatic AI tool-loop пока намеренно выключен.\
 **Обновлено:** 2026-10-01
 
-### Кандидат 0.1.121-dev — AI Agent restart persistence hotfix
+### Выпуск 0.1.121-dev — AI Agent restart persistence hotfix
 
 - ✅ Найдена live-причина ошибки `failed to persist module state`: SQLite CHECK для `modules.status` не разрешает transient `restarting`.
 - ✅ Restart больше не сохраняет `restarting`; persistent state остаётся `enabled`.
@@ -21,7 +21,9 @@
 - ✅ Web type приведён к реальной DB-схеме: `registered / enabled / disabled / error`.
 - ✅ Добавлен regression test через реальный SQLite-backed Module Registry.
 - ✅ Добавлен test, что `restarting` нельзя записать в persistent registry.
-- 🧪 Требуется PR/main CI, release и повторная live-проверка кнопки **Перезапустить**.
+- ✅ PR #117 прошёл полный Core/Web, Windows и Debian CI; main CI также зелёный.
+- ✅ Release workflow опубликовал `v0.1.121-dev` со всеми Core/Windows/Debian артефактами и SHA-256.
+- 🧪 Требуется повторная live-проверка кнопки **Перезапустить** на установленном сервере.
 
 ### Выпуск 0.1.120-dev — AI Agent module runtime control
 
@@ -1209,8 +1211,8 @@ AI не может расширять собственные права.
 | `0.1.117-dev` | ✅ AI read tools + API | опубликовано: system/jobs/modules read tools + permission filtering + timeout + audit + authenticated API; PR/main CI и release зелёные |
 | `0.1.118-dev` | 🧪 Windows owner-draw visual fix | опубликовано: rounded child regions, parent-surface corner erase, clean primary border/focus, left-aligned nav, unclipped HOME AI; automated CI/release зелёные, live acceptance pending |
 | `0.1.119-dev` | 🧪 AI Local Conversation v1 | опубликовано: persistent per-user chat + optional Ollama provider + Web AI page + audit redaction; automated CI/release зелёные, live local-model acceptance pending |
-| `0.1.120-dev` | 🧪 AI Agent runtime control | опубликовано: Modules enable/disable/restart + persistent status + modules.manage + audit/runtime cancellation; automated CI/release зелёные, live acceptance pending |
-| `0.1.121-dev` | 🚧 AI restart hotfix | transient `restarting` не пишется в SQLite; real-registry regression test добавлен; CI/release pending |
+| `0.1.120-dev` | ⚠️ AI Agent runtime control | опубликовано; live выявлен Restart bug из-за SQLite CHECK на transient `restarting`; исправлено в `0.1.121-dev` |
+| `0.1.121-dev` | 🧪 AI restart hotfix | опубликовано: transient `restarting` не пишется в SQLite; real-registry regression test зелёный; live re-test pending |
 
 ## 10. Правило ведения карты
 

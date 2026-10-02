@@ -171,7 +171,8 @@ Published in `v0.1.119-dev` after successful Core/Web, Windows, Debian and relea
 - ✅ restart now persists only the durable `enabled` state and recreates the AI runtime in memory;
 - ✅ persistent Module Registry rejects `restarting`;
 - ✅ regression test exercises the restart API against the real SQLite-backed registry;
-- 🧪 CI/release and live re-test pending.
+- ✅ published in `v0.1.121-dev` after successful Core/Web, Windows, Debian and release workflows.
+- 🧪 live restart re-test on the installed Home-AI server remains pending.
 
 ### Next slice — Streaming + controlled tool loop
 
