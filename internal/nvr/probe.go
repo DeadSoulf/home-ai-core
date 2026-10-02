@@ -26,12 +26,13 @@ type ProbeRequest struct {
 }
 
 type ProbeResult struct {
-	Codec      string  `json:"codec"`
-	Width      int     `json:"width"`
-	Height     int     `json:"height"`
-	FPS        float64 `json:"fps"`
-	BitrateBPS int64   `json:"bitrate_bps"`
-	HasAudio   bool    `json:"has_audio"`
+	Codec      string       `json:"codec"`
+	Width      int          `json:"width"`
+	Height     int          `json:"height"`
+	FPS        float64      `json:"fps"`
+	BitrateBPS int64        `json:"bitrate_bps"`
+	HasAudio   bool         `json:"has_audio"`
+	Substream  *ProbeResult `json:"substream,omitempty"`
 }
 
 type CameraProber interface {
