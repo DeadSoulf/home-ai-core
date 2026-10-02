@@ -205,7 +205,9 @@ export default function App() {
         : accountPage;
       break;
     case "/modules":
-      page = has("modules.read") ? <ModulesPage revision={revision} /> : accountPage;
+      page = has("modules.read")
+        ? <ModulesPage revision={revision} canManage={has("modules.manage")} />
+        : accountPage;
       break;
     case "/jobs":
       page = has("jobs.read") ? <JobsPage revision={revision} canManage={has("jobs.cancel")} /> : accountPage;
