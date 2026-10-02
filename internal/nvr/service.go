@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/state"
@@ -25,6 +26,7 @@ type CameraStore interface {
 	) (state.NVRCameraRecord, error)
 	DeleteNVRCamera(context.Context, string) error
 	NVRCamera(context.Context, string) (state.NVRCameraRecord, error)
+	ListNVRCameras(context.Context) ([]state.NVRCameraRecord, error)
 	ListNVRStreamProfiles(context.Context, string) ([]state.NVRStreamProfileRecord, error)
 	SetNVRStreamProfile(
 		context.Context,
@@ -39,6 +41,14 @@ type Service struct {
 	credentials CameraCredentialStore
 	prober      CameraProber
 	now         func() time.Time
+
+	runtimeMu        sync.RWMutex
+	supervisorCancel context.CancelFunc
+	workers          map[string]cameraWorker
+	runtime          map[string]CameraRuntimeStatus
+	runtimeEvent     func(RuntimeEvent)
+	healthInterval   time.Duration
+	retryDelays      []time.Duration
 }
 
 type CameraInput struct {
@@ -67,12 +77,7 @@ func NewService(stateDir string, store CameraStore) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Service{
-		store:       store,
-		credentials: credentials,
-		prober:      NewFFProbe(),
-		now:         time.Now,
-	}, nil
+	return newService(store, credentials, NewFFProbe()), nil
 }
 
 func NewServiceWithDependencies(
@@ -80,11 +85,23 @@ func NewServiceWithDependencies(
 	credentials CameraCredentialStore,
 	prober CameraProber,
 ) *Service {
+	return newService(store, credentials, prober)
+}
+
+func newService(
+	store CameraStore,
+	credentials CameraCredentialStore,
+	prober CameraProber,
+) *Service {
 	return &Service{
-		store:       store,
-		credentials: credentials,
-		prober:      prober,
-		now:         time.Now,
+		store:           store,
+		credentials:     credentials,
+		prober:          prober,
+		now:             time.Now,
+		workers:         map[string]cameraWorker{},
+		runtime:         map[string]CameraRuntimeStatus{},
+		healthInterval:  30 * time.Second,
+		retryDelays:     []time.Duration{2 * time.Second, 5 * time.Second, 15 * time.Second, 30 * time.Second},
 	}
 }
 
@@ -205,6 +222,9 @@ func (s *Service) CreateCamera(
 		}
 		return CameraConfig{}, ProbeResult{}, err
 	}
+	if err := s.RefreshCamera(ctx, camera.ID); err != nil {
+		return CameraConfig{}, ProbeResult{}, err
+	}
 	config, err := s.CameraConfig(ctx, camera.ID)
 	if err != nil {
 		return CameraConfig{}, ProbeResult{}, err
@@ -314,6 +334,9 @@ func (s *Service) UpdateCamera(
 	if credentialChanged && oldRef != "" && oldRef != targetRef {
 		_ = s.credentials.DeleteCameraCredential(context.WithoutCancel(ctx), oldRef)
 	}
+	if err := s.RefreshCamera(ctx, cameraID); err != nil {
+		return CameraConfig{}, ProbeResult{}, err
+	}
 	config, err := s.CameraConfig(ctx, cameraID)
 	if err != nil {
 		return CameraConfig{}, ProbeResult{}, err
@@ -333,6 +356,7 @@ func (s *Service) DeleteCamera(ctx context.Context, cameraID string) error {
 	if err := s.store.DeleteNVRCamera(ctx, camera.ID); err != nil {
 		return err
 	}
+	s.RemoveCameraRuntime(camera.ID)
 	if ref != "" && s.credentials != nil {
 		_ = s.credentials.DeleteCameraCredential(context.WithoutCancel(ctx), ref)
 	}
@@ -353,6 +377,7 @@ func (s *Service) CameraConfig(ctx context.Context, cameraID string) (CameraConf
 		Address:       camera.Address,
 		Profiles:      make([]StreamProfile, 0, len(profiles)),
 	}
+	out.Runtime = s.CameraRuntime(camera.ID)
 	for _, profile := range profiles {
 		out.Profiles = append(out.Profiles, StreamProfile{
 			ID:         profile.ID,
