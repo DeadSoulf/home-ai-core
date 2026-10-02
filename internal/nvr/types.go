@@ -60,5 +60,6 @@ type Status struct {
 	LiveRuntimeReady  bool   `json:"live_runtime_ready"`
 	ActiveLiveStreams int    `json:"active_live_streams"`
 	SecretStoreReady  bool   `json:"secret_store_ready"`
+	ONVIFReady        bool   `json:"onvif_ready"`
 	FoundationStage   string `json:"foundation_stage"`
 }
