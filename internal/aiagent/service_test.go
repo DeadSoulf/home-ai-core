@@ -103,3 +103,161 @@ func TestServiceDeniedToolIsAudited(t *testing.T) {
 		t.Fatalf("metadata = %#v", audit.calls[0].metadata)
 	}
 }
+
+
+type chatMemoryStore struct {
+	schema        int
+	conversations map[string]state.AIConversationRecord
+	messages      map[string][]state.AIMessageRecord
+}
+
+func newChatMemoryStore() *chatMemoryStore {
+	return &chatMemoryStore{
+		schema:        18,
+		conversations: map[string]state.AIConversationRecord{},
+		messages:      map[string][]state.AIMessageRecord{},
+	}
+}
+
+func (s *chatMemoryStore) SchemaVersion(context.Context) (int, error) { return s.schema, nil }
+
+func (s *chatMemoryStore) CreateAIConversation(_ context.Context, id, userID, title string, now time.Time) (state.AIConversationRecord, error) {
+	record := state.AIConversationRecord{ID: id, UserID: userID, Title: title, CreatedAt: now, UpdatedAt: now}
+	s.conversations[id] = record
+	return record, nil
+}
+
+func (s *chatMemoryStore) ListAIConversations(_ context.Context, userID string, _ int) ([]state.AIConversationRecord, error) {
+	result := []state.AIConversationRecord{}
+	for _, item := range s.conversations {
+		if item.UserID == userID {
+			result = append(result, item)
+		}
+	}
+	return result, nil
+}
+
+func (s *chatMemoryStore) AIConversation(_ context.Context, id, userID string) (state.AIConversationRecord, error) {
+	item, ok := s.conversations[id]
+	if !ok || item.UserID != userID {
+		return state.AIConversationRecord{}, state.ErrAIConversationNotFound
+	}
+	return item, nil
+}
+
+func (s *chatMemoryStore) UpdateAIConversationTitle(_ context.Context, id, userID, title string, now time.Time) error {
+	item, ok := s.conversations[id]
+	if !ok || item.UserID != userID {
+		return state.ErrAIConversationNotFound
+	}
+	item.Title = title
+	item.UpdatedAt = now
+	s.conversations[id] = item
+	return nil
+}
+
+func (s *chatMemoryStore) AppendAIMessage(_ context.Context, id, conversationID, userID, role, content string, now time.Time) (state.AIMessageRecord, error) {
+	if _, err := s.AIConversation(context.Background(), conversationID, userID); err != nil {
+		return state.AIMessageRecord{}, err
+	}
+	item := state.AIMessageRecord{
+		ID: id, ConversationID: conversationID, Role: role, Content: content, CreatedAt: now,
+	}
+	s.messages[conversationID] = append(s.messages[conversationID], item)
+	return item, nil
+}
+
+func (s *chatMemoryStore) ListAIMessages(_ context.Context, conversationID, userID string, limit int) ([]state.AIMessageRecord, error) {
+	if _, err := s.AIConversation(context.Background(), conversationID, userID); err != nil {
+		return nil, err
+	}
+	items := s.messages[conversationID]
+	if limit > 0 && len(items) > limit {
+		items = items[len(items)-limit:]
+	}
+	return append([]state.AIMessageRecord(nil), items...), nil
+}
+
+func TestServicePersistentChatUsesProviderAndRedactsAuditText(t *testing.T) {
+	store := newChatMemoryStore()
+	audit := &serviceAudit{}
+	provider := DeterministicProvider{
+		ProviderID: "test-local",
+		Response: ModelResponse{Message: Message{Role: RoleAssistant, Content: "Local assistant reply"}},
+	}
+	service := NewService("node-1", store, serviceJobs{}, serviceModules{}, audit, provider)
+	actor := security.Actor{Type: "user", ID: "usr-1"}
+
+	conversation, err := service.CreateConversation(
+		context.Background(), actor, security.RequestContext{RequestID: "req-create"}, "",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	userMessage, assistantMessage, err := service.Chat(
+		context.Background(),
+		actor,
+		security.RequestContext{RequestID: "req-chat"},
+		conversation.ID,
+		"How is Home AI?",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if userMessage.Content != "How is Home AI?" || assistantMessage.Content != "Local assistant reply" {
+		t.Fatalf("chat messages = %#v %#v", userMessage, assistantMessage)
+	}
+	updated, err := store.AIConversation(context.Background(), conversation.ID, actor.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Title == "" {
+		t.Fatal("first message did not set conversation title")
+	}
+
+	messages, err := service.Messages(context.Background(), actor, conversation.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(messages) != 2 {
+		t.Fatalf("messages = %#v", messages)
+	}
+	if _, err := service.Messages(context.Background(), security.Actor{ID: "usr-2"}, conversation.ID); !errors.Is(err, state.ErrAIConversationNotFound) {
+		t.Fatalf("foreign Messages() error = %v", err)
+	}
+
+	var chatAudit *auditCall
+	for i := range audit.calls {
+		if audit.calls[i].action == "ai.chat.generate" {
+			chatAudit = &audit.calls[i]
+			break
+		}
+	}
+	if chatAudit == nil {
+		t.Fatalf("chat audit missing: %#v", audit.calls)
+	}
+	if chatAudit.outcome != "success" {
+		t.Fatalf("chat audit = %#v", chatAudit)
+	}
+	raw, err := json.Marshal(chatAudit.metadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(raw, []byte("How is Home AI?")) || bytes.Contains(raw, []byte("Local assistant reply")) {
+		t.Fatalf("chat text leaked into audit metadata: %s", raw)
+	}
+}
+
+func TestServiceChatUnavailableWithoutProvider(t *testing.T) {
+	store := newChatMemoryStore()
+	service := NewService("node-1", store, serviceJobs{}, serviceModules{}, nil)
+	actor := security.Actor{Type: "user", ID: "usr-1"}
+	conversation, err := service.CreateConversation(context.Background(), actor, security.RequestContext{}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = service.Chat(context.Background(), actor, security.RequestContext{}, conversation.ID, "hello")
+	if !errors.Is(err, ErrChatUnavailable) {
+		t.Fatalf("Chat() error = %v, want chat unavailable", err)
+	}
+}
