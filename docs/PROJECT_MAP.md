@@ -9,7 +9,7 @@
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.133-dev` — Cloud AI diagnostics + menu cleanup\
 **Текущий срез:** `0.1.133-dev` опубликован; этап разработки **AI Agent** зафиксирован и временно завершён. Локальный Ollama, controlled tools, persistent chat, Cloud AI и диагностика провайдеров реализованы.\
-**Следующий engineering milestone:** перейти к следующему модулю Home-AI; дальнейшие изменения AI Agent выполнять только по результатам эксплуатации или при появлении новых требований.\
+**Следующий engineering milestone:** начать **NVR-0 — Contracts and persistence** по [NVR_ARCHITECTURE.md](NVR_ARCHITECTURE.md): модуль `nvr`, permissions, camera/archive/event schema, secret-reference contract и API types.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
 
@@ -1140,22 +1140,66 @@ Home Assistant не является основой.
 - permission-scoped actions;
 - events/audit.
 
-### ⏭ F4 — Cameras / NVR
+### 🚧 F4 — Cameras / NVR
 
-Нужно:
+Архитектура зафиксирована в [NVR_ARCHITECTURE.md](NVR_ARCHITECTURE.md) и [ADR-0037](decisions/0037-cameras-nvr-media-plane.md).
 
-- camera entities;
-- RTSP;
-- ONVIF where useful;
-- live view;
-- continuous/event recording;
-- archive/timeline;
-- выделенная ёмкость архива через storage purpose `video`;
-- ring overwrite самых старых незакреплённых записей;
-- motion/object events;
-- AI vision hooks;
-- локальная база известных лиц;
-- face recognition при наличии подходящего hardware.
+Ключевые решения:
+
+- first-party module ID `nvr`, Web route `/cameras`;
+- Core остаётся control plane: identity, permissions, metadata, jobs/events/audit;
+- RTSP/live/recording идут отдельным media data plane и не проходят через SQLite/WebSocket event history;
+- camera является resource-scoped объектом Core;
+- recording не зависит от AI/Internet/cloud;
+- main stream используется для архива, substream — для preview/motion/будущего detection, когда доступен;
+- архив строится из time-bounded segments, media-файлы лежат вне SQLite;
+- NVR использует только storage с purpose `video`;
+- NVR v1 использует один активный video archive target;
+- reserve + ring retention удаляет только самые старые **незащищённые** segments;
+- protected evidence никогда не удаляется retention автоматически;
+- camera credentials не попадают в API/audit/events; persistent camera config хранит только secret reference;
+- FFmpeg/FFprobe допускаются как первый managed media backend за typed Go abstraction;
+- browser live transport отделён от archive contract и может развиваться независимо;
+- AI/object/face/LPR/semantic search строятся как downstream vision/enrichment слои после надёжного архива.
+
+**Точный NVR v1 scope:**
+
+1. модуль `nvr` enable/disable;
+2. permissions и camera resource scopes;
+3. manual RTSP CRUD;
+4. bounded ONVIF discovery/import;
+5. connection test перед сохранением;
+6. protected server-side camera credentials;
+7. main/sub stream probe;
+8. single live view;
+9. multi-camera grid;
+10. health + automatic reconnect;
+11. выбор одного ready `video` storage target;
+12. continuous recording с packet-copy/remux где возможно;
+13. basic motion recording;
+14. pre/post event buffer;
+15. segmented archive;
+16. reserve + ring overwrite;
+17. protected recordings;
+18. timeline с gaps/recording/motion markers;
+19. grouping motion bursts в review events;
+20. snapshot;
+21. protect/unprotect range;
+22. export clip через persistent Job Engine;
+23. per-camera live/archive/export/manage authorization;
+24. audit без credentials/media leakage;
+25. automatic runtime/archive recovery после restart.
+
+**Implementation slices:**
+
+- **NVR-0:** module contract, permissions, schema, API types, secret-reference contract;
+- **NVR-1:** RTSP/ONVIF onboarding, probe, runtime supervisor, live/grid, reconnect;
+- **NVR-2:** video storage target, segment recorder, recovery, reserve/ring retention;
+- **NVR-3:** motion, pre/post buffer, review grouping, timeline, protect/snapshot/export;
+- **NVR-4:** permission UI, restart/storage-full failure tests, soak/load/live acceptance;
+- **NVR-5 после v1:** object detection, zones/tripwires, accelerators, face/LPR, semantic search и NVR tools для AI Agent.
+
+После stable NVR v1: локальная база известных лиц, face recognition, LPR, semantic/natural-language search, advanced PTZ, incident/case manager, multi-storage и cluster/failover.
 
 ### ⏭ F5 — Full Local AI Agent
 
