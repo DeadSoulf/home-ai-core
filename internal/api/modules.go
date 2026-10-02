@@ -112,6 +112,31 @@ func (s *server) moduleResource(
 	writeJSON(w, http.StatusOK, map[string]any{"module": item})
 }
 
+func (s *server) cloudAIModuleTest(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	if !validMutationCSRF(actor, source, r) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	if !s.ai.CloudProviderConfigured() {
+		writeAPIError(w, r, http.StatusConflict, "cloud_ai_not_configured", "Cloud AI provider is not configured", nil)
+		return
+	}
+	if err := s.ai.TestCloudProvider(r.Context()); err != nil {
+		s.writeAIChatError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 func (s *server) moduleControl(
 	w http.ResponseWriter,
 	r *http.Request,
