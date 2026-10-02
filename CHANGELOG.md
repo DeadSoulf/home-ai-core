@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.125-dev
+
+- Fix AI chat history accumulating duplicate/orphan user messages when model generation fails, times out, is cancelled, or the AI runtime is restarted.
+- Do not persist a user chat message before the provider has successfully produced an assistant response.
+- Keep the current user turn in transient model context during generation so tool calling and normal model behavior remain unchanged.
+- Persist the user/assistant turn only after successful generation; failed/cancelled attempts no longer become durable chat history.
+- Add regression coverage proving provider failure and runtime cancellation do not persist messages.
+- Preserve the 0.1.124 public web tools, controlled server-tool approval boundary and Web chat lifecycle.
 ## 0.1.124-dev
 
 - Keep the Web AI Agent **Finish chat / Завершить чат** action visible in the conversation header even when no active chat is selected; disable it only when closing is not applicable.
