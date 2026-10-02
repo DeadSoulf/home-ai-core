@@ -22,17 +22,17 @@ var CameraScopedPermissions = []string{
 }
 
 type CameraSummary struct {
-	ID             string    `json:"id"`
-	Name           string    `json:"name"`
-	Enabled        bool      `json:"enabled"`
-	SourceType     string    `json:"source_type"`
-	Transport      string    `json:"transport"`
-	RecordingMode  string    `json:"recording_mode"`
-	AudioEnabled   bool      `json:"audio_enabled"`
+	ID             string              `json:"id"`
+	Name           string              `json:"name"`
+	Enabled        bool                `json:"enabled"`
+	SourceType     string              `json:"source_type"`
+	Transport      string              `json:"transport"`
+	RecordingMode  string              `json:"recording_mode"`
+	AudioEnabled   bool                `json:"audio_enabled"`
 	HasCredentials bool                `json:"has_credentials"`
 	Runtime        CameraRuntimeStatus `json:"runtime"`
 	CreatedAt      time.Time           `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	UpdatedAt      time.Time           `json:"updated_at"`
 }
 
 type StreamProfile struct {
