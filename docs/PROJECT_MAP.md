@@ -8,10 +8,26 @@
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.117-dev` — первый вызываемый AI Agent read-tool/API слой: system/jobs/modules tools, permission filtering, timeout и Audit\
-**Текущий срез:** `0.1.117-dev` опубликован: **AI Agent read-tool/API** слой доступен через authenticated API; compact Windows UI `0.1.116-dev` остаётся на параллельной live visual/DPI acceptance\
-**Следующий engineering milestone:** **AI Local Conversation** — local model provider adapter, persistent AI sessions, streaming Web chat, context limits/cancellation и provider health UI. Параллельно live acceptance compact Windows UI `0.1.116-dev`; stable signing-key provisioning и long-duration updater tests остаются release/operations gates\
-**Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent развивается как first-party module: `0.1.115-dev` дал tool/provider contracts, `0.1.117-dev` добавляет реальные read-only Core tools + authenticated API + audit. Compact Windows UI `0.1.116-dev` опубликован и не откатывается; его live visual/DPI acceptance ещё открыт.\
+**Текущий срез:** `0.1.118-dev` — **AI Local Conversation v1**: optional local Ollama provider, persistent per-user conversations/messages, bounded context, audit metadata и Web AI chat\
+**Следующий engineering milestone:** завершить `0.1.118-dev` через CI/release, затем добавить **streaming + controlled model tool-loop** поверх существующих permission/approval boundaries. Compact Windows UI `0.1.116-dev` live acceptance идёт параллельно; stable signing-key provisioning и long-duration updater tests остаются release/operations gates\
+**Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent развивается как first-party module: contracts `0.1.115`, read tools/API `0.1.117`, persistent local conversation `0.1.118`. Автоматический tool-loop пока намеренно выключен; Windows compact UI acceptance остаётся параллельной проверкой.\
 **Обновлено:** 2026-10-01
+
+### Кандидат 0.1.118-dev — AI Local Conversation v1
+
+- ✅ Migration 018 добавляет persistent AI conversations/messages, привязанные к конкретному Home-AI user.
+- ✅ State store проверяет ownership на чтении истории и добавлении сообщений; чужой conversation ID fail-closed.
+- ✅ Добавлен optional local Ollama provider через HTTP без обязательной runtime/vendor зависимости.
+- ✅ Provider конфигурируется через `HOME_AI_AI_PROVIDER / ENDPOINT / MODEL`; без provider Core продолжает работать, чат показывает disabled state.
+- ✅ Conversation API: list/create + messages/history + message generation.
+- ✅ Prompt/message/context limits и server-side provider timeout ограничивают ресурсы.
+- ✅ Audit `ai.chat.generate` хранит provider/model/duration/размеры, но не текст prompt/response.
+- ✅ Web получил отдельный **ИИ Агент / AI Agent**: список диалогов, история, новый чат, provider/model status, RU/EN.
+- ✅ Module capability расширен до `ai.chat`.
+- ✅ Automatic model-driven tool execution в этом срезе **не включён**; existing tools остаются под explicit API permission boundary.
+- ✅ Добавлены tests state/provider/service/API isolation.
+- 🧪 Требуется PR/main CI и release workflow.
+- ⏭ Следом: streaming response + controlled model tool-loop, где read tools идут через permissions, а change/sensitive — через approval.
 
 ### Выпуск 0.1.117-dev — AI Agent read tools + API
 
@@ -1147,6 +1163,7 @@ AI не может расширять собственные права.
 | `0.1.115-dev` | ✅ AI Agent Foundation v1 contracts | опубликовано: first-party `ai.agent`, Tool Registry, provider contract, permission/scope/approval boundaries + tests; API/audit/read tools next |
 | `0.1.116-dev` | 🧪 Compact Figma Windows UI | опубликовано: native window `976×635`, dark logo-style sidebar, gradient hero, compact cards/pages; automated CI/release зелёные, live acceptance pending |
 | `0.1.117-dev` | ✅ AI read tools + API | опубликовано: system/jobs/modules read tools + permission filtering + timeout + audit + authenticated API; PR/main CI и release зелёные |
+| `0.1.118-dev` | 🚧 AI Local Conversation v1 | persistent per-user chat + optional Ollama provider + Web AI page + audit redaction; CI/release pending, streaming/tool-loop next |
 
 ## 10. Правило ведения карты
 
