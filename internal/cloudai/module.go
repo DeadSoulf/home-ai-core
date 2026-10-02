@@ -17,7 +17,7 @@ func (Module) Manifest() modules.Manifest {
 		ID:            "ai.cloud",
 		Name:          "Cloud AI",
 		Description:   "Optional OpenAI-compatible cloud provider for the Home-AI agent",
-		Version:       "0.1.1",
+		Version:       "0.1.2",
 		Core:          ">=0.1.131 <1.0.0",
 		Dependencies: []modules.Dependency{{
 			ID:      "ai.agent",
