@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.127-dev
+
+- Keep the AI Agent page mounted after its first visit so the current chat does not disappear when navigating between Home-AI sections.
+- Preserve the selected conversation, visible/optimistic messages, draft text, pending tool actions and in-flight model request while the AI page is hidden.
+- Do not eagerly mount the AI page before the user visits it, avoiding unnecessary AI API requests for sessions that never open the agent.
+- Add regression coverage for the persistent AI-page mount policy.
+- Preserve the 0.1.125 durable-chat fix and 0.1.126 Finish-chat network hardening.
 ## 0.1.126-dev
 
 - Harden the Web **Finish chat / Завершить чат** flow after the live `Failed to fetch` report.
