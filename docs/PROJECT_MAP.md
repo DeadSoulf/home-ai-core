@@ -8,11 +8,20 @@
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.125-dev` — AI chat duplicate/orphan message fix\
-**Текущий срез:** `0.1.125-dev` опубликован; failed/cancelled generation больше не оставляет duplicate/orphan user messages; live acceptance pending\
+**Текущий срез:** `0.1.126-dev` staged: hotfix кнопки **Завершить чат** после live `Failed to fetch`; release publication pending\
 **Следующий engineering milestone:** live-проверить `0.1.124-dev` на установленном сервере: завершение диалога, web search/fetch и controlled server actions; затем добавить streaming и расширить tools на updater/service/NAS/SMB.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent: contracts `0.1.115`, read tools/API `0.1.117`, local conversation `0.1.119`, runtime control `0.1.120`, controlled model tool-loop `0.1.123`, public web tools `0.1.124`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
 
+### Выпуск 0.1.126-dev — Finish chat network hardening
+
+- ✅ Для завершения AI-диалога зарегистрирован явный `POST /api/v1/ai/conversations/{conversationID}/close` route.
+- ✅ Сохраняются существующие session/CSRF/ownership проверки и persistent `closed_at` lifecycle.
+- ✅ При обрыве close-запроса Web повторно читает authoritative список диалогов; если `closed_at` уже записан, ложный `Failed to fetch` не показывается.
+- ✅ Если состояние подтвердить не удалось, сырой browser network text заменяется локализованной ошибкой запроса.
+- ✅ Web API regression test проверяет exact path, POST, `credentials: same-origin` и CSRF header.
+- ✅ PR #125 прошёл Core/Web, Go tests/vet/build/smoke, Debian installer и Windows client CI перед release bump.
+- 🧪 После публикации требуется live-проверка кнопки **Завершить чат** на установленном сервере.
 ### Выпуск 0.1.125-dev — AI chat duplicate/orphan message fix
 
 - ✅ Сообщение пользователя больше не записывается в persistent history до успешного ответа модели.
