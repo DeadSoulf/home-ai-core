@@ -43,9 +43,12 @@ func New(
 	aiService := aiagent.NewService(nodeID, state, jobService, moduleService, securityService, aiProviders...)
 	if moduleService != nil {
 		if item, err := moduleService.Get(context.Background(), "ai.agent"); err == nil {
-			if item.Status == "disabled" {
+			switch item.Status {
+			case "disabled", "error":
 				aiService.SetEnabled(false)
-			} else if item.Status == "restarting" {
+			case "registered":
+				_ = moduleService.SetStatus(context.Background(), "ai.agent", "enabled", "")
+			case "restarting":
 				aiService.Restart()
 				_ = moduleService.SetStatus(context.Background(), "ai.agent", "enabled", "")
 			}
