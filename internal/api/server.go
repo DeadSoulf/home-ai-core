@@ -171,6 +171,7 @@ func newServer(
 	s.mux.HandleFunc("PUT /api/v1/nvr/cameras/{cameraID}", s.requireAuth("security.self.read", s.nvrCameraResource))
 	s.mux.HandleFunc("DELETE /api/v1/nvr/cameras/{cameraID}", s.requireAuth("security.self.read", s.nvrCameraResource))
 	s.mux.HandleFunc("POST /api/v1/nvr/cameras/{cameraID}/test", s.requireAuth("security.self.read", s.nvrCameraExistingTest))
+	s.mux.HandleFunc("GET /api/v1/nvr/cameras/{cameraID}/live.mjpeg", s.requireAuth("security.self.read", s.nvrCameraLiveMJPEG))
 	s.mux.HandleFunc("/api/v1/ai/status", s.requireAuth("", s.aiStatus))
 	s.mux.HandleFunc("/api/v1/ai/tools", s.requireAuth("", s.aiTools))
 	s.mux.HandleFunc("/api/v1/ai/tools/", s.requireAuth("", s.aiToolResource))
