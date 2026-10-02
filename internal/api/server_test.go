@@ -721,6 +721,101 @@ func TestModulesAPI(t *testing.T) {
 	}
 }
 
+func TestAIModuleRuntimeControl(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	const nodeID = "00000000-0000-4000-8000-000000000000"
+	moduleService := fakeModules{
+		items: []modules.Registered{{
+			Manifest: modules.Manifest{
+				SchemaVersion: 1,
+				ID:            "ai.agent",
+				Name:          "AI Agent",
+				Version:       "0.2.0",
+				Core:          ">=0.1.0 <1.0.0",
+				Lifecycle:     []string{"backup", "restore"},
+			},
+			Status: "enabled",
+		}},
+	}
+	handler := New(
+		nodeID,
+		logger,
+		fakeState{schemaVersion: 19},
+		defaultFakeSecurity(),
+		nil,
+		nil,
+		moduleService,
+		nil,
+		realtime.New(nodeID, logger),
+	)
+
+	post := func(operation string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(
+			http.MethodPost,
+			"/api/v1/modules/ai.agent/control",
+			strings.NewReader(`{"operation":"`+operation+`"}`),
+		)
+		req.Header.Set("Authorization", "Bearer test")
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec
+	}
+
+	rec := post("disable")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("disable status = %d: %s", rec.Code, rec.Body.String())
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/ai/status", nil)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"state":"disabled"`) {
+		t.Fatalf("AI status after disable = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = post("restart")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("restart status = %d: %s", rec.Code, rec.Body.String())
+	}
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/ai/status", nil)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"state":"ready"`) {
+		t.Fatalf("AI status after restart = %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAIModuleRuntimeControlRequiresManagePermission(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	const nodeID = "00000000-0000-4000-8000-000000000000"
+	sec := defaultFakeSecurity()
+	filtered := make([]string, 0, len(sec.actor.Permissions))
+	for _, permission := range sec.actor.Permissions {
+		if permission != "modules.manage" {
+			filtered = append(filtered, permission)
+		}
+	}
+	sec.actor.Permissions = filtered
+	moduleService := fakeModules{
+		items: []modules.Registered{{
+			Manifest: modules.Manifest{SchemaVersion: 1, ID: "ai.agent", Name: "AI Agent", Version: "0.2.0", Core: ">=0.1.0 <1.0.0"},
+			Status:   "enabled",
+		}},
+	}
+	handler := New(nodeID, logger, fakeState{schemaVersion: 19}, sec, nil, nil, moduleService, nil, realtime.New(nodeID, logger))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/modules/ai.agent/control", strings.NewReader(`{"operation":"disable"}`))
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestUsersListRequiresPermission(t *testing.T) {
 	sec := defaultFakeSecurity()
 	sec.actor.Permissions = []string{"security.self.read"}
