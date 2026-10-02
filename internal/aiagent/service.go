@@ -45,6 +45,7 @@ type ConversationStore interface {
 	ListAIConversations(context.Context, string, int) ([]state.AIConversationRecord, error)
 	AIConversation(context.Context, string, string) (state.AIConversationRecord, error)
 	UpdateAIConversationTitle(context.Context, string, string, string, time.Time) error
+	CloseAIConversation(context.Context, string, string, time.Time) (state.AIConversationRecord, error)
 	AppendAIMessage(context.Context, string, string, string, string, string, time.Time) (state.AIMessageRecord, error)
 	ListAIMessages(context.Context, string, string, int) ([]state.AIMessageRecord, error)
 }
@@ -233,6 +234,28 @@ func (s *Service) CreateConversation(
 	return record, err
 }
 
+func (s *Service) CloseConversation(
+	ctx context.Context,
+	actor security.Actor,
+	meta security.RequestContext,
+	conversationID string,
+) (state.AIConversationRecord, error) {
+	if !s.Enabled() {
+		return state.AIConversationRecord{}, ErrAgentDisabled
+	}
+	if s.conversations == nil || actor.ID == "" {
+		return state.AIConversationRecord{}, ErrChatUnavailable
+	}
+	record, err := s.conversations.CloseAIConversation(ctx, conversationID, actor.ID, time.Now().UTC())
+	if err == nil && s.audit != nil {
+		s.audit.RecordAudit(
+			context.WithoutCancel(ctx), meta, actor,
+			"ai.conversation.close", "ai_conversation", conversationID, "success", nil,
+		)
+	}
+	return record, err
+}
+
 func (s *Service) Messages(
 	ctx context.Context,
 	actor security.Actor,
@@ -266,6 +289,9 @@ func (s *Service) Chat(
 	conversation, err := s.conversations.AIConversation(ctx, conversationID, actor.ID)
 	if err != nil {
 		return state.AIMessageRecord{}, state.AIMessageRecord{}, err
+	}
+	if conversation.ClosedAt != nil {
+		return state.AIMessageRecord{}, state.AIMessageRecord{}, state.ErrAIConversationClosed
 	}
 
 	userMessageID, err := newAgentID("aim_")
