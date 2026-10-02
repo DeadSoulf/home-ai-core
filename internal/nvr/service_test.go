@@ -81,7 +81,7 @@ func TestCameraOnboardingPersistsOnlySecretReferenceAndKeepsCredentialOnEdit(t *
 		return time.Date(2026, 10, 2, 15, 0, 0, 0, time.UTC)
 	}
 
-	camera, probe, err := service.CreateCamera(ctx, "usr_owner", CameraInput{
+	camera, probe, err := service.CreateCamera(ctx, "", CameraInput{
 		Name:          "Driveway",
 		Address:       "rtsp://192.0.2.10/stream1",
 		Username:      "viewer",
@@ -164,7 +164,7 @@ func TestCameraOnboardingRejectsPasswordInsideRTSPURL(t *testing.T) {
 		newFakeCredentialStore(),
 		&fakeProber{result: ProbeResult{Codec: "h264"}},
 	)
-	_, _, err = service.CreateCamera(ctx, "usr_owner", CameraInput{
+	_, _, err = service.CreateCamera(ctx, "", CameraInput{
 		Name:    "Unsafe",
 		Address: "rtsp://user:password@192.0.2.10/stream",
 	})
