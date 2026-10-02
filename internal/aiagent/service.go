@@ -28,6 +28,11 @@ const (
 	maxChatResponseRunes   = 32000
 	maxChatContextMessages = 24
 	maxChatContextRunes    = 32000
+	maxAgentToolRounds     = 4
+	maxAgentAutoToolCalls  = 6
+	maxToolContextBytes    = 64 << 10
+	maxActionInputBytes    = 32 << 10
+	maxActionResultBytes   = 64 << 10
 )
 
 var (
@@ -48,6 +53,14 @@ type ConversationStore interface {
 	CloseAIConversation(context.Context, string, string, time.Time) (state.AIConversationRecord, error)
 	AppendAIMessage(context.Context, string, string, string, string, string, time.Time) (state.AIMessageRecord, error)
 	ListAIMessages(context.Context, string, string, int) ([]state.AIMessageRecord, error)
+}
+
+type ActionStore interface {
+	CreateAIToolAction(context.Context, string, string, string, string, string, string, json.RawMessage, time.Time) (state.AIToolActionRecord, error)
+	ListAIToolActions(context.Context, string, string, int) ([]state.AIToolActionRecord, error)
+	ClaimAIToolAction(context.Context, string, string, string, time.Time) (state.AIToolActionRecord, error)
+	RejectAIToolAction(context.Context, string, string, string, time.Time) (state.AIToolActionRecord, error)
+	FinishAIToolAction(context.Context, string, string, string, string, json.RawMessage, string, time.Time) (state.AIToolActionRecord, error)
 }
 
 type JobReader interface {
@@ -71,6 +84,7 @@ type Service struct {
 	modules       ModuleReader
 	audit         AuditRecorder
 	conversations ConversationStore
+	actions       ActionStore
 	provider      Provider
 	toolTimeout   time.Duration
 	chatTimeout   time.Duration
@@ -102,6 +116,7 @@ func NewService(
 	providers ...Provider,
 ) *Service {
 	conversations, _ := stateReader.(ConversationStore)
+	actions, _ := stateReader.(ActionStore)
 	var provider Provider
 	if len(providers) > 0 {
 		provider = providers[0]
@@ -109,7 +124,7 @@ func NewService(
 	runtimeCtx, runtimeCancel := context.WithCancel(context.Background())
 	s := &Service{
 		nodeID: nodeID, registry: NewToolRegistry(), state: stateReader, jobs: jobReader, modules: moduleReader,
-		audit: auditRecorder, conversations: conversations, provider: provider,
+		audit: auditRecorder, conversations: conversations, actions: actions, provider: provider,
 		toolTimeout: defaultToolTimeout, chatTimeout: defaultChatTimeout,
 		enabled: true, runtimeCtx: runtimeCtx, runtimeCancel: runtimeCancel,
 	}
@@ -270,6 +285,148 @@ func (s *Service) Messages(
 	return s.conversations.ListAIMessages(ctx, conversationID, actor.ID, 100)
 }
 
+func (s *Service) Actions(
+	ctx context.Context,
+	actor security.Actor,
+	conversationID string,
+) ([]state.AIToolActionRecord, error) {
+	if s.actions == nil || actor.ID == "" {
+		return nil, ErrChatUnavailable
+	}
+	return s.actions.ListAIToolActions(ctx, conversationID, actor.ID, 50)
+}
+
+func (s *Service) ApproveAction(
+	ctx context.Context,
+	actor security.Actor,
+	meta security.RequestContext,
+	conversationID, actionID string,
+) (state.AIToolActionRecord, error) {
+	if !s.Enabled() {
+		return state.AIToolActionRecord{}, ErrAgentDisabled
+	}
+	if s.actions == nil || s.conversations == nil || actor.ID == "" {
+		return state.AIToolActionRecord{}, ErrChatUnavailable
+	}
+	conversation, err := s.conversations.AIConversation(ctx, conversationID, actor.ID)
+	if err != nil {
+		return state.AIToolActionRecord{}, err
+	}
+	if conversation.ClosedAt != nil {
+		return state.AIToolActionRecord{}, state.ErrAIConversationClosed
+	}
+
+	action, err := s.actions.ClaimAIToolAction(ctx, actionID, conversationID, actor.ID, time.Now().UTC())
+	if err != nil {
+		return action, err
+	}
+	descriptor, ok := s.registry.Descriptor(action.ToolID)
+	if !ok || descriptor.Sensitivity == SensitivityRead || string(descriptor.Sensitivity) != action.Sensitivity {
+		updated, finishErr := s.actions.FinishAIToolAction(
+			context.WithoutCancel(ctx),
+			action.ID,
+			conversationID,
+			actor.ID,
+			"failed",
+			nil,
+			"tool_contract_changed",
+			time.Now().UTC(),
+		)
+		if finishErr != nil {
+			return action, finishErr
+		}
+		return updated, errors.New("AI tool action no longer matches the registered tool contract")
+	}
+
+	result, runErr := s.Execute(ctx, actor, meta, action.ToolID, action.Input, true)
+	if runErr != nil {
+		updated, finishErr := s.actions.FinishAIToolAction(
+			context.WithoutCancel(ctx),
+			action.ID,
+			conversationID,
+			actor.ID,
+			"failed",
+			nil,
+			toolErrorCode(runErr),
+			time.Now().UTC(),
+		)
+		if finishErr != nil {
+			return action, finishErr
+		}
+		return updated, runErr
+	}
+
+	result = boundedActionResult(result)
+	updated, err := s.actions.FinishAIToolAction(
+		context.WithoutCancel(ctx),
+		action.ID,
+		conversationID,
+		actor.ID,
+		"executed",
+		result,
+		"",
+		time.Now().UTC(),
+	)
+	if err != nil {
+		return action, err
+	}
+	if s.audit != nil {
+		s.audit.RecordAudit(
+			context.WithoutCancel(ctx),
+			meta,
+			actor,
+			"ai.tool.approve",
+			"ai_tool_action",
+			action.ID,
+			"success",
+			map[string]any{"tool_id": action.ToolID, "sensitivity": action.Sensitivity},
+		)
+	}
+	return updated, nil
+}
+
+func (s *Service) RejectAction(
+	ctx context.Context,
+	actor security.Actor,
+	meta security.RequestContext,
+	conversationID, actionID string,
+) (state.AIToolActionRecord, error) {
+	if s.actions == nil || actor.ID == "" {
+		return state.AIToolActionRecord{}, ErrChatUnavailable
+	}
+	action, err := s.actions.RejectAIToolAction(ctx, actionID, conversationID, actor.ID, time.Now().UTC())
+	if err != nil {
+		return action, err
+	}
+	if s.audit != nil {
+		s.audit.RecordAudit(
+			context.WithoutCancel(ctx),
+			meta,
+			actor,
+			"ai.tool.reject",
+			"ai_tool_action",
+			action.ID,
+			"success",
+			map[string]any{"tool_id": action.ToolID, "sensitivity": action.Sensitivity},
+		)
+	}
+	return action, nil
+}
+
+func boundedActionResult(result json.RawMessage) json.RawMessage {
+	if len(result) == 0 {
+		return json.RawMessage(`{}`)
+	}
+	if len(result) <= maxActionResultBytes && json.Valid(result) {
+		return append(json.RawMessage(nil), result...)
+	}
+	fallback, _ := json.Marshal(map[string]any{
+		"truncated": true,
+		"message":   "tool result omitted because it exceeded the stored action-result limit",
+	})
+	return fallback
+}
+
 func (s *Service) Chat(
 	ctx context.Context,
 	actor security.Actor,
@@ -316,26 +473,11 @@ func (s *Service) Chat(
 	if err != nil {
 		return userMessage, state.AIMessageRecord{}, err
 	}
-	request := ModelRequest{Messages: buildChatContext(history)}
 	started := time.Now()
-	runtimeCtx, runtimeCleanup, runtimeErr := s.runtimeContext(ctx)
-	if runtimeErr != nil {
-		return userMessage, state.AIMessageRecord{}, runtimeErr
-	}
-	defer runtimeCleanup()
-	chatCtx, cancel := context.WithTimeout(runtimeCtx, s.chatTimeout)
-	response, generateErr := s.provider.Generate(chatCtx, request)
-	cancel()
+	answer, generateErr := s.generateAgentResponse(ctx, actor, meta, conversation.ID, history)
 	if generateErr != nil {
 		s.recordChatAudit(ctx, meta, actor, conversation.ID, content, "", time.Since(started), generateErr)
 		return userMessage, state.AIMessageRecord{}, generateErr
-	}
-
-	answer := strings.TrimSpace(response.Message.Content)
-	if response.Message.Role != RoleAssistant || answer == "" || utf8.RuneCountInString(answer) > maxChatResponseRunes {
-		err := errors.New("AI provider returned an invalid assistant response")
-		s.recordChatAudit(ctx, meta, actor, conversation.ID, content, answer, time.Since(started), err)
-		return userMessage, state.AIMessageRecord{}, err
 	}
 	assistantMessageID, err := newAgentID("aim_")
 	if err != nil {
@@ -352,6 +494,182 @@ func (s *Service) Chat(
 	return userMessage, assistantMessage, nil
 }
 
+func (s *Service) generateAgentResponse(
+	ctx context.Context,
+	actor security.Actor,
+	meta security.RequestContext,
+	conversationID string,
+	history []state.AIMessageRecord,
+) (string, error) {
+	runtimeCtx, runtimeCleanup, runtimeErr := s.runtimeContext(ctx)
+	if runtimeErr != nil {
+		return "", runtimeErr
+	}
+	defer runtimeCleanup()
+
+	chatCtx, cancel := context.WithTimeout(runtimeCtx, s.chatTimeout)
+	defer cancel()
+
+	request := ModelRequest{
+		Messages: buildChatContext(history),
+		Tools:    s.AvailableTools(actor),
+	}
+	autoCalls := 0
+	for round := 0; round < maxAgentToolRounds; round++ {
+		response, err := s.provider.Generate(chatCtx, request)
+		if err != nil {
+			return "", err
+		}
+		calls := response.ToolCalls
+		if len(calls) == 0 {
+			calls = response.Message.ToolCalls
+		}
+		if len(calls) == 0 {
+			answer := strings.TrimSpace(response.Message.Content)
+			if response.Message.Role != RoleAssistant || answer == "" || utf8.RuneCountInString(answer) > maxChatResponseRunes {
+				return "", errors.New("AI provider returned an invalid assistant response")
+			}
+			return answer, nil
+		}
+		if len(calls) > 4 {
+			return "", errors.New("AI provider returned too many tool calls in one turn")
+		}
+
+		response.Message.Role = RoleAssistant
+		response.Message.ToolCalls = calls
+		request.Messages = append(request.Messages, response.Message)
+
+		pendingCreated := false
+		for _, call := range calls {
+			descriptor, ok := s.registry.Descriptor(call.ToolID)
+			if !ok || !toolAllowed(actor, descriptor) {
+				request.Messages = append(request.Messages, Message{
+					Role:    RoleTool,
+					Content: toolContextError(call.ToolID, "tool is unavailable or not permitted"),
+				})
+				continue
+			}
+			input := call.Input
+			if len(input) == 0 {
+				input = json.RawMessage(`{}`)
+			}
+			if !json.Valid(input) || len(input) > maxActionInputBytes {
+				request.Messages = append(request.Messages, Message{
+					Role:    RoleTool,
+					Content: toolContextError(call.ToolID, "tool arguments are invalid or too large"),
+				})
+				continue
+			}
+
+			if descriptor.Sensitivity == SensitivityRead {
+				if autoCalls >= maxAgentAutoToolCalls {
+					return "", errors.New("AI automatic tool-call limit exceeded")
+				}
+				result, runErr := s.Execute(chatCtx, actor, meta, call.ToolID, input, false)
+				request.Messages = append(request.Messages, Message{
+					Role:    RoleTool,
+					Content: toolContextResult(call.ToolID, result, runErr),
+				})
+				autoCalls++
+				continue
+			}
+
+			if pendingCreated {
+				request.Messages = append(request.Messages, Message{
+					Role:    RoleTool,
+					Content: toolContextError(call.ToolID, "only one state-changing server action can be proposed per turn"),
+				})
+				continue
+			}
+			if s.actions == nil {
+				return "", errors.New("AI action store is unavailable")
+			}
+			if _, err := s.createPendingAction(ctx, actor, meta, conversationID, descriptor, input); err != nil {
+				return "", err
+			}
+			pendingCreated = true
+		}
+
+		if pendingCreated {
+			answer := strings.TrimSpace(response.Message.Content)
+			if answer == "" {
+				answer = "A server change is ready for approval in Home-AI."
+			}
+			if utf8.RuneCountInString(answer) > maxChatResponseRunes {
+				return "", errors.New("AI provider returned an oversized approval message")
+			}
+			return answer, nil
+		}
+	}
+	return "", errors.New("AI tool loop exceeded the maximum number of rounds")
+}
+
+func toolContextResult(toolID string, result json.RawMessage, runErr error) string {
+	if runErr != nil {
+		return toolContextError(toolID, runErr.Error())
+	}
+	if len(result) > maxToolContextBytes {
+		return toolContextError(toolID, "tool result exceeded the model context limit")
+	}
+	if len(result) == 0 {
+		result = json.RawMessage(`{}`)
+	}
+	payload, _ := json.Marshal(map[string]any{
+		"tool_id": toolID,
+		"result":  json.RawMessage(result),
+	})
+	return string(payload)
+}
+
+func toolContextError(toolID, message string) string {
+	payload, _ := json.Marshal(map[string]any{
+		"tool_id": toolID,
+		"error":   message,
+	})
+	return string(payload)
+}
+
+func (s *Service) createPendingAction(
+	ctx context.Context,
+	actor security.Actor,
+	meta security.RequestContext,
+	conversationID string,
+	descriptor ToolDescriptor,
+	input json.RawMessage,
+) (state.AIToolActionRecord, error) {
+	id, err := newAgentID("aia_")
+	if err != nil {
+		return state.AIToolActionRecord{}, err
+	}
+	action, err := s.actions.CreateAIToolAction(
+		ctx,
+		id,
+		conversationID,
+		actor.ID,
+		descriptor.ID,
+		descriptor.Name,
+		string(descriptor.Sensitivity),
+		input,
+		time.Now().UTC(),
+	)
+	if err == nil && s.audit != nil {
+		s.audit.RecordAudit(
+			context.WithoutCancel(ctx),
+			meta,
+			actor,
+			"ai.tool.propose",
+			"ai_tool_action",
+			action.ID,
+			"success",
+			map[string]any{
+				"tool_id":     descriptor.ID,
+				"sensitivity": descriptor.Sensitivity,
+			},
+		)
+	}
+	return action, err
+}
+
 func buildChatContext(history []state.AIMessageRecord) []Message {
 	selected := make([]state.AIMessageRecord, 0, len(history))
 	runes := 0
@@ -366,8 +684,9 @@ func buildChatContext(history []state.AIMessageRecord) []Message {
 	messages := []Message{{
 		Role: RoleSystem,
 		Content: "You are the local Home-AI assistant. Answer clearly and conservatively. " +
-			"This chat slice does not automatically execute Home-AI tools or system actions. " +
-			"Never claim an action was executed unless a tool result is explicitly present in the conversation.",
+			"Use available Home-AI tools when they are needed to inspect the system or prepare configuration changes. " +
+			"Read-only tools may run automatically; tools marked change or sensitive require user approval in Home-AI before they run. " +
+			"Describe completed changes only when a tool result confirms completion.",
 	}}
 	for i := len(selected) - 1; i >= 0; i-- {
 		role := RoleUser
@@ -519,6 +838,13 @@ func (s *Service) registerCoreReadTools() error {
 		{ToolDescriptor{ID: "core.system.status", ModuleID: "ai.agent", Name: "Home-AI system status", Description: "Read current Core version, schema and local hardware/system status.", InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false}`), RequiredPermissions: []string{"system.read"}, Sensitivity: SensitivityRead}, s.systemStatus},
 		{ToolDescriptor{ID: "core.jobs.list", ModuleID: "ai.agent", Name: "Home-AI jobs", Description: "List recent Core jobs without exposing job input/result payloads.", InputSchema: json.RawMessage(`{"type":"object","properties":{"status":{"type":"string","maxLength":32},"limit":{"type":"integer","minimum":1,"maximum":100}},"additionalProperties":false}`), RequiredPermissions: []string{"jobs.read"}, Sensitivity: SensitivityRead}, s.jobsList},
 		{ToolDescriptor{ID: "core.modules.list", ModuleID: "ai.agent", Name: "Home-AI modules", Description: "List registered modules and current platform capabilities.", InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false}`), RequiredPermissions: []string{"modules.read"}, Sensitivity: SensitivityRead}, s.modulesList},
+		{ToolDescriptor{ID: "core.network.profiles", ModuleID: "ai.agent", Name: "Network profiles", Description: "Inspect persistent Home-AI network profiles and their backend.", InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false}`), RequiredPermissions: []string{"network.read"}, Sensitivity: SensitivityRead}, s.networkProfiles},
+		{ToolDescriptor{ID: "core.network.wireguard", ModuleID: "ai.agent", Name: "WireGuard status", Description: "Inspect WireGuard availability, tunnels, peers and handshake status.", InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false}`), RequiredPermissions: []string{"network.read"}, Sensitivity: SensitivityRead}, s.wireGuardStatus},
+		{ToolDescriptor{ID: "core.storage.inspect", ModuleID: "ai.agent", Name: "Storage inspection", Description: "Inspect filesystems, disk health and LVM state through the Home-AI helper.", InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false}`), RequiredPermissions: []string{"storage.read"}, Sensitivity: SensitivityRead}, s.storageInspect},
+		{ToolDescriptor{ID: "core.network.profile.save", ModuleID: "ai.agent", Name: "Save network profile", Description: "Apply a persistent DHCP or static network profile. This can interrupt server connectivity and always requires explicit approval.", InputSchema: json.RawMessage(`{"type":"object","properties":{"interface":{"type":"string","minLength":1,"maxLength":15},"method":{"type":"string","enum":["dhcp","static"]},"address":{"type":"string","maxLength":64},"gateway":{"type":"string","maxLength":64},"dns":{"type":"array","items":{"type":"string","maxLength":64},"maxItems":4}},"required":["interface","method"],"additionalProperties":false}`), RequiredPermissions: []string{"network.manage"}, Sensitivity: SensitivitySensitive}, s.networkProfileSave},
+		{ToolDescriptor{ID: "core.network.link.set", ModuleID: "ai.agent", Name: "Set network link state", Description: "Bring a network interface up or down. This can interrupt server connectivity and always requires explicit approval.", InputSchema: json.RawMessage(`{"type":"object","properties":{"interface":{"type":"string","minLength":1,"maxLength":15},"state":{"type":"string","enum":["up","down"]}},"required":["interface","state"],"additionalProperties":false}`), RequiredPermissions: []string{"network.manage"}, Sensitivity: SensitivitySensitive}, s.networkLinkSet},
+		{ToolDescriptor{ID: "core.storage.mount", ModuleID: "ai.agent", Name: "Mount storage", Description: "Mount a block device under the Home-AI mount root after explicit approval.", InputSchema: json.RawMessage(`{"type":"object","properties":{"device":{"type":"string","pattern":"^/dev/"},"mountpoint":{"type":"string","maxLength":256}},"required":["device"],"additionalProperties":false}`), RequiredPermissions: []string{"storage.manage"}, Sensitivity: SensitivityChange}, s.storageMount},
+		{ToolDescriptor{ID: "core.storage.unmount", ModuleID: "ai.agent", Name: "Unmount storage", Description: "Unmount a block device. This can interrupt file access and always requires explicit approval.", InputSchema: json.RawMessage(`{"type":"object","properties":{"device":{"type":"string","pattern":"^/dev/"}},"required":["device"],"additionalProperties":false}`), RequiredPermissions: []string{"storage.manage"}, Sensitivity: SensitivitySensitive}, s.storageUnmount},
 	}
 	for _, tool := range tools {
 		if err := s.registry.Register(tool.descriptor, tool.handler); err != nil {

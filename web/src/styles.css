@@ -1156,3 +1156,48 @@ button:focus-visible, summary:focus-visible { outline: 2px solid #8bb0ff; outlin
   justify-content: flex-end;
   gap: 8px;
 }
+
+
+.ai-action-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #3a4657;
+  border-radius: 12px;
+  padding: 12px;
+  background: #111923;
+}
+.ai-action-card.pending { border-color: #6a5632; background: #1c1a14; }
+.ai-action-card.executed { border-color: #345643; }
+.ai-action-card.failed { border-color: #6d3b42; }
+.ai-action-card.rejected { opacity: .74; }
+.ai-action-head,
+.ai-action-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ai-action-head > div { display: grid; gap: 3px; min-width: 0; }
+.ai-action-head strong { color: #e4edf8; font-size: 13px; }
+.ai-action-head span,
+.ai-action-footer > span { color: #8897aa; font-size: 10px; overflow-wrap: anywhere; }
+.ai-action-card pre {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid #2b3543;
+  border-radius: 8px;
+  background: #0d131a;
+  padding: 9px 10px;
+  color: #bdcad9;
+  font: 11px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ai-action-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.ai-action-result summary { cursor: pointer; color: #9eafc5; font-size: 11px; margin-bottom: 8px; }
+
+@media (max-width: 620px) {
+  .ai-action-head,
+  .ai-action-footer { align-items: flex-start; flex-direction: column; }
+}

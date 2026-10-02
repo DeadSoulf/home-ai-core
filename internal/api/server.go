@@ -106,6 +106,9 @@ func New(
 	s.mux.HandleFunc("/api/v1/ai/tools", s.requireAuth("", s.aiTools))
 	s.mux.HandleFunc("/api/v1/ai/tools/", s.requireAuth("", s.aiToolResource))
 	s.mux.HandleFunc("/api/v1/ai/conversations", s.requireAuth("", s.aiConversations))
+	s.mux.HandleFunc("GET /api/v1/ai/conversations/{conversationID}/actions", s.requireAuth("", s.aiConversationActions))
+	s.mux.HandleFunc("POST /api/v1/ai/conversations/{conversationID}/actions/{actionID}/approve", s.requireAuth("", s.aiConversationActionApprove))
+	s.mux.HandleFunc("POST /api/v1/ai/conversations/{conversationID}/actions/{actionID}/reject", s.requireAuth("", s.aiConversationActionReject))
 	s.mux.HandleFunc("/api/v1/ai/conversations/", s.requireAuth("", s.aiConversationResource))
 	s.mux.HandleFunc("/api/v1/update", s.requireAuth("updates.read", func(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
 		s.updateStatus(w, r)

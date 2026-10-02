@@ -1,6 +1,6 @@
 import {FormEvent, useEffect, useMemo, useState} from "react";
 import {api, APIError} from "../api/client";
-import type {AIConversation, AIMessage, AIStatus} from "../api/types";
+import type {AIAction, AIConversation, AIMessage, AIStatus} from "../api/types";
 import {useI18n} from "../i18n";
 
 export function AIPage() {
@@ -9,11 +9,23 @@ export function AIPage() {
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [activeID, setActiveID] = useState("");
   const [messages, setMessages] = useState<AIMessage[]>([]);
+  const [actions, setActions] = useState<AIAction[]>([]);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [actionBusy, setActionBusy] = useState("");
   const [error, setError] = useState("");
+
+  const actionStatusLabel = (value: AIAction["status"]) => {
+    switch (value) {
+      case "pending": return t("aiActionStatusPending");
+      case "executing": return t("aiActionStatusExecuting");
+      case "executed": return t("aiActionStatusExecuted");
+      case "rejected": return t("aiActionStatusRejected");
+      case "failed": return t("aiActionStatusFailed");
+    }
+  };
 
   const active = useMemo(
     () => conversations.find((item) => item.id === activeID),
@@ -27,6 +39,18 @@ export function AIPage() {
     }
     try {
       setMessages(await api.aiMessages(id));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : t("requestFailed"));
+    }
+  };
+
+  const loadActions = async (id: string) => {
+    if (!id) {
+      setActions([]);
+      return;
+    }
+    try {
+      setActions(await api.aiActions(id));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t("requestFailed"));
     }
@@ -52,7 +76,14 @@ export function AIPage() {
         setConversations(items);
         const first = items[0]?.id || "";
         setActiveID(first);
-        if (first) setMessages(await api.aiMessages(first));
+        if (first) {
+          const [firstMessages, firstActions] = await Promise.all([
+            api.aiMessages(first),
+            api.aiActions(first),
+          ]);
+          setMessages(firstMessages);
+          setActions(firstActions);
+        }
       } catch (reason) {
         if (!stopped) setError(reason instanceof Error ? reason.message : t("requestFailed"));
       } finally {
@@ -69,6 +100,7 @@ export function AIPage() {
       setConversations((items) => [created, ...items]);
       setActiveID(created.id);
       setMessages([]);
+      setActions([]);
       return created.id;
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t("requestFailed"));
@@ -89,6 +121,23 @@ export function AIPage() {
       setError(reason instanceof Error ? reason.message : t("requestFailed"));
     } finally {
       setClosing(false);
+    }
+  };
+
+  const decideAction = async (action: AIAction, decision: "approve" | "reject") => {
+    if (!activeID || actionBusy || active?.closed_at) return;
+    setActionBusy(action.id);
+    setError("");
+    try {
+      const updated = decision === "approve"
+        ? await api.approveAIAction(activeID, action.id)
+        : await api.rejectAIAction(activeID, action.id);
+      setActions((items) => items.map((item) => item.id === updated.id ? updated : item));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : t("requestFailed"));
+      await loadActions(activeID);
+    } finally {
+      setActionBusy("");
     }
   };
 
@@ -119,7 +168,7 @@ export function AIPage() {
         result.user_message,
         result.assistant_message,
       ]);
-      await refreshConversations(id);
+      await Promise.all([refreshConversations(id), loadActions(id)]);
     } catch (reason) {
       if (reason instanceof APIError && reason.code === "ai_chat_unavailable") {
         setError(t("aiProviderUnavailable"));
@@ -183,7 +232,7 @@ export function AIPage() {
                 onClick={() => {
                   setActiveID(item.id);
                   setError("");
-                  void loadMessages(item.id);
+                  void Promise.all([loadMessages(item.id), loadActions(item.id)]);
                 }}
               >
                 <strong>{item.title || t("aiUntitledConversation")}</strong>
@@ -244,6 +293,52 @@ export function AIPage() {
                 <p>{message.content}</p>
               </article>
             ))}
+            {actions.map((action) => (
+              <article key={action.id} className={"ai-action-card " + action.status}>
+                <div className="ai-action-head">
+                  <div>
+                    <strong>{action.tool_name}</strong>
+                    <span>{action.tool_id}</span>
+                  </div>
+                  <span className={action.sensitivity === "sensitive" ? "badge warning" : "badge"}>
+                    {action.sensitivity === "sensitive" ? t("aiActionSensitive") : t("aiActionChange")}
+                  </span>
+                </div>
+                <pre>{safeActionJSON(action.input)}</pre>
+                <div className="ai-action-footer">
+                  <span>{t("aiActionStatus")}: {actionStatusLabel(action.status)}</span>
+                  {action.status === "pending" && !active?.closed_at && (
+                    <div className="ai-action-buttons">
+                      <button
+                        type="button"
+                        className="button secondary compact"
+                        disabled={Boolean(actionBusy)}
+                        onClick={() => void decideAction(action, "reject")}
+                      >
+                        {t("aiActionReject")}
+                      </button>
+                      <button
+                        type="button"
+                        className="button primary compact"
+                        disabled={Boolean(actionBusy)}
+                        onClick={() => void decideAction(action, "approve")}
+                      >
+                        {actionBusy === action.id ? t("working") : t("aiActionApprove")}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {action.status === "executed" && action.result !== undefined && (
+                  <details className="ai-action-result">
+                    <summary>{t("aiActionResult")}</summary>
+                    <pre>{safeActionJSON(action.result)}</pre>
+                  </details>
+                )}
+                {action.status === "failed" && (
+                  <div className="form-error">{t("aiActionFailed")}: {action.error_code || t("unknown")}</div>
+                )}
+              </article>
+            ))}
             {sending && <div className="ai-thinking">{t("aiThinking")}</div>}
           </div>
 
@@ -277,4 +372,31 @@ export function AIPage() {
       </div>
     </section>
   );
+}
+
+
+function safeActionJSON(value: unknown): string {
+  try {
+    return JSON.stringify(redactActionValue(value), null, 2);
+  } catch {
+    return "{}";
+  }
+}
+
+function redactActionValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(redactActionValue);
+  }
+  if (value && typeof value === "object") {
+    const result: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      if (/password|secret|token|private|preshared/i.test(key)) {
+        result[key] = "••••••";
+      } else {
+        result[key] = redactActionValue(item);
+      }
+    }
+    return result;
+  }
+  return value;
 }

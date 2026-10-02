@@ -59,3 +59,66 @@ func TestOllamaProviderRejectsInvalidConfiguration(t *testing.T) {
 		t.Fatal("empty model was accepted")
 	}
 }
+
+func TestOllamaProviderMapsTypedToolCalls(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Tools []struct {
+				Type     string `json:"type"`
+				Function struct {
+					Name       string          `json:"name"`
+					Parameters json.RawMessage `json:"parameters"`
+				} `json:"function"`
+			} `json:"tools"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if len(body.Tools) != 1 {
+			t.Fatalf("tools = %#v", body.Tools)
+		}
+		if body.Tools[0].Type != "function" || body.Tools[0].Function.Name != "home_ai_core_system_status" {
+			t.Fatalf("tool = %#v", body.Tools[0])
+		}
+		if !json.Valid(body.Tools[0].Function.Parameters) {
+			t.Fatalf("invalid parameters = %s", body.Tools[0].Function.Parameters)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"message":{
+				"role":"assistant",
+				"content":"",
+				"tool_calls":[{"function":{"name":"home_ai_core_system_status","arguments":{}}}]
+			}
+		}`))
+	}))
+	defer server.Close()
+
+	provider, err := NewOllamaProvider(server.URL, "tool-model")
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := provider.Generate(context.Background(), ModelRequest{
+		Messages: []Message{{Role: RoleUser, Content: "inspect the server"}},
+		Tools: []ToolDescriptor{{
+			ID:          "core.system.status",
+			ModuleID:    "ai.agent",
+			Name:        "System status",
+			Description: "Read system status",
+			InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false}`),
+			Sensitivity: SensitivityRead,
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(response.ToolCalls) != 1 {
+		t.Fatalf("tool calls = %#v", response.ToolCalls)
+	}
+	if response.ToolCalls[0].ToolID != "core.system.status" || string(response.ToolCalls[0].Input) != "{}" {
+		t.Fatalf("tool call = %#v", response.ToolCalls[0])
+	}
+	if len(response.Message.ToolCalls) != 1 {
+		t.Fatalf("message tool calls = %#v", response.Message.ToolCalls)
+	}
+}

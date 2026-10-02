@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"unicode"
 )
 
 const maxOllamaResponseBytes = 4 << 20
@@ -19,6 +20,32 @@ type OllamaProvider struct {
 	endpoint string
 	model    string
 	client   *http.Client
+}
+
+type ollamaFunctionDefinition struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description,omitempty"`
+	Parameters  json.RawMessage `json:"parameters"`
+}
+
+type ollamaToolDefinition struct {
+	Type     string                   `json:"type"`
+	Function ollamaFunctionDefinition `json:"function"`
+}
+
+type ollamaFunctionCall struct {
+	Name      string          `json:"name"`
+	Arguments json.RawMessage `json:"arguments"`
+}
+
+type ollamaToolCall struct {
+	Function ollamaFunctionCall `json:"function"`
+}
+
+type ollamaMessage struct {
+	Role      string           `json:"role"`
+	Content   string           `json:"content"`
+	ToolCalls []ollamaToolCall `json:"tool_calls,omitempty"`
 }
 
 func NewOllamaProvider(endpoint, model string) (*OllamaProvider, error) {
@@ -58,10 +85,33 @@ func (p *OllamaProvider) Generate(ctx context.Context, request ModelRequest) (Mo
 		return ModelResponse{}, errors.New("Ollama provider is not initialized")
 	}
 
-	type ollamaMessage struct {
-		Role    string `json:"role"`
-		Content string `json:"content"`
+	toolNameByID := make(map[string]string, len(request.Tools))
+	toolIDByName := make(map[string]string, len(request.Tools))
+	tools := make([]ollamaToolDefinition, 0, len(request.Tools))
+	for _, descriptor := range request.Tools {
+		name := ollamaToolName(descriptor.ID)
+		if existing, exists := toolIDByName[name]; exists && existing != descriptor.ID {
+			return ModelResponse{}, fmt.Errorf("Ollama tool-name collision between %q and %q", existing, descriptor.ID)
+		}
+		parameters := descriptor.InputSchema
+		if len(parameters) == 0 {
+			parameters = json.RawMessage(`{"type":"object","additionalProperties":false}`)
+		}
+		if !json.Valid(parameters) {
+			return ModelResponse{}, fmt.Errorf("invalid input schema for AI tool %q", descriptor.ID)
+		}
+		toolNameByID[descriptor.ID] = name
+		toolIDByName[name] = descriptor.ID
+		tools = append(tools, ollamaToolDefinition{
+			Type: "function",
+			Function: ollamaFunctionDefinition{
+				Name:        name,
+				Description: descriptor.Description,
+				Parameters:  parameters,
+			},
+		})
 	}
+
 	messages := make([]ollamaMessage, 0, len(request.Messages))
 	for _, message := range request.Messages {
 		switch message.Role {
@@ -69,14 +119,35 @@ func (p *OllamaProvider) Generate(ctx context.Context, request ModelRequest) (Mo
 		default:
 			return ModelResponse{}, fmt.Errorf("unsupported AI message role %q", message.Role)
 		}
-		messages = append(messages, ollamaMessage{Role: string(message.Role), Content: message.Content})
+		out := ollamaMessage{Role: string(message.Role), Content: message.Content}
+		for _, call := range message.ToolCalls {
+			name, ok := toolNameByID[call.ToolID]
+			if !ok {
+				return ModelResponse{}, fmt.Errorf("AI message references unavailable tool %q", call.ToolID)
+			}
+			input := call.Input
+			if len(input) == 0 {
+				input = json.RawMessage(`{}`)
+			}
+			if !json.Valid(input) {
+				return ModelResponse{}, fmt.Errorf("AI message tool input for %q is invalid JSON", call.ToolID)
+			}
+			out.ToolCalls = append(out.ToolCalls, ollamaToolCall{
+				Function: ollamaFunctionCall{Name: name, Arguments: input},
+			})
+		}
+		messages = append(messages, out)
 	}
 
-	body, err := json.Marshal(map[string]any{
+	payload := map[string]any{
 		"model":    p.model,
 		"messages": messages,
 		"stream":   false,
-	})
+	}
+	if len(tools) > 0 {
+		payload["tools"] = tools
+	}
+	body, err := json.Marshal(payload)
 	if err != nil {
 		return ModelResponse{}, fmt.Errorf("encode Ollama request: %w", err)
 	}
@@ -106,18 +177,54 @@ func (p *OllamaProvider) Generate(ctx context.Context, request ModelRequest) (Mo
 	}
 
 	var decoded struct {
-		Message struct {
-			Role    string `json:"role"`
-			Content string `json:"content"`
-		} `json:"message"`
+		Message ollamaMessage `json:"message"`
 	}
 	if err := json.Unmarshal(raw, &decoded); err != nil {
 		return ModelResponse{}, fmt.Errorf("decode Ollama response: %w", err)
 	}
-	if strings.TrimSpace(decoded.Message.Content) == "" {
+
+	calls := make([]ToolCall, 0, len(decoded.Message.ToolCalls))
+	for index, call := range decoded.Message.ToolCalls {
+		toolID, ok := toolIDByName[call.Function.Name]
+		if !ok {
+			return ModelResponse{}, fmt.Errorf("Ollama returned unknown tool %q", call.Function.Name)
+		}
+		input := call.Function.Arguments
+		if len(input) == 0 || string(input) == "null" {
+			input = json.RawMessage(`{}`)
+		}
+		if !json.Valid(input) {
+			return ModelResponse{}, fmt.Errorf("Ollama returned invalid arguments for tool %q", toolID)
+		}
+		calls = append(calls, ToolCall{
+			ID:     fmt.Sprintf("ollama_%d", index+1),
+			ToolID: toolID,
+			Input:  append(json.RawMessage(nil), input...),
+		})
+	}
+
+	content := strings.TrimSpace(decoded.Message.Content)
+	if content == "" && len(calls) == 0 {
 		return ModelResponse{}, errors.New("Ollama returned an empty response")
 	}
-	return ModelResponse{
-		Message: Message{Role: RoleAssistant, Content: decoded.Message.Content},
-	}, nil
+	message := Message{Role: RoleAssistant, Content: content, ToolCalls: calls}
+	return ModelResponse{Message: message, ToolCalls: calls}, nil
+}
+
+func ollamaToolName(id string) string {
+	var b strings.Builder
+	b.WriteString("home_ai_")
+	lastUnderscore := false
+	for _, r := range id {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+			lastUnderscore = false
+			continue
+		}
+		if !lastUnderscore {
+			b.WriteByte('_')
+			lastUnderscore = true
+		}
+	}
+	return strings.TrimRight(b.String(), "_")
 }
