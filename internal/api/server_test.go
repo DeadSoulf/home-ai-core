@@ -756,11 +756,11 @@ func TestCloudAIModuleRuntimeControl(t *testing.T) {
 	}
 	local := aiagent.DeterministicProvider{
 		ProviderID: "local",
-		Response: aiagent.ModelResponse{Message: aiagent.Message{Role: aiagent.RoleAssistant, Content: "local"}},
+		Response:   aiagent.ModelResponse{Message: aiagent.Message{Role: aiagent.RoleAssistant, Content: "local"}},
 	}
 	cloud := aiagent.DeterministicProvider{
 		ProviderID: "cloud",
-		Response: aiagent.ModelResponse{Message: aiagent.Message{Role: aiagent.RoleAssistant, Content: "cloud"}},
+		Response:   aiagent.ModelResponse{Message: aiagent.Message{Role: aiagent.RoleAssistant, Content: "cloud"}},
 	}
 	router := aiagent.NewRoutingProvider(local, cloud)
 	handler := New(
