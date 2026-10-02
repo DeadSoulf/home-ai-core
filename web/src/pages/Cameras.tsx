@@ -217,9 +217,14 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
           <small>{t("nvrFoundationStage")}: {data.status.foundation_stage.toUpperCase()}</small>
         </div>
         <div className="metric">
-          <span>{t("nvrMediaRuntime")}</span>
-          <strong>{data.status.media_runtime_ready ? t("available") : t("nvrNotYet")}</strong>
+          <span>{t("nvrOnline")} / {t("nvrOffline")}</span>
+          <strong>{data.status.online_count} / {data.status.offline_count}</strong>
           <small>{t("nvrMediaRuntimeHint")}</small>
+        </div>
+        <div className="metric">
+          <span>{t("nvrSupervisor")}</span>
+          <strong>{data.status.supervisor_running ? t("nvrSupervisorRunning") : t("nvrSupervisorStopped")}</strong>
+          <small>{data.status.media_runtime_ready ? "ffprobe OK" : "ffprobe —"}</small>
         </div>
         <div className="metric">
           <span>{t("nvrCredentialStore")}</span>
@@ -245,6 +250,14 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
           <div className="list">
             {data.cameras.map((camera) => {
               const canManage = hasCameraManage(actor, camera.id);
+              const runtimeLabel =
+                camera.runtime.state === "online"
+                  ? t("nvrRuntimeOnline")
+                  : camera.runtime.state === "offline"
+                    ? t("nvrRuntimeOffline")
+                    : camera.runtime.state === "connecting"
+                      ? t("nvrRuntimeConnecting")
+                      : t("nvrRuntimeDisabled");
               return (
                 <div className="list-row nvr-camera-row" key={camera.id}>
                   <div>
@@ -252,11 +265,17 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
                     <span>
                       {camera.source_type.toUpperCase()} · {camera.transport.toUpperCase()} · {t("nvrRecording")}: {camera.recording_mode}
                       {" · "}{camera.has_credentials ? t("nvrCredentialsSaved") : t("nvrNoCredentials")}
+                      {" · "}{runtimeLabel}
+                      {camera.runtime.last_seen_at ? <>{" · "}{t("nvrLastSeen")}: {date(camera.runtime.last_seen_at)}</> : null}
+                      {camera.runtime.reconnect_count > 0 ? <>{" · "}{t("nvrReconnects")}: {camera.runtime.reconnect_count}</> : null}
                       {" · "}{t("modified")}: {date(camera.updated_at)}
                     </span>
+                    {camera.runtime.last_error && (
+                      <span className="muted">{camera.runtime.last_error}</span>
+                    )}
                   </div>
                   <div className="nvr-camera-actions">
-                    <Status value={camera.enabled ? "enabled" : "disabled"} />
+                    <Status value={camera.runtime.state} />
                     {canManage && (
                       <>
                         <button
