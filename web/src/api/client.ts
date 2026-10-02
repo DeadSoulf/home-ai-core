@@ -24,6 +24,9 @@ import type {
   StoragePurposeAssignment,
   SMBStatus,
   WireGuardStatus,
+  AIStatus,
+  AIConversation,
+  AIMessage,
 } from "./types";
 
 type APIErrorBody = {
@@ -133,6 +136,41 @@ async function postJSON<T>(path: string, body?: unknown, csrf = false): Promise<
 
 export const api = {
   setupStatus: () => request<SetupStatus>("/api/v1/security/setup-status"),
+
+  aiStatus: async () => {
+    const result = await request<{ai: AIStatus}>("/api/v1/ai/status");
+    return result.ai;
+  },
+
+  aiConversations: async () => {
+    const result = await request<{conversations: AIConversation[]}>("/api/v1/ai/conversations");
+    return result.conversations;
+  },
+
+  createAIConversation: async (title = "") => {
+    const result = await postJSON<{conversation: AIConversation}>(
+      "/api/v1/ai/conversations",
+      {title},
+      true,
+    );
+    return result.conversation;
+  },
+
+  aiMessages: async (conversationId: string) => {
+    const result = await request<{messages: AIMessage[]}>(
+      `/api/v1/ai/conversations/${encodeURIComponent(conversationId)}/messages`,
+    );
+    return result.messages;
+  },
+
+  sendAIMessage: async (conversationId: string, content: string) => {
+    return postJSON<{user_message: AIMessage; assistant_message: AIMessage}>(
+      `/api/v1/ai/conversations/${encodeURIComponent(conversationId)}/messages`,
+      {content},
+      true,
+    );
+  },
+
 
   bootstrap: async (input: {
     bootstrapToken: string;
