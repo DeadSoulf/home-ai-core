@@ -798,11 +798,11 @@ func TestCloudAIModuleRuntimeControl(t *testing.T) {
 		t.Fatalf("cloud test status = %d: %s", rec.Code, rec.Body.String())
 	}
 
-	rec := post("enable")
+	rec = post("enable")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("cloud enable status = %d: %s", rec.Code, rec.Body.String())
 	}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/ai/status", nil)
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/ai/status", nil)
 	req.Header.Set("Authorization", "Bearer test")
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
