@@ -16,7 +16,7 @@ var (
 	ErrCameraDisabled  = errors.New("camera is disabled")
 )
 
-type liveProcessSource interface {
+type LiveSource interface {
 	Available() bool
 	Start(context.Context, ProbeRequest) (io.ReadCloser, <-chan error, error)
 }
