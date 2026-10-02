@@ -8,11 +8,22 @@
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.128-dev` — AI finished conversation cleanup\
-**Текущий срез:** `0.1.128-dev` опубликован; завершённые AI-диалоги можно удалять по одному или очищать массово; live acceptance pending\
-**Следующий engineering milestone:** live-проверить `0.1.128-dev` на установленном сервере: persistent chat, завершение/удаление диалогов, web search/fetch и controlled server actions; затем добавить streaming и расширить tools на updater/service/NAS/SMB.\
+**Текущий срез:** `0.1.129-dev` staged: Ollama/Web streaming + fast local inference profile (`think:false`, 16K context, 30m keep-alive); release publication pending\
+**Следующий engineering milestone:** live-проверить `0.1.129-dev` на сервере с `qwen3:4b`/Tesla K80, затем расширить controlled tools на updater/service/NAS/SMB и добавить provider runtime diagnostics.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent: contracts `0.1.115`, read tools/API `0.1.117`, local conversation `0.1.119`, runtime control `0.1.120`, controlled model tool-loop `0.1.123`, public web tools `0.1.124`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
 
+### Выпуск 0.1.129-dev — AI streaming + local inference performance
+
+- ✅ Ollama `/api/chat` работает в `stream:true`; Core декодирует NDJSON chunks и сохраняет tool-calling.
+- ✅ Web получает `delta`-события через `POST /api/v1/ai/conversations/{id}/messages/stream` и отображает текст по мере генерации.
+- ✅ Streaming не меняет durable-history гарантию: user/assistant сообщения сохраняются только после успешного завершения ответа.
+- ✅ `keep_alive=30m` удерживает модель в VRAM после запроса вместо короткого default idle периода.
+- ✅ Для обычного локального чата используется fast profile: `think:false`, `num_ctx=16384`.
+- ✅ HTTP `WriteTimeout` увеличен до 120 секунд при AI chat deadline 90 секунд.
+- ✅ Regression tests покрывают Ollama stream chunks, HTTP NDJSON stream, Web parser/CSRF и fast-profile payload.
+- ✅ PR #128 прошёл функциональный Core/Web/Go/Debian/Windows CI до release bump.
+- 🧪 После публикации требуется live acceptance на `qwen3:4b` + Tesla K80: time-to-first-token, полный ответ, tool-call и переход между страницами во время streaming.
 ### Выпуск 0.1.128-dev — AI finished conversation cleanup
 
 - ✅ Для завершённого диалога добавлена кнопка **Удалить чат**.
