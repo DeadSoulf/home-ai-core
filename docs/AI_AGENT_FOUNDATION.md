@@ -182,7 +182,8 @@ Published in `v0.1.119-dev` after successful Core/Web, Windows, Debian and relea
 - ✅ new messages fail closed with `ai_conversation_closed`.
 - ✅ close operation is user-scoped and audited without conversation text.
 - ✅ Web marks finished chats and offers a direct **New conversation** action.
-- 🧪 automated CI/release pending.
+- ✅ published in `v0.1.122-dev` after successful Core/Web, Windows, Debian and release workflows.
+- 🧪 live finish-chat acceptance on the installed Home-AI server remains pending.
 
 ### Next slice — Streaming + controlled tool loop
 
