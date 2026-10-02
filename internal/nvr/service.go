@@ -51,7 +51,7 @@ type Service struct {
 	retryDelays      []time.Duration
 
 	liveMu          sync.Mutex
-	liveSource      liveProcessSource
+	liveSource      LiveSource
 	liveSessions    map[string]*liveSession
 	liveIdleTimeout time.Duration
 }
@@ -91,6 +91,17 @@ func NewServiceWithDependencies(
 	prober CameraProber,
 ) *Service {
 	return newService(store, credentials, prober)
+}
+
+func NewServiceWithRuntimeDependencies(
+	store CameraStore,
+	credentials CameraCredentialStore,
+	prober CameraProber,
+	liveSource LiveSource,
+) *Service {
+	service := newService(store, credentials, prober)
+	service.liveSource = liveSource
+	return service
 }
 
 func newService(
