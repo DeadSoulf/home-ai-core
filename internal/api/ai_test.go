@@ -3,12 +3,18 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/DeadSoulf/home-ai-core/internal/aiagent"
+	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
+	"github.com/DeadSoulf/home-ai-core/internal/state"
 )
 
 type capturedAIAudit struct {
@@ -104,5 +110,197 @@ func TestAIToolExecutionFailsClosedWithoutPermission(t *testing.T) {
 	}
 	if len(sec.audits) != 1 || sec.audits[0].outcome != "denied" {
 		t.Fatalf("audits = %#v", sec.audits)
+	}
+}
+
+
+type apiChatState struct {
+	fakeState
+	conversations map[string]state.AIConversationRecord
+	messages      map[string][]state.AIMessageRecord
+}
+
+func newAPIChatState() *apiChatState {
+	return &apiChatState{
+		fakeState:     fakeState{schemaVersion: 18},
+		conversations: map[string]state.AIConversationRecord{},
+		messages:      map[string][]state.AIMessageRecord{},
+	}
+}
+
+func (s *apiChatState) CreateAIConversation(_ context.Context, id, userID, title string, now time.Time) (state.AIConversationRecord, error) {
+	item := state.AIConversationRecord{ID: id, UserID: userID, Title: title, CreatedAt: now, UpdatedAt: now}
+	s.conversations[id] = item
+	return item, nil
+}
+
+func (s *apiChatState) ListAIConversations(_ context.Context, userID string, _ int) ([]state.AIConversationRecord, error) {
+	result := []state.AIConversationRecord{}
+	for _, item := range s.conversations {
+		if item.UserID == userID {
+			result = append(result, item)
+		}
+	}
+	return result, nil
+}
+
+func (s *apiChatState) AIConversation(_ context.Context, id, userID string) (state.AIConversationRecord, error) {
+	item, ok := s.conversations[id]
+	if !ok || item.UserID != userID {
+		return state.AIConversationRecord{}, state.ErrAIConversationNotFound
+	}
+	return item, nil
+}
+
+func (s *apiChatState) UpdateAIConversationTitle(_ context.Context, id, userID, title string, now time.Time) error {
+	item, ok := s.conversations[id]
+	if !ok || item.UserID != userID {
+		return state.ErrAIConversationNotFound
+	}
+	item.Title = title
+	item.UpdatedAt = now
+	s.conversations[id] = item
+	return nil
+}
+
+func (s *apiChatState) AppendAIMessage(_ context.Context, id, conversationID, userID, role, content string, now time.Time) (state.AIMessageRecord, error) {
+	if _, err := s.AIConversation(context.Background(), conversationID, userID); err != nil {
+		return state.AIMessageRecord{}, err
+	}
+	item := state.AIMessageRecord{ID: id, ConversationID: conversationID, Role: role, Content: content, CreatedAt: now}
+	s.messages[conversationID] = append(s.messages[conversationID], item)
+	return item, nil
+}
+
+func (s *apiChatState) ListAIMessages(_ context.Context, conversationID, userID string, limit int) ([]state.AIMessageRecord, error) {
+	if _, err := s.AIConversation(context.Background(), conversationID, userID); err != nil {
+		return nil, err
+	}
+	items := s.messages[conversationID]
+	if limit > 0 && len(items) > limit {
+		items = items[len(items)-limit:]
+	}
+	return append([]state.AIMessageRecord(nil), items...), nil
+}
+
+func newAIChatHandler(chatState *apiChatState, sec SecurityService, provider aiagent.Provider) http.Handler {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	const nodeID = "00000000-0000-4000-8000-000000000000"
+	return New(
+		nodeID,
+		logger,
+		chatState,
+		sec,
+		nil,
+		nil,
+		nil,
+		nil,
+		realtime.New(nodeID, logger),
+		provider,
+	)
+}
+
+func TestAIConversationAPIWithLocalProvider(t *testing.T) {
+	chatState := newAPIChatState()
+	sec := defaultFakeSecurity()
+	provider := aiagent.DeterministicProvider{
+		ProviderID: "test-local",
+		Response: aiagent.ModelResponse{
+			Message: aiagent.Message{Role: aiagent.RoleAssistant, Content: "Local API reply"},
+		},
+	}
+	handler := newAIChatHandler(chatState, sec, provider)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/ai/conversations", strings.NewReader(`{}`))
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create status = %d: %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		Conversation state.AIConversationRecord `json:"conversation"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+		t.Fatal(err)
+	}
+	if created.Conversation.ID == "" {
+		t.Fatal("missing conversation id")
+	}
+
+	req = httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/ai/conversations/"+created.Conversation.ID+"/messages",
+		strings.NewReader(`{"content":"hello local model"}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("chat status = %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Local API reply") {
+		t.Fatalf("chat body = %s", rec.Body.String())
+	}
+
+	req = httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/ai/conversations/"+created.Conversation.ID+"/messages",
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("messages status = %d: %s", rec.Code, rec.Body.String())
+	}
+	var listed struct {
+		Messages []state.AIMessageRecord `json:"messages"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &listed); err != nil {
+		t.Fatal(err)
+	}
+	if len(listed.Messages) != 2 {
+		t.Fatalf("messages = %#v", listed.Messages)
+	}
+
+	other := defaultFakeSecurity()
+	other.actor.ID = "usr-other"
+	foreign := newAIChatHandler(chatState, other, provider)
+	req = httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/ai/conversations/"+created.Conversation.ID+"/messages",
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	foreign.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("foreign messages status = %d, want 404: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAIConversationMessageFailsWhenProviderMissing(t *testing.T) {
+	chatState := newAPIChatState()
+	sec := defaultFakeSecurity()
+	handler := newAIChatHandler(chatState, sec, nil)
+
+	conv, err := chatState.CreateAIConversation(context.Background(), "aic-test", sec.actor.ID, "", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/ai/conversations/"+conv.ID+"/messages",
+		strings.NewReader(`{"content":"hello"}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503: %s", rec.Code, rec.Body.String())
 	}
 }
