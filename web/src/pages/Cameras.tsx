@@ -1,6 +1,13 @@
 import {FormEvent, useCallback, useMemo, useState} from "react";
 import {api} from "../api/client";
-import type {Actor, NVRCamera, NVRCameraInput, NVRProbe} from "../api/types";
+import type {
+  Actor,
+  NVRCamera,
+  NVRCameraInput,
+  NVRProbe,
+  NVRONVIFDevice,
+  NVRONVIFProfile,
+} from "../api/types";
 import {EmptyState, ErrorState, LoadingState, Panel} from "../components/Panel";
 import {useResource} from "../hooks/useResource";
 import {useI18n} from "../i18n";
@@ -102,6 +109,18 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
   const [testedFingerprint, setTestedFingerprint] = useState("");
   const [liveIDs, setLiveIDs] = useState<string[]>([]);
   const [liveErrors, setLiveErrors] = useState<Record<string, boolean>>({});
+  const [onvifOpen, setONVIFOpen] = useState(false);
+  const [onvifDevices, setONVIFDevices] = useState<NVRONVIFDevice[]>([]);
+  const [onvifDevice, setONVIFDevice] = useState<NVRONVIFDevice>();
+  const [onvifProfiles, setONVIFProfiles] = useState<NVRONVIFProfile[]>([]);
+  const [onvifName, setONVIFName] = useState("");
+  const [onvifUsername, setONVIFUsername] = useState("");
+  const [onvifPassword, setONVIFPassword] = useState("");
+  const [onvifMainToken, setONVIFMainToken] = useState("");
+  const [onvifSubToken, setONVIFSubToken] = useState("");
+  const [onvifTransport, setONVIFTransport] = useState<"tcp" | "udp">("tcp");
+  const [onvifRecordingMode, setONVIFRecordingMode] = useState<"off" | "continuous" | "motion">("off");
+  const [onvifAudioEnabled, setONVIFAudioEnabled] = useState(false);
 
   const globalManage = actor.permissions.includes("camera.manage");
   const currentFingerprint = useMemo(() => probeFingerprint(editor), [editor]);
@@ -120,6 +139,97 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
   const openCreate = () => {
     resetEditor();
     setEditorOpen(true);
+  };
+
+  const resetONVIF = () => {
+    setONVIFOpen(false);
+    setONVIFDevices([]);
+    setONVIFDevice(undefined);
+    setONVIFProfiles([]);
+    setONVIFName("");
+    setONVIFUsername("");
+    setONVIFPassword("");
+    setONVIFMainToken("");
+    setONVIFSubToken("");
+    setONVIFTransport("tcp");
+    setONVIFRecordingMode("off");
+    setONVIFAudioEnabled(false);
+  };
+
+  const discoverONVIF = async () => {
+    setBusy("onvif:discover");
+    setFormError("");
+    try {
+      const devices = await api.discoverONVIF();
+      setONVIFDevices(devices);
+      setONVIFDevice(undefined);
+      setONVIFProfiles([]);
+      setONVIFOpen(true);
+    } catch (reason) {
+      setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const chooseONVIFDevice = (device: NVRONVIFDevice) => {
+    setONVIFDevice(device);
+    setONVIFName(device.name);
+    setONVIFProfiles([]);
+    setONVIFMainToken("");
+    setONVIFSubToken("");
+    setONVIFUsername("");
+    setONVIFPassword("");
+  };
+
+  const loadONVIFProfiles = async () => {
+    if (!onvifDevice) return;
+    setBusy("onvif:profiles");
+    setFormError("");
+    try {
+      const profiles = await api.onvifProfiles({
+        address: onvifDevice.address,
+        username: onvifUsername.trim() || undefined,
+        password: onvifPassword || undefined,
+      });
+      setONVIFProfiles(profiles);
+      setONVIFMainToken(profiles[0]?.token || "");
+      setONVIFSubToken(profiles.length > 1 ? profiles[profiles.length - 1].token : "");
+      setONVIFAudioEnabled(Boolean(profiles[0]?.has_audio));
+    } catch (reason) {
+      setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
+      setONVIFProfiles([]);
+      setONVIFMainToken("");
+      setONVIFSubToken("");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const importONVIF = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!onvifDevice || !onvifMainToken) return;
+    setBusy("onvif:import");
+    setFormError("");
+    try {
+      await api.importONVIFCamera({
+        name: onvifName.trim(),
+        address: onvifDevice.address,
+        username: onvifUsername.trim() || undefined,
+        password: onvifPassword || undefined,
+        main_profile_token: onvifMainToken,
+        sub_profile_token: onvifSubToken || undefined,
+        transport: onvifTransport,
+        recording_mode: onvifRecordingMode,
+        audio_enabled: onvifAudioEnabled,
+      });
+      resetONVIF();
+      resource.reload();
+    } catch (reason) {
+      setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
   };
 
   const openEdit = async (camera: NVRCamera) => {
@@ -350,10 +460,18 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
       </Panel>
 
       <Panel title={t("cameraList")}>
-        {globalManage && !editorOpen && (
+        {globalManage && !editorOpen && !onvifOpen && (
           <div className="nvr-toolbar">
             <button type="button" className="button primary" onClick={openCreate}>
               {t("nvrAddCamera")}
+            </button>
+            <button
+              type="button"
+              className="button secondary"
+              disabled={Boolean(busy) || !data.status.onvif_ready}
+              onClick={() => void discoverONVIF()}
+            >
+              {busy === "onvif:discover" ? t("working") : t("nvrDiscoverONVIF")}
             </button>
           </div>
         )}
@@ -435,6 +553,139 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
           </div>
         )}
       </Panel>
+
+      {onvifOpen && (
+        <Panel title={t("nvrONVIFDiscovery")} className="wide">
+          {onvifDevices.length === 0 ? (
+            <div className="notice"><p>{t("nvrONVIFNoDevices")}</p></div>
+          ) : !onvifDevice ? (
+            <div className="list">
+              {onvifDevices.map((device) => (
+                <div className="list-row" key={device.id}>
+                  <div>
+                    <strong>{device.name}</strong>
+                    <span>{device.ip} · {device.address}</span>
+                  </div>
+                  <button type="button" className="button primary compact" onClick={() => chooseONVIFDevice(device)}>
+                    {t("select")}
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <form className="nvr-camera-form" onSubmit={importONVIF}>
+              <div className="notice">
+                <strong>{onvifDevice.name}</strong>
+                <span>{onvifDevice.ip}</span>
+              </div>
+              <label>
+                {t("nvrCameraName")}
+                <input required maxLength={128} value={onvifName} onChange={(event) => setONVIFName(event.target.value)} />
+              </label>
+              <label>
+                {t("username")}
+                <input autoComplete="off" value={onvifUsername} onChange={(event) => {
+                  setONVIFUsername(event.target.value);
+                  setONVIFProfiles([]);
+                }} />
+              </label>
+              <label>
+                {t("password")}
+                <input type="password" autoComplete="new-password" value={onvifPassword} onChange={(event) => {
+                  setONVIFPassword(event.target.value);
+                  setONVIFProfiles([]);
+                }} />
+              </label>
+
+              {onvifProfiles.length === 0 ? (
+                <div className="nvr-form-actions">
+                  <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={() => setONVIFDevice(undefined)}>
+                    {t("back")}
+                  </button>
+                  <button type="button" className="button primary" disabled={Boolean(busy)} onClick={() => void loadONVIFProfiles()}>
+                    {busy === "onvif:profiles" ? t("working") : t("nvrLoadONVIFProfiles")}
+                  </button>
+                  <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={resetONVIF}>
+                    {t("cancel")}
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <label>
+                    {t("nvrMainStream")}
+                    <select value={onvifMainToken} onChange={(event) => {
+                      const value = event.target.value;
+                      setONVIFMainToken(value);
+                      if (onvifSubToken === value) setONVIFSubToken("");
+                    }}>
+                      {onvifProfiles.map((profile) => (
+                        <option key={profile.token} value={profile.token}>
+                          {profile.name || profile.token} · {profile.width || 0}×{profile.height || 0} · {(profile.codec || "").toUpperCase()}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    {t("nvrSubstream")}
+                    <select value={onvifSubToken} onChange={(event) => setONVIFSubToken(event.target.value)}>
+                      <option value="">{t("nvrNoSubstream")}</option>
+                      {onvifProfiles.filter((profile) => profile.token !== onvifMainToken).map((profile) => (
+                        <option key={profile.token} value={profile.token}>
+                          {profile.name || profile.token} · {profile.width || 0}×{profile.height || 0} · {(profile.codec || "").toUpperCase()}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    {t("nvrTransport")}
+                    <select value={onvifTransport} onChange={(event) => setONVIFTransport(event.target.value as "tcp" | "udp")}>
+                      <option value="tcp">TCP</option>
+                      <option value="udp">UDP</option>
+                    </select>
+                  </label>
+                  <label>
+                    {t("nvrRecording")}
+                    <select value={onvifRecordingMode} onChange={(event) => setONVIFRecordingMode(event.target.value as "off" | "continuous" | "motion")}>
+                      <option value="off">{t("nvrRecordingOff")}</option>
+                      <option value="continuous">{t("nvrRecordingContinuous")}</option>
+                      <option value="motion">{t("nvrRecordingMotion")}</option>
+                    </select>
+                  </label>
+                  <label className="nvr-inline-check">
+                    <input type="checkbox" checked={onvifAudioEnabled} onChange={(event) => setONVIFAudioEnabled(event.target.checked)} />
+                    <span>{t("nvrAudio")}</span>
+                  </label>
+                  <div className="nvr-form-actions">
+                    <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={() => {
+                      setONVIFProfiles([]);
+                      setONVIFMainToken("");
+                      setONVIFSubToken("");
+                    }}>
+                      {t("back")}
+                    </button>
+                    <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={resetONVIF}>
+                      {t("cancel")}
+                    </button>
+                    <button type="submit" className="button primary" disabled={Boolean(busy) || !onvifName.trim() || !onvifMainToken}>
+                      {busy === "onvif:import" ? t("working") : t("nvrImportONVIF")}
+                    </button>
+                  </div>
+                </>
+              )}
+            </form>
+          )}
+          {onvifDevices.length > 0 && !onvifDevice && (
+            <div className="nvr-form-actions">
+              <button type="button" className="button secondary" onClick={() => void discoverONVIF()}>
+                {t("refresh")}
+              </button>
+              <button type="button" className="button secondary" onClick={resetONVIF}>
+                {t("cancel")}
+              </button>
+            </div>
+          )}
+        </Panel>
+      )}
 
       {editorOpen && (
         <Panel title={editingID ? t("nvrEditCamera") : t("nvrAddCamera")} className="wide">
