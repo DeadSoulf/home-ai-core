@@ -1,6 +1,6 @@
 # AI Agent Foundation
 
-**Status:** local conversation v1 in implementation  
+**Status:** local conversation v1 published; live provider acceptance pending  
 **Started:** 2026-10-01  
 **First implementation slice:** `0.1.115-dev` published
 
@@ -139,6 +139,8 @@ Published in `v0.1.117-dev` after successful PR/main Core/Web, Windows and Debia
 - ✅ API/service regression tests cover discovery, authorization, execution, audit and payload redaction.
 
 ### 0.1.119-dev — Local conversation v1
+
+Published in `v0.1.119-dev` after successful Core/Web, Windows, Debian and release workflows. Live validation with a configured local model remains pending.
 
 - ✅ optional local Ollama provider adapter without mandatory provider dependency;
 - ✅ persistent per-user conversations/messages in Core state migration 018;
