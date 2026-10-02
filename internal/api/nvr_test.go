@@ -193,7 +193,8 @@ func TestNVRModuleControlAndNavigation(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	const nodeID = "00000000-0000-4000-8000-000000000000"
-	handler := New(
+	nvrService := nvr.NewServiceWithDependencies(store, nil, nil)
+	handler := NewWithNVR(
 		nodeID,
 		logger,
 		store,
@@ -203,6 +204,7 @@ func TestNVRModuleControlAndNavigation(t *testing.T) {
 		registry,
 		nil,
 		realtime.New(nodeID, logger),
+		nvrService,
 	)
 
 	req := httptest.NewRequest(
