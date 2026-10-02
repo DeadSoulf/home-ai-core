@@ -261,7 +261,6 @@ func TestCameraOnboardingRejectsPasswordInsideRTSPURL(t *testing.T) {
 	}
 }
 
-
 type fakeONVIFDiscoverer struct {
 	devices []ONVIFDevice
 	err     error
@@ -320,10 +319,10 @@ func TestONVIFDiscoveryAndImportPersistsSelectedProfiles(t *testing.T) {
 		},
 	}
 	discoverer := fakeONVIFDiscoverer{devices: []ONVIFDevice{{
-		ID: "onvif_test",
-		Name: "Front Camera",
+		ID:      "onvif_test",
+		Name:    "Front Camera",
 		Address: "http://192.168.1.40/onvif/device_service",
-		IP: "192.168.1.40",
+		IP:      "192.168.1.40",
 	}}}
 	service := NewServiceWithONVIFDependencies(store, secrets, prober, discoverer, onvif)
 
@@ -336,7 +335,7 @@ func TestONVIFDiscoveryAndImportPersistsSelectedProfiles(t *testing.T) {
 	}
 
 	profiles, err := service.ONVIFProfiles(ctx, ONVIFProfileRequest{
-		Address: "http://192.168.1.40/onvif/device_service",
+		Address:  "http://192.168.1.40/onvif/device_service",
 		Username: "viewer",
 		Password: "secret",
 	})
@@ -348,15 +347,15 @@ func TestONVIFDiscoveryAndImportPersistsSelectedProfiles(t *testing.T) {
 	}
 
 	camera, probe, err := service.ImportONVIFCamera(ctx, "", ONVIFImportInput{
-		Name: "Front ONVIF",
-		Address: "http://192.168.1.40/onvif/device_service",
-		Username: "viewer",
-		Password: "secret",
+		Name:             "Front ONVIF",
+		Address:          "http://192.168.1.40/onvif/device_service",
+		Username:         "viewer",
+		Password:         "secret",
 		MainProfileToken: "main-token",
-		SubProfileToken: "sub-token",
-		Transport: "tcp",
-		RecordingMode: "off",
-		AudioEnabled: true,
+		SubProfileToken:  "sub-token",
+		Transport:        "tcp",
+		RecordingMode:    "off",
+		AudioEnabled:     true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -405,10 +404,10 @@ func TestONVIFImportRejectsSameMainAndSubProfile(t *testing.T) {
 		&fakeONVIFClient{},
 	)
 	_, _, err = service.ImportONVIFCamera(ctx, "", ONVIFImportInput{
-		Name: "Invalid",
-		Address: "http://192.168.1.50/onvif/device_service",
+		Name:             "Invalid",
+		Address:          "http://192.168.1.50/onvif/device_service",
 		MainProfileToken: "same",
-		SubProfileToken: "same",
+		SubProfileToken:  "same",
 	})
 	if err == nil {
 		t.Fatal("same ONVIF main/sub profile was accepted")
