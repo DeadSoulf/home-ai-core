@@ -1,6 +1,6 @@
 # AI Agent Foundation
 
-**Status:** local conversation slice in implementation  
+**Status:** local conversation v1 in implementation  
 **Started:** 2026-10-01  
 **First implementation slice:** `0.1.115-dev` published
 
@@ -138,7 +138,7 @@ Published in `v0.1.117-dev` after successful PR/main Core/Web, Windows and Debia
 - ✅ cookie-session POSTs preserve Core CSRF enforcement;
 - ✅ API/service regression tests cover discovery, authorization, execution, audit and payload redaction.
 
-### 0.1.118-dev — Local conversation v1
+### 0.1.119-dev — Local conversation v1
 
 - ✅ optional local Ollama provider adapter without mandatory provider dependency;
 - ✅ persistent per-user conversations/messages in Core state migration 018;
