@@ -8,8 +8,8 @@
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.138-dev` — NVR explicit main/sub streams\
-**Текущий срез:** `0.1.138-dev` опубликован; explicit main/sub-stream profiles, отдельный probe substream и live-preview через substream готовы к live acceptance.\
-**Следующий engineering milestone:** завершить **NVR-1** через ONVIF discovery/import, затем перейти к **NVR-2 — recording + video storage + segmented archive + ring retention**.\
+**Текущий срез:** `0.1.139-dev` staged: ONVIF discovery/import завершает NVR-1 onboarding/live foundation; release publication pending.\
+**Следующий engineering milestone:** **NVR-2 — video storage target + continuous segmented recording + reserve/ring retention**.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
 
@@ -40,6 +40,22 @@
 - ✅ Релизы `0.1.115-dev` → `0.1.133-dev` прошли соответствующие Web/Go/Core/Debian/Windows CI и публикацию release artifacts.
 - ⏸ AI Agent считается функционально достаточным для текущего этапа; дальнейшее расширение tools, streaming и provider UI отложено до отдельного цикла.
 
+### Выпуск 0.1.139-dev — NVR ONVIF discovery/import
+
+- ✅ Добавлен bounded local WS-Discovery для ONVIF NetworkVideoTransmitter камер.
+- ✅ Discovery работает только по активным локальным IPv4 interfaces, с коротким timeout и лимитом результатов.
+- ✅ ONVIF SOAP доступ ограничен literal private/link-local IP; proxy отключён, service endpoints нормализуются к IP найденной камеры.
+- ✅ Реализованы WS-Security UsernameToken digest, GetCapabilities(Media), GetProfiles и GetStreamUri.
+- ✅ RTSP URI, возвращённый камерой, очищается от embedded credentials и привязывается к ожидаемому camera IP.
+- ✅ ONVIF management endpoint и выбранные main/sub profile tokens хранятся отдельно от RTSP media runtime address.
+- ✅ Schema migration 23 добавляет `nvr_onvif_sources`.
+- ✅ Import использует существующий encrypted camera secret store и FFprobe validation перед сохранением.
+- ✅ API: discover / profiles / import с `camera.manage`, CSRF и audit без username/password/source secrets.
+- ✅ Web: **Найти ONVIF камеры → выбрать → credentials → загрузить profiles → main/sub → импортировать**.
+- ✅ Source type импортированной камеры сохраняется как `onvif`, а supervisor/live продолжают использовать разрешённые RTSP main/sub sources.
+- ✅ Regression coverage: discovery parsing/SSRF boundary, WS-Security plaintext protection, profile parsing, state cascade, service import, API privacy и Web CSRF flow.
+- 🧪 Требуется live acceptance на реальных ONVIF камерах разных производителей.
+- ⏭ Следующий срез: **NVR-2 — video storage + continuous segmented recording + reserve/ring retention**.
 ### Выпуск 0.1.138-dev — NVR explicit main/sub streams
 
 - ✅ Camera config получил optional `substream_address`, основной `address` остаётся main/archive-quality source.
