@@ -125,11 +125,39 @@ func (s *server) aiConversationResource(
 ) {
 	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/v1/ai/conversations/"), "/")
 	parts := strings.Split(path, "/")
-	if len(parts) != 2 || parts[0] == "" || parts[1] != "messages" {
+	if len(parts) != 2 || parts[0] == "" {
 		s.notFound(w, r)
 		return
 	}
 	conversationID := parts[0]
+
+	if parts[1] == "close" {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", http.MethodPost)
+			writeAPIError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+			return
+		}
+		if !validMutationCSRF(actor, source, r) {
+			writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+			return
+		}
+		conversation, err := s.ai.CloseConversation(
+			r.Context(),
+			actor,
+			s.securityRequestContext(r),
+			conversationID,
+		)
+		if err != nil {
+			s.writeAIChatError(w, r, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"conversation": conversation})
+		return
+	}
+	if parts[1] != "messages" {
+		s.notFound(w, r)
+		return
+	}
 
 	switch r.Method {
 	case http.MethodGet:
@@ -182,6 +210,8 @@ func (s *server) writeAIChatError(w http.ResponseWriter, r *http.Request, err er
 		writeAPIError(w, r, http.StatusServiceUnavailable, "ai_agent_disabled", "AI Agent is disabled", nil)
 	case errors.Is(err, state.ErrAIConversationNotFound):
 		writeAPIError(w, r, http.StatusNotFound, "ai_conversation_not_found", "AI conversation not found", nil)
+	case errors.Is(err, state.ErrAIConversationClosed):
+		writeAPIError(w, r, http.StatusConflict, "ai_conversation_closed", "AI conversation is closed", nil)
 	case errors.Is(err, aiagent.ErrChatUnavailable):
 		writeAPIError(w, r, http.StatusServiceUnavailable, "ai_chat_unavailable", "AI chat is not configured or unavailable", nil)
 	case errors.Is(err, aiagent.ErrInvalidChatMessage):

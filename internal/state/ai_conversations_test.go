@@ -52,6 +52,24 @@ func TestAIConversationsAreUserScopedAndPersistent(t *testing.T) {
 		t.Fatalf("foreign AppendAIMessage() error = %v", err)
 	}
 
+	closed, err := store.CloseAIConversation(ctx, conv.ID, "usr-1", now.Add(3*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if closed.ClosedAt == nil {
+		t.Fatal("closed_at was not persisted")
+	}
+	if _, err := store.AppendAIMessage(ctx, "aim-3", conv.ID, "usr-1", "user", "after close", now.Add(4*time.Second)); !errors.Is(err, ErrAIConversationClosed) {
+		t.Fatalf("AppendAIMessage() after close error = %v, want closed", err)
+	}
+	if _, err := store.CloseAIConversation(ctx, conv.ID, "usr-2", now); !errors.Is(err, ErrAIConversationNotFound) {
+		t.Fatalf("foreign CloseAIConversation() error = %v", err)
+	}
+	messages, err = store.ListAIMessages(ctx, conv.ID, "usr-1", 20)
+	if err != nil || len(messages) != 2 {
+		t.Fatalf("history after close = %#v err=%v", messages, err)
+	}
+
 	list, err := store.ListAIConversations(ctx, "usr-1", 10)
 	if err != nil {
 		t.Fatal(err)

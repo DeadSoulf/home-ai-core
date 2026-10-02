@@ -8,14 +8,18 @@ import (
 	"time"
 )
 
-var ErrAIConversationNotFound = errors.New("AI conversation not found")
+var (
+	ErrAIConversationNotFound = errors.New("AI conversation not found")
+	ErrAIConversationClosed   = errors.New("AI conversation is closed")
+)
 
 type AIConversationRecord struct {
-	ID        string    `json:"id"`
-	UserID    string    `json:"user_id"`
-	Title     string    `json:"title"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        string     `json:"id"`
+	UserID    string     `json:"user_id"`
+	Title     string     `json:"title"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	ClosedAt  *time.Time `json:"closed_at,omitempty"`
 }
 
 type AIMessageRecord struct {
@@ -53,7 +57,7 @@ func (s *Store) ListAIConversations(
 		limit = 50
 	}
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, user_id, title, created_at, updated_at
+		SELECT id, user_id, title, created_at, updated_at, closed_at
 		FROM ai_conversations
 		WHERE user_id = ?
 		ORDER BY updated_at DESC
@@ -83,7 +87,7 @@ func (s *Store) AIConversation(
 	id, userID string,
 ) (AIConversationRecord, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, user_id, title, created_at, updated_at
+		SELECT id, user_id, title, created_at, updated_at, closed_at
 		FROM ai_conversations
 		WHERE id = ? AND user_id = ?
 	`, id, userID)
@@ -114,6 +118,27 @@ func (s *Store) UpdateAIConversationTitle(
 	return nil
 }
 
+func (s *Store) CloseAIConversation(
+	ctx context.Context,
+	id, userID string,
+	now time.Time,
+) (AIConversationRecord, error) {
+	timestamp := now.UTC().Format(time.RFC3339Nano)
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE ai_conversations
+		SET closed_at = COALESCE(closed_at, ?), updated_at = ?
+		WHERE id = ? AND user_id = ?
+	`, timestamp, timestamp, id, userID)
+	if err != nil {
+		return AIConversationRecord{}, fmt.Errorf("close AI conversation: %w", err)
+	}
+	affected, _ := result.RowsAffected()
+	if affected == 0 {
+		return AIConversationRecord{}, ErrAIConversationNotFound
+	}
+	return s.AIConversation(ctx, id, userID)
+}
+
 func (s *Store) AppendAIMessage(
 	ctx context.Context,
 	id, conversationID, userID, role, content string,
@@ -127,11 +152,20 @@ func (s *Store) AppendAIMessage(
 
 	var count int
 	if err := tx.QueryRowContext(ctx, `
-		SELECT COUNT(*) FROM ai_conversations WHERE id = ? AND user_id = ?
+		SELECT COUNT(*) FROM ai_conversations WHERE id = ? AND user_id = ? AND closed_at IS NULL
 	`, conversationID, userID).Scan(&count); err != nil {
 		return AIMessageRecord{}, fmt.Errorf("verify AI conversation owner: %w", err)
 	}
 	if count != 1 {
+		var exists int
+		if err := tx.QueryRowContext(ctx, `
+			SELECT COUNT(*) FROM ai_conversations WHERE id = ? AND user_id = ?
+		`, conversationID, userID).Scan(&exists); err != nil {
+			return AIMessageRecord{}, fmt.Errorf("verify AI conversation state: %w", err)
+		}
+		if exists == 1 {
+			return AIMessageRecord{}, ErrAIConversationClosed
+		}
 		return AIMessageRecord{}, ErrAIConversationNotFound
 	}
 
@@ -222,12 +256,14 @@ type aiConversationScanner interface {
 func scanAIConversation(scanner aiConversationScanner) (AIConversationRecord, error) {
 	var record AIConversationRecord
 	var createdAt, updatedAt string
+	var closedAt sql.NullString
 	if err := scanner.Scan(
 		&record.ID,
 		&record.UserID,
 		&record.Title,
 		&createdAt,
 		&updatedAt,
+		&closedAt,
 	); err != nil {
 		return AIConversationRecord{}, err
 	}
@@ -239,6 +275,13 @@ func scanAIConversation(scanner aiConversationScanner) (AIConversationRecord, er
 	record.UpdatedAt, err = time.Parse(time.RFC3339Nano, updatedAt)
 	if err != nil {
 		return AIConversationRecord{}, fmt.Errorf("parse AI conversation updated_at: %w", err)
+	}
+	if closedAt.Valid {
+		value, parseErr := time.Parse(time.RFC3339Nano, closedAt.String)
+		if parseErr != nil {
+			return AIConversationRecord{}, fmt.Errorf("parse AI conversation closed_at: %w", parseErr)
+		}
+		record.ClosedAt = &value
 	}
 	return record, nil
 }
