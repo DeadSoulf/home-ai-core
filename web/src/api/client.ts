@@ -774,6 +774,15 @@ export const api = {
     return result.module;
   },
 
+  testCloudAI: async () => {
+    const result = await postJSON<{ok: boolean}>(
+      "/api/v1/modules/ai.cloud/test",
+      {},
+      true,
+    );
+    return result.ok;
+  },
+
   jobs: async () => {
     const result = await request<{jobs: Job[]}>("/api/v1/jobs?limit=100");
     return result.jobs;

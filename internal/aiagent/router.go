@@ -98,6 +98,30 @@ func (p *RoutingProvider) LocalModel() string {
 	return ""
 }
 
+func (p *RoutingProvider) TestCloud(ctx context.Context) error {
+	p.mu.RLock()
+	cloud := p.cloud
+	p.mu.RUnlock()
+	if cloud == nil {
+		return ErrProviderUnavailable
+	}
+	response, err := cloud.Generate(ctx, ModelRequest{
+		Messages:     []Message{{Role: RoleUser, Content: "Reply with OK."}},
+		ProviderMode: ProviderModeCloud,
+	})
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(response.Message.Content) == "" {
+		return &ProviderRequestError{
+			Provider: "cloud",
+			Kind:     "invalid_response",
+			Message:  "Cloud AI returned an empty test response",
+		}
+	}
+	return nil
+}
+
 func (p *RoutingProvider) Generate(ctx context.Context, request ModelRequest) (ModelResponse, error) {
 	local, cloud, cloudEnabled := p.providers()
 	mode := strings.ToLower(strings.TrimSpace(request.ProviderMode))

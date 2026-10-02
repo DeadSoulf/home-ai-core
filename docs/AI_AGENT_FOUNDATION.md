@@ -1,6 +1,6 @@
 # AI Agent Foundation
 
-**Status:** controlled server tools/public web + local inference + separate Cloud AI provider module published; dependency auto-enable staged in `0.1.132-dev`; Web streaming remains pending compatibility rework  
+**Status:** controlled server tools/public web + local inference + Cloud AI published through `0.1.132-dev`; Cloud diagnostics/menu cleanup staged in `0.1.133-dev`; Web streaming remains pending compatibility rework  
 **Started:** 2026-10-01  
 **First implementation slice:** `0.1.115-dev` published
 
@@ -107,6 +107,13 @@ No single model vendor becomes a Core dependency.
 
 ## First implementation slices
 
+### 0.1.133-dev — Cloud diagnostics and UI cleanup
+
+- ✅ Cloud AI has no standalone main-menu contribution; it is managed from Modules and selected inside AI Agent.
+- ✅ a synthetic provider connection test validates endpoint/key/model without user history or tools.
+- ✅ provider failures are classified into actionable safe categories instead of one generic failure.
+- ✅ authentication response details are suppressed and configured API keys are redacted from other provider detail.
+- ✅ incompatible Chat Completions responses are reported explicitly.
 ### 0.1.132-dev — Cloud AI dependency auto-enable
 
 - ✅ enabling Cloud AI automatically enables the shared AI Agent runtime when it is only disabled/registered.

@@ -226,11 +226,7 @@ describe("API client", () => {
       new Response(JSON.stringify({
         modules: [
           {module_id: "ai.agent", status: "enabled"},
-          {
-            module_id: "ai.cloud",
-            status: "enabled",
-            items: [{id: "cloud", title: "Cloud AI", route: "/modules/ai.cloud", order: 25}],
-          },
+          {module_id: "ai.cloud", status: "enabled"},
         ],
       }), {
         status: 200,
@@ -242,8 +238,34 @@ describe("API client", () => {
     const modules = await api.moduleNavigation();
 
     expect(modules).toHaveLength(2);
-    expect(modules[1].items?.[0].route).toBe("/modules/ai.cloud");
+    expect(modules[1].items).toBeUndefined();
     expect(String(fetchMock.mock.calls[0][0])).toBe("/api/v1/modules/navigation");
+
+    vi.unstubAllGlobals();
+  });
+
+  it("tests Cloud AI with CSRF protection", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({ok: true}), {
+        status: 200,
+        headers: {"Content-Type": "application/json"},
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    });
+
+    setCSRFToken("csrf-cloud-test");
+    expect(await api.testCloudAI()).toBe(true);
+
+    const [input, init] = fetchMock.mock.calls[0];
+    expect(String(input)).toBe("/api/v1/modules/ai.cloud/test");
+    expect(init?.method).toBe("POST");
+    expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-cloud-test");
 
     vi.unstubAllGlobals();
   });

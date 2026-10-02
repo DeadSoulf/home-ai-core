@@ -196,6 +196,16 @@ func (s *Service) RestartCloudProvider() error {
 	return s.SetCloudProviderEnabled(true)
 }
 
+func (s *Service) TestCloudProvider(ctx context.Context) error {
+	router, ok := s.provider.(*RoutingProvider)
+	if !ok || !router.CloudConfigured() {
+		return ErrProviderUnavailable
+	}
+	testCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	return router.TestCloud(testCtx)
+}
+
 func (s *Service) runtimeContext(parent context.Context) (context.Context, func(), error) {
 	s.runtimeMu.RLock()
 	enabled := s.enabled

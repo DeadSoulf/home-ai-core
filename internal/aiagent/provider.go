@@ -4,9 +4,41 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strconv"
 )
 
 var ErrProviderUnavailable = errors.New("AI provider is unavailable")
+
+type ProviderRequestError struct {
+	Provider   string
+	Kind       string
+	StatusCode int
+	Message    string
+	Err        error
+}
+
+func (e *ProviderRequestError) Error() string {
+	if e == nil {
+		return "AI provider request failed"
+	}
+	if e.Message != "" {
+		return e.Message
+	}
+	if e.StatusCode > 0 {
+		return e.Provider + " provider returned HTTP " + strconv.Itoa(e.StatusCode)
+	}
+	if e.Err != nil {
+		return e.Provider + " provider request failed: " + e.Err.Error()
+	}
+	return e.Provider + " provider request failed"
+}
+
+func (e *ProviderRequestError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
 
 type MessageRole string
 
