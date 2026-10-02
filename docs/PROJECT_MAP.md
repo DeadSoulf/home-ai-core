@@ -8,11 +8,23 @@
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.123-dev` — AI Agent controlled server-tools + approval loop\
-**Текущий срез:** `0.1.123-dev` опубликован; AI Agent может автоматически читать состояние сервера и предлагать network/storage изменения через approval cards; live acceptance pending\
-**Следующий engineering milestone:** live-проверить `0.1.123-dev` на tool-capable локальной модели; затем добавить streaming и расширить controlled tools на updater/service/NAS/SMB. Windows UI acceptance и release-hardening gates продолжаются параллельно\
-**Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent развивается как first-party module: contracts `0.1.115`, read tools/API `0.1.117`, local conversation `0.1.119`, runtime control `0.1.120`, controlled model tool-loop `0.1.123`. Generic shell/root bypass отсутствует.\
+**Текущий срез:** `0.1.124-dev` staged в PR #123: видимая кнопка завершения чата + read-only `web.search` / `web.fetch` для локальной модели; release publication pending\
+**Следующий engineering milestone:** live-проверить `0.1.124-dev` на установленном сервере: завершение диалога, web search/fetch и controlled server actions; затем добавить streaming и расширить tools на updater/service/NAS/SMB.\
+**Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent: contracts `0.1.115`, read tools/API `0.1.117`, local conversation `0.1.119`, runtime control `0.1.120`, controlled model tool-loop `0.1.123`, public web tools `0.1.124`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
 
+### Выпуск 0.1.124-dev — AI public web access + finish-chat visibility
+
+- ✅ Кнопка **Завершить чат** теперь всегда видима в header AI-чата и disabled только когда действие неприменимо.
+- ✅ Существующий close API/`closed_at` lifecycle не менялся; backend уже был рабочим.
+- ✅ Добавлены read-only tools `web.search` и `web.fetch`, доступные локальной Ollama-модели через обычный typed Tool Registry.
+- ✅ Интернет-tools наследуют `system.read`; дополнительных change/sensitive прав модель не получает.
+- ✅ `web.fetch` блокирует localhost, private/LAN/link-local/CGNAT/non-public адреса, нестандартные порты и опасные redirects.
+- ✅ DNS проверяется непосредственно перед dial; response/model context ограничены по размеру и timeout.
+- ✅ Web content помечается в system prompt как недоверенные данные и не должен интерпретироваться как инструкции агенту.
+- ✅ Regression tests покрывают permission filtering, SSRF boundary и search-result parsing.
+- ✅ PR #123: Core/Web CI, Go tests/vet/build/smoke, Debian installer и Windows client checks прошли перед release bump.
+- 🧪 После публикации требуется live acceptance на HOME AI сервере.
 ### Выпуск 0.1.123-dev — AI controlled server tools
 
 - ✅ Ollama native tool calling: descriptors → function schemas, response `tool_calls` → Home-AI tool IDs.
@@ -1245,6 +1257,7 @@ AI не может расширять собственные права.
 | `0.1.121-dev` | 🧪 AI restart hotfix | опубликовано: transient `restarting` не пишется в SQLite; real-registry regression test зелёный; live re-test pending |
 | `0.1.122-dev` | 🧪 AI finish chat | опубликовано: persistent closed chats + read-only history + close API/audit/Web; automated CI/release зелёные, live acceptance pending |
 | `0.1.123-dev` | 🧪 AI controlled server tools | опубликовано: Ollama tool-calling + auto read loop + approval-gated network/storage changes; automated CI/release зелёные, live acceptance pending |
+| `0.1.124-dev` | 🚧 AI public web + finish-chat visibility | PR #123: public `web.search`/`web.fetch`, SSRF boundary, always-visible finish-chat action; release publication pending |
 
 ## 10. Правило ведения карты
 

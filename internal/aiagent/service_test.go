@@ -46,11 +46,14 @@ func TestServiceAvailableToolsRespectPermissions(t *testing.T) {
 	s := NewService("node-1", serviceState{schema: 1}, serviceJobs{}, serviceModules{}, nil)
 	actor := security.Actor{Permissions: []string{"system.read", "modules.read"}}
 	tools := s.AvailableTools(actor)
-	if len(tools) != 2 {
-		t.Fatalf("tool count = %d, want 2: %#v", len(tools), tools)
+	if len(tools) != 4 {
+		t.Fatalf("tool count = %d, want 4: %#v", len(tools), tools)
 	}
-	if tools[0].ID != "core.modules.list" || tools[1].ID != "core.system.status" {
-		t.Fatalf("tools = %#v", tools)
+	want := []string{"core.modules.list", "core.system.status", "web.fetch", "web.search"}
+	for index, tool := range tools {
+		if tool.ID != want[index] {
+			t.Fatalf("tools = %#v", tools)
+		}
 	}
 }
 

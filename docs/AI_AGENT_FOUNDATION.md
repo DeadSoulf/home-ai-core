@@ -1,6 +1,6 @@
 # AI Agent Foundation
 
-**Status:** controlled server tool loop published; live tool-capable provider acceptance pending  
+**Status:** controlled server tool loop published; public web tools staged in `0.1.124-dev`; live provider acceptance pending  
 **Started:** 2026-10-01  
 **First implementation slice:** `0.1.115-dev` published
 
@@ -198,6 +198,16 @@ Published in `v0.1.119-dev` after successful Core/Web, Windows, Debian and relea
 - ✅ published in `v0.1.123-dev` after successful Core/Web, Windows, Debian and release workflows.
 - 🧪 live tool-capable local-model acceptance remains pending.
 
+### 0.1.124-dev — Public web access + finish-chat visibility
+
+- ✅ `web.search` exposes bounded public web search to the local model through the existing Tool Registry.
+- ✅ `web.fetch` reads bounded public HTTP/HTTPS text while blocking localhost, private/LAN/link-local/CGNAT and non-public targets.
+- ✅ DNS is checked at dial time, redirects are bounded, explicit ports are limited to 80/443, and response/model-context size is capped.
+- ✅ web content is explicitly treated as untrusted data in the model system prompt.
+- ✅ web tools are read-only and inherit the current user's `system.read` permission.
+- ✅ **Finish chat / Завершить чат** remains visibly discoverable in the AI chat header; the existing close API/state contract is unchanged.
+- ✅ regression tests cover tool discovery/API counts, SSRF boundary and DuckDuckGo result decoding.
+- 🧪 live acceptance still required on the installed server: current-info question → `web.search` → optional `web.fetch` → grounded answer.
 ### Next slice — Streaming + broader controlled server tools
 
 - streaming local model responses to Web;

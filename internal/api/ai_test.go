@@ -42,7 +42,7 @@ func TestAIStatusAndPermissionFilteredTools(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status endpoint = %d: %s", rec.Code, rec.Body.String())
 	}
-	if !strings.Contains(rec.Body.String(), `"module_id":"ai.agent"`) || !strings.Contains(rec.Body.String(), `"tool_count":10`) {
+	if !strings.Contains(rec.Body.String(), `"module_id":"ai.agent"`) || !strings.Contains(rec.Body.String(), `"tool_count":12`) {
 		t.Fatalf("status body = %s", rec.Body.String())
 	}
 
@@ -61,8 +61,14 @@ func TestAIStatusAndPermissionFilteredTools(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if len(body.Tools) != 1 || body.Tools[0].ID != "core.system.status" {
+	want := []string{"core.system.status", "web.fetch", "web.search"}
+	if len(body.Tools) != len(want) {
 		t.Fatalf("tools = %#v", body.Tools)
+	}
+	for index, tool := range body.Tools {
+		if tool.ID != want[index] {
+			t.Fatalf("tools = %#v", body.Tools)
+		}
 	}
 }
 

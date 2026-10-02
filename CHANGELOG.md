@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.124-dev
+
+- Keep the Web AI Agent **Finish chat / Завершить чат** action visible in the conversation header even when no active chat is selected; disable it only when closing is not applicable.
+- Preserve the existing authenticated conversation-close API and persistent read-only chat history from 0.1.122-dev.
+- Add read-only `web.search` and `web.fetch` tools to the AI Agent so a local Ollama model can retrieve current public Internet information through the existing typed Tool Registry.
+- Run web tools automatically only for users with `system.read`; no new state-changing authority is granted to the model.
+- Use a bounded DuckDuckGo HTML search adapter for public search results and a bounded HTTP/HTTPS fetcher for readable public content.
+- Block localhost, RFC1918/private, link-local, CGNAT, documentation/benchmark and other non-public targets; restrict explicit ports to 80/443 and re-check DNS at dial time to prevent the web tool from becoming an SSRF path into HOME AI or the LAN.
+- Limit redirects, response bytes and model-visible characters; allow only readable text/HTML/JSON/XML content.
+- Mark fetched web content as untrusted in the agent system prompt so external pages cannot become instructions to the Home-AI agent.
+- Add regression coverage for permission-filtered tool discovery, private-target rejection, public-IP classification and search-result decoding.
+- Full PR CI covers Web typecheck/tests/production build, Go tests/vet/Core build/integration smoke, Linux/Windows cross-builds, Debian installer build and Windows client tests.
 ## 0.1.123-dev
 
 - Give the local AI Agent controlled access to Home-AI server configuration through typed tools instead of an unrestricted root shell.
