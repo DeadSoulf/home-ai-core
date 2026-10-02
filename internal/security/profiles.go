@@ -500,7 +500,7 @@ func actorIsAdministrator(actor Actor) bool {
 
 func administratorOnlyPermission(permission string) bool {
 	switch permission {
-	case "security.users.manage", "security.roles.manage", "modules.manage":
+	case "security.users.manage", "security.roles.manage", "modules.manage", "nvr.storage.manage", "nvr.settings.manage":
 		return true
 	default:
 		return false
