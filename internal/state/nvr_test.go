@@ -150,3 +150,59 @@ func TestCreateNVRCameraRejectsInvalidCredentialReference(t *testing.T) {
 		t.Fatal("plain credential value was accepted as a secret reference")
 	}
 }
+
+
+func TestUpdateAndDeleteNVRCamera(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	camera, err := store.CreateNVRCamera(
+		ctx,
+		"Front",
+		"rtsp",
+		"rtsp://192.0.2.30/main",
+		"sec_front",
+		"tcp",
+		"off",
+		"",
+		false,
+		time.Now(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updated, err := store.UpdateNVRCamera(
+		ctx,
+		camera.ID,
+		"Front door",
+		"rtsp",
+		"rtsp://192.0.2.30/stream2",
+		"sec_front",
+		"udp",
+		"continuous",
+		false,
+		true,
+		time.Now(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Name != "Front door" || updated.Enabled || !updated.AudioEnabled {
+		t.Fatalf("updated camera = %#v", updated)
+	}
+	if updated.Transport != "udp" || updated.RecordingMode != "continuous" {
+		t.Fatalf("updated transport/mode = %#v", updated)
+	}
+
+	if err := store.DeleteNVRCamera(ctx, camera.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.NVRCamera(ctx, camera.ID); err != ErrNVRCameraNotFound {
+		t.Fatalf("camera after delete error = %v", err)
+	}
+}
