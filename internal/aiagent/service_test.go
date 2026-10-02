@@ -104,7 +104,6 @@ func TestServiceDeniedToolIsAudited(t *testing.T) {
 	}
 }
 
-
 type chatMemoryStore struct {
 	schema        int
 	conversations map[string]state.AIConversationRecord
@@ -183,7 +182,7 @@ func TestServicePersistentChatUsesProviderAndRedactsAuditText(t *testing.T) {
 	audit := &serviceAudit{}
 	provider := DeterministicProvider{
 		ProviderID: "test-local",
-		Response: ModelResponse{Message: Message{Role: RoleAssistant, Content: "Local assistant reply"}},
+		Response:   ModelResponse{Message: Message{Role: RoleAssistant, Content: "Local assistant reply"}},
 	}
 	service := NewService("node-1", store, serviceJobs{}, serviceModules{}, audit, provider)
 	actor := security.Actor{Type: "user", ID: "usr-1"}
