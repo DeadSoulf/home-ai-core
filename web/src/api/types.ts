@@ -236,6 +236,33 @@ export type UpdateStatus = {
   rollback_version?: string;
 };
 
+export type AIStatus = {
+  module_id: string;
+  state: string;
+  version: string;
+  tool_count: number;
+  provider_configured: boolean;
+  provider_id?: string;
+  provider_model?: string;
+  conversation_store_ready: boolean;
+};
+
+export type AIConversation = {
+  id: string;
+  user_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AIMessage = {
+  id: string;
+  conversation_id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+};
+
 export type UpdaterState = {
   phase: "idle" | "checking" | "available" | "downloading" | "ready" | "installing" | "rolling_back" | "restarting" | "succeeded" | "failed";
   current_version?: string;

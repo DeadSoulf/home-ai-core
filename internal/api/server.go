@@ -38,6 +38,7 @@ func New(
 	moduleService ModuleService,
 	updaterService UpdaterService,
 	realtimeHub *realtime.Hub,
+	aiProviders ...aiagent.Provider,
 ) http.Handler {
 	s := &server{
 		nodeID:              nodeID,
@@ -47,7 +48,7 @@ func New(
 		jobs:                jobService,
 		eventHistoryService: eventHistoryService,
 		modules:             moduleService,
-		ai:                  aiagent.NewService(nodeID, state, jobService, moduleService, securityService),
+		ai:                  aiagent.NewService(nodeID, state, jobService, moduleService, securityService, aiProviders...),
 		updater:             updaterService,
 		realtime:            realtimeHub,
 		mux:                 http.NewServeMux(),
@@ -92,6 +93,8 @@ func New(
 	s.mux.HandleFunc("/api/v1/ai/status", s.requireAuth("", s.aiStatus))
 	s.mux.HandleFunc("/api/v1/ai/tools", s.requireAuth("", s.aiTools))
 	s.mux.HandleFunc("/api/v1/ai/tools/", s.requireAuth("", s.aiToolResource))
+	s.mux.HandleFunc("/api/v1/ai/conversations", s.requireAuth("", s.aiConversations))
+	s.mux.HandleFunc("/api/v1/ai/conversations/", s.requireAuth("", s.aiConversationResource))
 	s.mux.HandleFunc("/api/v1/update", s.requireAuth("updates.read", func(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
 		s.updateStatus(w, r)
 	}))

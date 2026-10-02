@@ -6,6 +6,9 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("HOME_AI_LISTEN", "")
 	t.Setenv("HOME_AI_STATE_DIR", "")
 	t.Setenv("HOME_AI_WEB_DIR", "")
+	t.Setenv("HOME_AI_AI_PROVIDER", "")
+	t.Setenv("HOME_AI_AI_ENDPOINT", "")
+	t.Setenv("HOME_AI_AI_MODEL", "")
 
 	cfg, err := Load(nil)
 	if err != nil {
@@ -27,11 +30,15 @@ func TestLoadOverrides(t *testing.T) {
 	t.Setenv("HOME_AI_LISTEN", "127.0.0.1:9000")
 	t.Setenv("HOME_AI_STATE_DIR", "/tmp/from-env")
 	t.Setenv("HOME_AI_WEB_DIR", "/tmp/web-env")
+	t.Setenv("HOME_AI_AI_PROVIDER", "ollama")
+	t.Setenv("HOME_AI_AI_ENDPOINT", "http://127.0.0.1:11434")
+	t.Setenv("HOME_AI_AI_MODEL", "qwen3:8b")
 
 	cfg, err := Load([]string{
 		"-listen", "127.0.0.1:9100",
 		"-state-dir", "/tmp/from-flag",
 		"-web-dir", "/tmp/web-flag",
+		"-ai-model", "qwen3:14b",
 	})
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
@@ -45,5 +52,16 @@ func TestLoadOverrides(t *testing.T) {
 	}
 	if cfg.WebDir != "/tmp/web-flag" {
 		t.Fatalf("WebDir = %q", cfg.WebDir)
+	}
+	if cfg.AIProvider != "ollama" || cfg.AIEndpoint != "http://127.0.0.1:11434" || cfg.AIModel != "qwen3:14b" {
+		t.Fatalf("AI config = %#v", cfg)
+	}
+}
+
+func TestLoadRejectsIncompleteAIConfig(t *testing.T) {
+	t.Setenv("HOME_AI_AI_PROVIDER", "ollama")
+	t.Setenv("HOME_AI_AI_MODEL", "")
+	if _, err := Load(nil); err == nil {
+		t.Fatal("missing Ollama model was accepted")
 	}
 }
