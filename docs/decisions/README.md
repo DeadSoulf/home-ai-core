@@ -17,3 +17,6 @@ Each ADR should include:
 - [ADR-0034: Kernel-enforced SMB pool reserve](0034-smb-kernel-quota.md)
 
 - [ADR-0035: Users, folder quotas and access reconciliation](0035-users-folder-quotas.md)
+
+- [ADR-0036: AI Agent as a first-party typed-tool module](0036-ai-agent-first-party-tool-contract.md)
+- [ADR-0037: Cameras / NVR control-plane and media-plane architecture](0037-cameras-nvr-media-plane.md)
