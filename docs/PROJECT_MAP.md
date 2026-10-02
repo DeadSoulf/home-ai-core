@@ -7,8 +7,8 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.138-dev` — NVR explicit main/sub streams\
-**Текущий срез:** `0.1.139-dev` staged: ONVIF discovery/import завершает NVR-1 onboarding/live foundation; release publication pending.\
+**Последний опубликованный релиз:** `0.1.139-dev` — NVR ONVIF discovery/import\
+**Текущий срез:** `0.1.139-dev` опубликован; NVR-1 onboarding/live foundation завершён в коде, ONVIF требует live acceptance на реальных камерах.\
 **Следующий engineering milestone:** **NVR-2 — video storage target + continuous segmented recording + reserve/ring retention**.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
@@ -54,6 +54,8 @@
 - ✅ Web: **Найти ONVIF камеры → выбрать → credentials → загрузить profiles → main/sub → импортировать**.
 - ✅ Source type импортированной камеры сохраняется как `onvif`, а supervisor/live продолжают использовать разрешённые RTSP main/sub sources.
 - ✅ Regression coverage: discovery parsing/SSRF boundary, WS-Security plaintext protection, profile parsing, state cascade, service import, API privacy и Web CSRF flow.
+- ✅ PR #138 и main прошли Web/Go/Core/integration/Linux/Windows/Debian CI.
+- ✅ Release workflow опубликовал `v0.1.139-dev` с update bundles amd64/arm64, Debian `.deb` amd64/arm64, Windows client и SHA-256.
 - 🧪 Требуется live acceptance на реальных ONVIF камерах разных производителей.
 - ⏭ Следующий срез: **NVR-2 — video storage + continuous segmented recording + reserve/ring retention**.
 ### Выпуск 0.1.138-dev — NVR explicit main/sub streams
