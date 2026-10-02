@@ -138,7 +138,6 @@ func TestOllamaProviderMapsTypedToolCalls(t *testing.T) {
 	}
 }
 
-
 func TestOllamaProviderGenerateStream(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
