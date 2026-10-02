@@ -42,8 +42,18 @@ func (Module) Lifecycle() modules.Lifecycle { return moduleLifecycle{} }
 
 type moduleLifecycle struct{}
 
-func (moduleLifecycle) Install(context.Context, modules.OperationContext, modules.Progress) error { return nil }
-func (moduleLifecycle) Upgrade(context.Context, modules.OperationContext, modules.Progress) error { return nil }
-func (moduleLifecycle) Remove(context.Context, modules.OperationContext, modules.Progress) error { return nil }
-func (moduleLifecycle) Backup(context.Context, modules.OperationContext, modules.Progress, io.Writer) error { return nil }
-func (moduleLifecycle) Restore(context.Context, modules.OperationContext, modules.Progress, io.Reader) error { return nil }
+func (moduleLifecycle) Install(context.Context, modules.OperationContext, modules.Progress) error {
+	return nil
+}
+func (moduleLifecycle) Upgrade(context.Context, modules.OperationContext, modules.Progress) error {
+	return nil
+}
+func (moduleLifecycle) Remove(context.Context, modules.OperationContext, modules.Progress) error {
+	return nil
+}
+func (moduleLifecycle) Backup(context.Context, modules.OperationContext, modules.Progress, io.Writer) error {
+	return nil
+}
+func (moduleLifecycle) Restore(context.Context, modules.OperationContext, modules.Progress, io.Reader) error {
+	return nil
+}
