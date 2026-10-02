@@ -222,7 +222,7 @@ func TestNVRModuleControlAndNavigation(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer test")
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"/cameras"`) {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"/modules/nvr"`) {
 		t.Fatalf("NVR navigation = %d: %s", rec.Code, rec.Body.String())
 	}
 }
