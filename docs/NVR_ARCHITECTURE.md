@@ -1,6 +1,6 @@
 # Home-AI Cameras / NVR Architecture
 
-**Status:** NVR-0 + RTSP onboarding/supervisor/shared live/main-sub profiles implemented through staged `0.1.138-dev`; ONVIF discovery/import next  
+**Status:** NVR-0 + RTSP onboarding/supervisor/shared live/main-sub profiles published through `0.1.138-dev`; ONVIF discovery/import next  
 **Baseline:** Home-AI-Core 0.1.138-dev  
 **Date:** 2026-10-02
 
