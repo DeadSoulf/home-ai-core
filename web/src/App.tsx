@@ -20,7 +20,7 @@ type Phase = "loading" | "setup" | "login" | "app";
 
 function currentPath(): string {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
-  const known = ["/", "/ai", "/cameras", "/files", "/files/storage", "/files/windows", "/system", "/modules", "/jobs", "/audit", "/users", "/account"];
+  const known = ["/", "/ai", "/files", "/files/storage", "/files/windows", "/system", "/modules", "/jobs", "/audit", "/users", "/account"];
   const moduleRoute = /^\/modules\/[a-z][a-z0-9.-]*$/.test(path);
   if (!known.includes(path) && !moduleRoute) return "/";
   return path + (path === "/system" || path === "/files" ? window.location.hash : "");
@@ -218,7 +218,7 @@ export default function App() {
     case "/account":
       page = accountPage;
       break;
-    case "/cameras":
+    case "/modules/nvr":
       page = <CamerasPage revision={revision} />;
       break;
     case "/files":
