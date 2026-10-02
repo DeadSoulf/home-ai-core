@@ -118,7 +118,18 @@ export function AIPage() {
       const closed = await api.closeAIConversation(activeID);
       setConversations((items) => items.map((item) => item.id === closed.id ? closed : item));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t("requestFailed"));
+      // A connection can be interrupted after Core has already committed closed_at.
+      // Reconcile from authoritative server state before surfacing a network error.
+      try {
+        const items = await api.aiConversations();
+        setConversations(items);
+        if (items.some((item) => item.id === activeID && Boolean(item.closed_at))) {
+          return;
+        }
+      } catch {
+        // Preserve the original close error when reconciliation is also unavailable.
+      }
+      setError(reason instanceof APIError ? reason.message : t("requestFailed"));
     } finally {
       setClosing(false);
     }
