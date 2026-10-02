@@ -19,12 +19,12 @@ func (Module) Manifest() modules.Manifest {
 		ID:            "ai.agent",
 		Name:          "AI Agent",
 		Description:   "First-party Home-AI agent orchestration foundation",
-		Version:       "0.4.0",
+		Version:       "0.5.0",
 		Core:          ">=0.1.0 <1.0.0",
-		Permissions:   []string{"jobs.read", "modules.read", "system.read"},
+		Permissions:   []string{"jobs.read", "modules.read", "network.manage", "network.read", "storage.manage", "storage.read", "system.read"},
 		Capabilities: modules.Capabilities{
 			Requires: []string{"host.linux"},
-			Provides: []string{"ai.agent", "ai.chat", "ai.tools"},
+			Provides: []string{"ai.agent", "ai.chat", "ai.server-tools", "ai.tools"},
 		},
 		API: modules.APIContribution{Namespace: "ai.agent"},
 		Events: modules.EventContract{
