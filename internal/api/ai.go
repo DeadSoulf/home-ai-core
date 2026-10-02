@@ -447,6 +447,30 @@ func (s *server) writeAIChatError(w http.ResponseWriter, r *http.Request, err er
 	case errors.Is(err, context.Canceled):
 		writeAPIError(w, r, http.StatusRequestTimeout, "ai_request_cancelled", "AI request was cancelled", nil)
 	default:
+		var providerErr *aiagent.ProviderRequestError
+		if errors.As(err, &providerErr) {
+			status := http.StatusBadGateway
+			code := "ai_provider_failed"
+			switch providerErr.Kind {
+			case "authentication":
+				code = "cloud_ai_auth_failed"
+			case "not_found":
+				code = "cloud_ai_endpoint_or_model_not_found"
+			case "rate_limit":
+				status = http.StatusTooManyRequests
+				code = "cloud_ai_rate_limited"
+			case "invalid_request":
+				code = "cloud_ai_invalid_request"
+			case "network":
+				status = http.StatusServiceUnavailable
+				code = "cloud_ai_network_error"
+			case "unavailable":
+				status = http.StatusServiceUnavailable
+				code = "cloud_ai_unavailable"
+			}
+			writeAPIError(w, r, status, code, providerErr.Error(), nil)
+			return
+		}
 		writeAPIError(w, r, http.StatusBadGateway, "ai_provider_failed", "AI provider request failed", nil)
 	}
 }
