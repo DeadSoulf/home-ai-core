@@ -1,6 +1,6 @@
 # AI Agent Foundation
 
-**Status:** controlled server tools/public web + streaming/local inference performance published through `0.1.129-dev`; live provider acceptance pending  
+**Status:** controlled server tools/public web published; local inference tuning published; Web streaming temporarily disabled after live transport regression and pending compatibility rework  
 **Started:** 2026-10-01  
 **First implementation slice:** `0.1.115-dev` published
 
@@ -209,6 +209,13 @@ Published in `v0.1.119-dev` after successful Core/Web, Windows, Debian and relea
 - ✅ regression tests cover tool discovery/API counts, SSRF boundary and DuckDuckGo result decoding.
 - ✅ published in `v0.1.124-dev` after successful PR/main Core/Web, Windows, Debian and release workflows.
 - 🧪 live acceptance still required on the installed server: current-info question → `web.search` → optional `web.fetch` → grounded answer.
+### 0.1.130-dev — Production Web transport fallback
+
+- ✅ production Web AI chat uses the stable JSON message endpoint after live `Failed to fetch` on the 0.1.129 browser stream.
+- ✅ streaming provider/Core endpoint remains implemented for isolated compatibility work and is no longer on the critical user path.
+- ✅ Ollama fast-profile tuning from 0.1.129 remains active.
+- ✅ server-side provider failures now include request/correlation IDs in logs without chat content.
+- 🧪 streaming must return only after a dedicated live transport compatibility pass.
 ### 0.1.129-dev — Streaming + local inference performance
 
 - ✅ Ollama streaming provider path decodes incremental `/api/chat` responses while preserving typed tool calls.

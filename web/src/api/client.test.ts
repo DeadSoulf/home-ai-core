@@ -177,6 +177,49 @@ describe("API client", () => {
 
     vi.unstubAllGlobals();
   });
+  it("sends AI messages through the stable JSON transport", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({
+        user_message: {
+          id: "aim-user-json",
+          conversation_id: "aic-json",
+          role: "user",
+          content: "hello",
+          created_at: "2026-10-02T11:00:00Z",
+        },
+        assistant_message: {
+          id: "aim-assistant-json",
+          conversation_id: "aic-json",
+          role: "assistant",
+          content: "reply",
+          created_at: "2026-10-02T11:00:01Z",
+        },
+      }), {
+        status: 200,
+        headers: {"Content-Type": "application/json"},
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    });
+
+    setCSRFToken("csrf-ai-json");
+    const result = await api.sendAIMessage("aic-json", "hello");
+
+    expect(result.assistant_message.content).toBe("reply");
+    const [input, init] = fetchMock.mock.calls[0];
+    expect(String(input)).toBe("/api/v1/ai/conversations/aic-json/messages");
+    expect(init?.method).toBe("POST");
+    expect(init?.credentials).toBe("same-origin");
+    expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-ai-json");
+
+    vi.unstubAllGlobals();
+  });
+
   it("streams AI message deltas and returns the persisted turn", async () => {
     const body = [
       JSON.stringify({type: "delta", content: "Fast "}),
