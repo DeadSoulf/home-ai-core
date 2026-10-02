@@ -120,6 +120,39 @@ func TestRegistryPersistsManifest(t *testing.T) {
 	}
 }
 
+func TestRegistrySetStatusPersistsDisabledState(t *testing.T) {
+	ctx := context.Background()
+	store, err := state.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	registry := NewRegistry(store)
+	manifest := validManifest("ai.agent", "0.2.0")
+	if err := registry.Register(ctx, testModule{manifest: manifest}); err != nil {
+		t.Fatal(err)
+	}
+	if err := registry.SetStatus(ctx, "ai.agent", "disabled", ""); err != nil {
+		t.Fatal(err)
+	}
+	item, err := registry.Get(ctx, "ai.agent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.Status != "disabled" {
+		t.Fatalf("status = %q, want disabled", item.Status)
+	}
+
+	capabilities, err := registry.Capabilities(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if contains(capabilities, "ai.agent") {
+		t.Fatalf("disabled module capability leaked: %#v", capabilities)
+	}
+}
+
 func TestManifestAllowsWildcardSubscriptions(t *testing.T) {
 	m := validManifest("monitoring", "1.0.0")
 	m.Events.Subscribes = []string{"system.*", "job.*", "*"}
