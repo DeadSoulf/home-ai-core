@@ -415,6 +415,14 @@ func validMutationCSRF(actor security.Actor, source authSource, r *http.Request)
 }
 
 func (s *server) writeAIChatError(w http.ResponseWriter, r *http.Request, err error) {
+	if s.logger != nil {
+		s.logger.Warn(
+			"AI chat request failed",
+			"request_id", requestIDFromContext(r.Context()),
+			"correlation_id", metadataFromContext(r.Context()).CorrelationID,
+			"error", err,
+		)
+	}
 	switch {
 	case errors.Is(err, aiagent.ErrAgentDisabled):
 		writeAPIError(w, r, http.StatusServiceUnavailable, "ai_agent_disabled", "AI Agent is disabled", nil)
