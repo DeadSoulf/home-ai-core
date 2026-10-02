@@ -132,7 +132,7 @@ func (c *SOAPONVIFClient) Profiles(
 
 	result := make([]ONVIFProfile, 0, len(profiles))
 	for _, profile := range profiles {
-		body := `<trt:GetStreamUri xmlns:trt="`+onvifMediaNamespace+`">` +
+		body := `<trt:GetStreamUri xmlns:trt="` + onvifMediaNamespace + `">` +
 			`<trt:StreamSetup>` +
 			`<tt:Stream xmlns:tt="http://www.onvif.org/ver10/schema">RTP-Unicast</tt:Stream>` +
 			`<tt:Transport xmlns:tt="http://www.onvif.org/ver10/schema"><tt:Protocol>RTSP</tt:Protocol></tt:Transport>` +
