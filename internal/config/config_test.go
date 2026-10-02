@@ -75,7 +75,6 @@ func TestLoadRejectsIncompleteAIConfig(t *testing.T) {
 	}
 }
 
-
 func TestLoadRejectsIncompleteCloudAIConfig(t *testing.T) {
 	t.Setenv("HOME_AI_AI_PROVIDER", "")
 	t.Setenv("HOME_AI_AI_ENDPOINT", "")
