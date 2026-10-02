@@ -27,7 +27,8 @@ const (
 	settingsDTSingleLine  = 0x0020
 	settingsDTEndEllipsis = 0x8000
 
-	settingsGradientFillRectH = 0
+	settingsGradientFillRectH  = 0
+	settingsButtonCornerRadius = 10
 
 	settingsFWNormal   = 400
 	settingsFWMedium   = 500
@@ -73,6 +74,8 @@ type settingsButtonRole int
 const (
 	settingsButtonSecondary settingsButtonRole = iota
 	settingsButtonPrimary
+	settingsButtonHeroSecondary
+	settingsButtonHeroPrimary
 	settingsButtonNavigation
 )
 
@@ -112,9 +115,11 @@ type settingsVisualResources struct {
 	navMutedBrush      windows.Handle
 	storageTrackBrush  windows.Handle
 	borderPen          windows.Handle
+	navBorderPen       windows.Handle
 	accentPen          windows.Handle
 	glowPen            windows.Handle
 	checkPen           windows.Handle
+	brandFont          windows.Handle
 	titleFont          windows.Handle
 	headlineFont       windows.Handle
 	subtitleFont       windows.Handle
@@ -144,7 +149,7 @@ var (
 	procSettingsCreateRoundRectRgn = settingsGDI32.NewProc("CreateRoundRectRgn")
 	procSettingsSelectClipRgn      = settingsGDI32.NewProc("SelectClipRgn")
 	procSettingsDrawText           = settingsUser32.NewProc("DrawTextW")
-	procSettingsDrawFocusRect      = settingsUser32.NewProc("DrawFocusRect")
+	procSettingsSetWindowRgn       = settingsUser32.NewProc("SetWindowRgn")
 	procSettingsGradientFill       = settingsMsimg32.NewProc("GradientFill")
 )
 
@@ -177,7 +182,8 @@ func (state *windowsSettingsUI) initVisualResources() error {
 	state.visual.sidebarBrush = windows.Handle(mustCreateBrush(7, 11, 20))
 	state.visual.heroBrush = windows.Handle(mustCreateBrush(5, 44, 91))
 	state.visual.cardBrush = windows.Handle(mustCreateBrush(255, 255, 255))
-	state.visual.navSelectedBrush = windows.Handle(mustCreateBrush(9, 34, 62))
+	// Figma selected nav is rgba(#0561DB, .18) over #070B14 => approximately #071A38.
+	state.visual.navSelectedBrush = windows.Handle(mustCreateBrush(7, 26, 56))
 	state.visual.successBrush = windows.Handle(mustCreateBrush(20, 173, 112))
 	state.visual.accentBrush = windows.Handle(mustCreateBrush(5, 97, 219))
 	state.visual.accentPressedBrush = windows.Handle(mustCreateBrush(4, 76, 173))
@@ -187,6 +193,9 @@ func (state *windowsSettingsUI) initVisualResources() error {
 
 	borderPen, _, _ := procSettingsCreatePen.Call(0, 1, settingsRGB(219, 229, 245))
 	state.visual.borderPen = windows.Handle(borderPen)
+	// Figma nav border is rgba(#1FB8FA, .42) on the dark sidebar.
+	navBorderPen, _, _ := procSettingsCreatePen.Call(0, 1, settingsRGB(17, 84, 117))
+	state.visual.navBorderPen = windows.Handle(navBorderPen)
 	accentPen, _, _ := procSettingsCreatePen.Call(0, 1, settingsRGB(31, 184, 250))
 	state.visual.accentPen = windows.Handle(accentPen)
 	glowPen, _, _ := procSettingsCreatePen.Call(0, 2, settingsRGB(5, 97, 219))
@@ -194,6 +203,7 @@ func (state *windowsSettingsUI) initVisualResources() error {
 	checkPen, _, _ := procSettingsCreatePen.Call(0, 4, settingsRGB(255, 255, 255))
 	state.visual.checkPen = windows.Handle(checkPen)
 
+	state.visual.brandFont = createSettingsFont(-20, settingsFWBold)
 	state.visual.titleFont = createSettingsFont(-22, settingsFWBold)
 	state.visual.headlineFont = createSettingsFont(-20, settingsFWBold)
 	state.visual.subtitleFont = createSettingsFont(-11, settingsFWNormal)
@@ -205,9 +215,9 @@ func (state *windowsSettingsUI) initVisualResources() error {
 		state.visual.navSelectedBrush == 0 || state.visual.successBrush == 0 ||
 		state.visual.accentBrush == 0 || state.visual.accentPressedBrush == 0 ||
 		state.visual.cyanBrush == 0 || state.visual.navMutedBrush == 0 ||
-		state.visual.storageTrackBrush == 0 || state.visual.borderPen == 0 || state.visual.accentPen == 0 ||
-		state.visual.glowPen == 0 || state.visual.checkPen == 0 ||
-		state.visual.titleFont == 0 || state.visual.headlineFont == 0 ||
+		state.visual.storageTrackBrush == 0 || state.visual.borderPen == 0 || state.visual.navBorderPen == 0 ||
+		state.visual.accentPen == 0 || state.visual.glowPen == 0 || state.visual.checkPen == 0 ||
+		state.visual.brandFont == 0 || state.visual.titleFont == 0 || state.visual.headlineFont == 0 ||
 		state.visual.subtitleFont == 0 || state.visual.cardTitleFont == 0 ||
 		state.visual.cardValueFont == 0 {
 		return fmt.Errorf("create Windows client visual resources")
@@ -237,9 +247,11 @@ func (state *windowsSettingsUI) releaseVisualResources() {
 		state.visual.navMutedBrush,
 		state.visual.storageTrackBrush,
 		state.visual.borderPen,
+		state.visual.navBorderPen,
 		state.visual.accentPen,
 		state.visual.glowPen,
 		state.visual.checkPen,
+		state.visual.brandFont,
 		state.visual.titleFont,
 		state.visual.headlineFont,
 		state.visual.subtitleFont,
@@ -261,6 +273,40 @@ func (state *windowsSettingsUI) setVisualRole(hwnd windows.Handle, role settings
 		state.visualRoles = make(map[windows.Handle]settingsVisualRole)
 	}
 	state.visualRoles[hwnd] = role
+}
+
+func (state *windowsSettingsUI) applyRoundedButtonRegion(hwnd windows.Handle, width, height int32) {
+	if hwnd == 0 || width <= 0 || height <= 0 {
+		return
+	}
+	region, _, _ := procSettingsCreateRoundRectRgn.Call(
+		0,
+		0,
+		uintptr(width+1),
+		uintptr(height+1),
+		uintptr(settingsButtonCornerRadius*2),
+		uintptr(settingsButtonCornerRadius*2),
+	)
+	if region == 0 {
+		return
+	}
+	applied, _, _ := procSettingsSetWindowRgn.Call(uintptr(hwnd), region, 1)
+	if applied == 0 {
+		procSettingsDeleteObject.Call(region)
+	}
+}
+
+func settingsButtonRoleForName(name string) settingsButtonRole {
+	switch name {
+	case "overview_sync_button":
+		return settingsButtonHeroPrimary
+	case "overview_open_button":
+		return settingsButtonHeroSecondary
+	case "connect_button", "save_button", "sync_button", "schedule_save_button", "agent_enable":
+		return settingsButtonPrimary
+	default:
+		return settingsButtonSecondary
+	}
 }
 
 func (state *windowsSettingsUI) setControlFont(hwnd, font windows.Handle) {
@@ -482,12 +528,16 @@ func (state *windowsSettingsUI) drawButton(lParam uintptr) uintptr {
 	}
 	item := (*settingsDrawItemStruct)(unsafe.Pointer(lParam))
 	role := state.buttonRoles[item.HwndItem]
+
 	brush := state.visual.cardBrush
+	backgroundBrush := state.visual.cardBrush
 	textColor := settingsRGB(19, 28, 46)
 	border := state.visual.borderPen
 	selected := false
 
-	if role == settingsButtonNavigation {
+	switch role {
+	case settingsButtonNavigation:
+		backgroundBrush = state.visual.sidebarBrush
 		for page, hwnd := range state.navButtons {
 			if hwnd == item.HwndItem && page == state.page {
 				selected = true
@@ -497,19 +547,42 @@ func (state *windowsSettingsUI) drawButton(lParam uintptr) uintptr {
 		if selected {
 			brush = state.visual.navSelectedBrush
 			textColor = settingsRGB(255, 255, 255)
-			border = state.visual.accentPen
+			border = state.visual.navBorderPen
 		} else {
 			brush = state.visual.sidebarBrush
 			textColor = settingsRGB(184, 204, 227)
 			border = 0
 		}
-	} else if role == settingsButtonPrimary {
+	case settingsButtonHeroPrimary:
+		backgroundBrush = state.visual.heroBrush
 		brush = state.visual.accentBrush
 		textColor = settingsRGB(255, 255, 255)
+		border = 0
+		if item.ItemState&settingsODSSelected != 0 {
+			brush = state.visual.accentPressedBrush
+		}
+	case settingsButtonHeroSecondary:
+		backgroundBrush = state.visual.heroBrush
+		brush = state.visual.cardBrush
+		textColor = settingsRGB(19, 28, 46)
+		border = state.visual.borderPen
+	case settingsButtonPrimary:
+		brush = state.visual.accentBrush
+		textColor = settingsRGB(255, 255, 255)
+		border = 0
 		if item.ItemState&settingsODSSelected != 0 {
 			brush = state.visual.accentPressedBrush
 		}
 	}
+
+	// BUTTON controls are rectangular Win32 child windows. Clear the complete
+	// client rectangle with the parent surface before painting the rounded
+	// shape so the native button-face background cannot leak through corners.
+	procSettingsFillRect.Call(
+		uintptr(item.HDC),
+		uintptr(unsafe.Pointer(&item.Rect)),
+		uintptr(backgroundBrush),
+	)
 
 	oldBrush, _, _ := procSettingsSelectObject.Call(uintptr(item.HDC), uintptr(brush))
 	var oldPen uintptr
@@ -523,8 +596,9 @@ func (state *windowsSettingsUI) drawButton(lParam uintptr) uintptr {
 		uintptr(item.HDC),
 		uintptr(item.Rect.Left), uintptr(item.Rect.Top),
 		uintptr(item.Rect.Right), uintptr(item.Rect.Bottom),
-		20, 20,
+		settingsButtonCornerRadius*2, settingsButtonCornerRadius*2,
 	)
+
 	if role == settingsButtonNavigation {
 		dotBrush := state.visual.navMutedBrush
 		if selected {
@@ -545,6 +619,7 @@ func (state *windowsSettingsUI) drawButton(lParam uintptr) uintptr {
 			procSettingsSelectObject.Call(uintptr(item.HDC), oldDotPen)
 		}
 	}
+
 	if oldBrush != 0 {
 		procSettingsSelectObject.Call(uintptr(item.HDC), oldBrush)
 	}
@@ -557,34 +632,51 @@ func (state *windowsSettingsUI) drawButton(lParam uintptr) uintptr {
 		textColor = settingsRGB(133, 150, 173)
 	}
 	procSettingsSetTextColor.Call(uintptr(item.HDC), textColor)
+
 	font, _, _ := procSettingsSendMessage.Call(uintptr(item.HwndItem), settingsWMGetFont, 0, 0)
 	var oldFont uintptr
 	if font != 0 {
 		oldFont, _, _ = procSettingsSelectObject.Call(uintptr(item.HDC), font)
 	}
+
 	label := state.text(item.HwndItem)
 	labelPtr, _ := windows.UTF16PtrFromString(label)
 	rect := item.Rect
+	flags := uintptr(settingsDTCenter | settingsDTVCenter | settingsDTSingleLine | settingsDTEndEllipsis)
 	if role == settingsButtonNavigation {
-		rect.Left += 22
+		// Figma uses a 30 px left text inset, not centered navigation labels.
+		rect.Left += 30
+		rect.Right -= 8
+		flags = settingsDTVCenter | settingsDTSingleLine | settingsDTEndEllipsis
 	}
 	procSettingsDrawText.Call(
 		uintptr(item.HDC),
 		uintptr(unsafe.Pointer(labelPtr)),
 		^uintptr(0),
 		uintptr(unsafe.Pointer(&rect)),
-		settingsDTCenter|settingsDTVCenter|settingsDTSingleLine|settingsDTEndEllipsis,
+		flags,
 	)
 	if oldFont != 0 {
 		procSettingsSelectObject.Call(uintptr(item.HDC), oldFont)
 	}
+
 	if item.ItemState&settingsODSFocus != 0 {
+		// Draw a deterministic rounded focus ring instead of DrawFocusRect,
+		// whose XOR rendering produced the double/uneven outline seen live.
 		focus := item.Rect
-		focus.Left += 4
-		focus.Top += 4
-		focus.Right -= 4
-		focus.Bottom -= 4
-		procSettingsDrawFocusRect.Call(uintptr(item.HDC), uintptr(unsafe.Pointer(&focus)))
+		focus.Left += 3
+		focus.Top += 3
+		focus.Right -= 3
+		focus.Bottom -= 3
+		state.paintRoundedOutline(
+			item.HDC,
+			focus.Left,
+			focus.Top,
+			focus.Right,
+			focus.Bottom,
+			state.visual.accentPen,
+			settingsButtonCornerRadius-3,
+		)
 	}
 	return 1
 }

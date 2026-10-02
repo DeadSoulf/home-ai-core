@@ -94,12 +94,8 @@ func (state *windowsSettingsUI) createLightControls(module windows.Handle) error
 		if name != "" {
 			state.localized[name] = hwnd
 		}
-		role := settingsButtonSecondary
-		switch name {
-		case "overview_sync_button", "connect_button", "save_button", "sync_button", "schedule_save_button", "agent_enable":
-			role = settingsButtonPrimary
-		}
-		state.buttonRoles[hwnd] = role
+		state.buttonRoles[hwnd] = settingsButtonRoleForName(name)
+		state.applyRoundedButtonRegion(hwnd, w, h)
 		if page >= 0 {
 			state.trackPage(page, hwnd)
 		}
@@ -119,9 +115,9 @@ func (state *windowsSettingsUI) createLightControls(module windows.Handle) error
 			procSettingsSendMessage.Call(uintptr(iconView), settingsSTMSetIcon, uintptr(state.windowIcon), 0)
 		}
 	}
-	brand := static("brand_name", "brand_name", 90, 29, 92, 28, -1, settingsVisualSidebar)
-	state.setControlFont(brand, state.visual.titleFont)
-	staticText("brand_desktop", "Desktop", 91, 58, 88, 18, -1, settingsVisualSidebarMuted)
+	brand := static("brand_name", "brand_name", 88, 31, 104, 25, -1, settingsVisualSidebar)
+	state.setControlFont(brand, state.visual.brandFont)
+	staticText("brand_desktop", "Desktop", 90, 58, 96, 18, -1, settingsVisualSidebarMuted)
 	staticText("", "© 2026 TexNik", 18, 560, 150, 20, -1, settingsVisualSidebarMuted)
 
 	nav := func(page int, id uint16, key string, y int32, first bool) {
@@ -130,6 +126,7 @@ func (state *windowsSettingsUI) createLightControls(module windows.Handle) error
 			style |= settingsWSGroup
 		}
 		hwnd := state.createControl(module, "BUTTON", state.tr(key), style, 16, y, 164, 36, id, windows.Handle(font))
+		state.applyRoundedButtonRegion(hwnd, 164, 36)
 		state.navButtons[page] = hwnd
 		state.buttonRoles[hwnd] = settingsButtonNavigation
 		state.localized[fmt.Sprintf("nav_%d", page)] = hwnd
@@ -342,7 +339,9 @@ func (state *windowsSettingsUI) showPage(page int) {
 func (state *windowsSettingsUI) initialFocusForPage(page int) windows.Handle {
 	switch page {
 	case settingsPageOverview:
-		return state.localized["overview_sync_button"]
+		// Keep the default Overview screenshot visually clean. Keyboard users
+		// still reach the first action with Tab through IsDialogMessage.
+		return 0
 	case settingsPageConnection:
 		return state.serverEdit
 	case settingsPageSync:
