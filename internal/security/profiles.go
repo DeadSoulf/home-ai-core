@@ -180,6 +180,26 @@ func (s *Service) AccessCatalog(ctx context.Context) (AccessCatalog, error) {
 		})
 	}
 
+	cameras, err := s.store.ListNVRCameras(ctx)
+	if err != nil {
+		return AccessCatalog{}, err
+	}
+	for _, camera := range cameras {
+		resources = append(resources, ResourceDefinition{
+			Type:        "camera",
+			ID:          camera.ID,
+			Name:        camera.Name,
+			Description: camera.SourceType,
+			Permissions: []string{
+				"camera.live",
+				"camera.archive",
+				"camera.export",
+				"camera.ptz",
+				"camera.manage",
+			},
+		})
+	}
+
 	return AccessCatalog{
 		Profiles:    profiles,
 		Permissions: permissions,
