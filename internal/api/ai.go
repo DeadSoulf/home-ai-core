@@ -200,6 +200,78 @@ func (s *server) aiConversationResource(
 	}
 }
 
+func (s *server) aiConversationMessageStream(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if !validMutationCSRF(actor, source, r) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	conversationID := r.PathValue("conversationID")
+	if conversationID == "" {
+		s.notFound(w, r)
+		return
+	}
+	var request struct {
+		Content string `json:"content"`
+	}
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_request", err.Error(), nil)
+		return
+	}
+
+	started := false
+	controller := http.NewResponseController(w)
+	writeEvent := func(event any) error {
+		if !started {
+			w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-cache, no-transform")
+			w.Header().Set("X-Accel-Buffering", "no")
+			w.WriteHeader(http.StatusOK)
+			started = true
+		}
+		if err := json.NewEncoder(w).Encode(event); err != nil {
+			return err
+		}
+		return controller.Flush()
+	}
+
+	userMessage, assistantMessage, err := s.ai.ChatStream(
+		r.Context(),
+		actor,
+		s.securityRequestContext(r),
+		conversationID,
+		request.Content,
+		func(delta string) error {
+			if delta == "" {
+				return nil
+			}
+			return writeEvent(map[string]any{"type": "delta", "content": delta})
+		},
+	)
+	if err != nil {
+		if !started {
+			s.writeAIChatError(w, r, err)
+			return
+		}
+		_ = writeEvent(map[string]any{
+			"type":    "error",
+			"code":    "ai_stream_failed",
+			"message": "AI response stream failed",
+		})
+		return
+	}
+
+	_ = writeEvent(map[string]any{
+		"type":              "done",
+		"user_message":      userMessage,
+		"assistant_message": assistantMessage,
+	})
+}
+
 func (s *server) aiConversationDelete(
 	w http.ResponseWriter,
 	r *http.Request,
