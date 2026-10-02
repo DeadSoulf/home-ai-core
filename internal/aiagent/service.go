@@ -284,10 +284,10 @@ func (s *Service) recordChatAudit(
 	}
 	outcome := "success"
 	metadata := map[string]any{
-		"provider":       s.provider.ID(),
-		"duration_ms":    duration.Milliseconds(),
-		"input_chars":    utf8.RuneCountInString(input),
-		"output_chars":   utf8.RuneCountInString(output),
+		"provider":     s.provider.ID(),
+		"duration_ms":  duration.Milliseconds(),
+		"input_chars":  utf8.RuneCountInString(input),
+		"output_chars": utf8.RuneCountInString(output),
 	}
 	if modelProvider, ok := s.provider.(interface{ Model() string }); ok {
 		metadata["model"] = modelProvider.Model()
