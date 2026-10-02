@@ -7,8 +7,8 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.134-dev` — NVR-0 contracts and persistence\
-**Текущий срез:** `0.1.135-dev` staged: **NVR-1 RTSP onboarding** реализован — encrypted credentials, ffprobe Test connection и manual camera CRUD; release publication pending.\
+**Последний опубликованный релиз:** `0.1.135-dev` — NVR-1 secure RTSP camera onboarding\
+**Текущий срез:** `0.1.135-dev` опубликован; encrypted credentials, ffprobe Test connection и manual camera CRUD готовы к live-проверке с реальной камерой.\
 **Следующий engineering milestone:** продолжить **NVR-1 media runtime**: persistent camera supervisor, automatic reconnect/health, shared local restream, single live view и multi-camera grid; затем ONVIF/main-sub discovery.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
@@ -55,7 +55,9 @@
 - ✅ NVR status показывает реальную готовность protected secret store и `ffprobe`.
 - ✅ Debian package теперь зависит от `ffmpeg`, чтобы `ffprobe` был доступен после обычной установки/обновления.
 - ✅ Ошибка инициализации NVR secret store не валит Core: модуль переходит в `error` независимо от остальных сервисов.
-- ✅ Functional PR CI: Web typecheck/tests/build, Go tests/vet, Core/integration, Linux/Windows cross-build, Debian installer и Windows client.
+- ✅ PR #134 и main прошли Web typecheck/tests/build, Go tests/vet, Core/integration, Linux/Windows cross-build, Debian installer и Windows client CI.
+- ✅ Release workflow опубликовал `v0.1.135-dev` с Core amd64/arm64, Debian `.deb` amd64/arm64, Windows client и SHA-256.
+- 🧪 Требуется live-проверка реальной RTSP-камеры: Test connection → save → edit → повторный test с сохранёнными credentials.
 - ⏭ Следующий срез NVR-1: persistent camera supervisor + reconnect/health + live restream/single/grid.
 ### Выпуск 0.1.134-dev — NVR-0 contracts and persistence
 
