@@ -113,7 +113,6 @@ func TestAIToolExecutionFailsClosedWithoutPermission(t *testing.T) {
 	}
 }
 
-
 type apiChatState struct {
 	fakeState
 	conversations map[string]state.AIConversationRecord
