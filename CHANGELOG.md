@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.122-dev
+
+- Add **Finish chat / Завершить чат** to the Web AI Agent conversation header.
+- Add migration 020 with persistent `closed_at` state for AI conversations.
+- Keep finished chats in per-user history while making them read-only.
+- Add `POST /api/v1/ai/conversations/{conversationID}/close` with the existing authentication/CSRF boundary.
+- Reject new messages to finished conversations with explicit `ai_conversation_closed` / HTTP 409.
+- Audit successful chat completion as `ai.conversation.close` without copying conversation text into audit metadata.
+- Show **Finished / Завершён** in the conversation list/header and replace the composer with a read-only finished state.
+- Offer **New conversation / Новый диалог** directly from a finished chat.
+- Add state/service/API regression coverage for persistence, read-only history, ownership isolation and post-close message rejection.
+
 ## 0.1.121-dev
 
 - Fix AI Agent **Restart** failing with `failed to persist module state` on real installations.
