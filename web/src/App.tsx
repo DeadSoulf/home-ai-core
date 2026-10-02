@@ -8,6 +8,7 @@ import { FirstRunPage, LoginPage } from "./pages/Auth";
 import { AccountPage } from "./pages/Account";
 import { AIPage } from "./pages/AI";
 import { AuditPage } from "./pages/Audit";
+import { CamerasPage } from "./pages/Cameras";
 import { Dashboard } from "./pages/Dashboard";
 import { FilesPage } from "./pages/Files";
 import { JobsPage } from "./pages/Jobs";
@@ -19,7 +20,7 @@ type Phase = "loading" | "setup" | "login" | "app";
 
 function currentPath(): string {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
-  const known = ["/", "/ai", "/files", "/files/storage", "/files/windows", "/system", "/modules", "/jobs", "/audit", "/users", "/account"];
+  const known = ["/", "/ai", "/cameras", "/files", "/files/storage", "/files/windows", "/system", "/modules", "/jobs", "/audit", "/users", "/account"];
   const moduleRoute = /^\/modules\/[a-z][a-z0-9.-]*$/.test(path);
   if (!known.includes(path) && !moduleRoute) return "/";
   return path + (path === "/system" || path === "/files" ? window.location.hash : "");
@@ -216,6 +217,9 @@ export default function App() {
       break;
     case "/account":
       page = accountPage;
+      break;
+    case "/cameras":
+      page = <CamerasPage revision={revision} />;
       break;
     case "/files":
     case "/files/storage":
