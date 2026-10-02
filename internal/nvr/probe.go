@@ -160,7 +160,6 @@ func (p *FFProbe) Probe(ctx context.Context, request ProbeRequest) (ProbeResult,
 	return result, nil
 }
 
-
 func ffconcatRTSPInput(address, transport string) string {
 	escaped := strings.ReplaceAll(address, "'", "'\\''")
 	return "ffconcat version 1.0\n" +
