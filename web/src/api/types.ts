@@ -541,6 +541,7 @@ export type NVRStreamProfile = {
 
 export type NVRCameraConfig = NVRCamera & {
   address: string;
+  substream_address?: string;
   profiles?: NVRStreamProfile[];
 };
 
@@ -551,11 +552,13 @@ export type NVRProbe = {
   fps: number;
   bitrate_bps: number;
   has_audio: boolean;
+  substream?: NVRProbe;
 };
 
 export type NVRCameraInput = {
   name: string;
   address: string;
+  substream_address?: string;
   username?: string;
   password?: string;
   transport?: "tcp" | "udp";
@@ -563,4 +566,5 @@ export type NVRCameraInput = {
   audio_enabled: boolean;
   enabled?: boolean;
   clear_credentials?: boolean;
+  clear_substream?: boolean;
 };

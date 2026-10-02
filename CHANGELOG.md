@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.138-dev
+
+- Complete the explicit main/sub-stream portion of NVR-1 camera onboarding.
+- Add optional `substream_address` to managed camera configuration while keeping the existing main RTSP source as the archive-quality stream.
+- Probe main and substream independently and return metadata for both before a new camera is saved.
+- Persist the optional substream as `nvr_stream_profiles.role = sub`; keep source URIs out of the normal camera-list response.
+- Preserve an existing substream on ordinary edits and add explicit removal support.
+- Make shared live preview prefer the configured substream and automatically fall back to the main stream when none exists.
+- Keep supervisor health checks on the main stream so preview optimization does not weaken primary-source monitoring.
+- Add Web configuration fields and separate main/sub probe details.
+- Add state/service/live regression coverage for substream persistence, preservation, removal and live-source selection.
+- ONVIF discovery/import remains the final major NVR-1 onboarding slice before recording/storage work.
 ## 0.1.137-dev
 
 - Add the first shared NVR live-preview runtime: one local FFmpeg process per camera is shared by all active Web viewers.

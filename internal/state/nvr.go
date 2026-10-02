@@ -331,6 +331,27 @@ func (s *Store) SetNVRStreamProfile(
 	return s.nvrStreamProfile(ctx, id)
 }
 
+func (s *Store) DeleteNVRStreamProfile(ctx context.Context, cameraID, role string) error {
+	cameraID = strings.TrimSpace(cameraID)
+	role = strings.ToLower(strings.TrimSpace(role))
+	if cameraID == "" {
+		return errors.New("camera id is required")
+	}
+	if role != "main" && role != "sub" {
+		return errors.New("stream role must be main or sub")
+	}
+	_, err := s.db.ExecContext(
+		ctx,
+		"DELETE FROM nvr_stream_profiles WHERE camera_id = ? AND role = ?",
+		cameraID,
+		role,
+	)
+	if err != nil {
+		return fmt.Errorf("delete NVR stream profile: %w", err)
+	}
+	return nil
+}
+
 func (s *Store) ListNVRStreamProfiles(ctx context.Context, cameraID string) ([]NVRStreamProfileRecord, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, camera_id, role, source_uri, codec, width, height, fps, bitrate_bps,

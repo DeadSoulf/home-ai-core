@@ -56,6 +56,28 @@ func TestNVRFoundationPersistence(t *testing.T) {
 		t.Fatalf("profile = %#v", profile)
 	}
 
+	sub, err := store.SetNVRStreamProfile(
+		ctx,
+		camera.ID,
+		"sub",
+		"rtsp://192.0.2.10/stream2",
+		"h264",
+		640,
+		360,
+		10,
+		500_000,
+		now,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sub.Role != "sub" {
+		t.Fatalf("sub profile = %#v", sub)
+	}
+	if err := store.DeleteNVRStreamProfile(ctx, camera.ID, "sub"); err != nil {
+		t.Fatal(err)
+	}
+
 	cameras, err := store.ListNVRCameras(ctx)
 	if err != nil {
 		t.Fatal(err)

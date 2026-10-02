@@ -77,15 +77,17 @@ func TestFFmpegMJPEGSourceKeepsCredentialsOutOfArguments(t *testing.T) {
 }
 
 type fakeLiveSource struct {
-	mu     sync.Mutex
-	starts int
+	mu       sync.Mutex
+	starts   int
+	requests []ProbeRequest
 }
 
 func (s *fakeLiveSource) Available() bool { return true }
 
-func (s *fakeLiveSource) Start(ctx context.Context, _ ProbeRequest) (io.ReadCloser, <-chan error, error) {
+func (s *fakeLiveSource) Start(ctx context.Context, request ProbeRequest) (io.ReadCloser, <-chan error, error) {
 	s.mu.Lock()
 	s.starts++
+	s.requests = append(s.requests, request)
 	s.mu.Unlock()
 
 	reader, writer := io.Pipe()
@@ -116,6 +118,15 @@ func (s *fakeLiveSource) Starts() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.starts
+}
+
+func (s *fakeLiveSource) LastRequest() ProbeRequest {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.requests) == 0 {
+		return ProbeRequest{}
+	}
+	return s.requests[len(s.requests)-1]
 }
 
 func TestLiveSubscribersShareOneCameraProcess(t *testing.T) {
@@ -184,6 +195,76 @@ func TestLiveSubscribersShareOneCameraProcess(t *testing.T) {
 		time.Sleep(2 * time.Millisecond)
 	}
 	t.Fatal("shared live stream did not stop after idle timeout")
+}
+
+func TestLivePrefersConfiguredSubstream(t *testing.T) {
+	ctx := context.Background()
+	store, err := state.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	camera, err := store.CreateNVRCamera(
+		ctx,
+		"Garage",
+		"rtsp",
+		"rtsp://192.0.2.90/main",
+		"",
+		"tcp",
+		"off",
+		"",
+		false,
+		time.Now(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SetNVRStreamProfile(
+		ctx,
+		camera.ID,
+		"main",
+		"rtsp://192.0.2.90/main",
+		"h264",
+		1920,
+		1080,
+		25,
+		4_000_000,
+		time.Now(),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SetNVRStreamProfile(
+		ctx,
+		camera.ID,
+		"sub",
+		"rtsp://192.0.2.90/sub",
+		"h264",
+		640,
+		360,
+		10,
+		500_000,
+		time.Now(),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	source := &fakeLiveSource{}
+	service := NewServiceWithRuntimeDependencies(
+		store,
+		newFakeCredentialStore(),
+		&supervisorProber{result: ProbeResult{Codec: "h264"}},
+		source,
+	)
+	subscription, err := service.SubscribeLive(ctx, camera.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer subscription.Close()
+
+	if got := source.LastRequest().Address; got != "rtsp://192.0.2.90/sub" {
+		t.Fatalf("live address = %q, want substream", got)
+	}
 }
 
 func TestReadJPEGFrameRejectsOversize(t *testing.T) {

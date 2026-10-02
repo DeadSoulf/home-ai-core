@@ -28,6 +28,7 @@ type CameraStore interface {
 	NVRCamera(context.Context, string) (state.NVRCameraRecord, error)
 	ListNVRCameras(context.Context) ([]state.NVRCameraRecord, error)
 	ListNVRStreamProfiles(context.Context, string) ([]state.NVRStreamProfileRecord, error)
+	DeleteNVRStreamProfile(context.Context, string, string) error
 	SetNVRStreamProfile(
 		context.Context,
 		string, string, string, string,
@@ -57,21 +58,24 @@ type Service struct {
 }
 
 type CameraInput struct {
-	Name            string `json:"name"`
-	Address         string `json:"address"`
-	Username        string `json:"username,omitempty"`
-	Password        string `json:"password,omitempty"`
-	Transport       string `json:"transport,omitempty"`
-	RecordingMode   string `json:"recording_mode,omitempty"`
-	AudioEnabled    bool   `json:"audio_enabled"`
-	Enabled         *bool  `json:"enabled,omitempty"`
-	ClearCredential bool   `json:"clear_credentials,omitempty"`
+	Name             string `json:"name"`
+	Address          string `json:"address"`
+	SubstreamAddress string `json:"substream_address,omitempty"`
+	Username         string `json:"username,omitempty"`
+	Password         string `json:"password,omitempty"`
+	Transport        string `json:"transport,omitempty"`
+	RecordingMode    string `json:"recording_mode,omitempty"`
+	AudioEnabled     bool   `json:"audio_enabled"`
+	Enabled          *bool  `json:"enabled,omitempty"`
+	ClearCredential  bool   `json:"clear_credentials,omitempty"`
+	ClearSubstream   bool   `json:"clear_substream,omitempty"`
 }
 
 type CameraConfig struct {
 	CameraSummary
-	Address  string          `json:"address"`
-	Profiles []StreamProfile `json:"profiles,omitempty"`
+	Address          string          `json:"address"`
+	SubstreamAddress string          `json:"substream_address,omitempty"`
+	Profiles         []StreamProfile `json:"profiles,omitempty"`
 }
 
 func NewService(stateDir string, store CameraStore) (*Service, error) {
@@ -140,6 +144,13 @@ func (s *Service) TestCamera(ctx context.Context, input CameraInput) (ProbeResul
 	if err != nil {
 		return ProbeResult{}, err
 	}
+	substreamAddress := strings.TrimSpace(input.SubstreamAddress)
+	if substreamAddress != "" {
+		substreamAddress, err = normalizeRTSPAddress(substreamAddress)
+		if err != nil {
+			return ProbeResult{}, fmt.Errorf("invalid camera substream: %w", err)
+		}
+	}
 	transport, err := normalizeTransport(input.Transport)
 	if err != nil {
 		return ProbeResult{}, err
@@ -148,11 +159,7 @@ func (s *Service) TestCamera(ctx context.Context, input CameraInput) (ProbeResul
 	if err != nil {
 		return ProbeResult{}, err
 	}
-	return s.prober.Probe(ctx, ProbeRequest{
-		Address:    address,
-		Transport:  transport,
-		Credential: credential,
-	})
+	return s.probeStreams(ctx, address, substreamAddress, transport, credential)
 }
 
 func (s *Service) TestExistingCamera(ctx context.Context, cameraID string) (ProbeResult, error) {
@@ -164,11 +171,11 @@ func (s *Service) TestExistingCamera(ctx context.Context, cameraID string) (Prob
 	if err != nil {
 		return ProbeResult{}, err
 	}
-	return s.prober.Probe(ctx, ProbeRequest{
-		Address:    camera.Address,
-		Transport:  camera.Transport,
-		Credential: credential,
-	})
+	substreamAddress, err := s.substreamAddress(ctx, camera.ID)
+	if err != nil {
+		return ProbeResult{}, err
+	}
+	return s.probeStreams(ctx, camera.Address, substreamAddress, camera.Transport, credential)
 }
 
 func (s *Service) CreateCamera(
@@ -241,6 +248,26 @@ func (s *Service) CreateCamera(
 		}
 		return CameraConfig{}, ProbeResult{}, err
 	}
+	if input.SubstreamAddress != "" && probe.Substream != nil {
+		if _, err := s.store.SetNVRStreamProfile(
+			ctx,
+			camera.ID,
+			"sub",
+			input.SubstreamAddress,
+			probe.Substream.Codec,
+			probe.Substream.Width,
+			probe.Substream.Height,
+			probe.Substream.FPS,
+			probe.Substream.BitrateBPS,
+			now,
+		); err != nil {
+			_ = s.store.DeleteNVRCamera(context.WithoutCancel(ctx), camera.ID)
+			if ref != "" {
+				_ = s.credentials.DeleteCameraCredential(context.WithoutCancel(ctx), ref)
+			}
+			return CameraConfig{}, ProbeResult{}, err
+		}
+	}
 	if err := s.RefreshCamera(ctx, camera.ID); err != nil {
 		return CameraConfig{}, ProbeResult{}, err
 	}
@@ -291,11 +318,25 @@ func (s *Service) UpdateCamera(
 		}
 	}
 
-	probe, err := s.prober.Probe(ctx, ProbeRequest{
-		Address:    input.Address,
-		Transport:  input.Transport,
-		Credential: credential,
-	})
+	currentSubstream, err := s.substreamAddress(ctx, cameraID)
+	if err != nil {
+		return CameraConfig{}, ProbeResult{}, err
+	}
+	targetSubstream := currentSubstream
+	switch {
+	case input.ClearSubstream:
+		targetSubstream = ""
+	case input.SubstreamAddress != "":
+		targetSubstream = input.SubstreamAddress
+	}
+
+	probe, err := s.probeStreams(
+		ctx,
+		input.Address,
+		targetSubstream,
+		input.Transport,
+		credential,
+	)
 	if err != nil {
 		return CameraConfig{}, ProbeResult{}, err
 	}
@@ -350,6 +391,26 @@ func (s *Service) UpdateCamera(
 	); err != nil {
 		return CameraConfig{}, ProbeResult{}, err
 	}
+	if targetSubstream == "" {
+		if err := s.store.DeleteNVRStreamProfile(ctx, cameraID, "sub"); err != nil {
+			return CameraConfig{}, ProbeResult{}, err
+		}
+	} else if probe.Substream != nil {
+		if _, err := s.store.SetNVRStreamProfile(
+			ctx,
+			cameraID,
+			"sub",
+			targetSubstream,
+			probe.Substream.Codec,
+			probe.Substream.Width,
+			probe.Substream.Height,
+			probe.Substream.FPS,
+			probe.Substream.BitrateBPS,
+			now,
+		); err != nil {
+			return CameraConfig{}, ProbeResult{}, err
+		}
+	}
 	if credentialChanged && oldRef != "" && oldRef != targetRef {
 		_ = s.credentials.DeleteCameraCredential(context.WithoutCancel(ctx), oldRef)
 	}
@@ -398,6 +459,9 @@ func (s *Service) CameraConfig(ctx context.Context, cameraID string) (CameraConf
 	}
 	out.Runtime = s.CameraRuntime(camera.ID)
 	for _, profile := range profiles {
+		if profile.Role == "sub" {
+			out.SubstreamAddress = profile.SourceURI
+		}
 		out.Profiles = append(out.Profiles, StreamProfile{
 			ID:         profile.ID,
 			CameraID:   profile.CameraID,
@@ -432,6 +496,7 @@ func summaryFromRecord(camera state.NVRCameraRecord) CameraSummary {
 func normalizeCameraInput(input CameraInput, create bool) (CameraInput, error) {
 	input.Name = strings.TrimSpace(input.Name)
 	input.Address = strings.TrimSpace(input.Address)
+	input.SubstreamAddress = strings.TrimSpace(input.SubstreamAddress)
 	input.Username = strings.TrimSpace(input.Username)
 	input.Transport = strings.ToLower(strings.TrimSpace(input.Transport))
 	input.RecordingMode = strings.ToLower(strings.TrimSpace(input.RecordingMode))
@@ -443,6 +508,12 @@ func normalizeCameraInput(input CameraInput, create bool) (CameraInput, error) {
 		return CameraInput{}, err
 	}
 	input.Address = address
+	if input.SubstreamAddress != "" {
+		input.SubstreamAddress, err = normalizeRTSPAddress(input.SubstreamAddress)
+		if err != nil {
+			return CameraInput{}, fmt.Errorf("invalid camera substream: %w", err)
+		}
+	}
 	input.Transport, err = normalizeTransport(input.Transport)
 	if err != nil {
 		return CameraInput{}, err
@@ -458,10 +529,57 @@ func normalizeCameraInput(input CameraInput, create bool) (CameraInput, error) {
 	if create && input.ClearCredential {
 		return CameraInput{}, errors.New("cannot clear credentials while creating a camera")
 	}
+	if create && input.ClearSubstream {
+		return CameraInput{}, errors.New("cannot clear substream while creating a camera")
+	}
+	if input.ClearSubstream && input.SubstreamAddress != "" {
+		return CameraInput{}, errors.New("camera substream cannot be set and cleared at the same time")
+	}
 	if _, err := credentialFromInput(input); err != nil {
 		return CameraInput{}, err
 	}
 	return input, nil
+}
+
+func (s *Service) probeStreams(
+	ctx context.Context,
+	mainAddress, substreamAddress, transport string,
+	credential CameraCredential,
+) (ProbeResult, error) {
+	main, err := s.prober.Probe(ctx, ProbeRequest{
+		Address:    mainAddress,
+		Transport:  transport,
+		Credential: credential,
+	})
+	if err != nil {
+		return ProbeResult{}, err
+	}
+	if strings.TrimSpace(substreamAddress) == "" {
+		return main, nil
+	}
+	sub, err := s.prober.Probe(ctx, ProbeRequest{
+		Address:    substreamAddress,
+		Transport:  transport,
+		Credential: credential,
+	})
+	if err != nil {
+		return ProbeResult{}, fmt.Errorf("camera substream probe failed: %w", err)
+	}
+	main.Substream = &sub
+	return main, nil
+}
+
+func (s *Service) substreamAddress(ctx context.Context, cameraID string) (string, error) {
+	profiles, err := s.store.ListNVRStreamProfiles(ctx, strings.TrimSpace(cameraID))
+	if err != nil {
+		return "", err
+	}
+	for _, profile := range profiles {
+		if profile.Role == "sub" {
+			return profile.SourceURI, nil
+		}
+	}
+	return "", nil
 }
 
 func normalizeTransport(value string) (string, error) {

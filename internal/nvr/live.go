@@ -142,6 +142,14 @@ func (s *Service) SubscribeLive(ctx context.Context, cameraID string) (*LiveSubs
 	if err != nil {
 		return nil, err
 	}
+	liveAddress := camera.Address
+	substreamAddress, err := s.substreamAddress(ctx, camera.ID)
+	if err != nil {
+		return nil, err
+	}
+	if substreamAddress != "" {
+		liveAddress = substreamAddress
+	}
 
 	s.liveMu.Lock()
 	if session, ok := s.liveSessions[cameraID]; ok && !session.isClosed() {
@@ -152,7 +160,7 @@ func (s *Service) SubscribeLive(ctx context.Context, cameraID string) (*LiveSubs
 
 	liveCtx, cancel := context.WithCancel(context.Background())
 	stdout, processDone, err := s.liveSource.Start(liveCtx, ProbeRequest{
-		Address:    camera.Address,
+		Address:    liveAddress,
 		Transport:  camera.Transport,
 		Credential: credential,
 	})
