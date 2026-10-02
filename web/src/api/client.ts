@@ -27,6 +27,7 @@ import type {
   AIStatus,
   AIConversation,
   AIMessage,
+  AIAction,
 } from "./types";
 
 type APIErrorBody = {
@@ -163,6 +164,31 @@ export const api = {
       true,
     );
     return result.conversation;
+  },
+
+  aiActions: async (conversationId: string) => {
+    const result = await request<{actions: AIAction[]}>(
+      `/api/v1/ai/conversations/${encodeURIComponent(conversationId)}/actions`,
+    );
+    return result.actions;
+  },
+
+  approveAIAction: async (conversationId: string, actionId: string) => {
+    const result = await postJSON<{action: AIAction}>(
+      `/api/v1/ai/conversations/${encodeURIComponent(conversationId)}/actions/${encodeURIComponent(actionId)}/approve`,
+      {},
+      true,
+    );
+    return result.action;
+  },
+
+  rejectAIAction: async (conversationId: string, actionId: string) => {
+    const result = await postJSON<{action: AIAction}>(
+      `/api/v1/ai/conversations/${encodeURIComponent(conversationId)}/actions/${encodeURIComponent(actionId)}/reject`,
+      {},
+      true,
+    );
+    return result.action;
   },
 
   aiMessages: async (conversationId: string) => {
