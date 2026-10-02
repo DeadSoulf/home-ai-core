@@ -35,12 +35,20 @@ type CameraStore interface {
 		int, int, float64, int64,
 		time.Time,
 	) (state.NVRStreamProfileRecord, error)
+	SetNVRONVIFSource(
+		context.Context,
+		string, string, string, string,
+		time.Time,
+	) (state.NVRONVIFSourceRecord, error)
+	NVRONVIFSource(context.Context, string) (state.NVRONVIFSourceRecord, error)
 }
 
 type Service struct {
 	store       CameraStore
 	credentials CameraCredentialStore
 	prober      CameraProber
+	discoverer  ONVIFDiscoverer
+	onvif       ONVIFClient
 	now         func() time.Time
 
 	runtimeMu        sync.RWMutex
@@ -108,6 +116,19 @@ func NewServiceWithRuntimeDependencies(
 	return service
 }
 
+func NewServiceWithONVIFDependencies(
+	store CameraStore,
+	credentials CameraCredentialStore,
+	prober CameraProber,
+	discoverer ONVIFDiscoverer,
+	onvif ONVIFClient,
+) *Service {
+	service := newService(store, credentials, prober)
+	service.discoverer = discoverer
+	service.onvif = onvif
+	return service
+}
+
 func newService(
 	store CameraStore,
 	credentials CameraCredentialStore,
@@ -117,6 +138,8 @@ func newService(
 		store:           store,
 		credentials:     credentials,
 		prober:          prober,
+		discoverer:      NewWSDiscovery(),
+		onvif:           NewSOAPONVIFClient(),
 		now:             time.Now,
 		workers:         map[string]cameraWorker{},
 		runtime:         map[string]CameraRuntimeStatus{},
@@ -134,6 +157,187 @@ func (s *Service) SecretStoreReady() bool {
 
 func (s *Service) MediaProbeReady() bool {
 	return s != nil && s.prober != nil && s.prober.Available()
+}
+
+func (s *Service) ONVIFReady() bool {
+	return s != nil && s.discoverer != nil && s.onvif != nil
+}
+
+func (s *Service) DiscoverONVIF(ctx context.Context) ([]ONVIFDevice, error) {
+	if s == nil || s.discoverer == nil {
+		return nil, ErrONVIFDiscoveryUnavailable
+	}
+	return s.discoverer.Discover(ctx)
+}
+
+func (s *Service) ONVIFProfiles(
+	ctx context.Context,
+	input ONVIFProfileRequest,
+) ([]ONVIFProfile, error) {
+	if s == nil || s.onvif == nil {
+		return nil, ErrONVIFConnection
+	}
+	credential := CameraCredential{
+		Username: strings.TrimSpace(input.Username),
+		Password: input.Password,
+	}
+	if credential.Username == "" && credential.Password != "" {
+		return nil, errors.New("camera username is required when a password is supplied")
+	}
+	return s.onvif.Profiles(ctx, strings.TrimSpace(input.Address), credential)
+}
+
+func (s *Service) ImportONVIFCamera(
+	ctx context.Context,
+	createdBy string,
+	input ONVIFImportInput,
+) (CameraConfig, ProbeResult, error) {
+	if s == nil || s.onvif == nil || s.prober == nil {
+		return CameraConfig{}, ProbeResult{}, ErrONVIFConnection
+	}
+	input.Name = strings.TrimSpace(input.Name)
+	input.Address = strings.TrimSpace(input.Address)
+	input.Username = strings.TrimSpace(input.Username)
+	input.MainProfileToken = strings.TrimSpace(input.MainProfileToken)
+	input.SubProfileToken = strings.TrimSpace(input.SubProfileToken)
+	if input.Name == "" {
+		return CameraConfig{}, ProbeResult{}, errors.New("camera name is required")
+	}
+	if input.MainProfileToken == "" {
+		return CameraConfig{}, ProbeResult{}, errors.New("ONVIF main profile is required")
+	}
+	if input.SubProfileToken != "" && input.SubProfileToken == input.MainProfileToken {
+		return CameraConfig{}, ProbeResult{}, errors.New("ONVIF main and sub profiles must be different")
+	}
+	transport, err := normalizeTransport(input.Transport)
+	if err != nil {
+		return CameraConfig{}, ProbeResult{}, err
+	}
+	recordingMode := strings.ToLower(strings.TrimSpace(input.RecordingMode))
+	if recordingMode == "" {
+		recordingMode = "off"
+	}
+	switch recordingMode {
+	case "off", "continuous", "motion":
+	default:
+		return CameraConfig{}, ProbeResult{}, errors.New("camera recording mode must be off, continuous or motion")
+	}
+	credential := CameraCredential{Username: input.Username, Password: input.Password}
+	if credential.Username == "" && credential.Password != "" {
+		return CameraConfig{}, ProbeResult{}, errors.New("camera username is required when a password is supplied")
+	}
+	profiles, err := s.onvif.Profiles(ctx, input.Address, credential)
+	if err != nil {
+		return CameraConfig{}, ProbeResult{}, err
+	}
+	var mainProfile, subProfile *ONVIFProfile
+	for i := range profiles {
+		switch profiles[i].Token {
+		case input.MainProfileToken:
+			copy := profiles[i]
+			mainProfile = &copy
+		case input.SubProfileToken:
+			copy := profiles[i]
+			subProfile = &copy
+		}
+	}
+	if mainProfile == nil {
+		return CameraConfig{}, ProbeResult{}, errors.New("selected ONVIF main profile is no longer available")
+	}
+	if input.SubProfileToken != "" && subProfile == nil {
+		return CameraConfig{}, ProbeResult{}, errors.New("selected ONVIF sub profile is no longer available")
+	}
+
+	probe, err := s.probeStreams(
+		ctx,
+		mainProfile.StreamURI,
+		func() string {
+			if subProfile == nil {
+				return ""
+			}
+			return subProfile.StreamURI
+		}(),
+		transport,
+		credential,
+	)
+	if err != nil {
+		return CameraConfig{}, ProbeResult{}, err
+	}
+
+	var ref SecretRef
+	if credential.Username != "" || credential.Password != "" {
+		if s.credentials == nil {
+			return CameraConfig{}, ProbeResult{}, ErrSecretStoreUnavailable
+		}
+		ref, err = s.credentials.PutCameraCredential(ctx, "pending-"+strings.TrimSpace(createdBy), credential)
+		if err != nil {
+			return CameraConfig{}, ProbeResult{}, err
+		}
+	}
+	cleanupSecret := func() {
+		if ref != "" && s.credentials != nil {
+			_ = s.credentials.DeleteCameraCredential(context.WithoutCancel(ctx), ref)
+		}
+	}
+
+	now := s.now().UTC()
+	camera, err := s.store.CreateNVRCamera(
+		ctx,
+		input.Name,
+		"onvif",
+		mainProfile.StreamURI,
+		string(ref),
+		transport,
+		recordingMode,
+		createdBy,
+		input.AudioEnabled,
+		now,
+	)
+	if err != nil {
+		cleanupSecret()
+		return CameraConfig{}, ProbeResult{}, err
+	}
+	cleanupCamera := func() {
+		_ = s.store.DeleteNVRCamera(context.WithoutCancel(ctx), camera.ID)
+		cleanupSecret()
+	}
+
+	if _, err := s.store.SetNVRStreamProfile(
+		ctx, camera.ID, "main", mainProfile.StreamURI,
+		probe.Codec, probe.Width, probe.Height, probe.FPS, probe.BitrateBPS, now,
+	); err != nil {
+		cleanupCamera()
+		return CameraConfig{}, ProbeResult{}, err
+	}
+	if subProfile != nil && probe.Substream != nil {
+		if _, err := s.store.SetNVRStreamProfile(
+			ctx, camera.ID, "sub", subProfile.StreamURI,
+			probe.Substream.Codec, probe.Substream.Width, probe.Substream.Height,
+			probe.Substream.FPS, probe.Substream.BitrateBPS, now,
+		); err != nil {
+			cleanupCamera()
+			return CameraConfig{}, ProbeResult{}, err
+		}
+	}
+	if _, err := s.store.SetNVRONVIFSource(
+		ctx,
+		camera.ID,
+		input.Address,
+		input.MainProfileToken,
+		input.SubProfileToken,
+		now,
+	); err != nil {
+		cleanupCamera()
+		return CameraConfig{}, ProbeResult{}, err
+	}
+	if err := s.RefreshCamera(ctx, camera.ID); err != nil {
+		return CameraConfig{}, ProbeResult{}, err
+	}
+	config, err := s.CameraConfig(ctx, camera.ID)
+	if err != nil {
+		return CameraConfig{}, ProbeResult{}, err
+	}
+	return config, probe, nil
 }
 
 func (s *Service) TestCamera(ctx context.Context, input CameraInput) (ProbeResult, error) {
