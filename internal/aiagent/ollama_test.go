@@ -60,12 +60,11 @@ func TestOllamaProviderRejectsInvalidConfiguration(t *testing.T) {
 	}
 }
 
-
 func TestOllamaProviderMapsTypedToolCalls(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Tools []struct {
-				Type string `json:"type"`
+				Type     string `json:"type"`
 				Function struct {
 					Name       string          `json:"name"`
 					Parameters json.RawMessage `json:"parameters"`
