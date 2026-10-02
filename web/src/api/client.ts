@@ -33,6 +33,9 @@ import type {
   NVRCameraConfig,
   NVRCameraInput,
   NVRProbe,
+  NVRONVIFDevice,
+  NVRONVIFProfile,
+  NVRONVIFImportInput,
 } from "./types";
 
 type APIErrorBody = {
@@ -188,6 +191,32 @@ export const api = {
       true,
     );
     return result;
+  },
+
+  discoverONVIF: async () => {
+    const result = await postJSON<{devices: NVRONVIFDevice[]}>(
+      "/api/v1/nvr/onvif/discover",
+      {},
+      true,
+    );
+    return result.devices;
+  },
+
+  onvifProfiles: async (input: {address: string; username?: string; password?: string}) => {
+    const result = await postJSON<{profiles: NVRONVIFProfile[]}>(
+      "/api/v1/nvr/onvif/profiles",
+      input,
+      true,
+    );
+    return result.profiles;
+  },
+
+  importONVIFCamera: async (input: NVRONVIFImportInput) => {
+    return postJSON<{camera: NVRCameraConfig; probe: NVRProbe}>(
+      "/api/v1/nvr/onvif/import",
+      input,
+      true,
+    );
   },
 
   updateNVRCamera: async (cameraId: string, input: NVRCameraInput) => {

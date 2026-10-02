@@ -26,6 +26,15 @@ type NVRCameraRecord struct {
 	UpdatedAt     time.Time
 }
 
+type NVRONVIFSourceRecord struct {
+	CameraID         string
+	DeviceEndpoint   string
+	MainProfileToken string
+	SubProfileToken  string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
 type NVRStreamProfileRecord struct {
 	ID         string
 	CameraID   string
@@ -412,6 +421,65 @@ func (s *Store) nvrStreamProfile(ctx context.Context, id string) (NVRStreamProfi
 	record.UpdatedAt, err = time.Parse(time.RFC3339Nano, updatedAt)
 	if err != nil {
 		return NVRStreamProfileRecord{}, err
+	}
+	return record, nil
+}
+
+func (s *Store) SetNVRONVIFSource(
+	ctx context.Context,
+	cameraID, deviceEndpoint, mainProfileToken, subProfileToken string,
+	now time.Time,
+) (NVRONVIFSourceRecord, error) {
+	cameraID = strings.TrimSpace(cameraID)
+	deviceEndpoint = strings.TrimSpace(deviceEndpoint)
+	mainProfileToken = strings.TrimSpace(mainProfileToken)
+	subProfileToken = strings.TrimSpace(subProfileToken)
+	if cameraID == "" || deviceEndpoint == "" || mainProfileToken == "" {
+		return NVRONVIFSourceRecord{}, errors.New("camera id, ONVIF endpoint and main profile token are required")
+	}
+	timestamp := now.UTC().Format(time.RFC3339Nano)
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO nvr_onvif_sources(
+			camera_id, device_endpoint, main_profile_token, sub_profile_token, created_at, updated_at
+		)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT(camera_id) DO UPDATE SET
+			device_endpoint = excluded.device_endpoint,
+			main_profile_token = excluded.main_profile_token,
+			sub_profile_token = excluded.sub_profile_token,
+			updated_at = excluded.updated_at
+	`, cameraID, deviceEndpoint, mainProfileToken, subProfileToken, timestamp, timestamp)
+	if err != nil {
+		return NVRONVIFSourceRecord{}, fmt.Errorf("set NVR ONVIF source: %w", err)
+	}
+	return s.NVRONVIFSource(ctx, cameraID)
+}
+
+func (s *Store) NVRONVIFSource(ctx context.Context, cameraID string) (NVRONVIFSourceRecord, error) {
+	var record NVRONVIFSourceRecord
+	var createdAt, updatedAt string
+	err := s.db.QueryRowContext(ctx, `
+		SELECT camera_id, device_endpoint, main_profile_token, sub_profile_token, created_at, updated_at
+		FROM nvr_onvif_sources
+		WHERE camera_id = ?
+	`, strings.TrimSpace(cameraID)).Scan(
+		&record.CameraID,
+		&record.DeviceEndpoint,
+		&record.MainProfileToken,
+		&record.SubProfileToken,
+		&createdAt,
+		&updatedAt,
+	)
+	if err != nil {
+		return NVRONVIFSourceRecord{}, err
+	}
+	record.CreatedAt, err = time.Parse(time.RFC3339Nano, createdAt)
+	if err != nil {
+		return NVRONVIFSourceRecord{}, fmt.Errorf("parse NVR ONVIF source created_at: %w", err)
+	}
+	record.UpdatedAt, err = time.Parse(time.RFC3339Nano, updatedAt)
+	if err != nil {
+		return NVRONVIFSourceRecord{}, fmt.Errorf("parse NVR ONVIF source updated_at: %w", err)
 	}
 	return record, nil
 }

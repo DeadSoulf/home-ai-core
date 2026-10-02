@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.139-dev
+
+- Complete the ONVIF discovery/import portion of NVR-1.
+- Add bounded WS-Discovery on active local IPv4 interfaces for ONVIF NetworkVideoTransmitter devices.
+- Restrict ONVIF SOAP requests to literal private/link-local camera addresses, disable HTTP proxy use and normalize discovered service endpoints to the responding camera IP.
+- Add WS-Security UsernameToken digest authentication plus Media v1 GetCapabilities, GetProfiles and GetStreamUri support.
+- Strip credentials from camera-provided RTSP URIs and persist ONVIF management endpoint/profile tokens separately from the RTSP runtime source.
+- Add discover, profile and import APIs with camera.manage authorization, CSRF protection and secret-free audit metadata.
+- Add the Web ONVIF onboarding flow: discover → select → credentials → profiles → main/sub selection → import.
+- Add schema migration 23 and state/service/API/Web/parser/security regression coverage.
+- NVR-1 onboarding/live foundation is now feature-complete in code; real-camera ONVIF compatibility acceptance remains.
+- Next engineering slice: NVR-2 video storage target + continuous segmented recording + reserve/ring retention.
 ## 0.1.138-dev
 
 - Complete the explicit main/sub-stream portion of NVR-1 camera onboarding.

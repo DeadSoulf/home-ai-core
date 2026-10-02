@@ -265,6 +265,96 @@ describe("API client", () => {
     vi.unstubAllGlobals();
   });
 
+  it("discovers, reads profiles and imports ONVIF cameras with CSRF protection", async () => {
+    const calls: Array<{url: string; init?: RequestInit}> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      calls.push({url, init});
+      if (url === "/api/v1/nvr/onvif/discover") {
+        return new Response(JSON.stringify({
+          devices: [{
+            id: "onvif-1",
+            name: "Front Door",
+            address: "http://192.168.1.60/onvif/device_service",
+            ip: "192.168.1.60",
+          }],
+        }), {status: 200, headers: {"Content-Type": "application/json"}});
+      }
+      if (url === "/api/v1/nvr/onvif/profiles") {
+        return new Response(JSON.stringify({
+          profiles: [
+            {token: "main", name: "Main", stream_uri: "rtsp://192.168.1.60/main", width: 1920, height: 1080, has_audio: true},
+            {token: "sub", name: "Sub", stream_uri: "rtsp://192.168.1.60/sub", width: 640, height: 360, has_audio: false},
+          ],
+        }), {status: 200, headers: {"Content-Type": "application/json"}});
+      }
+      if (url === "/api/v1/nvr/onvif/import") {
+        return new Response(JSON.stringify({
+          camera: {
+            id: "cam-onvif",
+            name: "Front Door",
+            enabled: true,
+            source_type: "onvif",
+            transport: "tcp",
+            recording_mode: "off",
+            audio_enabled: true,
+            has_credentials: true,
+            runtime: {state: "connecting", reconnect_count: 0},
+            address: "rtsp://192.168.1.60/main",
+            substream_address: "rtsp://192.168.1.60/sub",
+            created_at: "2026-10-02T18:00:00Z",
+            updated_at: "2026-10-02T18:00:00Z",
+          },
+          probe: {codec: "h264", width: 1920, height: 1080, fps: 25, bitrate_bps: 4000000, has_audio: true},
+        }), {status: 201, headers: {"Content-Type": "application/json"}});
+      }
+      return new Response("not found", {status: 404});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    });
+    setCSRFToken("csrf-onvif");
+
+    const devices = await api.discoverONVIF();
+    expect(devices[0].ip).toBe("192.168.1.60");
+
+    const profiles = await api.onvifProfiles({
+      address: devices[0].address,
+      username: "viewer",
+      password: "camera-secret",
+    });
+    expect(profiles).toHaveLength(2);
+
+    const imported = await api.importONVIFCamera({
+      name: "Front Door",
+      address: devices[0].address,
+      username: "viewer",
+      password: "camera-secret",
+      main_profile_token: "main",
+      sub_profile_token: "sub",
+      transport: "tcp",
+      recording_mode: "off",
+      audio_enabled: true,
+    });
+    expect(imported.camera.source_type).toBe("onvif");
+
+    expect(calls.map((call) => call.url)).toEqual([
+      "/api/v1/nvr/onvif/discover",
+      "/api/v1/nvr/onvif/profiles",
+      "/api/v1/nvr/onvif/import",
+    ]);
+    for (const call of calls) {
+      expect(call.init?.method).toBe("POST");
+      expect(new Headers(call.init?.headers).get("X-CSRF-Token")).toBe("csrf-onvif");
+    }
+
+    vi.unstubAllGlobals();
+  });
+
   it("loads authenticated module navigation state", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({

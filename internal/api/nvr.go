@@ -69,6 +69,7 @@ func (s *server) nvrStatus(
 				return s.nvr.ActiveLiveStreams()
 			}(),
 			SecretStoreReady: s.nvr != nil && s.nvr.SecretStoreReady(),
+			ONVIFReady:       s.nvr != nil && s.nvr.ONVIFReady(),
 			FoundationStage:  nvrFoundationStage(s.nvr),
 		},
 	})
@@ -247,6 +248,111 @@ func (s *server) nvrCameraTest(
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "probe": probe})
+}
+
+func (s *server) nvrONVIFDiscover(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if !s.nvrEnabled(w, r) {
+		return
+	}
+	if !actor.Has(nvrpkg.PermissionCameraManage) {
+		writeAPIError(w, r, http.StatusForbidden, "permission_denied", "camera management permission required", nil)
+		return
+	}
+	if !validMutationCSRF(actor, source, r) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	devices, err := s.nvr.DiscoverONVIF(r.Context())
+	if err != nil {
+		s.writeNVRError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"devices": devices})
+}
+
+func (s *server) nvrONVIFProfiles(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if !s.nvrEnabled(w, r) {
+		return
+	}
+	if !actor.Has(nvrpkg.PermissionCameraManage) {
+		writeAPIError(w, r, http.StatusForbidden, "permission_denied", "camera management permission required", nil)
+		return
+	}
+	if !validMutationCSRF(actor, source, r) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	var input nvrpkg.ONVIFProfileRequest
+	if err := decodeJSON(w, r, &input); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_request", err.Error(), nil)
+		return
+	}
+	profiles, err := s.nvr.ONVIFProfiles(r.Context(), input)
+	if err != nil {
+		s.writeNVRError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"profiles": profiles})
+}
+
+func (s *server) nvrONVIFImport(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if !s.nvrEnabled(w, r) {
+		return
+	}
+	if !actor.Has(nvrpkg.PermissionCameraManage) {
+		writeAPIError(w, r, http.StatusForbidden, "permission_denied", "camera management permission required", nil)
+		return
+	}
+	if !validMutationCSRF(actor, source, r) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	var input nvrpkg.ONVIFImportInput
+	if err := decodeJSON(w, r, &input); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_request", err.Error(), nil)
+		return
+	}
+	camera, probe, err := s.nvr.ImportONVIFCamera(r.Context(), actor.ID, input)
+	if err != nil {
+		s.writeNVRError(w, r, err)
+		return
+	}
+	s.security.RecordAudit(
+		context.WithoutCancel(r.Context()),
+		s.securityRequestContext(r),
+		actor,
+		"nvr.camera.import_onvif",
+		"camera",
+		camera.ID,
+		"success",
+		map[string]any{
+			"name":            camera.Name,
+			"source_type":     camera.SourceType,
+			"transport":       camera.Transport,
+			"recording_mode":  camera.RecordingMode,
+			"main_profile":    input.MainProfileToken,
+			"has_sub_profile": strings.TrimSpace(input.SubProfileToken) != "",
+			"codec":           probe.Codec,
+			"width":           probe.Width,
+			"height":          probe.Height,
+		},
+	)
+	writeJSON(w, http.StatusCreated, map[string]any{"camera": camera, "probe": probe})
 }
 
 func (s *server) nvrCameraResource(
@@ -444,6 +550,16 @@ func (s *server) writeNVRError(w http.ResponseWriter, r *http.Request, err error
 		writeAPIError(w, r, http.StatusConflict, "camera_disabled", "camera is disabled", nil)
 	case errors.Is(err, nvrpkg.ErrSecretStoreUnavailable):
 		writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_secret_store_unavailable", "camera credential store is unavailable", nil)
+	case errors.Is(err, nvrpkg.ErrONVIFDiscoveryUnavailable):
+		writeAPIError(w, r, http.StatusServiceUnavailable, "onvif_discovery_unavailable", "ONVIF discovery is unavailable on this node", nil)
+	case errors.Is(err, nvrpkg.ErrONVIFInvalidEndpoint):
+		writeAPIError(w, r, http.StatusBadRequest, "onvif_invalid_endpoint", "ONVIF endpoint must be a local/private HTTP or HTTPS address", nil)
+	case errors.Is(err, nvrpkg.ErrONVIFAuthentication):
+		writeAPIError(w, r, http.StatusBadGateway, "onvif_authentication_failed", "ONVIF authentication failed", nil)
+	case errors.Is(err, nvrpkg.ErrONVIFNoMediaProfiles):
+		writeAPIError(w, r, http.StatusUnprocessableEntity, "onvif_no_profiles", "ONVIF device returned no media profiles", nil)
+	case errors.Is(err, nvrpkg.ErrONVIFConnection):
+		writeAPIError(w, r, http.StatusBadGateway, "onvif_connection_failed", "ONVIF device request failed", nil)
 	case errors.Is(err, nvrpkg.ErrRTSPAuthentication):
 		writeAPIError(w, r, http.StatusBadGateway, "camera_authentication_failed", "camera authentication failed", nil)
 	case errors.Is(err, nvrpkg.ErrRTSPConnection):

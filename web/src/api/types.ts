@@ -503,6 +503,7 @@ export type NVRStatus = {
   live_runtime_ready: boolean;
   active_live_streams: number;
   secret_store_ready: boolean;
+  onvif_ready: boolean;
   foundation_stage: string;
 };
 
@@ -567,4 +568,37 @@ export type NVRCameraInput = {
   enabled?: boolean;
   clear_credentials?: boolean;
   clear_substream?: boolean;
+};
+
+
+export type NVRONVIFDevice = {
+  id: string;
+  name: string;
+  address: string;
+  ip: string;
+  scopes?: string[];
+};
+
+export type NVRONVIFProfile = {
+  token: string;
+  name: string;
+  stream_uri: string;
+  codec?: string;
+  width?: number;
+  height?: number;
+  fps?: number;
+  bitrate_bps?: number;
+  has_audio: boolean;
+};
+
+export type NVRONVIFImportInput = {
+  name: string;
+  address: string;
+  username?: string;
+  password?: string;
+  main_profile_token: string;
+  sub_profile_token?: string;
+  transport?: "tcp" | "udp";
+  recording_mode?: "off" | "continuous" | "motion";
+  audio_enabled: boolean;
 };
