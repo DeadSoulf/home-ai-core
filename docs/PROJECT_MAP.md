@@ -7,8 +7,8 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.132-dev` — Cloud AI dependency auto-enable\
-**Текущий срез:** `0.1.133-dev` staged: Cloud AI убран из главного меню, добавлена безопасная проверка соединения и provider diagnostics; release publication pending\
+**Последний опубликованный релиз:** `0.1.133-dev` — Cloud AI diagnostics + menu cleanup\
+**Текущий срез:** `0.1.133-dev` опубликован; Cloud AI убран из главного меню, добавлена безопасная проверка соединения и provider diagnostics; live acceptance pending\
 **Следующий engineering milestone:** live-проверить Cloud AI connection test и реальный cloud chat; затем расширить controlled tools на updater/service/NAS/SMB.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent: contracts `0.1.115`, read tools/API `0.1.117`, local conversation `0.1.119`, runtime control `0.1.120`, controlled model tool-loop `0.1.123`, public web tools `0.1.124`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
@@ -24,8 +24,9 @@
 - ✅ Для 400/404/429 сохраняется короткая полезная provider detail; для 401/403 detail не возвращается вообще.
 - ✅ Настроенный API key дополнительно редактируется из provider error text.
 - ✅ Incompatible HTTP-200 payload получает отдельную ошибку OpenAI Chat Completions compatibility.
-- ✅ PR #132 прошёл функциональный Web/Go/Core/Debian/Windows CI до release bump.
-- 🧪 После публикации требуется live-проверка **Модули → Cloud AI → Проверить соединение**.
+- ✅ PR #132 и main прошли Web/Go/Core/Debian/Windows CI.
+- ✅ Release workflow опубликовал `v0.1.133-dev` с Core amd64/arm64, Windows `.exe`, Debian `.deb` amd64/arm64 и SHA-256.
+- 🧪 Требуется live-проверка **Модули → Cloud AI → Проверить соединение**.
 ### Выпуск 0.1.132-dev — Cloud AI dependency auto-enable
 
 - ✅ При **Включить Cloud AI** выключенный `ai.agent` автоматически переводится в `enabled` и runtime запускается.
