@@ -8,11 +8,22 @@
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.131-dev` — Cloud AI module + module-aware navigation\
-**Текущий срез:** `0.1.131-dev` опубликован; отдельный `ai.cloud`, Local/Cloud/Auto routing и скрытие выключенных модулей; live acceptance pending\
+**Текущий срез:** `0.1.132-dev` staged: включение Cloud AI автоматически включает требуемый AI Agent runtime; release publication pending\
 **Следующий engineering milestone:** live-проверить локальный/облачный routing и скрытие выключенных модулей; затем расширить controlled tools на updater/service/NAS/SMB и добавить provider runtime diagnostics.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent: contracts `0.1.115`, read tools/API `0.1.117`, local conversation `0.1.119`, runtime control `0.1.120`, controlled model tool-loop `0.1.123`, public web tools `0.1.124`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
 
+### Выпуск 0.1.132-dev — Cloud AI dependency auto-enable
+
+- ✅ При **Включить Cloud AI** выключенный `ai.agent` автоматически переводится в `enabled` и runtime запускается.
+- ✅ Ошибка `AI Agent must be enabled before Cloud AI` больше не блокирует нормальный сценарий включения.
+- ✅ Локальный Ollama не включается автоматически: активируется только общий AI Agent chat/tool runtime.
+- ✅ Если `ai.agent` находится в реальном `error`, Cloud AI по-прежнему не включается.
+- ✅ При ошибке включения Cloud AI автоматически включённая зависимость откатывается.
+- ✅ Dependency enable публикует realtime event и audit, поэтому главное меню обновляется без перезагрузки.
+- ✅ Regression test подтверждает сценарий `AI Agent disabled → Enable Cloud AI → оба runtime ready`.
+- ✅ PR #131 прошёл функциональный Web/Go/Core/Debian/Windows CI до release bump.
+- 🧪 После публикации требуется live-проверка одной кнопкой **Cloud AI → Включить**.
 ### Выпуск 0.1.131-dev — Cloud AI module + module-aware navigation
 
 - ✅ Добавлен отдельный first-party модуль `ai.cloud` с OpenAI-compatible Chat Completions provider.

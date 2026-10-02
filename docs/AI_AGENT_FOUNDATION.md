@@ -1,6 +1,6 @@
 # AI Agent Foundation
 
-**Status:** controlled server tools/public web + local inference + separate Cloud AI provider module and module-aware navigation published through `0.1.131-dev`; Web streaming remains pending compatibility rework  
+**Status:** controlled server tools/public web + local inference + separate Cloud AI provider module published; dependency auto-enable staged in `0.1.132-dev`; Web streaming remains pending compatibility rework  
 **Started:** 2026-10-01  
 **First implementation slice:** `0.1.115-dev` published
 
@@ -107,6 +107,13 @@ No single model vendor becomes a Core dependency.
 
 ## First implementation slices
 
+### 0.1.132-dev — Cloud AI dependency auto-enable
+
+- ✅ enabling Cloud AI automatically enables the shared AI Agent runtime when it is only disabled/registered.
+- ✅ local Ollama remains optional; the dependency is the orchestration runtime, not the local model.
+- ✅ genuine AI Agent error state still blocks Cloud AI.
+- ✅ partial enable failures roll the dependency state back.
+- ✅ dependency transition is audited and emitted through realtime module state.
 ### 0.1.131-dev — Separate Cloud AI provider module
 
 - ✅ `ai.cloud` is an independent first-party module with an OpenAI-compatible provider adapter.

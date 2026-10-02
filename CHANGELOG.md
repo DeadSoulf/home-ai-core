@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.132-dev
+
+- Make Cloud AI enablement automatically start its required AI Agent runtime when that dependency is simply disabled or registered.
+- Remove the normal `AI Agent must be enabled before Cloud AI` dead-end from the Modules workflow.
+- Do not force local Ollama on; auto-enabling the dependency only starts the shared chat/tool orchestration runtime.
+- Keep fail-closed behavior when AI Agent is in a genuine error state.
+- Roll back the auto-enabled dependency if Cloud AI provider activation or state persistence fails.
+- Audit and publish realtime state for dependency auto-enable so Web navigation updates immediately.
+- Add regression coverage for disabled AI Agent -> enable Cloud AI -> both AI Agent and Cloud AI become ready.
 ## 0.1.131-dev
 
 - Add `ai.cloud` as a separate first-party module backed by an OpenAI-compatible Chat Completions provider.
