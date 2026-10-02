@@ -1126,3 +1126,13 @@ button:focus-visible, summary:focus-visible { outline: 2px solid #8bb0ff; outlin
   .ai-message-list { max-height: 520px; }
   .ai-provider-state { justify-items: start; }
 }
+
+
+.module-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 8px;
+}
+.module-actions .button { min-width: 112px; }
+.module-control-hint { margin: 0 0 10px; font-size: 12px; }
