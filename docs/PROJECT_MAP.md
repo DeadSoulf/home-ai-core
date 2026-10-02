@@ -7,9 +7,9 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.127-dev` — persistent AI chat across navigation\
-**Текущий срез:** `0.1.128-dev` staged: удаление одного завершённого AI-диалога и массовая очистка завершённых; release publication pending\
-**Следующий engineering milestone:** live-проверить `0.1.124-dev` на установленном сервере: завершение диалога, web search/fetch и controlled server actions; затем добавить streaming и расширить tools на updater/service/NAS/SMB.\
+**Последний опубликованный релиз:** `0.1.128-dev` — AI finished conversation cleanup\
+**Текущий срез:** `0.1.128-dev` опубликован; завершённые AI-диалоги можно удалять по одному или очищать массово; live acceptance pending\
+**Следующий engineering milestone:** live-проверить `0.1.128-dev` на установленном сервере: persistent chat, завершение/удаление диалогов, web search/fetch и controlled server actions; затем добавить streaming и расширить tools на updater/service/NAS/SMB.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent: contracts `0.1.115`, read tools/API `0.1.117`, local conversation `0.1.119`, runtime control `0.1.120`, controlled model tool-loop `0.1.123`, public web tools `0.1.124`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
 
@@ -22,8 +22,9 @@
 - ✅ Вместе с диалогом каскадно удаляются его сообщения и сохранённые AI tool actions.
 - ✅ Single delete и bulk cleanup проходят через существующую session/CSRF защиту и записываются в audit без текста переписки.
 - ✅ Regression tests покрывают state ownership/cascade, API active-chat protection и Web CSRF/path contracts.
-- ✅ PR #127 прошёл Web/Go/Core/Debian/Windows CI перед release bump.
-- 🧪 После публикации требуется live-проверка: завершить несколько диалогов, удалить один и затем выполнить **Очистить завершённые**.
+- ✅ PR #127 и main прошли Web/Go/Core/Debian/Windows CI.
+- ✅ Release workflow опубликовал `v0.1.128-dev` с Core amd64/arm64, Windows `.exe`, Debian `.deb` amd64/arm64 и SHA-256.
+- 🧪 Требуется live-проверка: завершить несколько диалогов, удалить один и затем выполнить **Очистить завершённые**.
 ### Выпуск 0.1.127-dev — persistent AI chat across navigation
 
 - ✅ `AIPage` больше не размонтируется при переходе из **ИИ Агент** в другие разделы после первого открытия.
