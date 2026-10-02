@@ -24,7 +24,7 @@ const (
 )
 
 var (
-	webScriptStylePattern = regexp.MustCompile(`(?is)<(script|style|noscript)[^>]*>.*?</\1>`)
+	webScriptStylePattern = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>|<style[^>]*>.*?</style>|<noscript[^>]*>.*?</noscript>`)
 	webTagPattern         = regexp.MustCompile(`(?s)<[^>]+>`)
 	webWhitespacePattern  = regexp.MustCompile(`\s+`)
 	webAnchorPattern      = regexp.MustCompile(`(?is)<a\b[^>]*href=["']([^"']+)["'][^>]*>(.*?)</a>`)
