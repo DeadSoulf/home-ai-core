@@ -15,22 +15,22 @@ const (
 )
 
 type Config struct {
-	ListenAddress string
-	StateDir      string
-	WebDir        string
-	AIProvider       string
-	AIEndpoint       string
-	AIModel          string
-	CloudAIEndpoint  string
-	CloudAIModel     string
-	CloudAIAPIKey    string
+	ListenAddress   string
+	StateDir        string
+	WebDir          string
+	AIProvider      string
+	AIEndpoint      string
+	AIModel         string
+	CloudAIEndpoint string
+	CloudAIModel    string
+	CloudAIAPIKey   string
 }
 
 func Load(args []string) (Config, error) {
 	cfg := Config{
-		ListenAddress: envOrDefault("HOME_AI_LISTEN", defaultListen),
-		StateDir:      envOrDefault("HOME_AI_STATE_DIR", defaultStateDir),
-		WebDir:        envOrDefault("HOME_AI_WEB_DIR", defaultWebDir),
+		ListenAddress:   envOrDefault("HOME_AI_LISTEN", defaultListen),
+		StateDir:        envOrDefault("HOME_AI_STATE_DIR", defaultStateDir),
+		WebDir:          envOrDefault("HOME_AI_WEB_DIR", defaultWebDir),
 		AIProvider:      strings.ToLower(strings.TrimSpace(os.Getenv("HOME_AI_AI_PROVIDER"))),
 		AIEndpoint:      strings.TrimSpace(os.Getenv("HOME_AI_AI_ENDPOINT")),
 		AIModel:         strings.TrimSpace(os.Getenv("HOME_AI_AI_MODEL")),
