@@ -38,12 +38,19 @@ func (s *server) nvrStatus(
 		return
 	}
 
+	onlineCount, offlineCount := 0, 0
+	if s.nvr != nil {
+		onlineCount, offlineCount = s.nvr.RuntimeCounts()
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"nvr": nvrpkg.Status{
 			ModuleID:          nvrpkg.ModuleID,
 			State:             item.Status,
 			Version:           item.Manifest.Version,
 			CameraCount:       len(cameras),
+			OnlineCount:       onlineCount,
+			OfflineCount:      offlineCount,
+			SupervisorRunning: s.nvr != nil && s.nvr.SupervisorRunning(),
 			MediaRuntimeReady: s.nvr != nil && s.nvr.MediaProbeReady(),
 			SecretStoreReady:  s.nvr != nil && s.nvr.SecretStoreReady(),
 			FoundationStage:   nvrFoundationStage(s.nvr),
@@ -74,6 +81,10 @@ func (s *server) nvrCameras(
 	}
 	out := make([]nvrpkg.CameraSummary, 0, len(cameras))
 	for _, camera := range cameras {
+		runtime := nvrpkg.CameraRuntimeStatus{State: nvrpkg.RuntimeDisabled}
+		if s.nvr != nil {
+			runtime = s.nvr.CameraRuntime(camera.ID)
+		}
 		out = append(out, nvrpkg.CameraSummary{
 			ID:             camera.ID,
 			Name:           camera.Name,
@@ -83,6 +94,7 @@ func (s *server) nvrCameras(
 			RecordingMode:  camera.RecordingMode,
 			AudioEnabled:   camera.AudioEnabled,
 			HasCredentials: camera.CredentialRef != "",
+			Runtime:        runtime,
 			CreatedAt:      camera.CreatedAt,
 			UpdatedAt:      camera.UpdatedAt,
 		})
@@ -117,6 +129,9 @@ func (s *server) visibleNVRCameras(ctx context.Context, actor security.Actor) ([
 func nvrFoundationStage(service *nvrpkg.Service) string {
 	if service == nil {
 		return "nvr-0"
+	}
+	if service.SupervisorRunning() {
+		return "nvr-1-supervisor"
 	}
 	return "nvr-1-onboarding"
 }
