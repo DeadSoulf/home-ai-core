@@ -17,6 +17,7 @@ type Store interface {
 	UpsertModule(context.Context, state.ModuleRecord) error
 	Module(context.Context, string) (state.ModuleRecord, error)
 	ListModules(context.Context) ([]state.ModuleRecord, error)
+	SetModuleStatus(context.Context, string, string, string) error
 }
 
 type Registry struct {
@@ -91,6 +92,24 @@ func (r *Registry) List(ctx context.Context) ([]Registered, error) {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Manifest.ID < out[j].Manifest.ID })
 	return out, nil
+}
+
+func (r *Registry) SetStatus(ctx context.Context, id, status, errorMessage string) error {
+	switch status {
+	case "registered", "enabled", "disabled", "restarting", "error":
+	default:
+		return fmt.Errorf("invalid module status %q", status)
+	}
+	if _, err := r.Get(ctx, id); err != nil {
+		return err
+	}
+	if err := r.store.SetModuleStatus(ctx, id, status, errorMessage); err != nil {
+		if errors.Is(err, state.ErrModuleNotFound) {
+			return ErrModuleNotFound
+		}
+		return err
+	}
+	return nil
 }
 
 func (r *Registry) Runtime(id string) (Module, bool) {
