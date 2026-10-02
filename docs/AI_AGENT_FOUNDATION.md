@@ -153,6 +153,17 @@ Published in `v0.1.119-dev` after successful Core/Web, Windows, Debian and relea
 - 🚧 streaming transport remains next;
 - 🚧 model-driven tool-call orchestration remains next.
 
+### 0.1.120-dev — Module runtime control
+
+- ✅ AI Agent is controllable from the standard **Modules** page.
+- ✅ `modules.manage` separates module runtime control from read-only module visibility.
+- ✅ `enabled / disabled` state persists across Core restart.
+- ✅ Disable cancels active AI work and removes AI capabilities while leaving Core/NAS/other modules running.
+- ✅ Restart recreates only the AI runtime context and cancels active AI requests.
+- ✅ Runtime operations are audited and emitted as realtime module events.
+- ✅ AI chat/tools fail closed while the agent is disabled.
+- 🧪 automated CI/release pending.
+
 ### Next slice — Streaming + controlled tool loop
 
 - streaming local model responses to Web;
