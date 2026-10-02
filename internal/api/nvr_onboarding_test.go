@@ -181,7 +181,6 @@ func TestNVRCameraOnboardingAPIKeepsCredentialsPrivate(t *testing.T) {
 	}
 }
 
-
 type apiONVIFDiscoverer struct{}
 
 func (apiONVIFDiscoverer) Discover(context.Context) ([]nvr.ONVIFDevice, error) {
