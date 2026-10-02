@@ -44,6 +44,23 @@ func (s *Store) UpsertModule(ctx context.Context, record ModuleRecord) error {
 	return nil
 }
 
+func (s *Store) SetModuleStatus(ctx context.Context, id, status, errorMessage string) error {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE modules
+		SET status = ?, error_message = ?, updated_at = ?
+		WHERE id = ?
+	`, status, nullIfEmpty(errorMessage), now, id)
+	if err != nil {
+		return fmt.Errorf("set module status: %w", err)
+	}
+	count, _ := result.RowsAffected()
+	if count == 0 {
+		return ErrModuleNotFound
+	}
+	return nil
+}
+
 func (s *Store) Module(ctx context.Context, id string) (ModuleRecord, error) {
 	var record ModuleRecord
 	var createdAt, updatedAt string
