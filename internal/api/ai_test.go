@@ -117,13 +117,15 @@ type apiChatState struct {
 	fakeState
 	conversations map[string]state.AIConversationRecord
 	messages      map[string][]state.AIMessageRecord
+	actions       map[string]state.AIToolActionRecord
 }
 
 func newAPIChatState() *apiChatState {
 	return &apiChatState{
-		fakeState:     fakeState{schemaVersion: 18},
+		fakeState:     fakeState{schemaVersion: 21},
 		conversations: map[string]state.AIConversationRecord{},
 		messages:      map[string][]state.AIMessageRecord{},
+		actions:       map[string]state.AIToolActionRecord{},
 	}
 }
 
@@ -198,6 +200,87 @@ func (s *apiChatState) ListAIMessages(_ context.Context, conversationID, userID 
 		items = items[len(items)-limit:]
 	}
 	return append([]state.AIMessageRecord(nil), items...), nil
+}
+
+func (s *apiChatState) CreateAIToolAction(
+	_ context.Context,
+	id, conversationID, userID, toolID, toolName, sensitivity string,
+	input json.RawMessage,
+	now time.Time,
+) (state.AIToolActionRecord, error) {
+	if _, err := s.AIConversation(context.Background(), conversationID, userID); err != nil {
+		return state.AIToolActionRecord{}, err
+	}
+	item := state.AIToolActionRecord{
+		ID: id, ConversationID: conversationID, UserID: userID, ToolID: toolID, ToolName: toolName,
+		Sensitivity: sensitivity, Input: append(json.RawMessage(nil), input...),
+		Status: "pending", CreatedAt: now, UpdatedAt: now,
+	}
+	s.actions[id] = item
+	return item, nil
+}
+
+func (s *apiChatState) ListAIToolActions(_ context.Context, conversationID, userID string, _ int) ([]state.AIToolActionRecord, error) {
+	if _, err := s.AIConversation(context.Background(), conversationID, userID); err != nil {
+		return nil, err
+	}
+	result := []state.AIToolActionRecord{}
+	for _, item := range s.actions {
+		if item.ConversationID == conversationID && item.UserID == userID {
+			result = append(result, item)
+		}
+	}
+	return result, nil
+}
+
+func (s *apiChatState) ClaimAIToolAction(_ context.Context, id, conversationID, userID string, now time.Time) (state.AIToolActionRecord, error) {
+	item, ok := s.actions[id]
+	if !ok || item.ConversationID != conversationID || item.UserID != userID {
+		return state.AIToolActionRecord{}, state.ErrAIToolActionNotFound
+	}
+	if item.Status != "pending" {
+		return item, state.ErrAIToolActionNotPending
+	}
+	item.Status = "executing"
+	item.UpdatedAt = now
+	s.actions[id] = item
+	return item, nil
+}
+
+func (s *apiChatState) RejectAIToolAction(_ context.Context, id, conversationID, userID string, now time.Time) (state.AIToolActionRecord, error) {
+	item, ok := s.actions[id]
+	if !ok || item.ConversationID != conversationID || item.UserID != userID {
+		return state.AIToolActionRecord{}, state.ErrAIToolActionNotFound
+	}
+	if item.Status != "pending" {
+		return item, state.ErrAIToolActionNotPending
+	}
+	item.Status = "rejected"
+	item.UpdatedAt = now
+	s.actions[id] = item
+	return item, nil
+}
+
+func (s *apiChatState) FinishAIToolAction(
+	_ context.Context,
+	id, conversationID, userID, status string,
+	result json.RawMessage,
+	errorCode string,
+	now time.Time,
+) (state.AIToolActionRecord, error) {
+	item, ok := s.actions[id]
+	if !ok || item.ConversationID != conversationID || item.UserID != userID {
+		return state.AIToolActionRecord{}, state.ErrAIToolActionNotFound
+	}
+	if item.Status != "executing" {
+		return item, state.ErrAIToolActionNotPending
+	}
+	item.Status = status
+	item.Result = append(json.RawMessage(nil), result...)
+	item.ErrorCode = errorCode
+	item.UpdatedAt = now
+	s.actions[id] = item
+	return item, nil
 }
 
 func newAIChatHandler(chatState *apiChatState, sec SecurityService, provider aiagent.Provider) http.Handler {
@@ -350,6 +433,65 @@ func TestAIConversationCloseAPIKeepsHistoryReadOnly(t *testing.T) {
 	foreign.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("foreign close status = %d, want 404: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAIConversationActionListAndRejectAPI(t *testing.T) {
+	chatState := newAPIChatState()
+	sec := defaultFakeSecurity()
+	handler := newAIChatHandler(chatState, sec, nil)
+
+	conversation, err := chatState.CreateAIConversation(context.Background(), "aic-actions", sec.actor.ID, "Actions", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	action, err := chatState.CreateAIToolAction(
+		context.Background(),
+		"aia-actions",
+		conversation.ID,
+		sec.actor.ID,
+		"core.storage.mount",
+		"Mount storage",
+		"change",
+		json.RawMessage(`{"device":"/dev/sdb1"}`),
+		time.Now(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/ai/conversations/"+conversation.ID+"/actions", nil)
+	req.Header.Set("Authorization", "Bearer test")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), action.ID) {
+		t.Fatalf("actions status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/ai/conversations/"+conversation.ID+"/actions/"+action.ID+"/reject",
+		strings.NewReader(`{}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"status":"rejected"`) {
+		t.Fatalf("reject status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/ai/conversations/"+conversation.ID+"/actions/"+action.ID+"/reject",
+		strings.NewReader(`{}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("second reject status = %d, want 409: %s", rec.Code, rec.Body.String())
 	}
 }
 
