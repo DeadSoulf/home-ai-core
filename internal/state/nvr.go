@@ -149,6 +149,85 @@ func (s *Store) NVRCamera(ctx context.Context, cameraID string) (NVRCameraRecord
 	return record, nil
 }
 
+func (s *Store) UpdateNVRCamera(
+	ctx context.Context,
+	cameraID, name, sourceType, address, credentialRef, transport, recordingMode string,
+	enabled, audioEnabled bool,
+	now time.Time,
+) (NVRCameraRecord, error) {
+	cameraID = strings.TrimSpace(cameraID)
+	name = strings.TrimSpace(name)
+	sourceType = strings.ToLower(strings.TrimSpace(sourceType))
+	address = strings.TrimSpace(address)
+	credentialRef = strings.TrimSpace(credentialRef)
+	transport = strings.ToLower(strings.TrimSpace(transport))
+	recordingMode = strings.ToLower(strings.TrimSpace(recordingMode))
+	if cameraID == "" {
+		return NVRCameraRecord{}, errors.New("camera id is required")
+	}
+	if name == "" {
+		return NVRCameraRecord{}, errors.New("camera name is required")
+	}
+	if sourceType != "rtsp" && sourceType != "onvif" {
+		return NVRCameraRecord{}, errors.New("camera source type must be rtsp or onvif")
+	}
+	if address == "" {
+		return NVRCameraRecord{}, errors.New("camera address is required")
+	}
+	if credentialRef != "" && (!strings.HasPrefix(credentialRef, "sec_") || len(credentialRef) > 128) {
+		return NVRCameraRecord{}, errors.New("camera credential reference is invalid")
+	}
+	if transport != "tcp" && transport != "udp" {
+		return NVRCameraRecord{}, errors.New("camera transport must be tcp or udp")
+	}
+	switch recordingMode {
+	case "off", "continuous", "motion":
+	default:
+		return NVRCameraRecord{}, errors.New("camera recording mode is invalid")
+	}
+	enabledValue := 0
+	if enabled {
+		enabledValue = 1
+	}
+	audioValue := 0
+	if audioEnabled {
+		audioValue = 1
+	}
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE nvr_cameras
+		SET name = ?, enabled = ?, source_type = ?, address = ?, credential_ref = NULLIF(?, ''),
+		    transport = ?, recording_mode = ?, audio_enabled = ?, updated_at = ?
+		WHERE id = ?
+	`, name, enabledValue, sourceType, address, credentialRef, transport, recordingMode,
+		audioValue, now.UTC().Format(time.RFC3339Nano), cameraID)
+	if err != nil {
+		return NVRCameraRecord{}, fmt.Errorf("update NVR camera: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return NVRCameraRecord{}, fmt.Errorf("update NVR camera rows: %w", err)
+	}
+	if affected == 0 {
+		return NVRCameraRecord{}, ErrNVRCameraNotFound
+	}
+	return s.NVRCamera(ctx, cameraID)
+}
+
+func (s *Store) DeleteNVRCamera(ctx context.Context, cameraID string) error {
+	result, err := s.db.ExecContext(ctx, "DELETE FROM nvr_cameras WHERE id = ?", strings.TrimSpace(cameraID))
+	if err != nil {
+		return fmt.Errorf("delete NVR camera: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("delete NVR camera rows: %w", err)
+	}
+	if affected == 0 {
+		return ErrNVRCameraNotFound
+	}
+	return nil
+}
+
 func (s *Store) ListNVRCameras(ctx context.Context) ([]NVRCameraRecord, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, name, enabled, source_type, address, COALESCE(credential_ref, ''),
