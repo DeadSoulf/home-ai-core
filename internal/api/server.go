@@ -104,6 +104,8 @@ func New(
 	s.mux.HandleFunc("POST /api/v1/modules/ai.cloud/test", s.requireAuth("modules.manage", s.cloudAIModuleTest))
 	s.mux.HandleFunc("POST /api/v1/modules/{moduleID}/control", s.requireAuth("modules.manage", s.moduleControl))
 	s.mux.HandleFunc("/api/v1/modules/", s.requireAuth("modules.read", s.moduleResource))
+	s.mux.HandleFunc("GET /api/v1/nvr/status", s.requireAuth("security.self.read", s.nvrStatus))
+	s.mux.HandleFunc("GET /api/v1/nvr/cameras", s.requireAuth("security.self.read", s.nvrCameras))
 	s.mux.HandleFunc("/api/v1/ai/status", s.requireAuth("", s.aiStatus))
 	s.mux.HandleFunc("/api/v1/ai/tools", s.requireAuth("", s.aiTools))
 	s.mux.HandleFunc("/api/v1/ai/tools/", s.requireAuth("", s.aiToolResource))
