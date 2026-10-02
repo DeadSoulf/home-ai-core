@@ -183,6 +183,37 @@ func (s *apiChatState) CloseAIConversation(_ context.Context, id, userID string,
 	}
 	return item, nil
 }
+func (s *apiChatState) DeleteClosedAIConversation(_ context.Context, id, userID string) error {
+	item, ok := s.conversations[id]
+	if !ok || item.UserID != userID {
+		return state.ErrAIConversationNotFound
+	}
+	if item.ClosedAt == nil {
+		return state.ErrAIConversationNotClosed
+	}
+	delete(s.conversations, id)
+	delete(s.messages, id)
+	for actionID, action := range s.actions {
+		if action.ConversationID == id {
+			delete(s.actions, actionID)
+		}
+	}
+	return nil
+}
+
+func (s *apiChatState) DeleteClosedAIConversations(_ context.Context, userID string) (int64, error) {
+	var deleted int64
+	for id, item := range s.conversations {
+		if item.UserID != userID || item.ClosedAt == nil {
+			continue
+		}
+		if err := s.DeleteClosedAIConversation(context.Background(), id, userID); err != nil {
+			return deleted, err
+		}
+		deleted++
+	}
+	return deleted, nil
+}
 
 func (s *apiChatState) AppendAIMessage(_ context.Context, id, conversationID, userID, role, content string, now time.Time) (state.AIMessageRecord, error) {
 	conversation, err := s.AIConversation(context.Background(), conversationID, userID)
@@ -442,6 +473,60 @@ func TestAIConversationCloseAPIKeepsHistoryReadOnly(t *testing.T) {
 	}
 }
 
+func TestAIConversationDeleteRequiresFinishedChatAndSupportsBulkCleanup(t *testing.T) {
+	chatState := newAPIChatState()
+	sec := defaultFakeSecurity()
+	handler := newAIChatHandler(chatState, sec, nil)
+
+	active, err := chatState.CreateAIConversation(context.Background(), "aic-active-delete", sec.actor.ID, "Active", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	closedOne, err := chatState.CreateAIConversation(context.Background(), "aic-closed-delete-1", sec.actor.ID, "Closed 1", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	closedTwo, err := chatState.CreateAIConversation(context.Background(), "aic-closed-delete-2", sec.actor.ID, "Closed 2", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := chatState.CloseAIConversation(context.Background(), closedOne.ID, sec.actor.ID, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := chatState.CloseAIConversation(context.Background(), closedTwo.ID, sec.actor.ID, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/ai/conversations/"+active.ID, strings.NewReader(`{}`))
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "ai_conversation_not_closed") {
+		t.Fatalf("active delete status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodDelete, "/api/v1/ai/conversations/"+closedOne.ID, strings.NewReader(`{}`))
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), closedOne.ID) {
+		t.Fatalf("closed delete status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodDelete, "/api/v1/ai/conversations/closed", strings.NewReader(`{}`))
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"deleted":1`) {
+		t.Fatalf("bulk delete status = %d: %s", rec.Code, rec.Body.String())
+	}
+	if _, err := chatState.AIConversation(context.Background(), active.ID, sec.actor.ID); err != nil {
+		t.Fatalf("active conversation disappeared: %v", err)
+	}
+}
 func TestAIConversationActionListAndRejectAPI(t *testing.T) {
 	chatState := newAPIChatState()
 	sec := defaultFakeSecurity()
