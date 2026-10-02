@@ -29,8 +29,8 @@ type openAICompatibleFunction struct {
 }
 
 type openAICompatibleTool struct {
-	Type     string                     `json:"type"`
-	Function openAICompatibleFunction   `json:"function"`
+	Type     string                   `json:"type"`
+	Function openAICompatibleFunction `json:"function"`
 }
 
 type openAICompatibleToolCallFunction struct {
