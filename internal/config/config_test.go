@@ -65,4 +65,3 @@ func TestLoadRejectsIncompleteAIConfig(t *testing.T) {
 		t.Fatal("missing Ollama model was accepted")
 	}
 }
-
