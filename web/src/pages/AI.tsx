@@ -205,18 +205,32 @@ export function AIPage() {
       if (!id) return;
 
       setDraft("");
+      const timestamp = Date.now();
       const localUser: AIMessage = {
-        id: "pending-" + Date.now(),
+        id: "pending-user-" + timestamp,
         conversation_id: id,
         role: "user",
         content,
         created_at: new Date().toISOString(),
       };
-      setMessages((items) => [...items, localUser]);
+      const localAssistant: AIMessage = {
+        id: "streaming-assistant-" + timestamp,
+        conversation_id: id,
+        role: "assistant",
+        content: "",
+        created_at: new Date().toISOString(),
+      };
+      setMessages((items) => [...items, localUser, localAssistant]);
 
-      const result = await api.sendAIMessage(id, content);
+      const result = await api.streamAIMessage(id, content, (delta) => {
+        setMessages((items) => items.map((item) =>
+          item.id === localAssistant.id
+            ? {...item, content: item.content + delta}
+            : item,
+        ));
+      });
       setMessages((items) => [
-        ...items.filter((item) => item.id !== localUser.id),
+        ...items.filter((item) => item.id !== localUser.id && item.id !== localAssistant.id),
         result.user_message,
         result.assistant_message,
       ]);
@@ -417,7 +431,9 @@ export function AIPage() {
                 )}
               </article>
             ))}
-            {sending && <div className="ai-thinking">{t("aiThinking")}</div>}
+            {sending && !messages.some((message) => message.id.startsWith("streaming-assistant-") && message.content) && (
+              <div className="ai-thinking">{t("aiThinking")}</div>
+            )}
           </div>
 
           <form className="ai-composer" onSubmit={submit}>
