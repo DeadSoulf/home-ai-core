@@ -77,8 +77,8 @@ func TestFFmpegMJPEGSourceKeepsCredentialsOutOfArguments(t *testing.T) {
 }
 
 type fakeLiveSource struct {
-	mu      sync.Mutex
-	starts  int
+	mu       sync.Mutex
+	starts   int
 	requests []ProbeRequest
 }
 
