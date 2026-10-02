@@ -78,6 +78,7 @@ func (s *Service) Stop() {
 	if s == nil {
 		return
 	}
+	s.stopAllLive()
 	s.runtimeMu.Lock()
 	cancel := s.supervisorCancel
 	s.supervisorCancel = nil
@@ -104,6 +105,7 @@ func (s *Service) RefreshCamera(ctx context.Context, cameraID string) error {
 	if s == nil {
 		return nil
 	}
+	s.StopLive(cameraID)
 	camera, err := s.store.NVRCamera(ctx, cameraID)
 	if err != nil {
 		return err
@@ -132,6 +134,7 @@ func (s *Service) RemoveCameraRuntime(cameraID string) {
 	if s == nil {
 		return
 	}
+	s.StopLive(cameraID)
 	s.runtimeMu.Lock()
 	if worker, ok := s.workers[cameraID]; ok {
 		worker.cancel()
