@@ -451,37 +451,39 @@ func (s *Service) Chat(
 		return state.AIMessageRecord{}, state.AIMessageRecord{}, state.ErrAIConversationClosed
 	}
 
-	userMessageID, err := newAgentID("aim_")
+	history, err := s.conversations.ListAIMessages(ctx, conversation.ID, actor.ID, maxChatContextMessages)
 	if err != nil {
 		return state.AIMessageRecord{}, state.AIMessageRecord{}, err
 	}
 	now := time.Now().UTC()
-	userMessage, err := s.conversations.AppendAIMessage(
-		ctx, userMessageID, conversation.ID, actor.ID, string(RoleUser), content, now,
-	)
-	if err != nil {
-		return state.AIMessageRecord{}, state.AIMessageRecord{}, err
-	}
-	if conversation.Title == "" {
-		title := cleanConversationTitle(content)
-		if title != "" {
-			_ = s.conversations.UpdateAIConversationTitle(ctx, conversation.ID, actor.ID, title, now)
-		}
-	}
+	history = append(history, state.AIMessageRecord{
+		ConversationID: conversation.ID,
+		Role:           string(RoleUser),
+		Content:        content,
+		CreatedAt:      now,
+	})
 
-	history, err := s.conversations.ListAIMessages(ctx, conversation.ID, actor.ID, maxChatContextMessages)
-	if err != nil {
-		return userMessage, state.AIMessageRecord{}, err
-	}
 	started := time.Now()
 	answer, generateErr := s.generateAgentResponse(ctx, actor, meta, conversation.ID, history)
 	if generateErr != nil {
 		s.recordChatAudit(ctx, meta, actor, conversation.ID, content, "", time.Since(started), generateErr)
-		return userMessage, state.AIMessageRecord{}, generateErr
+		return state.AIMessageRecord{}, state.AIMessageRecord{}, generateErr
+	}
+
+	userMessageID, err := newAgentID("aim_")
+	if err != nil {
+		return state.AIMessageRecord{}, state.AIMessageRecord{}, err
 	}
 	assistantMessageID, err := newAgentID("aim_")
 	if err != nil {
-		return userMessage, state.AIMessageRecord{}, err
+		return state.AIMessageRecord{}, state.AIMessageRecord{}, err
+	}
+	userMessage, err := s.conversations.AppendAIMessage(
+		ctx, userMessageID, conversation.ID, actor.ID, string(RoleUser), content, now,
+	)
+	if err != nil {
+		s.recordChatAudit(ctx, meta, actor, conversation.ID, content, answer, time.Since(started), err)
+		return state.AIMessageRecord{}, state.AIMessageRecord{}, err
 	}
 	assistantMessage, err := s.conversations.AppendAIMessage(
 		ctx, assistantMessageID, conversation.ID, actor.ID, string(RoleAssistant), answer, time.Now().UTC(),
@@ -489,6 +491,12 @@ func (s *Service) Chat(
 	if err != nil {
 		s.recordChatAudit(ctx, meta, actor, conversation.ID, content, answer, time.Since(started), err)
 		return userMessage, state.AIMessageRecord{}, err
+	}
+	if conversation.Title == "" {
+		title := cleanConversationTitle(content)
+		if title != "" {
+			_ = s.conversations.UpdateAIConversationTitle(ctx, conversation.ID, actor.ID, title, now)
+		}
 	}
 	s.recordChatAudit(ctx, meta, actor, conversation.ID, content, answer, time.Since(started), nil)
 	return userMessage, assistantMessage, nil
