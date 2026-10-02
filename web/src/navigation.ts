@@ -7,6 +7,7 @@ export type NavigationItem = {
   title?: string;
   permission?: string;
   moduleId?: string;
+  order?: number;
 };
 
 type NavigationGroup = { label: StringKey; items: NavigationItem[] };
@@ -43,11 +44,13 @@ function dynamicModuleItems(modules?: ModuleNavigationState[]): NavigationItem[]
     .filter((module) => module.status === "enabled")
     .flatMap((module) => (module.items || []).map((item) => ({
       path: item.route,
+      label: module.module_id === "ai.cloud" ? "cloudAI" : undefined,
       title: item.title,
       permission: "security.self.read",
       moduleId: module.module_id,
+      order: item.order || 0,
     })))
-    .sort((a, b) => a.path.localeCompare(b.path));
+    .sort((a, b) => (a.order || 0) - (b.order || 0) || a.path.localeCompare(b.path));
 }
 
 export function visibleNavigation(actor: Actor, modules?: ModuleNavigationState[]): NavigationGroup[] {
