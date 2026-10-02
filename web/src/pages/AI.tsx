@@ -224,6 +224,8 @@ export function AIPage() {
     } catch (reason) {
       if (reason instanceof APIError && reason.code === "ai_chat_unavailable") {
         setError(t("aiProviderUnavailable"));
+      } else if (reason instanceof TypeError) {
+        setError(t("requestFailed"));
       } else {
         setError(reason instanceof Error ? reason.message : t("requestFailed"));
       }
