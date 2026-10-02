@@ -579,6 +579,35 @@ func TestServiceCloseConversationMakesHistoryReadOnly(t *testing.T) {
 	}
 }
 
+type failingProvider struct{}
+
+func (failingProvider) ID() string { return "failing" }
+
+func (failingProvider) Generate(context.Context, ModelRequest) (ModelResponse, error) {
+	return ModelResponse{}, errors.New("provider failed")
+}
+
+func TestServiceFailedGenerationDoesNotPersistUserMessage(t *testing.T) {
+	store := newChatMemoryStore()
+	service := NewService("node-1", store, serviceJobs{}, serviceModules{}, nil, failingProvider{})
+	actor := security.Actor{Type: "user", ID: "usr-1"}
+	conversation, err := service.CreateConversation(context.Background(), actor, security.RequestContext{}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := service.Chat(context.Background(), actor, security.RequestContext{}, conversation.ID, "do not duplicate me"); err == nil {
+		t.Fatal("Chat() error = nil, want provider failure")
+	}
+	messages, err := service.Messages(context.Background(), actor, conversation.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(messages) != 0 {
+		t.Fatalf("failed generation persisted messages: %#v", messages)
+	}
+}
+
 type blockingProvider struct {
 	started chan struct{}
 }
@@ -655,6 +684,13 @@ func TestServiceRestartCancelsActiveGeneration(t *testing.T) {
 	}
 	if !service.Enabled() {
 		t.Fatal("service disabled after restart")
+	}
+	messages, err := service.Messages(context.Background(), actor, conversation.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(messages) != 0 {
+		t.Fatalf("cancelled generation persisted messages: %#v", messages)
 	}
 }
 
