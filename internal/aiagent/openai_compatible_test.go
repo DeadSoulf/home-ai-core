@@ -3,8 +3,10 @@ package aiagent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -93,5 +95,56 @@ func TestOpenAICompatibleProviderSendsToolCallID(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+
+func TestOpenAICompatibleProviderReportsAuthenticationFailure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":{"message":"bad key test-secret"}}`))
+	}))
+	defer server.Close()
+
+	provider, err := NewOpenAICompatibleProvider(server.URL, "cloud-model", "test-secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = provider.Generate(context.Background(), ModelRequest{
+		Messages: []Message{{Role: RoleUser, Content: "test"}},
+	})
+	var providerErr *ProviderRequestError
+	if !errors.As(err, &providerErr) {
+		t.Fatalf("error = %T %v, want ProviderRequestError", err, err)
+	}
+	if providerErr.Kind != "authentication" || providerErr.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("provider error = %#v", providerErr)
+	}
+	if strings.Contains(providerErr.Error(), "test-secret") {
+		t.Fatalf("provider error leaked API key: %q", providerErr.Error())
+	}
+	if !strings.Contains(providerErr.Error(), "[redacted]") {
+		t.Fatalf("provider error did not redact provider detail: %q", providerErr.Error())
+	}
+}
+
+func TestOpenAICompatibleProviderReportsIncompatibleSuccessPayload(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"result":"not-chat-completions"}`))
+	}))
+	defer server.Close()
+
+	provider, err := NewOpenAICompatibleProvider(server.URL, "cloud-model", "test-secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = provider.Generate(context.Background(), ModelRequest{
+		Messages: []Message{{Role: RoleUser, Content: "test"}},
+	})
+	var providerErr *ProviderRequestError
+	if !errors.As(err, &providerErr) || providerErr.Kind != "invalid_response" {
+		t.Fatalf("error = %T %v, want invalid_response ProviderRequestError", err, err)
 	}
 }
