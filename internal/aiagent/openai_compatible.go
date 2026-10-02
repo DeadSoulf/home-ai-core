@@ -129,7 +129,7 @@ func cloudProviderErrorMessage(status int, detail string) string {
 			message = fmt.Sprintf("Cloud AI returned HTTP %d", status)
 		}
 	}
-	if detail != "" {
+	if detail != "" && status != http.StatusUnauthorized && status != http.StatusForbidden {
 		message += ": " + detail
 	}
 	return message
