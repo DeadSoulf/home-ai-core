@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -30,6 +31,7 @@ const (
 )
 
 var (
+	ErrAgentDisabled      = errors.New("AI agent is disabled")
 	ErrChatUnavailable    = errors.New("AI chat is unavailable")
 	ErrInvalidChatMessage = errors.New("invalid AI chat message")
 )
@@ -72,6 +74,11 @@ type Service struct {
 	toolTimeout   time.Duration
 	chatTimeout   time.Duration
 	initErr       error
+
+	runtimeMu     sync.RWMutex
+	enabled       bool
+	runtimeCtx    context.Context
+	runtimeCancel context.CancelFunc
 }
 
 type Status struct {
@@ -98,18 +105,76 @@ func NewService(
 	if len(providers) > 0 {
 		provider = providers[0]
 	}
+	runtimeCtx, runtimeCancel := context.WithCancel(context.Background())
 	s := &Service{
 		nodeID: nodeID, registry: NewToolRegistry(), state: stateReader, jobs: jobReader, modules: moduleReader,
 		audit: auditRecorder, conversations: conversations, provider: provider,
 		toolTimeout: defaultToolTimeout, chatTimeout: defaultChatTimeout,
+		enabled: true, runtimeCtx: runtimeCtx, runtimeCancel: runtimeCancel,
 	}
 	s.initErr = s.registerCoreReadTools()
 	return s
 }
 
+func (s *Service) Enabled() bool {
+	s.runtimeMu.RLock()
+	defer s.runtimeMu.RUnlock()
+	return s.enabled
+}
+
+func (s *Service) SetEnabled(enabled bool) {
+	s.runtimeMu.Lock()
+	defer s.runtimeMu.Unlock()
+
+	if enabled == s.enabled {
+		return
+	}
+	if s.runtimeCancel != nil {
+		s.runtimeCancel()
+	}
+	if enabled {
+		s.runtimeCtx, s.runtimeCancel = context.WithCancel(context.Background())
+	} else {
+		s.runtimeCtx = nil
+		s.runtimeCancel = nil
+	}
+	s.enabled = enabled
+}
+
+func (s *Service) Restart() {
+	s.runtimeMu.Lock()
+	defer s.runtimeMu.Unlock()
+
+	if s.runtimeCancel != nil {
+		s.runtimeCancel()
+	}
+	s.runtimeCtx, s.runtimeCancel = context.WithCancel(context.Background())
+	s.enabled = true
+}
+
+func (s *Service) runtimeContext(parent context.Context) (context.Context, func(), error) {
+	s.runtimeMu.RLock()
+	enabled := s.enabled
+	runtimeCtx := s.runtimeCtx
+	s.runtimeMu.RUnlock()
+	if !enabled || runtimeCtx == nil {
+		return nil, nil, ErrAgentDisabled
+	}
+
+	ctx, cancel := context.WithCancel(parent)
+	stop := context.AfterFunc(runtimeCtx, cancel)
+	cleanup := func() {
+		stop()
+		cancel()
+	}
+	return ctx, cleanup, nil
+}
+
 func (s *Service) Status() Status {
 	stateName := "ready"
-	if s.initErr != nil {
+	if !s.Enabled() {
+		stateName = "disabled"
+	} else if s.initErr != nil {
 		stateName = "error"
 	}
 	status := Status{
@@ -130,6 +195,9 @@ func (s *Service) Status() Status {
 }
 
 func (s *Service) Conversations(ctx context.Context, actor security.Actor) ([]state.AIConversationRecord, error) {
+	if !s.Enabled() {
+		return nil, ErrAgentDisabled
+	}
 	if s.conversations == nil || actor.ID == "" {
 		return nil, ErrChatUnavailable
 	}
@@ -142,6 +210,9 @@ func (s *Service) CreateConversation(
 	meta security.RequestContext,
 	title string,
 ) (state.AIConversationRecord, error) {
+	if !s.Enabled() {
+		return state.AIConversationRecord{}, ErrAgentDisabled
+	}
 	if s.conversations == nil || actor.ID == "" {
 		return state.AIConversationRecord{}, ErrChatUnavailable
 	}
@@ -167,6 +238,9 @@ func (s *Service) Messages(
 	actor security.Actor,
 	conversationID string,
 ) ([]state.AIMessageRecord, error) {
+	if !s.Enabled() {
+		return nil, ErrAgentDisabled
+	}
 	if s.conversations == nil || actor.ID == "" {
 		return nil, ErrChatUnavailable
 	}
@@ -179,6 +253,9 @@ func (s *Service) Chat(
 	meta security.RequestContext,
 	conversationID, content string,
 ) (state.AIMessageRecord, state.AIMessageRecord, error) {
+	if !s.Enabled() {
+		return state.AIMessageRecord{}, state.AIMessageRecord{}, ErrAgentDisabled
+	}
 	if s.conversations == nil || s.provider == nil || actor.ID == "" {
 		return state.AIMessageRecord{}, state.AIMessageRecord{}, ErrChatUnavailable
 	}
@@ -215,7 +292,12 @@ func (s *Service) Chat(
 	}
 	request := ModelRequest{Messages: buildChatContext(history)}
 	started := time.Now()
-	chatCtx, cancel := context.WithTimeout(ctx, s.chatTimeout)
+	runtimeCtx, runtimeCleanup, runtimeErr := s.runtimeContext(ctx)
+	if runtimeErr != nil {
+		return userMessage, state.AIMessageRecord{}, runtimeErr
+	}
+	defer runtimeCleanup()
+	chatCtx, cancel := context.WithTimeout(runtimeCtx, s.chatTimeout)
 	response, generateErr := s.provider.Generate(chatCtx, request)
 	cancel()
 	if generateErr != nil {
@@ -327,6 +409,9 @@ func newAgentID(prefix string) (string, error) {
 }
 
 func (s *Service) AvailableTools(principal Principal) []ToolDescriptor {
+	if !s.Enabled() {
+		return []ToolDescriptor{}
+	}
 	all := s.registry.List()
 	available := make([]ToolDescriptor, 0, len(all))
 	for _, descriptor := range all {
@@ -338,12 +423,20 @@ func (s *Service) AvailableTools(principal Principal) []ToolDescriptor {
 }
 
 func (s *Service) Execute(ctx context.Context, actor security.Actor, meta security.RequestContext, toolID string, input json.RawMessage, approved bool) (json.RawMessage, error) {
+	if !s.Enabled() {
+		return nil, ErrAgentDisabled
+	}
 	if s.initErr != nil {
 		return nil, s.initErr
 	}
 	descriptor, _ := s.registry.Descriptor(toolID)
 	started := time.Now()
-	toolCtx, cancel := context.WithTimeout(ctx, s.toolTimeout)
+	runtimeCtx, runtimeCleanup, runtimeErr := s.runtimeContext(ctx)
+	if runtimeErr != nil {
+		return nil, runtimeErr
+	}
+	defer runtimeCleanup()
+	toolCtx, cancel := context.WithTimeout(runtimeCtx, s.toolTimeout)
 	defer cancel()
 	result, err := s.registry.Execute(toolCtx, actor, toolID, input, approved)
 	outcome := "success"
@@ -381,6 +474,8 @@ func toolErrorCode(err error) string {
 		return "approval_required"
 	case errors.Is(err, ErrInvalidToolInput):
 		return "invalid_input"
+	case errors.Is(err, ErrAgentDisabled):
+		return "agent_disabled"
 	case errors.Is(err, context.DeadlineExceeded):
 		return "timeout"
 	case errors.Is(err, context.Canceled):
