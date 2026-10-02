@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/aiagent"
+	"github.com/DeadSoulf/home-ai-core/internal/nvr"
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/storage"
@@ -23,6 +24,7 @@ type server struct {
 	eventHistoryService EventHistoryService
 	modules             ModuleService
 	ai                  *aiagent.Service
+	nvr                 *nvr.Service
 	updater             UpdaterService
 	realtime            *realtime.Hub
 	mux                 *http.ServeMux
@@ -38,6 +40,62 @@ func New(
 	moduleService ModuleService,
 	updaterService UpdaterService,
 	realtimeHub *realtime.Hub,
+	aiProviders ...aiagent.Provider,
+) http.Handler {
+	return newServer(
+		nodeID,
+		logger,
+		state,
+		securityService,
+		jobService,
+		eventHistoryService,
+		moduleService,
+		updaterService,
+		realtimeHub,
+		nil,
+		aiProviders...,
+	)
+}
+
+func NewWithNVR(
+	nodeID string,
+	logger *slog.Logger,
+	state State,
+	securityService SecurityService,
+	jobService JobService,
+	eventHistoryService EventHistoryService,
+	moduleService ModuleService,
+	updaterService UpdaterService,
+	realtimeHub *realtime.Hub,
+	nvrService *nvr.Service,
+	aiProviders ...aiagent.Provider,
+) http.Handler {
+	return newServer(
+		nodeID,
+		logger,
+		state,
+		securityService,
+		jobService,
+		eventHistoryService,
+		moduleService,
+		updaterService,
+		realtimeHub,
+		nvrService,
+		aiProviders...,
+	)
+}
+
+func newServer(
+	nodeID string,
+	logger *slog.Logger,
+	state State,
+	securityService SecurityService,
+	jobService JobService,
+	eventHistoryService EventHistoryService,
+	moduleService ModuleService,
+	updaterService UpdaterService,
+	realtimeHub *realtime.Hub,
+	nvrService *nvr.Service,
 	aiProviders ...aiagent.Provider,
 ) http.Handler {
 	aiService := aiagent.NewService(nodeID, state, jobService, moduleService, securityService, aiProviders...)
@@ -60,6 +118,7 @@ func New(
 		eventHistoryService: eventHistoryService,
 		modules:             moduleService,
 		ai:                  aiService,
+		nvr:                 nvrService,
 		updater:             updaterService,
 		realtime:            realtimeHub,
 		mux:                 http.NewServeMux(),
