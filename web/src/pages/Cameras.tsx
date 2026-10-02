@@ -62,6 +62,15 @@ function hasCameraManage(actor: Actor, cameraID: string): boolean {
   );
 }
 
+function hasCameraLive(actor: Actor, cameraID: string): boolean {
+  if (actor.permissions.includes("camera.live")) return true;
+  return (actor.resource_permissions || []).some((scope) =>
+    scope.permission === "camera.live" &&
+    scope.resource_type === "camera" &&
+    scope.resource_id === cameraID
+  );
+}
+
 function probeText(probe: NVRProbe): string {
   const size = probe.width > 0 && probe.height > 0 ? `${probe.width}×${probe.height}` : "—";
   const fps = probe.fps > 0 ? `${probe.fps.toFixed(2)} FPS` : "—";
@@ -84,6 +93,8 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
   const [formError, setFormError] = useState("");
   const [probe, setProbe] = useState<NVRProbe>();
   const [testedFingerprint, setTestedFingerprint] = useState("");
+  const [liveIDs, setLiveIDs] = useState<string[]>([]);
+  const [liveErrors, setLiveErrors] = useState<Record<string, boolean>>({});
 
   const globalManage = actor.permissions.includes("camera.manage");
   const currentFingerprint = useMemo(() => probeFingerprint(editor), [editor]);
@@ -181,6 +192,12 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
     try {
       await api.deleteNVRCamera(camera.id);
       if (editingID === camera.id) resetEditor();
+      setLiveIDs((items) => items.filter((id) => id !== camera.id));
+      setLiveErrors((items) => {
+        const next = {...items};
+        delete next[camera.id];
+        return next;
+      });
       resource.reload();
     } catch (reason) {
       setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
@@ -200,6 +217,33 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
     } finally {
       setBusy("");
     }
+  };
+
+  const toggleLive = (camera: NVRCamera) => {
+    setLiveErrors((items) => {
+      const next = {...items};
+      delete next[camera.id];
+      return next;
+    });
+    setLiveIDs((items) =>
+      items.includes(camera.id)
+        ? items.filter((id) => id !== camera.id)
+        : [...items, camera.id],
+    );
+  };
+
+  const openAllLive = (cameras: NVRCamera[]) => {
+    setLiveErrors({});
+    setLiveIDs(cameras.filter((camera) =>
+      camera.enabled &&
+      camera.runtime.state !== "offline" &&
+      hasCameraLive(actor, camera.id)
+    ).map((camera) => camera.id));
+  };
+
+  const closeAllLive = () => {
+    setLiveIDs([]);
+    setLiveErrors({});
   };
 
   if (resource.loading && !resource.data) return <LoadingState />;
@@ -231,9 +275,70 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
           <strong>{data.status.secret_store_ready ? t("available") : t("nvrNotYet")}</strong>
           <small>{t("nvrCredentialStoreHint")}</small>
         </div>
+        <div className="metric">
+          <span>{t("nvrLiveRuntime")}</span>
+          <strong>{data.status.live_runtime_ready ? t("available") : t("nvrNotYet")}</strong>
+          <small>{t("nvrLiveStreams")}: {data.status.active_live_streams}</small>
+        </div>
       </div>
 
       {formError && <div className="form-error">{formError}</div>}
+
+      <Panel title={t("nvrLive")}>
+        {!data.status.live_runtime_ready ? (
+          <div className="notice warning"><p>{t("nvrLiveUnavailable")}</p></div>
+        ) : data.cameras.filter((camera) => camera.enabled && hasCameraLive(actor, camera.id)).length === 0 ? (
+          <EmptyState>{t("nvrNoLiveCameras")}</EmptyState>
+        ) : (
+          <>
+            <div className="nvr-toolbar nvr-live-toolbar">
+              <button
+                type="button"
+                className="button secondary compact"
+                onClick={() => openAllLive(data.cameras)}
+              >
+                {t("nvrOpenAllLive")}
+              </button>
+              {liveIDs.length > 0 && (
+                <button type="button" className="button secondary compact" onClick={closeAllLive}>
+                  {t("nvrCloseAllLive")}
+                </button>
+              )}
+            </div>
+            {liveIDs.length === 0 ? (
+              <div className="notice"><p>{t("nvrLiveHint")}</p></div>
+            ) : (
+              <div className="nvr-live-grid">
+                {data.cameras.filter((camera) => liveIDs.includes(camera.id)).map((camera) => (
+                  <figure className="nvr-live-tile" key={camera.id}>
+                    <div className="nvr-live-frame">
+                      <img
+                        src={api.nvrLiveURL(camera.id)}
+                        alt={camera.name}
+                        onLoad={() => setLiveErrors((items) => {
+                          const next = {...items};
+                          delete next[camera.id];
+                          return next;
+                        })}
+                        onError={() => setLiveErrors((items) => ({...items, [camera.id]: true}))}
+                      />
+                      {liveErrors[camera.id] && (
+                        <div className="nvr-live-error">{t("nvrLiveFailed")}</div>
+                      )}
+                    </div>
+                    <figcaption>
+                      <strong>{camera.name}</strong>
+                      <button type="button" className="button secondary compact" onClick={() => toggleLive(camera)}>
+                        {t("nvrHideLive")}
+                      </button>
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </Panel>
 
       <Panel title={t("cameraList")}>
         {globalManage && !editorOpen && (
@@ -276,6 +381,16 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
                   </div>
                   <div className="nvr-camera-actions">
                     <Status value={camera.runtime.state} />
+                    {camera.enabled && hasCameraLive(actor, camera.id) && (
+                      <button
+                        type="button"
+                        className={liveIDs.includes(camera.id) ? "button primary compact" : "button secondary compact"}
+                        disabled={!data.status.live_runtime_ready}
+                        onClick={() => toggleLive(camera)}
+                      >
+                        {liveIDs.includes(camera.id) ? t("nvrHideLive") : t("nvrShowLive")}
+                      </button>
+                    )}
                     {canManage && (
                       <>
                         <button

@@ -1215,6 +1215,51 @@ button:focus-visible, summary:focus-visible { outline: 2px solid #8bb0ff; outlin
 
 
 .nvr-toolbar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+.nvr-live-toolbar { gap: 8px; flex-wrap: wrap; }
+.nvr-live-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+.nvr-live-tile {
+  margin: 0;
+  border: 1px solid #273140;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0c1117;
+}
+.nvr-live-frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #05080c;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.nvr-live-frame img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  background: #05080c;
+}
+.nvr-live-error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  text-align: center;
+  color: #d8e0eb;
+  background: #0b1016e8;
+}
+.nvr-live-tile figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+}
 .nvr-camera-row { align-items: flex-start; }
 .nvr-camera-actions {
   display: flex !important;

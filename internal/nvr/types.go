@@ -57,6 +57,8 @@ type Status struct {
 	OfflineCount      int    `json:"offline_count"`
 	SupervisorRunning bool   `json:"supervisor_running"`
 	MediaRuntimeReady bool   `json:"media_runtime_ready"`
+	LiveRuntimeReady  bool   `json:"live_runtime_ready"`
+	ActiveLiveStreams int    `json:"active_live_streams"`
 	SecretStoreReady  bool   `json:"secret_store_ready"`
 	FoundationStage   string `json:"foundation_stage"`
 }

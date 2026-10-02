@@ -83,12 +83,15 @@ func (p *FFProbe) Probe(ctx context.Context, request ProbeRequest) (ProbeResult,
 		probeCtx,
 		p.path,
 		"-v", "error",
-		"-rtsp_transport", transport,
+		"-f", "concat",
+		"-safe", "0",
+		"-protocol_whitelist", "file,pipe,rtsp,tcp,udp,rtp,tls,http,https,crypto",
+		"-i", "pipe:0",
 		"-show_streams",
 		"-show_format",
 		"-of", "json",
-		probeURL,
 	)
+	command.Stdin = strings.NewReader(ffconcatRTSPInput(probeURL, transport))
 	output, err := command.Output()
 	if err != nil {
 		if errors.Is(probeCtx.Err(), context.DeadlineExceeded) {
@@ -155,6 +158,13 @@ func (p *FFProbe) Probe(ctx context.Context, request ProbeRequest) (ProbeResult,
 		result.BitrateBPS, _ = strconv.ParseInt(strings.TrimSpace(decoded.Format.BitRate), 10, 64)
 	}
 	return result, nil
+}
+
+func ffconcatRTSPInput(address, transport string) string {
+	escaped := strings.ReplaceAll(address, "'", "'\\''")
+	return "ffconcat version 1.0\n" +
+		"file '" + escaped + "'\n" +
+		"option rtsp_transport " + transport + "\n"
 }
 
 func normalizeRTSPAddress(value string) (string, error) {

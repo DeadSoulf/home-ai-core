@@ -9,7 +9,7 @@ import (
 
 const (
 	ModuleID      = "nvr"
-	ModuleVersion = "0.3.0"
+	ModuleVersion = "0.4.0"
 )
 
 type Module struct{}
@@ -25,7 +25,7 @@ func (Module) Manifest() modules.Manifest {
 		Name:          "Cameras / NVR",
 		Description:   "Local-first camera, live view and recording foundation",
 		Version:       ModuleVersion,
-		Core:          ">=0.1.136 <1.0.0",
+		Core:          ">=0.1.137 <1.0.0",
 		Capabilities: modules.Capabilities{
 			Requires: []string{"host.linux"},
 			Provides: []string{"camera.nvr"},
