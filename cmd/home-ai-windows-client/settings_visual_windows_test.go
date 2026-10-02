@@ -75,7 +75,6 @@ func TestDashboardFolderCount(t *testing.T) {
 	}
 }
 
-
 func TestSettingsButtonRoles(t *testing.T) {
 	tests := map[string]settingsButtonRole{
 		"overview_sync_button": settingsButtonHeroPrimary,
