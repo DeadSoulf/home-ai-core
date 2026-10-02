@@ -165,6 +165,14 @@ Published in `v0.1.119-dev` after successful Core/Web, Windows, Debian and relea
 - ✅ published in `v0.1.120-dev` after successful Core/Web, Windows, Debian and release workflows.
 - 🧪 live enable/disable/restart acceptance on the installed Home-AI server remains pending.
 
+### 0.1.121-dev — Restart persistence hotfix
+
+- ✅ live failure in `0.1.120-dev` traced to the SQLite `modules.status` CHECK rejecting transient `restarting`;
+- ✅ restart now persists only the durable `enabled` state and recreates the AI runtime in memory;
+- ✅ persistent Module Registry rejects `restarting`;
+- ✅ regression test exercises the restart API against the real SQLite-backed registry;
+- 🧪 CI/release and live re-test pending.
+
 ### Next slice — Streaming + controlled tool loop
 
 - streaming local model responses to Web;
