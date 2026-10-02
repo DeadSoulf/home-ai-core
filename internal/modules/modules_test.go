@@ -130,6 +130,7 @@ func TestRegistrySetStatusPersistsDisabledState(t *testing.T) {
 
 	registry := NewRegistry(store)
 	manifest := validManifest("ai.agent", "0.2.0")
+	manifest.Capabilities.Provides = []string{"ai.agent"}
 	if err := registry.Register(ctx, testModule{manifest: manifest}); err != nil {
 		t.Fatal(err)
 	}
