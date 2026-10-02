@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.118-dev
+
+- Fix live Windows rendering defects found in the 0.1.116 compact Figma dashboard screenshot.
+- Clip native owner-drawn BUTTON child windows to the Figma 10px rounded geometry so the Win32 button-face background no longer leaks through as white corner artifacts.
+- Clear each button client area with its real parent surface before custom painting; hero actions now blend into the hero and sidebar navigation into `#070B14`.
+- Remove the unintended light border from primary actions and replace XOR `DrawFocusRect` with a deterministic rounded cyan keyboard-focus ring.
+- Use dedicated hero primary/secondary button roles so the white secondary action and blue primary action render correctly on the gradient hero.
+- Match the selected sidebar row more closely to the Figma alpha-composited fill/border and left-align nav labels at the specified 30px inset.
+- Do not auto-focus the Overview primary action at startup, preventing a focus outline from appearing in the default dashboard view while preserving Tab keyboard navigation.
+- Fix the clipped `HOME AI` sidebar wordmark with a dedicated brand font and wider text slot.
+- Preserve sync, Credential Manager, background agent, tray, updater, AI Agent Foundation/read-tool API and Debian installer behavior.
+- Native Windows tests, Windows cross-build, Debian installer checks and full pull-request CI pass on the code slice; a new live Windows screenshot is still required for visual acceptance.
+
 ## 0.1.117-dev
 
 - Add the first callable **AI Agent read-tool layer** on top of the `0.1.115-dev` contracts while preserving the published compact Windows UI from `0.1.116-dev`.
