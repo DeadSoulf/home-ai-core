@@ -24,6 +24,10 @@ function currentPath(): string {
   return path + (path === "/system" || path === "/files" ? window.location.hash : "");
 }
 
+export function keepAIPageMounted(wasMounted: boolean, path: string): boolean {
+  return wasMounted || path.split("#")[0] === "/ai";
+}
+
 export default function App() {
   const {t} = useI18n();
   const [phase, setPhase] = useState<Phase>("loading");
@@ -32,6 +36,7 @@ export default function App() {
   const [realtime, setRealtime] = useState<RealtimeStatus>("disconnected");
   const [revision, setRevision] = useState(0);
   const [availableUpdate, setAvailableUpdate] = useState<string>();
+  const [aiMounted, setAIMounted] = useState(() => currentPath().split("#")[0] === "/ai");
 
   useEffect(() => {
     api.setupStatus()
@@ -128,6 +133,14 @@ export default function App() {
     }
   }, [phase, actor, path]);
 
+  useEffect(() => {
+    if (phase !== "app" || !actor) return;
+    const allowedPath = accessiblePath(actor, path);
+    if (allowedPath.split("#")[0] === "/ai") {
+      setAIMounted(true);
+    }
+  }, [phase, actor, path]);
+
   const authenticated = (nextActor: Actor) => {
     setActor(nextActor);
     setPhase("app");
@@ -169,7 +182,9 @@ export default function App() {
   let page;
   switch (allowedPath.split("#")[0]) {
     case "/ai":
-      page = <AIPage />;
+      // AIPage is mounted separately and kept alive after the first visit so
+      // in-flight model requests and the visible chat state survive navigation.
+      page = null;
       break;
     case "/account":
       page = accountPage;
@@ -224,9 +239,13 @@ export default function App() {
       page = dashboardAllowed ? <Dashboard actor={actor} revision={revision} onNavigate={navigate} /> : accountPage;
   }
 
+  const aiVisible = allowedPath.split("#")[0] === "/ai";
+  const mountAI = keepAIPageMounted(aiMounted, allowedPath);
+
   return (
     <Shell actor={actor} path={allowedPath} realtime={realtime} availableUpdate={availableUpdate} onNavigate={navigate} onLogout={logout}>
-      {page}
+      {mountAI && <div hidden={!aiVisible}><AIPage /></div>}
+      {!aiVisible && page}
     </Shell>
   );
 }
