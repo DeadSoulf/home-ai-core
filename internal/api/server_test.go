@@ -189,6 +189,7 @@ func defaultFakeSecurity() fakeSecurity {
 				"security.users.manage",
 				"audit.read",
 				"modules.read",
+				"modules.manage",
 				"updates.read",
 				"updates.manage",
 				"files.read",
@@ -654,6 +655,17 @@ func (f fakeModules) Get(_ context.Context, id string) (modules.Registered, erro
 
 func (f fakeModules) Capabilities(context.Context) ([]string, error) {
 	return f.capabilities, nil
+}
+
+func (f fakeModules) SetStatus(_ context.Context, id, status, errorMessage string) error {
+	for i := range f.items {
+		if f.items[i].Manifest.ID == id {
+			f.items[i].Status = status
+			f.items[i].Error = errorMessage
+			return nil
+		}
+	}
+	return modules.ErrModuleNotFound
 }
 
 func TestModulesAPI(t *testing.T) {
