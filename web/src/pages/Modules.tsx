@@ -15,6 +15,22 @@ export function ModulesPage({revision, canManage}: {revision: number; canManage:
   const [controlBusy, setControlBusy] = useState("");
   const [controlError, setControlError] = useState("");
   const [controlMessage, setControlMessage] = useState("");
+  const [cloudTestBusy, setCloudTestBusy] = useState(false);
+
+  const testCloudAI = async () => {
+    if (cloudTestBusy || controlBusy) return;
+    setCloudTestBusy(true);
+    setControlError("");
+    setControlMessage("");
+    try {
+      await api.testCloudAI();
+      setControlMessage(t("cloudAITestSuccess"));
+    } catch (reason) {
+      setControlError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setCloudTestBusy(false);
+    }
+  };
 
   const controlModule = async (id: string, operation: "enable" | "disable" | "restart") => {
     if (controlBusy) return;
@@ -92,6 +108,16 @@ export function ModulesPage({revision, canManage}: {revision: number; canManage:
                 >
                   {controlBusy === module.manifest.id + ":restart" ? t("working") : t("moduleRestart")}
                 </button>
+                {module.manifest.id === "ai.cloud" && (
+                  <button
+                    type="button"
+                    className="button secondary"
+                    disabled={Boolean(controlBusy) || cloudTestBusy}
+                    onClick={() => void testCloudAI()}
+                  >
+                    {cloudTestBusy ? t("working") : t("cloudAITest")}
+                  </button>
+                )}
               </div>
             )}
             {module.manifest.id === "ai.agent" && (
