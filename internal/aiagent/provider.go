@@ -16,8 +16,9 @@ const (
 )
 
 type Message struct {
-	Role    MessageRole `json:"role"`
-	Content string      `json:"content"`
+	Role      MessageRole `json:"role"`
+	Content   string      `json:"content"`
+	ToolCalls []ToolCall  `json:"tool_calls,omitempty"`
 }
 
 type ToolCall struct {
