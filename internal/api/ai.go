@@ -350,6 +350,8 @@ func (s *server) writeAIChatError(w http.ResponseWriter, r *http.Request, err er
 		writeAPIError(w, r, http.StatusNotFound, "ai_conversation_not_found", "AI conversation not found", nil)
 	case errors.Is(err, state.ErrAIConversationClosed):
 		writeAPIError(w, r, http.StatusConflict, "ai_conversation_closed", "AI conversation is closed", nil)
+	case errors.Is(err, state.ErrAIConversationNotClosed):
+		writeAPIError(w, r, http.StatusConflict, "ai_conversation_not_closed", "AI conversation must be finished before deletion", nil)
 	case errors.Is(err, aiagent.ErrChatUnavailable):
 		writeAPIError(w, r, http.StatusServiceUnavailable, "ai_chat_unavailable", "AI chat is not configured or unavailable", nil)
 	case errors.Is(err, aiagent.ErrInvalidChatMessage):
