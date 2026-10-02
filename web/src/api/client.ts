@@ -28,6 +28,8 @@ import type {
   AIConversation,
   AIMessage,
   AIAction,
+  NVRStatus,
+  NVRCamera,
 } from "./types";
 
 type APIErrorBody = {
@@ -137,6 +139,16 @@ async function postJSON<T>(path: string, body?: unknown, csrf = false): Promise<
 
 export const api = {
   setupStatus: () => request<SetupStatus>("/api/v1/security/setup-status"),
+
+  nvrStatus: async () => {
+    const result = await request<{nvr: NVRStatus}>("/api/v1/nvr/status");
+    return result.nvr;
+  },
+
+  nvrCameras: async () => {
+    const result = await request<{cameras: NVRCamera[]}>("/api/v1/nvr/cameras");
+    return result.cameras;
+  },
 
   aiStatus: async () => {
     const result = await request<{ai: AIStatus}>("/api/v1/ai/status");

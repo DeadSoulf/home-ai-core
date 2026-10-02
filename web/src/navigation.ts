@@ -44,7 +44,11 @@ function dynamicModuleItems(modules?: ModuleNavigationState[]): NavigationItem[]
     .filter((module) => module.status === "enabled")
     .flatMap((module) => (module.items || []).map((item) => ({
       path: item.route,
-      label: module.module_id === "ai.cloud" ? ("cloudAI" as StringKey) : undefined,
+      label: module.module_id === "ai.cloud"
+        ? ("cloudAI" as StringKey)
+        : module.module_id === "nvr"
+          ? ("cameras" as StringKey)
+          : undefined,
       title: item.title,
       permission: "security.self.read",
       moduleId: module.module_id,

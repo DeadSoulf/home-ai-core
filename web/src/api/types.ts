@@ -489,3 +489,27 @@ export type SMBStatus = {
   hard_quota_error?: string;
 };
 
+
+
+export type NVRStatus = {
+  module_id: string;
+  state: "registered" | "enabled" | "disabled" | "error";
+  version: string;
+  camera_count: number;
+  media_runtime_ready: boolean;
+  secret_store_ready: boolean;
+  foundation_stage: string;
+};
+
+export type NVRCamera = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  source_type: "rtsp" | "onvif";
+  transport: "tcp" | "udp";
+  recording_mode: "off" | "continuous" | "motion";
+  audio_enabled: boolean;
+  has_credentials: boolean;
+  created_at: string;
+  updated_at: string;
+};

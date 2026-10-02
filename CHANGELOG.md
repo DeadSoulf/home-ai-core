@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.134-dev
+
+- Start the Home-AI Cameras / NVR implementation with the **NVR-0 contracts and persistence** slice.
+- Add first-party `nvr` module `0.1.0`, disabled by default, with module-aware **Cameras / Камеры** navigation at `/modules/nvr` while enabled.
+- Add schema migration 22 with NVR camera, stream-profile, archive storage-target, recording-segment and review-event metadata tables.
+- Add `camera.list/live/archive/export/ptz/manage` and `nvr.storage.manage/settings.manage` permissions; owner receives the complete catalog.
+- Expose persisted cameras as exact `resource_type=camera` objects in the unified household access catalog.
+- Keep global NVR storage/settings permissions administrator-only while camera operations support exact per-camera grants.
+- Add server-side camera `SecretRef` and credential-store contracts without persisting real camera passwords yet.
+- Add camera and stream-profile state helpers with strict source/transport/recording-mode and secret-reference validation.
+- Add safe read-only NVR status and camera-list APIs; source addresses and credential references are not returned.
+- Filter camera lists by global camera visibility or exact scoped camera permissions.
+- Add the initial Cameras Web page showing NVR-0 state and safe camera summaries.
+- Keep FFmpeg/RTSP/ONVIF media runtime intentionally out of NVR-0; it starts in NVR-1.
+- Add migration, permission, privacy, scoped-access, module-navigation and Web client regression coverage.
 ## 0.1.133-dev
 
 - Remove the standalone Cloud AI section from the Home-AI main menu. Cloud AI is managed only from **Modules** and selected inside **AI Agent**.

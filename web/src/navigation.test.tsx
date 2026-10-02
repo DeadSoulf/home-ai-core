@@ -76,6 +76,25 @@ describe("navigation access", () => {
     expect(accessiblePath(reader, "/modules/ai.cloud", modules)).toBe("/");
   });
 
+  it("shows Cameras only while the NVR module is enabled", () => {
+    const reader = actor(allReads);
+    const enabled = [
+      {
+        module_id: "nvr",
+        status: "enabled" as const,
+        items: [{id: "cameras", title: "Cameras", route: "/modules/nvr", order: 20}],
+      },
+    ];
+    const paths = visibleNavigation(reader, enabled).flatMap((group) => group.items.map((item) => item.path));
+    expect(paths).toContain("/modules/nvr");
+    expect(accessiblePath(reader, "/modules/nvr", enabled)).toBe("/modules/nvr");
+
+    const disabled = [{module_id: "nvr", status: "disabled" as const, items: []}];
+    expect(visibleNavigation(reader, disabled).flatMap((group) => group.items.map((item) => item.path)))
+      .not.toContain("/modules/nvr");
+    expect(accessiblePath(reader, "/modules/nvr", disabled)).toBe("/");
+  });
+
   it("does not infer access from owner role or a similar permission name", () => {
     const restrictedOwner = actor(["system.read.extra", "updates.manage"]);
     expect(hasPermission(restrictedOwner, "system.read")).toBe(false);

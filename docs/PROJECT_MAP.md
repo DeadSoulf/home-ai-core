@@ -8,8 +8,8 @@
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.133-dev` — Cloud AI diagnostics + menu cleanup\
-**Текущий срез:** `0.1.133-dev` опубликован; этап разработки **AI Agent** зафиксирован и временно завершён. Локальный Ollama, controlled tools, persistent chat, Cloud AI и диагностика провайдеров реализованы.\
-**Следующий engineering milestone:** начать **NVR-0 — Contracts and persistence** по [NVR_ARCHITECTURE.md](NVR_ARCHITECTURE.md): модуль `nvr`, permissions, camera/archive/event schema, secret-reference contract и API types.\
+**Текущий срез:** `0.1.134-dev` staged: **NVR-0 — Contracts and persistence** реализован и прошёл функциональный CI; release publication pending.\
+**Следующий engineering milestone:** **NVR-1 — Camera onboarding and live**: protected credential store, RTSP probe/test, manual camera CRUD, ONVIF discovery/import, runtime supervisor, main/sub streams, live/grid и reconnect/health.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
 
@@ -40,6 +40,22 @@
 - ✅ Релизы `0.1.115-dev` → `0.1.133-dev` прошли соответствующие Web/Go/Core/Debian/Windows CI и публикацию release artifacts.
 - ⏸ AI Agent считается функционально достаточным для текущего этапа; дальнейшее расширение tools, streaming и provider UI отложено до отдельного цикла.
 
+### Выпуск 0.1.134-dev — NVR-0 contracts and persistence
+
+- ✅ Создан first-party модуль `nvr` версии `0.1.0`, выключенный по умолчанию.
+- ✅ При включённом модуле в общем меню появляется **Камеры**, canonical route — `/modules/nvr` по Module SDK.
+- ✅ Schema migration 22 добавляет `nvr_cameras`, `nvr_stream_profiles`, `nvr_storage_targets`, `nvr_recording_segments`, `nvr_review_events`.
+- ✅ Добавлены permissions `camera.list/live/archive/export/ptz/manage` и `nvr.storage.manage/settings.manage`.
+- ✅ Камеры подключены к unified household access как exact `resource_type=camera` resources.
+- ✅ Global NVR storage/settings права оставлены administrator-only; camera permissions можно выдавать на конкретную камеру.
+- ✅ Добавлен `SecretRef` / `CameraCredentialStore` contract; реальные camera passwords пока намеренно не сохраняются.
+- ✅ Public NVR API не возвращает camera source/address и `credential_ref`, только безопасную summary и `has_credentials`.
+- ✅ Camera list фильтруется по global/scoped permissions пользователя.
+- ✅ Схема допускает только один активный archive target и заранее содержит `protected` flag для будущего ring-retention.
+- ✅ Создана foundation-страница **Камеры**; `media_runtime_ready=false` и `secret_store_ready=false` честно показывают границу NVR-0.
+- ✅ FFmpeg, RTSP ingest и запись в этом срезе не запускаются.
+- ✅ Web/Go/NVR/security/state/API tests, Go vet, Core/integration, Linux cross-build, Debian installer и Windows client прошли функциональный CI перед release bump.
+- ⏭ Следующий срез: **NVR-1 — protected secrets + RTSP/ONVIF onboarding + live runtime**.
 ### Выпуск 0.1.133-dev — Cloud AI diagnostics + menu cleanup
 
 - ✅ Отдельный пункт **Cloud AI / Облачный ИИ** удалён из главного меню.
@@ -1146,7 +1162,7 @@ Home Assistant не является основой.
 
 Ключевые решения:
 
-- first-party module ID `nvr`, Web route `/cameras`;
+- first-party module ID `nvr`, Web route `/modules/nvr`;
 - Core остаётся control plane: identity, permissions, metadata, jobs/events/audit;
 - RTSP/live/recording идут отдельным media data plane и не проходят через SQLite/WebSocket event history;
 - camera является resource-scoped объектом Core;

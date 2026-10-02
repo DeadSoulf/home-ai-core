@@ -180,6 +180,26 @@ func (s *Service) AccessCatalog(ctx context.Context) (AccessCatalog, error) {
 		})
 	}
 
+	cameras, err := s.store.ListNVRCameras(ctx)
+	if err != nil {
+		return AccessCatalog{}, err
+	}
+	for _, camera := range cameras {
+		resources = append(resources, ResourceDefinition{
+			Type:        "camera",
+			ID:          camera.ID,
+			Name:        camera.Name,
+			Description: camera.SourceType,
+			Permissions: []string{
+				"camera.live",
+				"camera.archive",
+				"camera.export",
+				"camera.ptz",
+				"camera.manage",
+			},
+		})
+	}
+
 	return AccessCatalog{
 		Profiles:    profiles,
 		Permissions: permissions,
@@ -480,7 +500,7 @@ func actorIsAdministrator(actor Actor) bool {
 
 func administratorOnlyPermission(permission string) bool {
 	switch permission {
-	case "security.users.manage", "security.roles.manage", "modules.manage":
+	case "security.users.manage", "security.roles.manage", "modules.manage", "nvr.storage.manage", "nvr.settings.manage":
 		return true
 	default:
 		return false
