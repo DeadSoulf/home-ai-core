@@ -137,6 +137,45 @@ func TestModuleRegistrationPreservesStatus(t *testing.T) {
 	}
 }
 
+func TestModuleStatusPersistsAcrossRegistration(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	if err := store.UpsertModule(ctx, ModuleRecord{
+		ID:           "ai.agent",
+		Version:      "0.2.0",
+		Status:       "registered",
+		ManifestJSON: `{"id":"ai.agent","version":"0.2.0"}`,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetModuleStatus(ctx, "ai.agent", "disabled", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpsertModule(ctx, ModuleRecord{
+		ID:           "ai.agent",
+		Version:      "0.3.0",
+		Status:       "registered",
+		ManifestJSON: `{"id":"ai.agent","version":"0.3.0"}`,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	record, err := store.Module(ctx, "ai.agent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if record.Status != "disabled" {
+		t.Fatalf("status = %q, want disabled", record.Status)
+	}
+	if record.Version != "0.3.0" {
+		t.Fatalf("version = %q, want 0.3.0", record.Version)
+	}
+}
+
 func TestDiskNamesPersist(t *testing.T) {
 	ctx := context.Background()
 	store, err := Open(ctx, t.TempDir())
