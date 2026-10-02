@@ -4,7 +4,7 @@ import type {
   AuthResponse,
   Job,
   RealtimeEvent,
-  RegisteredModule,
+  RegisteredModule, ModuleNavigationState,
   SetupStatus,
   SystemResponse,
   UpdateStatus,
@@ -216,10 +216,14 @@ export const api = {
     return result.messages;
   },
 
-  sendAIMessage: async (conversationId: string, content: string) => {
+  sendAIMessage: async (
+    conversationId: string,
+    content: string,
+    providerMode: "local" | "cloud" | "auto" = "local",
+  ) => {
     return postJSON<{user_message: AIMessage; assistant_message: AIMessage}>(
       `/api/v1/ai/conversations/${encodeURIComponent(conversationId)}/messages`,
-      {content},
+      {content, provider_mode: providerMode},
       true,
     );
   },
@@ -748,6 +752,11 @@ export const api = {
 
   modules: async () => {
     const result = await request<{modules: RegisteredModule[]}>("/api/v1/modules");
+    return result.modules;
+  },
+
+  moduleNavigation: async () => {
+    const result = await request<{modules: ModuleNavigationState[]}>("/api/v1/modules/navigation");
     return result.modules;
   },
 
