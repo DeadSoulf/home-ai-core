@@ -36,9 +36,9 @@ const (
 )
 
 var (
-	ErrAgentDisabled      = errors.New("AI agent is disabled")
-	ErrChatUnavailable    = errors.New("AI chat is unavailable")
-	ErrInvalidChatMessage = errors.New("invalid AI chat message")
+	ErrAgentDisabled       = errors.New("AI agent is disabled")
+	ErrChatUnavailable     = errors.New("AI chat is unavailable")
+	ErrInvalidChatMessage  = errors.New("invalid AI chat message")
 	ErrInvalidProviderMode = errors.New("invalid AI provider mode")
 )
 
@@ -100,12 +100,12 @@ type Service struct {
 }
 
 type Status struct {
-	ModuleID               string `json:"module_id"`
-	State                  string `json:"state"`
-	Version                string `json:"version"`
-	ToolCount              int    `json:"tool_count"`
-	ProviderConfigured     bool   `json:"provider_configured"`
-	ProviderID             string `json:"provider_id,omitempty"`
+	ModuleID                string   `json:"module_id"`
+	State                   string   `json:"state"`
+	Version                 string   `json:"version"`
+	ToolCount               int      `json:"tool_count"`
+	ProviderConfigured      bool     `json:"provider_configured"`
+	ProviderID              string   `json:"provider_id,omitempty"`
 	ProviderModel           string   `json:"provider_model,omitempty"`
 	ProviderModes           []string `json:"provider_modes,omitempty"`
 	CloudProviderConfigured bool     `json:"cloud_provider_configured"`
@@ -698,7 +698,7 @@ func (s *Service) generateAgentResponse(
 				request.Messages = append(request.Messages, Message{
 					Role:       RoleTool,
 					ToolCallID: call.ID,
-					Content: toolContextError(call.ToolID, "tool is unavailable or not permitted"),
+					Content:    toolContextError(call.ToolID, "tool is unavailable or not permitted"),
 				})
 				continue
 			}
@@ -710,7 +710,7 @@ func (s *Service) generateAgentResponse(
 				request.Messages = append(request.Messages, Message{
 					Role:       RoleTool,
 					ToolCallID: call.ID,
-					Content: toolContextError(call.ToolID, "tool arguments are invalid or too large"),
+					Content:    toolContextError(call.ToolID, "tool arguments are invalid or too large"),
 				})
 				continue
 			}
@@ -723,7 +723,7 @@ func (s *Service) generateAgentResponse(
 				request.Messages = append(request.Messages, Message{
 					Role:       RoleTool,
 					ToolCallID: call.ID,
-					Content: toolContextResult(call.ToolID, result, runErr),
+					Content:    toolContextResult(call.ToolID, result, runErr),
 				})
 				autoCalls++
 				continue
@@ -733,7 +733,7 @@ func (s *Service) generateAgentResponse(
 				request.Messages = append(request.Messages, Message{
 					Role:       RoleTool,
 					ToolCallID: call.ID,
-					Content: toolContextError(call.ToolID, "only one state-changing server action can be proposed per turn"),
+					Content:    toolContextError(call.ToolID, "only one state-changing server action can be proposed per turn"),
 				})
 				continue
 			}
