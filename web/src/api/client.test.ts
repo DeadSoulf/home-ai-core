@@ -85,6 +85,43 @@ describe("API client", () => {
     vi.unstubAllGlobals();
   });
 
+  it("closes an AI conversation with same-origin CSRF protection", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({
+        conversation: {
+          id: "aic-close",
+          user_id: "usr-1",
+          title: "Close me",
+          created_at: "2026-10-02T08:00:00Z",
+          updated_at: "2026-10-02T08:05:00Z",
+          closed_at: "2026-10-02T08:05:00Z",
+        },
+      }), {
+        status: 200,
+        headers: {"Content-Type": "application/json"},
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    });
+
+    setCSRFToken("csrf-ai-close");
+    const closed = await api.closeAIConversation("aic-close");
+
+    expect(closed.closed_at).toBeTruthy();
+    const [input, init] = fetchMock.mock.calls[0];
+    expect(String(input)).toBe("/api/v1/ai/conversations/aic-close/close");
+    expect(init?.method).toBe("POST");
+    expect(init?.credentials).toBe("same-origin");
+    expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-ai-close");
+
+    vi.unstubAllGlobals();
+  });
+
   it("creates a household user with CSRF protection", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({

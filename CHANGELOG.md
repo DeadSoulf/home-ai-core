@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.126-dev
+
+- Harden the Web **Finish chat / Завершить чат** flow after the live `Failed to fetch` report.
+- Register an explicit method-aware `POST /api/v1/ai/conversations/{conversationID}/close` route while preserving the existing authenticated/CSRF-protected close implementation.
+- When a close request loses the connection, reload authoritative conversation state before displaying an error; if Core already committed `closed_at`, accept the close instead of reporting a false network failure.
+- Replace raw browser `Failed to fetch` text with the localized generic request error when the server state cannot be reconciled.
+- Add Web API regression coverage for the exact close path, POST method, same-origin credentials and CSRF header.
+- Preserve AI public web access, server-tool approval boundaries and the 0.1.125 chat persistence fix.
 ## 0.1.125-dev
 
 - Fix AI chat history accumulating duplicate/orphan user messages when model generation fails, times out, is cancelled, or the AI runtime is restarted.
