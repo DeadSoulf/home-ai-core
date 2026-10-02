@@ -7,10 +7,10 @@ import (
 )
 
 type routerTestProvider struct {
-	id       string
-	content  string
-	err      error
-	calls    int
+	id      string
+	content string
+	err     error
+	calls   int
 }
 
 func (p *routerTestProvider) ID() string { return p.id }
