@@ -48,9 +48,6 @@ func New(
 				aiService.SetEnabled(false)
 			case "registered":
 				_ = moduleService.SetStatus(context.Background(), "ai.agent", "enabled", "")
-			case "restarting":
-				aiService.Restart()
-				_ = moduleService.SetStatus(context.Background(), "ai.agent", "enabled", "")
 			}
 		}
 	}

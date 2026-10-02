@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.121-dev
+
+- Fix AI Agent **Restart** failing with `failed to persist module state` on real installations.
+- Root cause: `0.1.120-dev` attempted to persist a transient `restarting` status, while the existing SQLite `modules.status` constraint only permits `registered / enabled / disabled / error`.
+- Keep restart as a runtime-only transition and persist only the durable `enabled` state.
+- Remove `restarting` from the Module Registry persistent-status contract and Web status type.
+- Remove startup recovery for an impossible persisted `restarting` state.
+- Add a regression test that drives the restart API through the real SQLite-backed Module Registry so schema/status mismatches cannot be hidden by fakes.
+- Add registry coverage that explicitly rejects attempts to persist `restarting`.
+
 ## 0.1.120-dev
 
 - Add runtime management for the first-party **AI Agent** directly from **Modules**.

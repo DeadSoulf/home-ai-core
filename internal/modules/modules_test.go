@@ -144,6 +144,9 @@ func TestRegistrySetStatusPersistsDisabledState(t *testing.T) {
 	if item.Status != "disabled" {
 		t.Fatalf("status = %q, want disabled", item.Status)
 	}
+	if err := registry.SetStatus(ctx, "ai.agent", "restarting", ""); err == nil {
+		t.Fatal("transient restarting status was accepted for persistence")
+	}
 
 	capabilities, err := registry.Capabilities(ctx)
 	if err != nil {
