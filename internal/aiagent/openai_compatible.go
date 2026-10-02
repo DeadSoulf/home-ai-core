@@ -92,7 +92,6 @@ func (p *OpenAICompatibleProvider) Model() string {
 	return p.model
 }
 
-
 func cloudProviderErrorKind(status int) string {
 	switch status {
 	case http.StatusUnauthorized, http.StatusForbidden:
