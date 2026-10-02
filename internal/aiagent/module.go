@@ -19,7 +19,7 @@ func (Module) Manifest() modules.Manifest {
 		ID:            "ai.agent",
 		Name:          "AI Agent",
 		Description:   "First-party Home-AI agent orchestration foundation",
-		Version:       "0.7.1",
+		Version:       "0.8.0",
 		Core:          ">=0.1.0 <1.0.0",
 		Permissions:   []string{"jobs.read", "modules.read", "network.manage", "network.read", "storage.manage", "storage.read", "system.read"},
 		Capabilities: modules.Capabilities{
