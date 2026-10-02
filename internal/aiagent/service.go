@@ -28,6 +28,10 @@ const (
 	maxChatResponseRunes   = 32000
 	maxChatContextMessages = 24
 	maxChatContextRunes    = 32000
+	maxAgentToolRounds     = 4
+	maxAgentAutoToolCalls  = 6
+	maxToolContextBytes    = 64 << 10
+	maxActionResultBytes   = 64 << 10
 )
 
 var (
@@ -48,6 +52,14 @@ type ConversationStore interface {
 	CloseAIConversation(context.Context, string, string, time.Time) (state.AIConversationRecord, error)
 	AppendAIMessage(context.Context, string, string, string, string, string, time.Time) (state.AIMessageRecord, error)
 	ListAIMessages(context.Context, string, string, int) ([]state.AIMessageRecord, error)
+}
+
+type ActionStore interface {
+	CreateAIToolAction(context.Context, string, string, string, string, string, string, json.RawMessage, time.Time) (state.AIToolActionRecord, error)
+	ListAIToolActions(context.Context, string, string, int) ([]state.AIToolActionRecord, error)
+	ClaimAIToolAction(context.Context, string, string, string, time.Time) (state.AIToolActionRecord, error)
+	RejectAIToolAction(context.Context, string, string, string, time.Time) (state.AIToolActionRecord, error)
+	FinishAIToolAction(context.Context, string, string, string, string, json.RawMessage, string, time.Time) (state.AIToolActionRecord, error)
 }
 
 type JobReader interface {
@@ -71,6 +83,7 @@ type Service struct {
 	modules       ModuleReader
 	audit         AuditRecorder
 	conversations ConversationStore
+	actions       ActionStore
 	provider      Provider
 	toolTimeout   time.Duration
 	chatTimeout   time.Duration
@@ -102,6 +115,7 @@ func NewService(
 	providers ...Provider,
 ) *Service {
 	conversations, _ := stateReader.(ConversationStore)
+	actions, _ := stateReader.(ActionStore)
 	var provider Provider
 	if len(providers) > 0 {
 		provider = providers[0]
@@ -109,7 +123,7 @@ func NewService(
 	runtimeCtx, runtimeCancel := context.WithCancel(context.Background())
 	s := &Service{
 		nodeID: nodeID, registry: NewToolRegistry(), state: stateReader, jobs: jobReader, modules: moduleReader,
-		audit: auditRecorder, conversations: conversations, provider: provider,
+		audit: auditRecorder, conversations: conversations, actions: actions, provider: provider,
 		toolTimeout: defaultToolTimeout, chatTimeout: defaultChatTimeout,
 		enabled: true, runtimeCtx: runtimeCtx, runtimeCancel: runtimeCancel,
 	}
