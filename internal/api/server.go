@@ -40,6 +40,20 @@ func New(
 	realtimeHub *realtime.Hub,
 	aiProviders ...aiagent.Provider,
 ) http.Handler {
+	aiService := aiagent.NewService(nodeID, state, jobService, moduleService, securityService, aiProviders...)
+	if moduleService != nil {
+		if item, err := moduleService.Get(context.Background(), "ai.agent"); err == nil {
+			switch item.Status {
+			case "disabled", "error":
+				aiService.SetEnabled(false)
+			case "registered":
+				_ = moduleService.SetStatus(context.Background(), "ai.agent", "enabled", "")
+			case "restarting":
+				aiService.Restart()
+				_ = moduleService.SetStatus(context.Background(), "ai.agent", "enabled", "")
+			}
+		}
+	}
 	s := &server{
 		nodeID:              nodeID,
 		logger:              logger,
@@ -48,7 +62,7 @@ func New(
 		jobs:                jobService,
 		eventHistoryService: eventHistoryService,
 		modules:             moduleService,
-		ai:                  aiagent.NewService(nodeID, state, jobService, moduleService, securityService, aiProviders...),
+		ai:                  aiService,
 		updater:             updaterService,
 		realtime:            realtimeHub,
 		mux:                 http.NewServeMux(),
@@ -89,6 +103,7 @@ func New(
 	s.mux.HandleFunc("/api/v1/jobs/", s.requireAuth("jobs.read", s.jobResource))
 	s.mux.HandleFunc("/api/v1/modules", s.requireAuth("modules.read", s.modulesCollection))
 	s.mux.HandleFunc("/api/v1/modules/capabilities", s.requireAuth("modules.read", s.moduleCapabilities))
+	s.mux.HandleFunc("POST /api/v1/modules/{moduleID}/control", s.requireAuth("modules.manage", s.moduleControl))
 	s.mux.HandleFunc("/api/v1/modules/", s.requireAuth("modules.read", s.moduleResource))
 	s.mux.HandleFunc("/api/v1/ai/status", s.requireAuth("", s.aiStatus))
 	s.mux.HandleFunc("/api/v1/ai/tools", s.requireAuth("", s.aiTools))

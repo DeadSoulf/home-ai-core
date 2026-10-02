@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.120-dev
+
+- Add runtime management for the first-party **AI Agent** directly from **Modules**.
+- Add **Enable / Disable / Restart** controls for `ai.agent` in the Web Modules page.
+- Add the `modules.manage` permission; only administrator-profile users may receive it and the owner role receives it through migration 019.
+- Persist module runtime state in SQLite so an intentionally disabled AI Agent remains disabled after Home-AI-Core restarts.
+- Normalize a newly registered AI Agent to `enabled`; interrupted `restarting` state is recovered to `enabled` during Core startup.
+- Disabling the agent removes its provided capabilities, blocks chat/tools, and cancels active AI provider/tool requests without stopping Home-AI-Core or other modules.
+- Restarting the agent cancels active AI requests and creates a fresh AI runtime context without restarting the Core process.
+- Add `POST /api/v1/modules/{moduleID}/control` with `enable / disable / restart` operations, CSRF protection, `modules.manage` authorization and fail-closed unsupported-module handling.
+- Audit successful module control operations as `module.runtime.control` and publish `module.runtime.changed` realtime events.
+- Add explicit `ai_agent_disabled` API errors while keeping `/api/v1/ai/status` available to report the disabled state.
+- Add state/registry/service/API regression coverage for persistent disable, capability removal, runtime cancellation/restart and permission denial.
+
 ## 0.1.119-dev
 
 - Add the first persistent **local AI conversation** layer on top of the published AI read-tool/API foundation.

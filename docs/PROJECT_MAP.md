@@ -8,10 +8,25 @@
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.119-dev` — **AI Local Conversation v1**: persistent per-user chat, optional local Ollama provider и Web AI Agent\
-**Текущий срез:** `0.1.119-dev` опубликован; AI Local Conversation v1 готов к live-проверке с локальной моделью на HOME AI сервере\
-**Следующий engineering milestone:** live acceptance `0.1.119-dev` с локальной моделью, затем **streaming + controlled model tool-loop** поверх существующих permission/approval boundaries. Параллельно требуется повторная live acceptance Windows UI `0.1.118-dev`; stable signing-key provisioning и long-duration updater tests остаются release/operations gates\
-**Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent развивается как first-party module: contracts `0.1.115`, read tools/API `0.1.117`, persistent local conversation `0.1.119` опубликован. Windows rendering fix `0.1.118-dev` сохранён; automatic AI tool-loop пока намеренно выключен.\
+**Текущий срез:** `0.1.120-dev` — управление **AI Agent** из раздела Модули: enable / disable / restart, persistent state, runtime cancellation, permission + audit\
+**Следующий engineering milestone:** завершить `0.1.120-dev` и live-проверить управление AI Agent из Модулей; затем подключить локальную модель и перейти к **streaming + controlled model tool-loop**. Windows UI acceptance и release-hardening gates продолжаются параллельно\
+**Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent развивается как first-party module: contracts `0.1.115`, read tools/API `0.1.117`, local conversation `0.1.119`, runtime module control `0.1.120`. Automatic AI tool-loop пока намеренно выключен.\
 **Обновлено:** 2026-10-01
+
+### Кандидат 0.1.120-dev — AI Agent module runtime control
+
+- ✅ В карточке **AI Agent** раздела **Модули** добавлены **Включить / Выключить / Перезапустить**.
+- ✅ Добавлено отдельное право `modules.manage`; read-only `modules.read` не позволяет управлять runtime.
+- ✅ Migration 019 выдаёт `modules.manage` administrator/owner profile и сохраняет совместимость существующих установок.
+- ✅ Статус модуля хранится в SQLite; `disabled` переживает reboot/restart Core.
+- ✅ Первый `registered` AI Agent нормализуется в `enabled`; незавершённый `restarting` восстанавливается при старте.
+- ✅ Disable отменяет активные AI requests, скрывает AI capabilities и блокирует chat/tools, не останавливая Home-AI-Core.
+- ✅ Restart отменяет активные AI requests и пересоздаёт только runtime AI Agent.
+- ✅ API: `POST /api/v1/modules/{moduleID}/control` + CSRF + `modules.manage`.
+- ✅ Audit: `module.runtime.control`; realtime: `module.runtime.changed`.
+- ✅ Disabled AI возвращает explicit `ai_agent_disabled`.
+- ✅ Tests покрывают persistence, capability removal, disable/enable/restart/cancellation и permission denial.
+- 🧪 Требуется PR/main CI, release workflow и live acceptance на сервере.
 
 ### Выпуск 0.1.119-dev — AI Local Conversation v1
 
@@ -1182,6 +1197,7 @@ AI не может расширять собственные права.
 | `0.1.117-dev` | ✅ AI read tools + API | опубликовано: system/jobs/modules read tools + permission filtering + timeout + audit + authenticated API; PR/main CI и release зелёные |
 | `0.1.118-dev` | 🧪 Windows owner-draw visual fix | опубликовано: rounded child regions, parent-surface corner erase, clean primary border/focus, left-aligned nav, unclipped HOME AI; automated CI/release зелёные, live acceptance pending |
 | `0.1.119-dev` | 🧪 AI Local Conversation v1 | опубликовано: persistent per-user chat + optional Ollama provider + Web AI page + audit redaction; automated CI/release зелёные, live local-model acceptance pending |
+| `0.1.120-dev` | 🚧 AI Agent runtime control | Modules enable/disable/restart + persistent status + modules.manage + audit/runtime cancellation; CI/release pending |
 
 ## 10. Правило ведения карты
 

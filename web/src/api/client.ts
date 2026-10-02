@@ -623,6 +623,15 @@ export const api = {
     return result.capabilities;
   },
 
+  controlModule: async (id: string, operation: "enable" | "disable" | "restart") => {
+    const result = await postJSON<{module: RegisteredModule}>(
+      `/api/v1/modules/${encodeURIComponent(id)}/control`,
+      {operation},
+      true,
+    );
+    return result.module;
+  },
+
   jobs: async () => {
     const result = await request<{jobs: Job[]}>("/api/v1/jobs?limit=100");
     return result.jobs;
