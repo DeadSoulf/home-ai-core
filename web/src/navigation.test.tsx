@@ -82,17 +82,17 @@ describe("navigation access", () => {
       {
         module_id: "nvr",
         status: "enabled" as const,
-        items: [{id: "cameras", title: "Cameras", route: "/cameras", order: 20}],
+        items: [{id: "cameras", title: "Cameras", route: "/modules/nvr", order: 20}],
       },
     ];
     const paths = visibleNavigation(reader, enabled).flatMap((group) => group.items.map((item) => item.path));
-    expect(paths).toContain("/cameras");
-    expect(accessiblePath(reader, "/cameras", enabled)).toBe("/cameras");
+    expect(paths).toContain("/modules/nvr");
+    expect(accessiblePath(reader, "/modules/nvr", enabled)).toBe("/modules/nvr");
 
     const disabled = [{module_id: "nvr", status: "disabled" as const, items: []}];
     expect(visibleNavigation(reader, disabled).flatMap((group) => group.items.map((item) => item.path)))
-      .not.toContain("/cameras");
-    expect(accessiblePath(reader, "/cameras", disabled)).toBe("/");
+      .not.toContain("/modules/nvr");
+    expect(accessiblePath(reader, "/modules/nvr", disabled)).toBe("/");
   });
 
   it("does not infer access from owner role or a similar permission name", () => {
