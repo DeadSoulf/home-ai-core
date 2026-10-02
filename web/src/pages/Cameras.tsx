@@ -674,7 +674,7 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
               )}
             </form>
           )}
-          {onvifDevices.length > 0 && !onvifDevice && (
+          {!onvifDevice && (
             <div className="nvr-form-actions">
               <button type="button" className="button secondary" onClick={() => void discoverONVIF()}>
                 {t("refresh")}
