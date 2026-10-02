@@ -208,7 +208,7 @@ describe("API client", () => {
     });
 
     setCSRFToken("csrf-ai-json");
-    const result = await api.sendAIMessage("aic-json", "hello");
+    const result = await api.sendAIMessage("aic-json", "hello", "cloud");
 
     expect(result.assistant_message.content).toBe("reply");
     const [input, init] = fetchMock.mock.calls[0];
@@ -216,6 +216,34 @@ describe("API client", () => {
     expect(init?.method).toBe("POST");
     expect(init?.credentials).toBe("same-origin");
     expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-ai-json");
+    expect(String(init?.body)).toContain('"provider_mode":"cloud"');
+
+    vi.unstubAllGlobals();
+  });
+
+  it("loads authenticated module navigation state", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({
+        modules: [
+          {module_id: "ai.agent", status: "enabled"},
+          {
+            module_id: "ai.cloud",
+            status: "enabled",
+            items: [{id: "cloud", title: "Cloud AI", route: "/modules/ai.cloud", order: 25}],
+          },
+        ],
+      }), {
+        status: 200,
+        headers: {"Content-Type": "application/json"},
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const modules = await api.moduleNavigation();
+
+    expect(modules).toHaveLength(2);
+    expect(modules[1].items?.[0].route).toBe("/modules/ai.cloud");
+    expect(String(fetchMock.mock.calls[0][0])).toBe("/api/v1/modules/navigation");
 
     vi.unstubAllGlobals();
   });
