@@ -286,10 +286,19 @@ func (p *OpenAICompatibleProvider) Generate(ctx context.Context, request ModelRe
 		} `json:"choices"`
 	}
 	if err := json.Unmarshal(raw, &decoded); err != nil {
-		return ModelResponse{}, fmt.Errorf("decode cloud AI response: %w", err)
+		return ModelResponse{}, &ProviderRequestError{
+			Provider: "cloud",
+			Kind:     "invalid_response",
+			Message:  "Cloud AI returned an incompatible response. Check that the endpoint supports OpenAI Chat Completions",
+			Err:      err,
+		}
 	}
 	if len(decoded.Choices) == 0 {
-		return ModelResponse{}, errors.New("cloud AI returned no choices")
+		return ModelResponse{}, &ProviderRequestError{
+			Provider: "cloud",
+			Kind:     "invalid_response",
+			Message:  "Cloud AI returned no choices. Check model and OpenAI Chat Completions compatibility",
+		}
 	}
 	message := decoded.Choices[0].Message
 	calls := make([]ToolCall, 0, len(message.ToolCalls))
@@ -318,7 +327,11 @@ func (p *OpenAICompatibleProvider) Generate(ctx context.Context, request ModelRe
 
 	content := strings.TrimSpace(message.Content)
 	if content == "" && len(calls) == 0 {
-		return ModelResponse{}, errors.New("cloud AI returned an empty response")
+		return ModelResponse{}, &ProviderRequestError{
+			Provider: "cloud",
+			Kind:     "invalid_response",
+			Message:  "Cloud AI returned an empty response",
+		}
 	}
 	out := Message{Role: RoleAssistant, Content: content, ToolCalls: calls}
 	return ModelResponse{Message: out, ToolCalls: calls}, nil
