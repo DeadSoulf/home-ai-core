@@ -9,7 +9,6 @@ import { AccountPage } from "./pages/Account";
 import { AIPage } from "./pages/AI";
 import { AuditPage } from "./pages/Audit";
 import { Dashboard } from "./pages/Dashboard";
-import { CloudAIPage } from "./pages/CloudAI";
 import { FilesPage } from "./pages/Files";
 import { JobsPage } from "./pages/Jobs";
 import { ModulesPage } from "./pages/Modules";
@@ -252,9 +251,6 @@ export default function App() {
       page = has("modules.read")
         ? <ModulesPage revision={revision} canManage={has("modules.manage")} />
         : accountPage;
-      break;
-    case "/modules/ai.cloud":
-      page = <CloudAIPage onOpenAgent={() => navigate("/ai")} />;
       break;
     case "/jobs":
       page = has("jobs.read") ? <JobsPage revision={revision} canManage={has("jobs.cancel")} /> : accountPage;
