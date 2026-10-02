@@ -236,12 +236,19 @@ func (s *Service) Status() Status {
 		}
 		if router, ok := s.provider.(*RoutingProvider); ok {
 			status.ProviderModes = router.AvailableModes()
+			status.ProviderConfigured = len(status.ProviderModes) > 0
 			status.CloudProviderConfigured = router.CloudConfigured()
 			status.CloudProviderEnabled = router.CloudEnabled()
 			status.CloudProviderModel = router.CloudModel()
 			if router.LocalConfigured() {
 				status.ProviderID = "ollama"
 				status.ProviderModel = router.LocalModel()
+			} else if router.CloudEnabled() {
+				status.ProviderID = "cloud.openai-compatible"
+				status.ProviderModel = router.CloudModel()
+			} else {
+				status.ProviderID = ""
+				status.ProviderModel = ""
 			}
 		} else {
 			status.ProviderModes = []string{ProviderModeLocal}
