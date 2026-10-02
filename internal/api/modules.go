@@ -166,7 +166,7 @@ func (s *server) moduleControl(
 		writeAPIError(w, r, http.StatusInternalServerError, "modules_unavailable", "module registry is unavailable", nil)
 		return
 	}
-	if id != "ai.agent" && id != "ai.cloud" {
+	if id != "ai.agent" && id != "ai.cloud" && id != "nvr" {
 		writeAPIError(w, r, http.StatusConflict, "module_control_unsupported", "runtime control is not supported for this module", nil)
 		return
 	}
@@ -299,6 +299,22 @@ func (s *server) moduleControl(
 				return
 			}
 			if err := s.modules.SetStatus(r.Context(), id, "enabled", ""); err != nil {
+				writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
+				return
+			}
+		default:
+			writeAPIError(w, r, http.StatusBadRequest, "invalid_module_operation", "operation must be enable, disable or restart", nil)
+			return
+		}
+	case "nvr":
+		switch request.Operation {
+		case "enable", "restart":
+			if err := s.modules.SetStatus(r.Context(), id, "enabled", ""); err != nil {
+				writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
+				return
+			}
+		case "disable":
+			if err := s.modules.SetStatus(r.Context(), id, "disabled", ""); err != nil {
 				writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
 				return
 			}
