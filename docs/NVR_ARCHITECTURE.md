@@ -1,6 +1,6 @@
 # Home-AI Cameras / NVR Architecture
 
-**Status:** NVR-0 + NVR-1 onboarding/live foundation implemented through `0.1.139-dev`; ONVIF live acceptance pending; NVR-2 recording/storage next  
+**Status:** NVR-0 + NVR-1 onboarding/live foundation published through `0.1.139-dev`; ONVIF live acceptance pending; NVR-2 recording/storage next  
 **Baseline:** Home-AI-Core 0.1.139-dev  
 **Date:** 2026-10-02
 
