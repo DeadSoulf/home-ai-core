@@ -81,7 +81,6 @@ func (s *server) moduleResource(
 	writeJSON(w, http.StatusOK, map[string]any{"module": item})
 }
 
-
 func (s *server) moduleControl(
 	w http.ResponseWriter,
 	r *http.Request,
