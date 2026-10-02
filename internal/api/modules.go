@@ -139,16 +139,13 @@ func (s *server) moduleControl(
 		}
 		s.ai.SetEnabled(false)
 	case "restart":
-		if err := s.modules.SetStatus(r.Context(), id, "restarting", ""); err != nil {
+		// Restart is a transient runtime operation. Persist only schema-supported
+		// durable states so existing installations do not violate modules.status CHECK.
+		if err := s.modules.SetStatus(r.Context(), id, "enabled", ""); err != nil {
 			writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
 			return
 		}
 		s.ai.Restart()
-		if err := s.modules.SetStatus(r.Context(), id, "enabled", ""); err != nil {
-			_ = s.modules.SetStatus(context.WithoutCancel(r.Context()), id, "error", "failed to persist enabled state after restart")
-			writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "agent restarted but module state could not be persisted", nil)
-			return
-		}
 	default:
 		writeAPIError(w, r, http.StatusBadRequest, "invalid_module_operation", "operation must be enable, disable or restart", nil)
 		return
