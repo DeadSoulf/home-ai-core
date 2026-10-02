@@ -684,8 +684,9 @@ func buildChatContext(history []state.AIMessageRecord) []Message {
 	messages := []Message{{
 		Role: RoleSystem,
 		Content: "You are the local Home-AI assistant. Answer clearly and conservatively. " +
-			"This chat slice does not automatically execute Home-AI tools or system actions. " +
-			"Never claim an action was executed unless a tool result is explicitly present in the conversation.",
+			"Use available Home-AI tools when they are needed to inspect the system or prepare configuration changes. " +
+			"Read-only tools may run automatically; tools marked change or sensitive require user approval in Home-AI before they run. " +
+			"Describe completed changes only when a tool result confirms completion.",
 	}}
 	for i := len(selected) - 1; i >= 0; i-- {
 		role := RoleUser
