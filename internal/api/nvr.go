@@ -360,12 +360,86 @@ func (s *server) nvrCameraExistingTest(
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "probe": probe})
 }
 
+func (s *server) nvrCameraLiveMJPEG(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	_ authSource,
+) {
+	if !s.nvrEnabled(w, r) {
+		return
+	}
+	cameraID := strings.TrimSpace(r.PathValue("cameraID"))
+	if !actor.Allows(nvrpkg.PermissionCameraLive, "camera", cameraID) {
+		writeAPIError(w, r, http.StatusForbidden, "permission_denied", "camera live permission required", nil)
+		return
+	}
+
+	subscription, err := s.nvr.SubscribeLive(r.Context(), cameraID)
+	if err != nil {
+		s.writeNVRError(w, r, err)
+		return
+	}
+	defer subscription.Close()
+
+	firstCtx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	firstFrame, err := subscription.Next(firstCtx)
+	cancel()
+	if err != nil {
+		s.writeNVRError(w, r, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no")
+	controller := http.NewResponseController(w)
+	_ = controller.SetWriteDeadline(time.Time{})
+
+	writeFrame := func(frame []byte) error {
+		if _, err := fmt.Fprintf(
+			w,
+			"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n",
+			len(frame),
+		); err != nil {
+			return err
+		}
+		if _, err := w.Write(frame); err != nil {
+			return err
+		}
+		if _, err := w.Write([]byte("\r\n")); err != nil {
+			return err
+		}
+		return controller.Flush()
+	}
+
+	if err := writeFrame(firstFrame); err != nil {
+		return
+	}
+	for {
+		frameCtx, frameCancel := context.WithTimeout(r.Context(), 20*time.Second)
+		frame, err := subscription.Next(frameCtx)
+		frameCancel()
+		if err != nil {
+			return
+		}
+		if err := writeFrame(frame); err != nil {
+			return
+		}
+	}
+}
+
 func (s *server) writeNVRError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, state.ErrNVRCameraNotFound):
 		writeAPIError(w, r, http.StatusNotFound, "camera_not_found", "camera not found", nil)
 	case errors.Is(err, nvrpkg.ErrMediaRuntimeUnavailable):
 		writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_media_runtime_unavailable", "ffprobe is not available on this Home-AI node", nil)
+	case errors.Is(err, nvrpkg.ErrLiveUnavailable):
+		writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_live_unavailable", "camera live stream is unavailable", nil)
+	case errors.Is(err, nvrpkg.ErrCameraDisabled):
+		writeAPIError(w, r, http.StatusConflict, "camera_disabled", "camera is disabled", nil)
 	case errors.Is(err, nvrpkg.ErrSecretStoreUnavailable):
 		writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_secret_store_unavailable", "camera credential store is unavailable", nil)
 	case errors.Is(err, nvrpkg.ErrRTSPAuthentication):
