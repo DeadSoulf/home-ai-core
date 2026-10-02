@@ -224,6 +224,86 @@ export const api = {
     );
   },
 
+  streamAIMessage: async (
+    conversationId: string,
+    content: string,
+    onDelta: (content: string) => void,
+  ) => {
+    const headers = new Headers({
+      "Content-Type": "application/json",
+      "Accept": "application/x-ndjson",
+    });
+    const token = getCSRFToken();
+    if (token) headers.set("X-CSRF-Token", token);
+
+    const response = await fetch(
+      `/api/v1/ai/conversations/${encodeURIComponent(conversationId)}/messages/stream`,
+      {
+        method: "POST",
+        headers,
+        credentials: "same-origin",
+        cache: "no-store",
+        body: JSON.stringify({content}),
+      },
+    );
+    if (!response.ok) {
+      let body: unknown = {};
+      const contentType = response.headers.get("Content-Type") || "";
+      if (contentType.includes("application/json")) {
+        body = await response.json();
+      }
+      throw new APIError(response.status, body as APIErrorBody);
+    }
+    if (!response.body) {
+      throw new Error("AI response stream is unavailable");
+    }
+
+    type StreamEvent =
+      | {type: "delta"; content: string}
+      | {type: "done"; user_message: AIMessage; assistant_message: AIMessage}
+      | {type: "error"; code?: string; message?: string};
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let result: {user_message: AIMessage; assistant_message: AIMessage} | undefined;
+
+    const consume = (line: string) => {
+      if (!line.trim()) return;
+      const event = JSON.parse(line) as StreamEvent;
+      if (event.type === "delta") {
+        if (event.content) onDelta(event.content);
+        return;
+      }
+      if (event.type === "done") {
+        result = {
+          user_message: event.user_message,
+          assistant_message: event.assistant_message,
+        };
+        return;
+      }
+      if (event.type === "error") {
+        throw new Error(event.message || event.code || "AI response stream failed");
+      }
+    };
+
+    for (;;) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, {stream: true});
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) consume(line);
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) consume(buffer);
+
+    if (!result) {
+      throw new Error("AI response stream ended before completion");
+    }
+    return result;
+  },
+
 
   bootstrap: async (input: {
     bootstrapToken: string;
