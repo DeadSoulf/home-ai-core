@@ -18,9 +18,12 @@ type Config struct {
 	ListenAddress string
 	StateDir      string
 	WebDir        string
-	AIProvider    string
-	AIEndpoint    string
-	AIModel       string
+	AIProvider       string
+	AIEndpoint       string
+	AIModel          string
+	CloudAIEndpoint  string
+	CloudAIModel     string
+	CloudAIAPIKey    string
 }
 
 func Load(args []string) (Config, error) {
@@ -28,9 +31,12 @@ func Load(args []string) (Config, error) {
 		ListenAddress: envOrDefault("HOME_AI_LISTEN", defaultListen),
 		StateDir:      envOrDefault("HOME_AI_STATE_DIR", defaultStateDir),
 		WebDir:        envOrDefault("HOME_AI_WEB_DIR", defaultWebDir),
-		AIProvider:    strings.ToLower(strings.TrimSpace(os.Getenv("HOME_AI_AI_PROVIDER"))),
-		AIEndpoint:    strings.TrimSpace(os.Getenv("HOME_AI_AI_ENDPOINT")),
-		AIModel:       strings.TrimSpace(os.Getenv("HOME_AI_AI_MODEL")),
+		AIProvider:      strings.ToLower(strings.TrimSpace(os.Getenv("HOME_AI_AI_PROVIDER"))),
+		AIEndpoint:      strings.TrimSpace(os.Getenv("HOME_AI_AI_ENDPOINT")),
+		AIModel:         strings.TrimSpace(os.Getenv("HOME_AI_AI_MODEL")),
+		CloudAIEndpoint: strings.TrimSpace(os.Getenv("HOME_AI_CLOUD_AI_ENDPOINT")),
+		CloudAIModel:    strings.TrimSpace(os.Getenv("HOME_AI_CLOUD_AI_MODEL")),
+		CloudAIAPIKey:   strings.TrimSpace(os.Getenv("HOME_AI_CLOUD_AI_API_KEY")),
 	}
 
 	fs := flag.NewFlagSet("home-ai-core", flag.ContinueOnError)
@@ -60,6 +66,9 @@ func Load(args []string) (Config, error) {
 	cfg.AIProvider = strings.ToLower(strings.TrimSpace(cfg.AIProvider))
 	cfg.AIEndpoint = strings.TrimSpace(cfg.AIEndpoint)
 	cfg.AIModel = strings.TrimSpace(cfg.AIModel)
+	cfg.CloudAIEndpoint = strings.TrimSpace(cfg.CloudAIEndpoint)
+	cfg.CloudAIModel = strings.TrimSpace(cfg.CloudAIModel)
+	cfg.CloudAIAPIKey = strings.TrimSpace(cfg.CloudAIAPIKey)
 	switch cfg.AIProvider {
 	case "":
 		if cfg.AIModel != "" || cfg.AIEndpoint != "" {
@@ -71,6 +80,12 @@ func Load(args []string) (Config, error) {
 		}
 	default:
 		return Config{}, fmt.Errorf("unsupported AI provider %q", cfg.AIProvider)
+	}
+
+	if cfg.CloudAIEndpoint != "" || cfg.CloudAIModel != "" || cfg.CloudAIAPIKey != "" {
+		if cfg.CloudAIEndpoint == "" || cfg.CloudAIModel == "" || cfg.CloudAIAPIKey == "" {
+			return Config{}, fmt.Errorf("cloud AI endpoint, model and API key must be configured together")
+		}
 	}
 
 	return cfg, nil
