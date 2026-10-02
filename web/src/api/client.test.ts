@@ -177,6 +177,60 @@ describe("API client", () => {
 
     vi.unstubAllGlobals();
   });
+  it("streams AI message deltas and returns the persisted turn", async () => {
+    const body = [
+      JSON.stringify({type: "delta", content: "Fast "}),
+      JSON.stringify({type: "delta", content: "reply"}),
+      JSON.stringify({
+        type: "done",
+        user_message: {
+          id: "aim-user",
+          conversation_id: "aic-stream",
+          role: "user",
+          content: "hello",
+          created_at: "2026-10-02T10:00:00Z",
+        },
+        assistant_message: {
+          id: "aim-assistant",
+          conversation_id: "aic-stream",
+          role: "assistant",
+          content: "Fast reply",
+          created_at: "2026-10-02T10:00:01Z",
+        },
+      }),
+      "",
+    ].join("\n");
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(body, {
+        status: 200,
+        headers: {"Content-Type": "application/x-ndjson"},
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    });
+
+    setCSRFToken("csrf-ai-stream");
+    let streamed = "";
+    const result = await api.streamAIMessage("aic-stream", "hello", (delta) => {
+      streamed += delta;
+    });
+
+    expect(streamed).toBe("Fast reply");
+    expect(result.assistant_message.content).toBe("Fast reply");
+    const [input, init] = fetchMock.mock.calls[0];
+    expect(String(input)).toBe("/api/v1/ai/conversations/aic-stream/messages/stream");
+    expect(init?.method).toBe("POST");
+    expect(init?.credentials).toBe("same-origin");
+    expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-ai-stream");
+
+    vi.unstubAllGlobals();
+  });
+
   it("creates a household user with CSRF protection", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({
