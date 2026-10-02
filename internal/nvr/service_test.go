@@ -46,9 +46,10 @@ func (s *fakeCredentialStore) DeleteCameraCredential(_ context.Context, ref Secr
 }
 
 type fakeProber struct {
-	result ProbeResult
-	last   ProbeRequest
-	calls  int
+	result  ProbeResult
+	results map[string]ProbeResult
+	last    ProbeRequest
+	calls   int
 }
 
 func (p *fakeProber) Available() bool { return true }
@@ -56,6 +57,9 @@ func (p *fakeProber) Available() bool { return true }
 func (p *fakeProber) Probe(_ context.Context, request ProbeRequest) (ProbeResult, error) {
 	p.calls++
 	p.last = request
+	if result, ok := p.results[request.Address]; ok {
+		return result, nil
+	}
 	return p.result, nil
 }
 
@@ -148,6 +152,90 @@ func TestCameraOnboardingPersistsOnlySecretReferenceAndKeepsCredentialOnEdit(t *
 	}
 	if _, err := store.NVRCamera(ctx, camera.ID); err != state.ErrNVRCameraNotFound {
 		t.Fatalf("camera still present after delete: %v", err)
+	}
+}
+
+func TestCameraOnboardingPersistsAndClearsSubstream(t *testing.T) {
+	ctx := context.Background()
+	store, err := state.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	prober := &fakeProber{
+		result: ProbeResult{Codec: "h264", Width: 1920, Height: 1080, FPS: 25},
+		results: map[string]ProbeResult{
+			"rtsp://192.0.2.20/main": {
+				Codec: "h264", Width: 1920, Height: 1080, FPS: 25, BitrateBPS: 4_000_000,
+			},
+			"rtsp://192.0.2.20/sub": {
+				Codec: "h264", Width: 640, Height: 360, FPS: 10, BitrateBPS: 500_000,
+			},
+		},
+	}
+	service := NewServiceWithDependencies(store, newFakeCredentialStore(), prober)
+
+	camera, probe, err := service.CreateCamera(ctx, "", CameraInput{
+		Name:             "Garage",
+		Address:          "rtsp://192.0.2.20/main",
+		SubstreamAddress: "rtsp://192.0.2.20/sub",
+		Transport:        "tcp",
+		RecordingMode:    "off",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if probe.Substream == nil || probe.Substream.Width != 640 || probe.Substream.Height != 360 {
+		t.Fatalf("substream probe = %#v", probe.Substream)
+	}
+	if camera.SubstreamAddress != "rtsp://192.0.2.20/sub" {
+		t.Fatalf("camera substream = %q", camera.SubstreamAddress)
+	}
+
+	profiles, err := store.ListNVRStreamProfiles(ctx, camera.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(profiles) != 2 || profiles[0].Role != "main" || profiles[1].Role != "sub" {
+		t.Fatalf("profiles = %#v", profiles)
+	}
+	if profiles[1].SourceURI != "rtsp://192.0.2.20/sub" || profiles[1].Width != 640 {
+		t.Fatalf("sub profile = %#v", profiles[1])
+	}
+
+	updated, probe, err := service.UpdateCamera(ctx, camera.ID, CameraInput{
+		Name:          "Garage",
+		Address:       "rtsp://192.0.2.20/main",
+		Transport:     "tcp",
+		RecordingMode: "off",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.SubstreamAddress != "rtsp://192.0.2.20/sub" || probe.Substream == nil {
+		t.Fatalf("blank update did not preserve substream: camera=%#v probe=%#v", updated, probe)
+	}
+
+	updated, probe, err = service.UpdateCamera(ctx, camera.ID, CameraInput{
+		Name:           "Garage",
+		Address:        "rtsp://192.0.2.20/main",
+		Transport:      "tcp",
+		RecordingMode:  "off",
+		ClearSubstream: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.SubstreamAddress != "" || probe.Substream != nil {
+		t.Fatalf("substream was not cleared: camera=%#v probe=%#v", updated, probe)
+	}
+	profiles, err = store.ListNVRStreamProfiles(ctx, camera.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(profiles) != 1 || profiles[0].Role != "main" {
+		t.Fatalf("profiles after clear = %#v", profiles)
 	}
 }
 
