@@ -160,6 +160,9 @@ export const api = {
     return result.camera;
   },
 
+  nvrLiveURL: (cameraId: string) =>
+    `/api/v1/nvr/cameras/${encodeURIComponent(cameraId)}/live.mjpeg`,
+
   testNVRCamera: async (input: NVRCameraInput) => {
     const result = await postJSON<{ok: boolean; probe: NVRProbe}>(
       "/api/v1/nvr/cameras/test",
