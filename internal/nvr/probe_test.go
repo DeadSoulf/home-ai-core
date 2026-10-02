@@ -52,7 +52,6 @@ func TestFFProbeUnavailableFailsClosed(t *testing.T) {
 	}
 }
 
-
 func TestFFProbeDoesNotExposeCredentialsInProcessArguments(t *testing.T) {
 	dir := t.TempDir()
 	script := filepath.Join(dir, "ffprobe")
