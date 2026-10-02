@@ -1146,7 +1146,7 @@ Home Assistant не является основой.
 
 Ключевые решения:
 
-- first-party module ID `nvr`, Web route `/cameras`;
+- first-party module ID `nvr`, Web route `/modules/nvr`;
 - Core остаётся control plane: identity, permissions, metadata, jobs/events/audit;
 - RTSP/live/recording идут отдельным media data plane и не проходят через SQLite/WebSocket event history;
 - camera является resource-scoped объектом Core;
