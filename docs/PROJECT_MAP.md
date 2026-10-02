@@ -7,8 +7,8 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.135-dev` — NVR-1 secure RTSP camera onboarding\
-**Текущий срез:** `0.1.136-dev` staged: persistent camera supervisor, automatic reconnect/health и permission-scoped runtime events готовы к публикации.\
+**Последний опубликованный релиз:** `0.1.136-dev` — NVR camera supervisor + reconnect health\
+**Текущий срез:** `0.1.136-dev` опубликован; persistent camera supervisor, automatic reconnect/health и permission-scoped runtime events готовы к live-проверке.\
 **Следующий engineering milestone:** продолжить **NVR-1 live runtime**: shared local restream, single live view и multi-camera grid; затем ONVIF/main-sub discovery.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
@@ -55,7 +55,9 @@
 - ✅ `/nvr/status` не раскрывает количество чужих online/offline камер: counters строятся только по visible cameras.
 - ✅ Web **Камеры** показывает состояние supervisor, online/offline, last seen, reconnect attempts и безопасную причину offline.
 - ✅ Добавлены regression tests supervisor lifecycle/reconnect, disabled camera и scoped NVR events.
-- ✅ PR #135 functional CI прошёл Web/Go/Core/integration/Linux/Windows/Debian до release bump.
+- ✅ PR #135 и main прошли Web/Go/Core/integration/Linux/Windows/Debian CI.
+- ✅ Release workflow опубликовал `v0.1.136-dev` с update bundles amd64/arm64, Debian `.deb` amd64/arm64, Windows client и SHA-256.
+- 🧪 Требуется live-проверка online/offline/reconnect на реальной RTSP-камере.
 - ⏭ Следующий срез: shared local live restream → single live view → multi-camera grid.
 ### Выпуск 0.1.135-dev — NVR-1 secure RTSP camera onboarding
 
