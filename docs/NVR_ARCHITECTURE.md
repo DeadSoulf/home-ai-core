@@ -1,7 +1,7 @@
 # Home-AI Cameras / NVR Architecture
 
-**Status:** accepted foundation for implementation  
-**Baseline:** Home-AI-Core 0.1.133-dev  
+**Status:** NVR-0 implemented; NVR-1 next  
+**Baseline:** Home-AI-Core 0.1.134-dev  
 **Date:** 2026-10-02
 
 ## 1. Goal
@@ -666,14 +666,17 @@ These are planned on top of the stable recording/archive foundation.
 
 ## 25. Implementation slices
 
-### NVR-0 — Contracts and persistence
+### NVR-0 — Contracts and persistence ✅
 
-- module manifest/runtime;
-- permissions;
-- camera/archive/event schema;
-- API types;
-- secret-reference contract;
-- tests.
+Implemented in `0.1.134-dev`:
+
+- first-party `nvr` manifest/runtime control;
+- camera/NVR permission catalog and exact camera access resources;
+- migration 22 for camera, stream, storage-target, segment and review-event metadata;
+- safe NVR status/camera-list API types;
+- secret-reference / credential-store contract without plaintext credential persistence;
+- Cameras foundation Web page and module-aware navigation;
+- privacy, scoped-access, schema and navigation regression tests.
 
 ### NVR-1 — Camera onboarding and live
 
