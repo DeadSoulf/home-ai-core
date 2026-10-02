@@ -114,10 +114,12 @@ func main() {
 		cloudProvider = provider
 	}
 
-	nvrService, err := nvr.NewService(cfg.StateDir, store)
-	if err != nil {
-		logger.Error("failed to initialize NVR onboarding runtime", "error", err)
-		os.Exit(1)
+	var nvrService *nvr.Service
+	if service, serviceErr := nvr.NewService(cfg.StateDir, store); serviceErr != nil {
+		logger.Error("failed to initialize NVR onboarding runtime", "error", serviceErr)
+		_ = moduleRegistry.SetStatus(startupCtx, nvr.ModuleID, "error", "NVR credential store is unavailable")
+	} else {
+		nvrService = service
 	}
 
 	var aiProvider aiagent.Provider
