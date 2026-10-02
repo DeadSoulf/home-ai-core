@@ -1,6 +1,6 @@
 # AI Agent Foundation
 
-**Status:** controlled server tools/public web published; streaming + local inference performance staged in `0.1.129-dev`; live provider acceptance pending  
+**Status:** controlled server tools/public web + streaming/local inference performance published through `0.1.129-dev`; live provider acceptance pending  
 **Started:** 2026-10-01  
 **First implementation slice:** `0.1.115-dev` published
 
@@ -217,6 +217,7 @@ Published in `v0.1.119-dev` after successful Core/Web, Windows, Debian and relea
 - ✅ local Ollama defaults are tuned for interactive use: `keep_alive=30m`, `think:false`, `num_ctx=16384`.
 - ✅ Core HTTP write timeout is longer than the AI chat deadline, preventing transport timeout from racing valid generation.
 - ✅ non-streaming provider contract remains supported as a fallback.
+- ✅ published in `v0.1.129-dev` after successful PR/main Core/Web, Windows, Debian and release workflows.
 - 🧪 live acceptance required on the installed GPU node.
 ### Next slice — Broader controlled server tools
 
