@@ -195,21 +195,70 @@ func (s *server) moduleControl(
 	case "ai.cloud":
 		switch request.Operation {
 		case "enable":
-			agent, agentErr := s.modules.Get(r.Context(), "ai.agent")
-			if agentErr != nil || agent.Status != "enabled" {
-				writeAPIError(w, r, http.StatusConflict, "ai_agent_required", "AI Agent must be enabled before Cloud AI", nil)
-				return
-			}
 			if !s.ai.CloudProviderConfigured() {
 				writeAPIError(w, r, http.StatusConflict, "cloud_ai_not_configured", "Cloud AI provider is not configured", nil)
 				return
 			}
+
+			agent, agentErr := s.modules.Get(r.Context(), "ai.agent")
+			if agentErr != nil {
+				writeAPIError(w, r, http.StatusInternalServerError, "modules_unavailable", "AI Agent module state is unavailable", nil)
+				return
+			}
+			if agent.Status == "error" {
+				writeAPIError(w, r, http.StatusConflict, "ai_agent_error", "AI Agent is in an error state", nil)
+				return
+			}
+			agentAutoEnabled := agent.Status != "enabled"
+			if agentAutoEnabled {
+				if err := s.modules.SetStatus(r.Context(), "ai.agent", "enabled", ""); err != nil {
+					writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to enable AI Agent dependency", nil)
+					return
+				}
+				s.ai.SetEnabled(true)
+				if s.realtime != nil {
+					s.realtime.Publish(
+						"module.runtime.changed",
+						map[string]any{
+							"module_id": "ai.agent",
+							"operation": "enable",
+							"status":    "enabled",
+							"reason":    "dependency_enabled",
+						},
+						requestIDFromContext(r.Context()),
+					)
+				}
+				s.security.RecordAudit(
+					context.WithoutCancel(r.Context()),
+					s.securityRequestContext(r),
+					actor,
+					"module.runtime.control",
+					"module",
+					"ai.agent",
+					"success",
+					map[string]any{
+						"operation":       "enable",
+						"previous_status": agent.Status,
+						"status":          "enabled",
+						"reason":          "cloud_ai_dependency",
+					},
+				)
+			}
+
 			if err := s.ai.SetCloudProviderEnabled(true); err != nil {
+				if agentAutoEnabled {
+					_ = s.modules.SetStatus(r.Context(), "ai.agent", agent.Status, "")
+					s.ai.SetEnabled(false)
+				}
 				writeAPIError(w, r, http.StatusServiceUnavailable, "cloud_ai_unavailable", "Cloud AI provider is unavailable", nil)
 				return
 			}
 			if err := s.modules.SetStatus(r.Context(), id, "enabled", ""); err != nil {
 				_ = s.ai.SetCloudProviderEnabled(false)
+				if agentAutoEnabled {
+					_ = s.modules.SetStatus(r.Context(), "ai.agent", agent.Status, "")
+					s.ai.SetEnabled(false)
+				}
 				writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
 				return
 			}
