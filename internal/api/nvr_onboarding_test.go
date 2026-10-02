@@ -222,9 +222,10 @@ func TestNVRONVIFDiscoveryProfilesAndImportAPI(t *testing.T) {
 	}
 	defer store.Close()
 
+	sec := defaultFakeSecurity()
 	if _, err := store.CreateOwner(
 		ctx,
-		"usr-onvif",
+		sec.actor.ID,
 		"owner",
 		"Owner",
 		"test-password-hash",
@@ -241,7 +242,6 @@ func TestNVRONVIFDiscoveryProfilesAndImportAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sec := defaultFakeSecurity()
 	sec.actor.Permissions = append(sec.actor.Permissions, nvr.PermissionCameraManage, nvr.PermissionCameraList)
 	service := nvr.NewServiceWithONVIFDependencies(
 		store,
