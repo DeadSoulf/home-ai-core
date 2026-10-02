@@ -7,13 +7,13 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.117-dev` — первый вызываемый AI Agent read-tool/API слой: system/jobs/modules tools, permission filtering, timeout и Audit\
-**Текущий срез:** `0.1.118-dev` — **AI Local Conversation v1**: optional local Ollama provider, persistent per-user conversations/messages, bounded context, audit metadata и Web AI chat\
-**Следующий engineering milestone:** завершить `0.1.118-dev` через CI/release, затем добавить **streaming + controlled model tool-loop** поверх существующих permission/approval boundaries. Compact Windows UI `0.1.116-dev` live acceptance идёт параллельно; stable signing-key provisioning и long-duration updater tests остаются release/operations gates\
-**Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent развивается как first-party module: contracts `0.1.115`, read tools/API `0.1.117`, persistent local conversation `0.1.118`. Автоматический tool-loop пока намеренно выключен; Windows compact UI acceptance остаётся параллельной проверкой.\
+**Последний опубликованный релиз:** `0.1.118-dev` — Windows owner-draw visual fix после live screenshot: rounded button regions, clean borders/focus и исправленный sidebar\
+**Текущий срез:** `0.1.119-dev` — **AI Local Conversation v1**: optional local Ollama provider, persistent per-user conversations/messages, bounded context, audit metadata и Web AI chat; Windows fix `0.1.118-dev` уже опубликован\
+**Следующий engineering milestone:** завершить `0.1.119-dev` через CI/release, затем добавить **streaming + controlled model tool-loop** поверх существующих permission/approval boundaries. Параллельно требуется повторная live acceptance Windows UI `0.1.118-dev`; stable signing-key provisioning и long-duration updater tests остаются release/operations gates\
+**Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent развивается как first-party module: contracts `0.1.115`, read tools/API `0.1.117`, local conversation candidate `0.1.119`. Windows rendering fix `0.1.118-dev` опубликован и сохранён; automatic AI tool-loop пока намеренно выключен.\
 **Обновлено:** 2026-10-01
 
-### Кандидат 0.1.118-dev — AI Local Conversation v1
+### Кандидат 0.1.119-dev — AI Local Conversation v1
 
 - ✅ Migration 018 добавляет persistent AI conversations/messages, привязанные к конкретному Home-AI user.
 - ✅ State store проверяет ownership на чтении истории и добавлении сообщений; чужой conversation ID fail-closed.
@@ -26,9 +26,24 @@
 - ✅ Module capability расширен до `ai.chat`.
 - ✅ Automatic model-driven tool execution в этом срезе **не включён**; existing tools остаются под explicit API permission boundary.
 - ✅ Добавлены tests state/provider/service/API isolation.
+- ✅ Сохранён опубликованный Windows visual fix `0.1.118-dev`.
 - 🧪 Требуется PR/main CI и release workflow.
 - ⏭ Следом: streaming response + controlled model tool-loop, где read tools идут через permissions, а change/sensitive — через approval.
 
+### Выпуск 0.1.118-dev — Windows button rendering fix после live screenshot
+
+- ✅ Live screenshot `0.1.116-dev` использован как фактическая visual acceptance-проверка; выявлены белые углы/линии у sidebar owner-draw buttons, двойная рамка primary action и обрезанный `HOME AI` wordmark.
+- ✅ Причина white-corner artifacts: прямоугольное Win32 child-window `BUTTON` оставляло native button-face background вне нашего `RoundRect`.
+- ✅ Все owner-draw buttons получают rounded window region с Figma radius `10 px` и перед рисованием очищают client area цветом реального parent surface.
+- ✅ Overview hero actions получили отдельные hero primary/secondary roles, поэтому углы смешиваются с hero surface, а не с белым card background.
+- ✅ Primary buttons больше не получают лишний light border.
+- ✅ XOR `DrawFocusRect` заменён на стабильный rounded cyan keyboard-focus ring; Overview больше не ставит focus на primary action автоматически при первом показе.
+- ✅ Sidebar selected row использует более близкий к Figma alpha-composited fill/border; nav text теперь left-aligned с Figma inset `30 px`.
+- ✅ `HOME AI` wordmark больше не должен обрезаться: отдельный brand font + расширенный text slot.
+- ✅ Сохранены Tab/Shift+Tab/Ctrl+Tab, arrow navigation, sync/Credential Manager/background agent/tray/updater и AI Agent functionality.
+- ✅ После VERSION/docs bump PR и `main` прошли native Windows tests, Windows cross-build, Debian installer checks и полный `core-ci`.
+- ✅ Release workflow опубликовал `v0.1.118-dev` с Windows `.exe`, Core update bundles amd64/arm64 и Debian `.deb` amd64/arm64 + SHA-256.
+- 🧪 После публикации нужен новый live screenshot на реальном Windows для подтверждения: sidebar corners, selected row, primary/secondary hero buttons, focus state и `HOME AI` wordmark.
 ### Выпуск 0.1.117-dev — AI Agent read tools + API
 
 - ✅ Добавлены реальные read-only tools: `core.system.status`, `core.jobs.list`, `core.modules.list`.
@@ -838,7 +853,7 @@ Check
 9. ✅ ADR-0026 + native Windows tests + полный core-ci;
 10. 🧪 реальная Windows acceptance установки, tray и обновления установленного binary остаётся незавершённой.
 
-Текущий Windows engineering slice: `0.1.116-dev` переносит утверждённый Figma compact layout в native Win32: меньшее окно, тёмный logo-style sidebar, gradient hero и compact cards. Sync/agent/update engine остаётся прежним; live Windows visual/DPI acceptance открыта.
+Текущий Windows engineering slice: `0.1.118-dev` исправляет live-дефекты `0.1.116-dev`: native white corners у owner-draw buttons, лишние/double borders, startup focus, nav alignment и clipped `HOME AI`. Sync/agent/update engine остаётся прежним; repeat live Windows visual/DPI acceptance открыта.
 
 Четырнадцатый вертикальный срез (`0.1.91-dev`) — пользователи, папки и квоты:
 
@@ -1163,7 +1178,8 @@ AI не может расширять собственные права.
 | `0.1.115-dev` | ✅ AI Agent Foundation v1 contracts | опубликовано: first-party `ai.agent`, Tool Registry, provider contract, permission/scope/approval boundaries + tests; API/audit/read tools next |
 | `0.1.116-dev` | 🧪 Compact Figma Windows UI | опубликовано: native window `976×635`, dark logo-style sidebar, gradient hero, compact cards/pages; automated CI/release зелёные, live acceptance pending |
 | `0.1.117-dev` | ✅ AI read tools + API | опубликовано: system/jobs/modules read tools + permission filtering + timeout + audit + authenticated API; PR/main CI и release зелёные |
-| `0.1.118-dev` | 🚧 AI Local Conversation v1 | persistent per-user chat + optional Ollama provider + Web AI page + audit redaction; CI/release pending, streaming/tool-loop next |
+| `0.1.118-dev` | 🧪 Windows owner-draw visual fix | опубликовано: rounded child regions, parent-surface corner erase, clean primary border/focus, left-aligned nav, unclipped HOME AI; automated CI/release зелёные, live acceptance pending |
+| `0.1.119-dev` | 🚧 AI Local Conversation v1 | persistent per-user chat + optional Ollama provider + Web AI page + audit redaction; CI/release pending, streaming/tool-loop next |
 
 ## 10. Правило ведения карты
 
