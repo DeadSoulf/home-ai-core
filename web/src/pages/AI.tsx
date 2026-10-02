@@ -17,6 +17,16 @@ export function AIPage() {
   const [actionBusy, setActionBusy] = useState("");
   const [error, setError] = useState("");
 
+  const actionStatusLabel = (value: AIAction["status"]) => {
+    switch (value) {
+      case "pending": return t("aiActionStatusPending");
+      case "executing": return t("aiActionStatusExecuting");
+      case "executed": return t("aiActionStatusExecuted");
+      case "rejected": return t("aiActionStatusRejected");
+      case "failed": return t("aiActionStatusFailed");
+    }
+  };
+
   const active = useMemo(
     () => conversations.find((item) => item.id === activeID),
     [conversations, activeID],
@@ -296,7 +306,7 @@ export function AIPage() {
                 </div>
                 <pre>{safeActionJSON(action.input)}</pre>
                 <div className="ai-action-footer">
-                  <span>{t("aiActionStatus")}: {t("aiActionStatus_" + action.status)}</span>
+                  <span>{t("aiActionStatus")}: {actionStatusLabel(action.status)}</span>
                   {action.status === "pending" && !active?.closed_at && (
                     <div className="ai-action-buttons">
                       <button
