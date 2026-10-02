@@ -7,8 +7,8 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.129-dev` — AI streaming + local inference performance\
-**Текущий срез:** `0.1.130-dev` staged: Web chat временно возвращён на стабильный JSON transport после live `Failed to fetch`; Ollama performance tuning сохранён; release publication pending\
+**Последний опубликованный релиз:** `0.1.130-dev` — AI chat transport hotfix\
+**Текущий срез:** `0.1.130-dev` опубликован; Web chat использует стабильный JSON transport, Ollama performance tuning сохранён; live acceptance pending\
 **Следующий engineering milestone:** live-проверить `0.1.129-dev` на сервере с `qwen3:4b`/Tesla K80, затем расширить controlled tools на updater/service/NAS/SMB и добавить provider runtime diagnostics.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent: contracts `0.1.115`, read tools/API `0.1.117`, local conversation `0.1.119`, runtime control `0.1.120`, controlled model tool-loop `0.1.123`, public web tools `0.1.124`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
@@ -22,8 +22,9 @@
 - ✅ Сырые browser `TypeError`/`Failed to fetch` нормализуются в обычную ошибку запроса.
 - ✅ Core пишет provider/transport error в журнал с request/correlation ID без текста переписки.
 - ✅ Добавлен regression test стабильного JSON send path + CSRF.
-- ✅ PR #129 прошёл Web/Go/Core/Debian/Windows CI перед release bump.
-- 🧪 После публикации требуется live-проверка обычного чата на `qwen3:4b` + Tesla K80.
+- ✅ PR #129 и main прошли Web/Go/Core/Debian/Windows CI.
+- ✅ Release workflow опубликовал `v0.1.130-dev` с Core amd64/arm64, Windows `.exe`, Debian `.deb` amd64/arm64 и SHA-256.
+- 🧪 Требуется live-проверка обычного чата на `qwen3:4b` + Tesla K80.
 ### Выпуск 0.1.129-dev — AI streaming + local inference performance
 
 - ✅ Ollama `/api/chat` работает в `stream:true`; Core декодирует NDJSON chunks и сохраняет tool-calling.
