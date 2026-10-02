@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.135-dev
+
+- Begin **NVR-1 camera onboarding** with a real RTSP validation path and protected camera credentials.
+- Add an encrypted server-side camera credential store using AES-GCM, a dedicated random 256-bit key and `0600` secret files under the Core state directory.
+- Keep camera passwords and secret references out of SQLite-visible configuration, Web responses, audit metadata and normal logs.
+- Reject RTSP/RTSPS URLs containing embedded `user:password@host` credentials; username/password must be supplied separately.
+- Add bounded `ffprobe` RTSP tests with TCP/UDP selection and safe codec, resolution, FPS, bitrate and audio metadata.
+- Classify RTSP authentication, connectivity, timeout, missing-video and missing-media-runtime failures without returning raw ffprobe stderr.
+- Add camera create, safe detail, update, stored-credential connection test and delete APIs with CSRF and global/scoped `camera.manage` enforcement.
+- Probe a new/updated camera before committing its configuration; keep the previous encrypted credentials when edit credential fields are left blank.
+- Persist the probed main-stream profile while keeping the public camera list free of source addresses and credential references.
+- Add the Cameras Web onboarding UI with **Test connection**, Add/Edit/Delete, TCP/UDP selection, recording-mode preparation and probe details.
+- Report real credential-store and ffprobe readiness from NVR status.
+- Install Debian `ffmpeg` with Home-AI-Core so `ffprobe` is available after a normal package/update installation.
+- Keep NVR startup fail-isolated: credential-store initialization failure marks the NVR module as error instead of stopping Home-AI-Core.
+- Add encrypted-secret, RTSP validation, camera service, state and API privacy/permission regression coverage.
+- Live view/grid, persistent camera supervisor, reconnect health, ONVIF discovery and recording remain in the next NVR-1 slices.
 ## 0.1.134-dev
 
 - Start the Home-AI Cameras / NVR implementation with the **NVR-0 contracts and persistence** slice.
