@@ -40,7 +40,14 @@ func (s *server) nvrStatus(
 
 	onlineCount, offlineCount := 0, 0
 	if s.nvr != nil {
-		onlineCount, offlineCount = s.nvr.RuntimeCounts()
+		for _, camera := range cameras {
+			switch s.nvr.CameraRuntime(camera.ID).State {
+			case nvrpkg.RuntimeOnline:
+				onlineCount++
+			case nvrpkg.RuntimeOffline:
+				offlineCount++
+			}
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"nvr": nvrpkg.Status{
