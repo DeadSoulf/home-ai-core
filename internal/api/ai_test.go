@@ -419,6 +419,53 @@ func TestAIConversationAPIWithLocalProvider(t *testing.T) {
 	}
 }
 
+func TestAIConversationMessageStreamAPI(t *testing.T) {
+	chatState := newAPIChatState()
+	sec := defaultFakeSecurity()
+	provider := aiagent.DeterministicProvider{
+		ProviderID: "test-stream",
+		Response: aiagent.ModelResponse{
+			Message: aiagent.Message{Role: aiagent.RoleAssistant, Content: "Streamed API reply"},
+		},
+	}
+	handler := newAIChatHandler(chatState, sec, provider)
+
+	conv, err := chatState.CreateAIConversation(context.Background(), "aic-stream", sec.actor.ID, "Stream", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/ai/conversations/"+conv.ID+"/messages/stream",
+		strings.NewReader(`{"content":"hello stream"}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("stream status = %d: %s", rec.Code, rec.Body.String())
+	}
+	if contentType := rec.Header().Get("Content-Type"); !strings.Contains(contentType, "application/x-ndjson") {
+		t.Fatalf("stream content type = %q", contentType)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `"type":"delta"`) || !strings.Contains(body, "Streamed API reply") {
+		t.Fatalf("missing stream delta: %s", body)
+	}
+	if !strings.Contains(body, `"type":"done"`) || !strings.Contains(body, `"assistant_message"`) {
+		t.Fatalf("missing stream completion: %s", body)
+	}
+	messages, err := chatState.ListAIMessages(context.Background(), conv.ID, sec.actor.ID, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(messages) != 2 || messages[0].Role != "user" || messages[1].Content != "Streamed API reply" {
+		t.Fatalf("persisted messages = %#v", messages)
+	}
+}
+
 func TestAIConversationCloseAPIKeepsHistoryReadOnly(t *testing.T) {
 	chatState := newAPIChatState()
 	sec := defaultFakeSecurity()
