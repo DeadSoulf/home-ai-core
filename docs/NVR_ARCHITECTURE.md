@@ -1,6 +1,6 @@
 # Home-AI Cameras / NVR Architecture
 
-**Status:** NVR-0 implemented; NVR-1 next  
+**Status:** NVR-0 implemented and published in `0.1.134-dev`; NVR-1 next  
 **Baseline:** Home-AI-Core 0.1.134-dev  
 **Date:** 2026-10-02
 
