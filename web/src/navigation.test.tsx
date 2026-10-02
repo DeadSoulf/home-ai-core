@@ -63,6 +63,30 @@ describe("navigation access", () => {
     }
   });
 
+  it("hides disabled modules and exposes enabled module navigation", () => {
+    const reader = actor(allReads);
+    const modules = [
+      {module_id: "ai.agent", status: "disabled" as const},
+      {
+        module_id: "ai.cloud",
+        status: "enabled" as const,
+        items: [{id: "cloud", title: "Cloud AI", route: "/modules/ai.cloud", order: 25}],
+      },
+    ];
+    const paths = visibleNavigation(reader, modules).flatMap((group) => group.items.map((item) => item.path));
+    expect(paths).not.toContain("/ai");
+    expect(paths).toContain("/modules/ai.cloud");
+    expect(accessiblePath(reader, "/ai", modules)).toBe("/");
+    expect(accessiblePath(reader, "/modules/ai.cloud", modules)).toBe("/modules/ai.cloud");
+
+    const disabledCloud = modules.map((item) =>
+      item.module_id === "ai.cloud" ? {...item, status: "disabled" as const, items: []} : item,
+    );
+    expect(visibleNavigation(reader, disabledCloud).flatMap((group) => group.items.map((item) => item.path)))
+      .not.toContain("/modules/ai.cloud");
+    expect(accessiblePath(reader, "/modules/ai.cloud", disabledCloud)).toBe("/");
+  });
+
   it("does not infer access from owner role or a similar permission name", () => {
     const restrictedOwner = actor(["system.read.extra", "updates.manage"]);
     expect(hasPermission(restrictedOwner, "system.read")).toBe(false);
