@@ -114,6 +114,12 @@ func main() {
 		cloudProvider = provider
 	}
 
+	nvrService, err := nvr.NewService(cfg.StateDir, store)
+	if err != nil {
+		logger.Error("failed to initialize NVR onboarding runtime", "error", err)
+		os.Exit(1)
+	}
+
 	var aiProvider aiagent.Provider
 	if localProvider != nil || cloudProvider != nil {
 		router := aiagent.NewRoutingProvider(localProvider, cloudProvider)
@@ -142,7 +148,7 @@ func main() {
 		}
 	}()
 
-	apiHandler := api.New(
+	apiHandler := api.NewWithNVR(
 		nodeID,
 		logger,
 		store,
@@ -152,6 +158,7 @@ func main() {
 		moduleRegistry,
 		updaterService,
 		realtimeHub,
+		nvrService,
 		aiProvider,
 	)
 	handler := webui.New(apiHandler, cfg.WebDir)
