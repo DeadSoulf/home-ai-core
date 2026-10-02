@@ -1,6 +1,6 @@
 # AI Agent Foundation
 
-**Status:** read-tool/API slice published  
+**Status:** local conversation slice in implementation  
 **Started:** 2026-10-01  
 **First implementation slice:** `0.1.115-dev` published
 
@@ -138,15 +138,29 @@ Published in `v0.1.117-dev` after successful PR/main Core/Web, Windows and Debia
 - ✅ cookie-session POSTs preserve Core CSRF enforcement;
 - ✅ API/service regression tests cover discovery, authorization, execution, audit and payload redaction.
 
-### Next slice — Local conversation
+### 0.1.118-dev — Local conversation v1
 
-- local model-provider adapter;
-- persistent AI sessions;
-- streaming Web chat;
-- context limits and cancellation;
-- health/status UI.
+- ✅ optional local Ollama provider adapter without mandatory provider dependency;
+- ✅ persistent per-user conversations/messages in Core state migration 018;
+- ✅ conversation ownership enforced at the state boundary;
+- ✅ bounded message/context sizes and provider timeout;
+- ✅ AI generation audit metadata without prompt/response text;
+- ✅ authenticated conversation API;
+- ✅ Web AI Agent chat page with provider/model status and RU/EN UI;
+- ✅ chat never auto-executes Home-AI tools in this slice;
+- 🚧 streaming transport remains next;
+- 🚧 model-driven tool-call orchestration remains next.
 
-### Next slice — Approval and controlled actions
+### Next slice — Streaming + controlled tool loop
+
+- streaming local model responses to Web;
+- model tool-call parsing/orchestration;
+- read tools may execute only through current permission checks;
+- change/sensitive tools enter approval workflow instead of executing directly;
+- cancellation and partial-response behavior;
+- provider health/reconnect diagnostics.
+
+### Later slice — Approval and controlled actions
 
 - proposal/approval flow;
 - permission re-check at execution time;
