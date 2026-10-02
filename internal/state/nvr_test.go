@@ -227,3 +227,58 @@ func TestUpdateAndDeleteNVRCamera(t *testing.T) {
 		t.Fatalf("camera after delete error = %v", err)
 	}
 }
+
+
+func TestNVRONVIFSourcePersistsAndCascades(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	camera, err := store.CreateNVRCamera(
+		ctx,
+		"ONVIF Front",
+		"onvif",
+		"rtsp://192.168.1.20/main",
+		"sec_onvif_front",
+		"tcp",
+		"off",
+		"",
+		false,
+		time.Now(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := store.SetNVRONVIFSource(
+		ctx,
+		camera.ID,
+		"http://192.168.1.20/onvif/device_service",
+		"profile-main",
+		"profile-sub",
+		time.Now(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if record.CameraID != camera.ID ||
+		record.MainProfileToken != "profile-main" ||
+		record.SubProfileToken != "profile-sub" {
+		t.Fatalf("ONVIF source = %#v", record)
+	}
+	read, err := store.NVRONVIFSource(ctx, camera.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read.DeviceEndpoint != "http://192.168.1.20/onvif/device_service" {
+		t.Fatalf("ONVIF endpoint = %q", read.DeviceEndpoint)
+	}
+	if err := store.DeleteNVRCamera(ctx, camera.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.NVRONVIFSource(ctx, camera.ID); err == nil {
+		t.Fatal("ONVIF source survived camera cascade delete")
+	}
+}
