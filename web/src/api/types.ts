@@ -513,3 +513,42 @@ export type NVRCamera = {
   created_at: string;
   updated_at: string;
 };
+
+export type NVRStreamProfile = {
+  id: string;
+  camera_id: string;
+  role: "main" | "sub";
+  codec?: string;
+  width?: number;
+  height?: number;
+  fps?: number;
+  bitrate_bps?: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NVRCameraConfig = NVRCamera & {
+  address: string;
+  profiles?: NVRStreamProfile[];
+};
+
+export type NVRProbe = {
+  codec: string;
+  width: number;
+  height: number;
+  fps: number;
+  bitrate_bps: number;
+  has_audio: boolean;
+};
+
+export type NVRCameraInput = {
+  name: string;
+  address: string;
+  username?: string;
+  password?: string;
+  transport?: "tcp" | "udp";
+  recording_mode?: "off" | "continuous" | "motion";
+  audio_enabled: boolean;
+  enabled?: boolean;
+  clear_credentials?: boolean;
+};

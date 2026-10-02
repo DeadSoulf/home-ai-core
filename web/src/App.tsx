@@ -219,7 +219,7 @@ export default function App() {
       page = accountPage;
       break;
     case "/modules/nvr":
-      page = <CamerasPage revision={revision} />;
+      page = <CamerasPage revision={revision} actor={actor} />;
       break;
     case "/files":
     case "/files/storage":

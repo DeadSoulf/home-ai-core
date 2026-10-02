@@ -30,6 +30,9 @@ import type {
   AIAction,
   NVRStatus,
   NVRCamera,
+  NVRCameraConfig,
+  NVRCameraInput,
+  NVRProbe,
 } from "./types";
 
 type APIErrorBody = {
@@ -148,6 +151,56 @@ export const api = {
   nvrCameras: async () => {
     const result = await request<{cameras: NVRCamera[]}>("/api/v1/nvr/cameras");
     return result.cameras;
+  },
+
+  nvrCamera: async (cameraId: string) => {
+    const result = await request<{camera: NVRCameraConfig}>(
+      `/api/v1/nvr/cameras/${encodeURIComponent(cameraId)}`,
+    );
+    return result.camera;
+  },
+
+  testNVRCamera: async (input: NVRCameraInput) => {
+    const result = await postJSON<{ok: boolean; probe: NVRProbe}>(
+      "/api/v1/nvr/cameras/test",
+      input,
+      true,
+    );
+    return result.probe;
+  },
+
+  testExistingNVRCamera: async (cameraId: string) => {
+    const result = await postJSON<{ok: boolean; probe: NVRProbe}>(
+      `/api/v1/nvr/cameras/${encodeURIComponent(cameraId)}/test`,
+      {},
+      true,
+    );
+    return result.probe;
+  },
+
+  createNVRCamera: async (input: NVRCameraInput) => {
+    const result = await postJSON<{camera: NVRCameraConfig; probe: NVRProbe}>(
+      "/api/v1/nvr/cameras",
+      input,
+      true,
+    );
+    return result;
+  },
+
+  updateNVRCamera: async (cameraId: string, input: NVRCameraInput) => {
+    return mutateJSON<{camera: NVRCameraConfig; probe: NVRProbe}>(
+      `/api/v1/nvr/cameras/${encodeURIComponent(cameraId)}`,
+      "PUT",
+      input,
+    );
+  },
+
+  deleteNVRCamera: async (cameraId: string) => {
+    return mutateJSON<{deleted: string}>(
+      `/api/v1/nvr/cameras/${encodeURIComponent(cameraId)}`,
+      "DELETE",
+      undefined,
+    );
   },
 
   aiStatus: async () => {

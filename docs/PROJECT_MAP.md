@@ -8,8 +8,8 @@
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.134-dev` — NVR-0 contracts and persistence\
-**Текущий срез:** `0.1.134-dev` опубликован; **NVR-0 — Contracts and persistence** завершён, NVR foundation доступен как отдельный выключаемый модуль.\
-**Следующий engineering milestone:** **NVR-1 — Camera onboarding and live**: protected credential store, RTSP probe/test, manual camera CRUD, ONVIF discovery/import, runtime supervisor, main/sub streams, live/grid и reconnect/health.\
+**Текущий срез:** `0.1.135-dev` staged: **NVR-1 RTSP onboarding** реализован — encrypted credentials, ffprobe Test connection и manual camera CRUD; release publication pending.\
+**Следующий engineering milestone:** продолжить **NVR-1 media runtime**: persistent camera supervisor, automatic reconnect/health, shared local restream, single live view и multi-camera grid; затем ONVIF/main-sub discovery.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
 
@@ -40,6 +40,23 @@
 - ✅ Релизы `0.1.115-dev` → `0.1.133-dev` прошли соответствующие Web/Go/Core/Debian/Windows CI и публикацию release artifacts.
 - ⏸ AI Agent считается функционально достаточным для текущего этапа; дальнейшее расширение tools, streaming и provider UI отложено до отдельного цикла.
 
+### Выпуск 0.1.135-dev — NVR-1 secure RTSP camera onboarding
+
+- ✅ Реализовано encrypted server-side хранилище camera credentials: AES-GCM, отдельный random 256-bit key, `0600` key/secret files.
+- ✅ SQLite хранит только `credential_ref`; Web/API camera responses не возвращают password или secret reference.
+- ✅ RTSP URL с `user:password@host` отклоняется — credentials вводятся отдельными полями.
+- ✅ Добавлен bounded `ffprobe` Test connection с TCP/UDP и metadata: codec, resolution, FPS, bitrate, audio.
+- ✅ Безопасно различаются authentication, connection, timeout, no-video и missing-ffprobe ошибки без raw stderr.
+- ✅ Добавлены create/detail/update/test/delete camera APIs с CSRF и global/exact-scoped `camera.manage`.
+- ✅ Новая/изменённая camera configuration проходит probe до записи; пустые credential fields при edit сохраняют текущий encrypted secret.
+- ✅ Main stream metadata после probe сохраняется в `nvr_stream_profiles`.
+- ✅ Public camera list по-прежнему не раскрывает source address; address доступен только management detail API.
+- ✅ Web **Камеры** получил Add/Edit/Delete и **Проверить соединение** с отображением codec/resolution/FPS/bitrate/audio.
+- ✅ NVR status показывает реальную готовность protected secret store и `ffprobe`.
+- ✅ Debian package теперь зависит от `ffmpeg`, чтобы `ffprobe` был доступен после обычной установки/обновления.
+- ✅ Ошибка инициализации NVR secret store не валит Core: модуль переходит в `error` независимо от остальных сервисов.
+- ✅ Functional PR CI: Web typecheck/tests/build, Go tests/vet, Core/integration, Linux/Windows cross-build, Debian installer и Windows client.
+- ⏭ Следующий срез NVR-1: persistent camera supervisor + reconnect/health + live restream/single/grid.
 ### Выпуск 0.1.134-dev — NVR-0 contracts and persistence
 
 - ✅ Создан first-party модуль `nvr` версии `0.1.0`, выключенный по умолчанию.

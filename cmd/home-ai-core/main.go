@@ -114,6 +114,14 @@ func main() {
 		cloudProvider = provider
 	}
 
+	var nvrService *nvr.Service
+	if service, serviceErr := nvr.NewService(cfg.StateDir, store); serviceErr != nil {
+		logger.Error("failed to initialize NVR onboarding runtime", "error", serviceErr)
+		_ = moduleRegistry.SetStatus(startupCtx, nvr.ModuleID, "error", "NVR credential store is unavailable")
+	} else {
+		nvrService = service
+	}
+
 	var aiProvider aiagent.Provider
 	if localProvider != nil || cloudProvider != nil {
 		router := aiagent.NewRoutingProvider(localProvider, cloudProvider)
@@ -142,7 +150,7 @@ func main() {
 		}
 	}()
 
-	apiHandler := api.New(
+	apiHandler := api.NewWithNVR(
 		nodeID,
 		logger,
 		store,
@@ -152,6 +160,7 @@ func main() {
 		moduleRegistry,
 		updaterService,
 		realtimeHub,
+		nvrService,
 		aiProvider,
 	)
 	handler := webui.New(apiHandler, cfg.WebDir)
