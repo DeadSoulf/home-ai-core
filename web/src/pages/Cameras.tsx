@@ -329,7 +329,7 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
                     <figcaption>
                       <strong>{camera.name}</strong>
                       <button type="button" className="button secondary compact" onClick={() => toggleLive(camera)}>
-                        {t("close")}
+                        {t("nvrHideLive")}
                       </button>
                     </figcaption>
                   </figure>
