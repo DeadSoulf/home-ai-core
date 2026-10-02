@@ -18,6 +18,7 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/identity"
 	"github.com/DeadSoulf/home-ai-core/internal/jobs"
 	"github.com/DeadSoulf/home-ai-core/internal/modules"
+	"github.com/DeadSoulf/home-ai-core/internal/nvr"
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
@@ -83,6 +84,14 @@ func main() {
 	if err := moduleRegistry.Register(startupCtx, cloudai.NewModule()); err != nil {
 		logger.Error("failed to register Cloud AI module", "error", err)
 		os.Exit(1)
+	}
+
+	if err := moduleRegistry.Register(startupCtx, nvr.NewModule()); err != nil {
+		logger.Error("failed to register Cameras / NVR module", "error", err)
+		os.Exit(1)
+	}
+	if item, err := moduleRegistry.Get(startupCtx, nvr.ModuleID); err == nil && item.Status == "registered" {
+		_ = moduleRegistry.SetStatus(startupCtx, nvr.ModuleID, "disabled", "")
 	}
 
 	var localProvider aiagent.Provider
