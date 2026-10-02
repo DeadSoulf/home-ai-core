@@ -169,7 +169,7 @@ export type RegisteredModule = {
     };
     lifecycle: string[];
   };
-  status: "registered" | "enabled" | "disabled" | "restarting" | "error";
+  status: "registered" | "enabled" | "disabled" | "error";
   error?: string;
 };
 
