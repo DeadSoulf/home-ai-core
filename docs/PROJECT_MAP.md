@@ -7,11 +7,25 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.122-dev` — **Завершить чат** для AI Agent с persistent read-only history\
-**Текущий срез:** `0.1.122-dev` опубликован; **Завершить чат** доступно в AI Agent, live acceptance на установленном сервере pending\
+**Последний опубликованный релиз:** `0.1.122-dev`; `0.1.123-dev` добавляет controlled server-tools для AI Agent\
+**Текущий срез:** `0.1.123-dev` — AI Agent получает typed server-tools: read auto, change/sensitive через persistent approval cards\
 **Следующий engineering milestone:** live-проверить управление AI Agent из Модулей и локальный provider; затем перейти к **streaming + controlled model tool-loop**. Windows UI acceptance и release-hardening gates продолжаются параллельно\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent развивается как first-party module: contracts `0.1.115`, read tools/API `0.1.117`, local conversation `0.1.119`, runtime module control `0.1.120`. Automatic AI tool-loop пока намеренно выключен.\
 **Обновлено:** 2026-10-01
+
+### Кандидат 0.1.123-dev — AI controlled server tools
+
+- ✅ Ollama native tool calling: descriptors → function schemas, response `tool_calls` → Home-AI tool IDs.
+- ✅ Bounded agent loop: read-tools выполняются автоматически и возвращаются модели для следующего шага.
+- ✅ Migration 021 хранит per-user server actions со статусами pending/executing/executed/rejected/failed.
+- ✅ Change/sensitive tools **не выполняются моделью напрямую** — создаётся карточка подтверждения.
+- ✅ При Approve Core повторно проверяет актуальные права пользователя; action одноразовый.
+- ✅ Web: точное действие/параметры, sensitivity, **Подтвердить / Отклонить**, result/error; secret-like поля маскируются.
+- ✅ Первые server-tools: network profiles/WireGuard inspect, storage inspect, persistent network profile save, link up/down, storage mount/unmount.
+- ✅ Все privileged изменения идут через существующий updater/helper contract; generic shell/root tool отсутствует.
+- ✅ Audit разделяет proposal, approve/reject и фактический `ai.tool.execute`, без raw tool input.
+- ✅ Tests покрывают Ollama mapping, ownership/single-use, auto read loop, approval-only writes и permission re-check.
+- 🧪 Требуется PR/main CI, release workflow и live acceptance с локальной tool-capable моделью.
 
 ### Выпуск 0.1.122-dev — AI finished chat lifecycle
 
@@ -1228,6 +1242,7 @@ AI не может расширять собственные права.
 | `0.1.120-dev` | ⚠️ AI Agent runtime control | опубликовано; live выявлен Restart bug из-за SQLite CHECK на transient `restarting`; исправлено в `0.1.121-dev` |
 | `0.1.121-dev` | 🧪 AI restart hotfix | опубликовано: transient `restarting` не пишется в SQLite; real-registry regression test зелёный; live re-test pending |
 | `0.1.122-dev` | 🧪 AI finish chat | опубликовано: persistent closed chats + read-only history + close API/audit/Web; automated CI/release зелёные, live acceptance pending |
+| `0.1.123-dev` | 🚧 AI controlled server tools | Ollama tool-calling + auto read loop + approval-gated network/storage changes; CI/release pending |
 
 ## 10. Правило ведения карты
 
