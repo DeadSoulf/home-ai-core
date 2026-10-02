@@ -13,7 +13,9 @@ func TestSettingsVisualResources(t *testing.T) {
 		t.Fatalf("init visual resources: %v", err)
 	}
 	defer state.releaseVisualResources()
-	if state.visual.mainBrush == 0 || state.visual.cardBrush == 0 || state.visual.headlineFont == 0 {
+	if state.visual.mainBrush == 0 || state.visual.cardBrush == 0 ||
+		state.visual.navBorderPen == 0 || state.visual.brandFont == 0 ||
+		state.visual.headlineFont == 0 {
 		t.Fatal("visual resources were not created")
 	}
 }
@@ -70,5 +72,23 @@ func TestDashboardFolderCount(t *testing.T) {
 		if got := dashboardFolderCount(tt.count, tt.language); got != tt.want {
 			t.Fatalf("dashboardFolderCount(%d, %q) = %q, want %q", tt.count, tt.language, got, tt.want)
 		}
+	}
+}
+
+
+func TestSettingsButtonRoles(t *testing.T) {
+	tests := map[string]settingsButtonRole{
+		"overview_sync_button": settingsButtonHeroPrimary,
+		"overview_open_button": settingsButtonHeroSecondary,
+		"connect_button":       settingsButtonPrimary,
+		"browse_button":        settingsButtonSecondary,
+	}
+	for name, want := range tests {
+		if got := settingsButtonRoleForName(name); got != want {
+			t.Fatalf("settingsButtonRoleForName(%q) = %d, want %d", name, got, want)
+		}
+	}
+	if settingsButtonCornerRadius != 10 {
+		t.Fatalf("settingsButtonCornerRadius = %d, want 10", settingsButtonCornerRadius)
 	}
 }
