@@ -222,7 +222,7 @@ describe("API client", () => {
   });
 
   it("loads authenticated module navigation state", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({
         modules: [
           {module_id: "ai.agent", status: "enabled"},
