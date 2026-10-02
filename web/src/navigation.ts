@@ -10,7 +10,7 @@ export const navigationGroups: NavigationGroup[] = [
     { path: "/system", label: "system", permission: "system.read" },
   ] },
   { label: "serviceGroup", items: [
-    { path: "/ai", label: "aiAgent" },
+    { path: "/ai", label: "aiAgent", permission: "security.self.read" },
     { path: "/files", label: "files", permission: "security.self.read" },
     { path: "/modules", label: "modules", permission: "modules.read" },
   ] },
