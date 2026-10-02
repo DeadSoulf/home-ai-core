@@ -166,6 +166,24 @@ export const api = {
     return result.conversation;
   },
 
+  deleteAIConversation: async (conversationId: string) => {
+    const result = await mutateJSON<{deleted: string}>(
+      `/api/v1/ai/conversations/${encodeURIComponent(conversationId)}`,
+      "DELETE",
+      {},
+    );
+    return result.deleted;
+  },
+
+  clearClosedAIConversations: async () => {
+    const result = await mutateJSON<{deleted: number}>(
+      "/api/v1/ai/conversations/closed",
+      "DELETE",
+      {},
+    );
+    return result.deleted;
+  },
+
   aiActions: async (conversationId: string) => {
     const result = await request<{actions: AIAction[]}>(
       `/api/v1/ai/conversations/${encodeURIComponent(conversationId)}/actions`,
