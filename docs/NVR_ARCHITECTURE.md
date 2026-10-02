@@ -1,7 +1,7 @@
 # Home-AI Cameras / NVR Architecture
 
-**Status:** NVR-0 implemented and published in `0.1.134-dev`; NVR-1 next  
-**Baseline:** Home-AI-Core 0.1.134-dev  
+**Status:** NVR-0 published in `0.1.134-dev`; secure RTSP onboarding implemented in `0.1.135-dev`; live/runtime supervisor next  
+**Baseline:** Home-AI-Core 0.1.135-dev  
 **Date:** 2026-10-02
 
 ## 1. Goal
@@ -138,7 +138,7 @@ StreamProfile
   role                   main | sub
 ```
 
-Passwords/tokens must never be returned by camera APIs or written to audit/event payloads. Persistent camera configuration stores only a credential reference. A dedicated server-side secret persistence mechanism is a prerequisite before camera passwords are stored.
+Passwords/tokens must never be returned by camera APIs or written to audit/event payloads. Persistent camera configuration stores only a credential reference. Since `0.1.135-dev`, camera username/password values are encrypted server-side with AES-GCM using a dedicated random 256-bit key and `0600` files under the Core state directory.
 
 ## 5. Camera onboarding
 
