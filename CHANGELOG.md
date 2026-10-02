@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.136-dev
+
+- Add a persistent NVR camera supervisor for every enabled camera.
+- Track per-camera runtime states `connecting`, `online`, `offline` and `disabled` with last seen/check timestamps, safe error text and reconnect count.
+- Reuse the protected camera credential store and bounded ffprobe path for background health checks without exposing RTSP URLs or credentials.
+- Automatically retry offline cameras with bounded reconnect backoff.
+- Refresh camera workers after camera create/update/enable changes and stop/remove workers on camera delete.
+- Start/restart/stop the supervisor together with the NVR module runtime; restore enabled camera supervision automatically after Core restart.
+- Publish low-rate `nvr.camera.online` / `nvr.camera.offline` domain events without source URLs or secrets.
+- Scope NVR event visibility to global camera access or exact per-camera resource permissions instead of generic `system.read`.
+- Expose supervisor state and per-camera runtime health through NVR APIs and show visible-camera online/offline counts only for cameras the current user may see.
+- Update the Cameras Web page with supervisor state, online/offline counts, last seen, reconnect attempts and safe camera errors.
+- Add supervisor lifecycle/reconnect, disabled-camera and scoped-event regression coverage.
+- Shared live restream, single-camera live view and multi-camera grid remain the next NVR-1 slice.
 ## 0.1.135-dev
 
 - Begin **NVR-1 camera onboarding** with a real RTSP validation path and protected camera credentials.

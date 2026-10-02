@@ -496,6 +496,9 @@ export type NVRStatus = {
   state: "registered" | "enabled" | "disabled" | "error";
   version: string;
   camera_count: number;
+  online_count: number;
+  offline_count: number;
+  supervisor_running: boolean;
   media_runtime_ready: boolean;
   secret_store_ready: boolean;
   foundation_stage: string;
@@ -510,6 +513,13 @@ export type NVRCamera = {
   recording_mode: "off" | "continuous" | "motion";
   audio_enabled: boolean;
   has_credentials: boolean;
+  runtime: {
+    state: "disabled" | "connecting" | "online" | "offline";
+    last_seen_at?: string;
+    last_checked_at?: string;
+    last_error?: string;
+    reconnect_count: number;
+  };
   created_at: string;
   updated_at: string;
 };

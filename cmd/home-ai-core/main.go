@@ -120,6 +120,41 @@ func main() {
 		_ = moduleRegistry.SetStatus(startupCtx, nvr.ModuleID, "error", "NVR credential store is unavailable")
 	} else {
 		nvrService = service
+		nvrService.SetRuntimeEventHandler(func(event nvr.RuntimeEvent) {
+			eventType := ""
+			switch event.State {
+			case nvr.RuntimeOnline:
+				eventType = "nvr.camera.online"
+			case nvr.RuntimeOffline:
+				eventType = "nvr.camera.offline"
+			}
+			if eventType == "" {
+				return
+			}
+			if _, err := eventService.Publish(context.Background(), events.Input{
+				Type:      eventType,
+				Component: "nvr",
+				Data: map[string]any{
+					"camera_id":       event.CameraID,
+					"state":           event.State,
+					"previous_state":  event.PreviousState,
+					"reconnect_count": event.Status.ReconnectCount,
+				},
+			}); err != nil {
+				logger.Warn("failed to publish NVR camera runtime event",
+					"camera_id", event.CameraID,
+					"state", event.State,
+					"error", err,
+				)
+			}
+		})
+		if item, itemErr := moduleRegistry.Get(startupCtx, nvr.ModuleID); itemErr == nil && item.Status == "enabled" {
+			if startErr := nvrService.Start(startupCtx); startErr != nil {
+				logger.Error("failed to start NVR camera supervisor", "error", startErr)
+				_ = moduleRegistry.SetStatus(startupCtx, nvr.ModuleID, "error", "NVR camera supervisor failed to start")
+			}
+		}
+		defer nvrService.Stop()
 	}
 
 	var aiProvider aiagent.Provider

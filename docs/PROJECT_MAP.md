@@ -8,8 +8,8 @@
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.135-dev` — NVR-1 secure RTSP camera onboarding\
-**Текущий срез:** `0.1.135-dev` опубликован; encrypted credentials, ffprobe Test connection и manual camera CRUD готовы к live-проверке с реальной камерой.\
-**Следующий engineering milestone:** продолжить **NVR-1 media runtime**: persistent camera supervisor, automatic reconnect/health, shared local restream, single live view и multi-camera grid; затем ONVIF/main-sub discovery.\
+**Текущий срез:** `0.1.136-dev` staged: persistent camera supervisor, automatic reconnect/health и permission-scoped runtime events готовы к публикации.\
+**Следующий engineering milestone:** продолжить **NVR-1 live runtime**: shared local restream, single live view и multi-camera grid; затем ONVIF/main-sub discovery.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
 
@@ -40,6 +40,23 @@
 - ✅ Релизы `0.1.115-dev` → `0.1.133-dev` прошли соответствующие Web/Go/Core/Debian/Windows CI и публикацию release artifacts.
 - ⏸ AI Agent считается функционально достаточным для текущего этапа; дальнейшее расширение tools, streaming и provider UI отложено до отдельного цикла.
 
+### Выпуск 0.1.136-dev — NVR camera supervisor + reconnect health
+
+- ✅ Для каждой включённой камеры добавлен persistent supervisor worker.
+- ✅ Runtime состояния: `connecting`, `online`, `offline`, `disabled`.
+- ✅ API хранит/показывает `last_seen_at`, `last_checked_at`, безопасную `last_error` и `reconnect_count`.
+- ✅ Background health-check повторно использует encrypted credential store + bounded ffprobe и не раскрывает source URL/password.
+- ✅ Потерявшая связь камера автоматически переподключается с bounded backoff.
+- ✅ Create/update/enable камеры обновляет worker; delete останавливает и удаляет runtime state.
+- ✅ Enable/restart/disable модуля NVR реально запускает/перезапускает/останавливает supervisor.
+- ✅ После Core restart ранее включённый NVR автоматически восстанавливает workers всех enabled cameras.
+- ✅ Переходы камеры публикуют `nvr.camera.online/offline` без media/secrets.
+- ✅ NVR events доступны только пользователям с global camera access или exact scoped permission на конкретную `camera_id`.
+- ✅ `/nvr/status` не раскрывает количество чужих online/offline камер: counters строятся только по visible cameras.
+- ✅ Web **Камеры** показывает состояние supervisor, online/offline, last seen, reconnect attempts и безопасную причину offline.
+- ✅ Добавлены regression tests supervisor lifecycle/reconnect, disabled camera и scoped NVR events.
+- ✅ PR #135 functional CI прошёл Web/Go/Core/integration/Linux/Windows/Debian до release bump.
+- ⏭ Следующий срез: shared local live restream → single live view → multi-camera grid.
 ### Выпуск 0.1.135-dev — NVR-1 secure RTSP camera onboarding
 
 - ✅ Реализовано encrypted server-side хранилище camera credentials: AES-GCM, отдельный random 256-bit key, `0600` key/secret files.

@@ -2,8 +2,9 @@ package api
 
 import (
 	"encoding/json"
-	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"strings"
+
+	"github.com/DeadSoulf/home-ai-core/internal/security"
 )
 
 func actorAllowsEvent(actor security.Actor, eventType string, data any) bool {
@@ -23,6 +24,26 @@ func actorAllowsEvent(actor security.Actor, eventType string, data any) bool {
 		}
 		id, _ := values["folder_id"].(string)
 		return id != "" && actor.Allows("files.read", "file_folder", id)
+	case strings.HasPrefix(eventType, "nvr."):
+		if actor.Has("camera.list") || actor.Has("camera.live") || actor.Has("camera.archive") || actor.Has("camera.manage") {
+			return true
+		}
+		values, ok := data.(map[string]any)
+		if !ok {
+			encoded, err := json.Marshal(data)
+			if err != nil || json.Unmarshal(encoded, &values) != nil {
+				return false
+			}
+		}
+		id, _ := values["camera_id"].(string)
+		if id == "" {
+			return false
+		}
+		return actor.Allows("camera.live", "camera", id) ||
+			actor.Allows("camera.archive", "camera", id) ||
+			actor.Allows("camera.export", "camera", id) ||
+			actor.Allows("camera.ptz", "camera", id) ||
+			actor.Allows("camera.manage", "camera", id)
 	case strings.HasPrefix(eventType, "security."):
 		return actor.Has("security.users.read")
 	case strings.HasPrefix(eventType, "storage."):

@@ -22,16 +22,17 @@ var CameraScopedPermissions = []string{
 }
 
 type CameraSummary struct {
-	ID             string    `json:"id"`
-	Name           string    `json:"name"`
-	Enabled        bool      `json:"enabled"`
-	SourceType     string    `json:"source_type"`
-	Transport      string    `json:"transport"`
-	RecordingMode  string    `json:"recording_mode"`
-	AudioEnabled   bool      `json:"audio_enabled"`
-	HasCredentials bool      `json:"has_credentials"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID             string              `json:"id"`
+	Name           string              `json:"name"`
+	Enabled        bool                `json:"enabled"`
+	SourceType     string              `json:"source_type"`
+	Transport      string              `json:"transport"`
+	RecordingMode  string              `json:"recording_mode"`
+	AudioEnabled   bool                `json:"audio_enabled"`
+	HasCredentials bool                `json:"has_credentials"`
+	Runtime        CameraRuntimeStatus `json:"runtime"`
+	CreatedAt      time.Time           `json:"created_at"`
+	UpdatedAt      time.Time           `json:"updated_at"`
 }
 
 type StreamProfile struct {
@@ -52,6 +53,9 @@ type Status struct {
 	State             string `json:"state"`
 	Version           string `json:"version"`
 	CameraCount       int    `json:"camera_count"`
+	OnlineCount       int    `json:"online_count"`
+	OfflineCount      int    `json:"offline_count"`
+	SupervisorRunning bool   `json:"supervisor_running"`
 	MediaRuntimeReady bool   `json:"media_runtime_ready"`
 	SecretStoreReady  bool   `json:"secret_store_ready"`
 	FoundationStage   string `json:"foundation_stage"`
