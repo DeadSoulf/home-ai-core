@@ -7,8 +7,8 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.124-dev` — AI public web access + visible finish-chat action\
-**Текущий срез:** `0.1.125-dev` staged: исправление duplicate/orphan сообщений AI-чата после failed/cancelled generation; release publication pending\
+**Последний опубликованный релиз:** `0.1.125-dev` — AI chat duplicate/orphan message fix\
+**Текущий срез:** `0.1.125-dev` опубликован; failed/cancelled generation больше не оставляет duplicate/orphan user messages; live acceptance pending\
 **Следующий engineering milestone:** live-проверить `0.1.124-dev` на установленном сервере: завершение диалога, web search/fetch и controlled server actions; затем добавить streaming и расширить tools на updater/service/NAS/SMB.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. AI Agent: contracts `0.1.115`, read tools/API `0.1.117`, local conversation `0.1.119`, runtime control `0.1.120`, controlled model tool-loop `0.1.123`, public web tools `0.1.124`. Generic shell/root bypass отсутствует.\
 **Обновлено:** 2026-10-02
@@ -19,8 +19,9 @@
 - ✅ Текущий user turn по-прежнему передаётся модели во временном context, поэтому reasoning/tool-calling не меняются.
 - ✅ Provider error/timeout/cancel/restart больше не оставляет в истории одинокое пользовательское сообщение.
 - ✅ Добавлены regression tests для provider failure и runtime cancellation.
-- ✅ PR #124 прошёл Core/Web, Go tests/vet/build/smoke, Debian installer и Windows client CI перед release bump.
-- 🧪 После публикации требуется live-проверка на сервере: отправить запрос, перейти между вкладками во время/после генерации и убедиться, что история не размножается.
+- ✅ PR #124 и main прошли Core/Web, Go tests/vet/build/smoke, Debian installer и Windows client CI.
+- ✅ Release workflow опубликовал `v0.1.125-dev` с Core amd64/arm64, Windows `.exe`, Debian `.deb` amd64/arm64 и SHA-256.
+- 🧪 Требуется live-проверка на сервере: отправить запрос, перейти между вкладками во время/после генерации и убедиться, что история не размножается.
 ### Выпуск 0.1.124-dev — AI public web access + finish-chat visibility
 
 - ✅ Кнопка **Завершить чат** теперь всегда видима в header AI-чата и disabled только когда действие неприменимо.
