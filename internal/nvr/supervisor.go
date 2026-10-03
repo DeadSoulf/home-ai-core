@@ -306,6 +306,8 @@ func runtimeRecordingErrorMessage(err error) string {
 		return "recording storage is not configured"
 	case errors.Is(err, ErrRecordingUnavailable):
 		return "recording runtime is unavailable"
+	case errors.Is(err, ErrRecordingStorageFull):
+		return "recording storage reserve cannot be restored"
 	case errors.Is(err, ErrSecretStoreUnavailable):
 		return "camera credential store is unavailable"
 	default:
