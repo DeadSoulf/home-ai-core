@@ -76,3 +76,68 @@ func TestDiscoveryBindIPsFallsBackToWildcard(t *testing.T) {
 		t.Fatalf("specific bind IPs changed: %#v", got)
 	}
 }
+
+func TestWSDiscoveryProbesCoverLegacyModernAndGeneric(t *testing.T) {
+	probes, err := wsDiscoveryProbes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(probes) != 6 {
+		t.Fatalf("probe count = %d, want 6", len(probes))
+	}
+	var legacyNVT, deviceType, generic, modern bool
+	for _, probe := range probes {
+		text := string(probe)
+		if strings.Contains(text, "2005/04/discovery") && strings.Contains(text, "NetworkVideoTransmitter") {
+			legacyNVT = true
+		}
+		if strings.Contains(text, "tds:Device") {
+			deviceType = true
+		}
+		if strings.Contains(text, "<d:Probe></d:Probe>") {
+			generic = true
+		}
+		if strings.Contains(text, "discovery/2009/01") {
+			modern = true
+		}
+	}
+	if !legacyNVT || !deviceType || !generic || !modern {
+		t.Fatalf("probe coverage missing: legacy=%v device=%v generic=%v modern=%v", legacyNVT, deviceType, generic, modern)
+	}
+}
+
+func TestParseWSDiscoveryResponseRejectsUnrelatedGenericService(t *testing.T) {
+	raw := []byte(`<?xml version="1.0"?>
+	<e:Envelope xmlns:e="http://www.w3.org/2003/05/soap-envelope"
+	 xmlns:d="http://schemas.xmlsoap.org/ws/2005/04/discovery">
+	  <e:Body><d:ProbeMatches><d:ProbeMatch>
+	    <d:Scopes>urn:example:printer</d:Scopes>
+	    <d:XAddrs>http://printer.local/service</d:XAddrs>
+	  </d:ProbeMatch></d:ProbeMatches></e:Body>
+	</e:Envelope>`)
+	if devices := parseWSDiscoveryResponse(raw, net.ParseIP("192.168.1.90")); len(devices) != 0 {
+		t.Fatalf("unrelated device accepted: %#v", devices)
+	}
+}
+
+func TestScanTargetsForIPv4BoundsLargeNetworksToLocal24(t *testing.T) {
+	targets := scanTargetsForIPv4(net.ParseIP("192.168.33.10"), net.CIDRMask(16, 32))
+	if len(targets) != 254 {
+		t.Fatalf("targets = %d, want 254", len(targets))
+	}
+	if got := targets[0].String(); got != "192.168.33.1" {
+		t.Fatalf("first target = %s", got)
+	}
+	if got := targets[len(targets)-1].String(); got != "192.168.33.254" {
+		t.Fatalf("last target = %s", got)
+	}
+}
+
+func TestLooksLikeONVIFHTTPResponse(t *testing.T) {
+	if !looksLikeONVIFHTTPResponse(200, []byte(`<Envelope><GetSystemDateAndTimeResponse xmlns="http://www.onvif.org/ver10/device/wsdl"/></Envelope>`)) {
+		t.Fatal("valid ONVIF response was not recognized")
+	}
+	if looksLikeONVIFHTTPResponse(200, []byte(`<html><body>camera admin</body></html>`)) {
+		t.Fatal("generic web response was recognized as ONVIF")
+	}
+}

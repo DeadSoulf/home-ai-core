@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.145-dev
+
+- Broaden ONVIF discovery across camera vendors with legacy WS-Discovery 2005/04 and modern 2009/01 probes, including `NetworkVideoTransmitter`, `Device` and generic probe variants.
+- Send discovery probes twice to tolerate lossy multicast behavior seen on embedded cameras and deduplicate repeated device responses by IP.
+- Add a bounded local-subnet fallback scan for common ONVIF device-service ports (80, 8000, 8080, 8899 and 2020) when cameras do not answer multicast discovery.
+- Validate fallback HTTP responses as ONVIF/SOAP before presenting them so unrelated Web devices are not added to the camera list.
+- Keep scanning local/private interfaces only, cap large networks to the local /24 and retain manual ONVIF/RTSP onboarding for devices with discovery disabled or non-standard ports.
+
 ## 0.1.144-dev
 
 - Make ONVIF WS-Discovery fall back to the host default IPv4 route when Core cannot enumerate a usable interface instead of reporting discovery as unavailable.
