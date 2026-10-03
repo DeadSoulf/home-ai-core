@@ -888,6 +888,17 @@ export const api = {
     return result.cameras;
   },
 
+  installCameraSDK: async (file: File) => {
+    const headers = new Headers({"Content-Type": "application/zip"});
+    const token = getCSRFToken();
+    if (token) headers.set("X-CSRF-Token", token);
+    const result = await request<{result: {installed: boolean; path: string; status: CamerasStatus}}>(
+      "/api/v1/cameras/sdk/install",
+      {method: "POST", headers, body: file},
+    );
+    return result.result;
+  },
+
   testCameraSDKLogin: async (input: {
     address: string;
     port?: number;
