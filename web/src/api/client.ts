@@ -888,15 +888,32 @@ export const api = {
     return result.cameras;
   },
 
-  installCameraSDK: async (file: File) => {
-    const headers = new Headers({"Content-Type": "application/zip"});
-    const token = getCSRFToken();
-    if (token) headers.set("X-CSRF-Token", token);
-    const result = await request<{result: {installed: boolean; path: string; status: CamerasStatus}}>(
-      "/api/v1/cameras/sdk/install",
-      {method: "POST", headers, body: file},
-    );
-    return result.result;
+  installCameraSDK: async (file: File, onProgress?: (percent: number) => void) => {
+    return new Promise<{installed: boolean; path: string; status: CamerasStatus}>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/v1/cameras/sdk/install");
+      xhr.setRequestHeader("Content-Type", "application/zip");
+      xhr.setRequestHeader("Accept", "application/json");
+      const token = getCSRFToken();
+      if (token) xhr.setRequestHeader("X-CSRF-Token", token);
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && onProgress) {
+          onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+        }
+      };
+      xhr.onerror = () => reject(new Error("HCNetSDK upload failed"));
+      xhr.onload = () => {
+        let body: any = {};
+        try { body = xhr.responseText ? JSON.parse(xhr.responseText) : {}; } catch {}
+        if (xhr.status < 200 || xhr.status >= 300) {
+          reject(new APIError(xhr.status, body as APIErrorBody));
+          return;
+        }
+        onProgress?.(100);
+        resolve(body.result);
+      };
+      xhr.send(file);
+    });
   },
 
   testCameraSDKLogin: async (input: {

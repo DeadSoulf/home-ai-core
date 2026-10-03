@@ -22,14 +22,16 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
   const [sdkFile, setSDKFile] = useState<File>();
   const [installing, setInstalling] = useState(false);
   const [installError, setInstallError] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const installSDK = async (event: FormEvent) => {
     event.preventDefault();
     if (!canManage || !sdkFile || installing) return;
     setInstalling(true);
     setInstallError("");
+    setUploadProgress(0);
     try {
-      await api.installCameraSDK(sdkFile);
+      await api.installCameraSDK(sdkFile, setUploadProgress);
       await resource.reload();
     } catch (reason) {
       setInstallError(reason instanceof Error ? reason.message : t("requestFailed"));
@@ -109,8 +111,14 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
                 />
               </label>
               <button type="submit" className="button primary" disabled={!canManage || !sdkFile || installing}>
-                {installing ? t("working") : "Установить HCNetSDK"}
+                {installing ? `Загрузка ${uploadProgress}%` : "Установить HCNetSDK"}
               </button>
+              {installing && (
+                <div>
+                  <progress value={uploadProgress} max={100} style={{width: "100%"}} />
+                  <div className="muted">{uploadProgress < 100 ? `Загружено: ${uploadProgress}%` : "Загрузка завершена, устанавливаю SDK…"}</div>
+                </div>
+              )}
             </form>
           </>
         )}
