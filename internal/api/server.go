@@ -70,7 +70,6 @@ func NewWithNVR(
 	updaterService UpdaterService,
 	realtimeHub *realtime.Hub,
 	nvrService *nvr.Service,
-	cameraService CamerasService,
 	aiProviders ...aiagent.Provider,
 ) http.Handler {
 	return newServer(
@@ -129,6 +128,7 @@ func newServer(
 	updaterService UpdaterService,
 	realtimeHub *realtime.Hub,
 	nvrService *nvr.Service,
+	cameraService CamerasService,
 	aiProviders ...aiagent.Provider,
 ) http.Handler {
 	aiService := aiagent.NewService(nodeID, state, jobService, moduleService, securityService, aiProviders...)
