@@ -81,6 +81,7 @@ type Service struct {
 	recordingSessions map[string]*recordingSession
 	recordingStatus   map[string]RecordingStatus
 	spaceChecker      SpaceChecker
+	mountChecker      MountChecker
 }
 
 type CameraInput struct {
@@ -170,6 +171,7 @@ func newService(
 		recordingSessions: map[string]*recordingSession{},
 		recordingStatus:   map[string]RecordingStatus{},
 		spaceChecker:      osSpaceChecker{},
+		mountChecker:      osMountChecker{},
 	}
 }
 
