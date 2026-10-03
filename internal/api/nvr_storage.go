@@ -11,6 +11,7 @@ import (
 	nvrpkg "github.com/DeadSoulf/home-ai-core/internal/nvr"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
+	"github.com/DeadSoulf/home-ai-core/internal/storage"
 	"github.com/DeadSoulf/home-ai-core/internal/systeminfo"
 )
 
@@ -89,7 +90,13 @@ func (s *server) nvrStorageGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nodes := systeminfo.Collect(s.nodeID).BlockTree
+	info := systeminfo.Collect(s.nodeID)
+	inspectCtx, inspectCancel := context.WithTimeout(r.Context(), 8*time.Second)
+	if inspection, err := storage.Inspect(inspectCtx); err == nil {
+		systeminfo.ApplyFilesystemStats(&info, inspection.Filesystems)
+	}
+	inspectCancel()
+	nodes := info.BlockTree
 	targets := make([]nvrStorageTargetResponse, 0)
 	for _, record := range records {
 		if record.Purpose != state.StoragePurposeVideo {
@@ -141,7 +148,13 @@ func (s *server) nvrStorageSet(w http.ResponseWriter, r *http.Request, actor sec
 		writeAPIError(w, r, http.StatusInternalServerError, "nvr_storage_unavailable", "NVR storage is unavailable", nil)
 		return
 	}
-	nodes := systeminfo.Collect(s.nodeID).BlockTree
+	info := systeminfo.Collect(s.nodeID)
+	inspectCtx, inspectCancel := context.WithTimeout(r.Context(), 8*time.Second)
+	if inspection, inspectErr := storage.Inspect(inspectCtx); inspectErr == nil {
+		systeminfo.ApplyFilesystemStats(&info, inspection.Filesystems)
+	}
+	inspectCancel()
+	nodes := info.BlockTree
 	node, ok := blockNodeByPath(nodes, input.Device)
 	if !ok {
 		writeAPIError(w, r, http.StatusNotFound, "nvr_storage_not_found", "video storage device was not found", nil)
