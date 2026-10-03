@@ -922,9 +922,6 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
               </div>
 
               <div className="nvr-form-actions">
-                <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={() => void discoverONVIF()}>
-                  {busy === "onvif:discover" ? t("working") : t("refresh")}
-                </button>
                 <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={resetONVIF}>
                   {t("cancel")}
                 </button>
