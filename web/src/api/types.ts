@@ -491,6 +491,23 @@ export type SMBStatus = {
 
 
 
+export type NVRStorageTarget = {
+  id?: string;
+  device: string;
+  filesystem_uuid?: string;
+  mountpoint?: string;
+  filesystem?: string;
+  label?: string;
+  size_bytes?: number;
+  free_bytes?: number;
+  free_known: boolean;
+  reserve_percent: number;
+  active: boolean;
+  ready: boolean;
+  mountpoints: string[];
+  archive_bytes?: number;
+};
+
 export type NVRStatus = {
   module_id: string;
   state: "registered" | "enabled" | "disabled" | "error";
@@ -502,6 +519,8 @@ export type NVRStatus = {
   media_runtime_ready: boolean;
   live_runtime_ready: boolean;
   active_live_streams: number;
+  recording_ready: boolean;
+  active_recordings: number;
   secret_store_ready: boolean;
   onvif_ready: boolean;
   foundation_stage: string;
@@ -522,6 +541,12 @@ export type NVRCamera = {
     last_checked_at?: string;
     last_error?: string;
     reconnect_count: number;
+  };
+  recording: {
+    active: boolean;
+    last_segment_at?: string;
+    last_segment_path?: string;
+    last_error?: string;
   };
   created_at: string;
   updated_at: string;
