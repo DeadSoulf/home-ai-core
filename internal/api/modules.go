@@ -166,7 +166,7 @@ func (s *server) moduleControl(
 		writeAPIError(w, r, http.StatusInternalServerError, "modules_unavailable", "module registry is unavailable", nil)
 		return
 	}
-	if id != "ai.agent" && id != "ai.cloud" && id != "nvr" {
+	if id != "ai.agent" && id != "ai.cloud" {
 		writeAPIError(w, r, http.StatusConflict, "module_control_unsupported", "runtime control is not supported for this module", nil)
 		return
 	}
@@ -306,41 +306,7 @@ func (s *server) moduleControl(
 			writeAPIError(w, r, http.StatusBadRequest, "invalid_module_operation", "operation must be enable, disable or restart", nil)
 			return
 		}
-	case "nvr":
-		if s.nvr == nil {
-			writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_runtime_unavailable", "NVR runtime is unavailable", nil)
-			return
-		}
-		switch request.Operation {
-		case "enable":
-			if err := s.nvr.Start(r.Context()); err != nil {
-				writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_runtime_start_failed", "failed to start NVR camera supervisor", nil)
-				return
-			}
-			if err := s.modules.SetStatus(r.Context(), id, "enabled", ""); err != nil {
-				s.nvr.Stop()
-				writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
-				return
-			}
-		case "restart":
-			if err := s.nvr.Restart(r.Context()); err != nil {
-				writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_runtime_start_failed", "failed to restart NVR camera supervisor", nil)
-				return
-			}
-			if err := s.modules.SetStatus(r.Context(), id, "enabled", ""); err != nil {
-				writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
-				return
-			}
-		case "disable":
-			if err := s.modules.SetStatus(r.Context(), id, "disabled", ""); err != nil {
-				writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
-				return
-			}
-			s.nvr.Stop()
-		default:
-			writeAPIError(w, r, http.StatusBadRequest, "invalid_module_operation", "operation must be enable, disable or restart", nil)
-			return
-		}
+
 	}
 
 	updated, err := s.modules.Get(r.Context(), id)
