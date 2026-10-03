@@ -10,8 +10,8 @@ OUT_DIR="$ROOT/build/packages"
 STAGE="$ROOT/build/deb-$ARCH"
 
 case "$ARCH" in
-  amd64) GOARCH=amd64 ;;
-  arm64) GOARCH=arm64 ;;
+  amd64) GOARCH=amd64; CORE_CGO=1 ;;
+  arm64) GOARCH=arm64; CORE_CGO=0 ;;
   *)
     echo "unsupported Debian architecture: $ARCH" >&2
     exit 2
@@ -20,7 +20,7 @@ esac
 
 command -v go >/dev/null 2>&1 || { echo "go is required" >&2; exit 2; }
 command -v npm >/dev/null 2>&1 || { echo "npm is required" >&2; exit 2; }
-command -v dpkg-deb >/dev/null 2>&1 || { echo "dpkg-deb is required" >&2; exit 2; }
+command -v dpkg-deb >/dev/null 2>&1 || { echo "dpkg-deb is required" >&2; exit 2; }\nif [ "$CORE_CGO" = "1" ]; then\n  command -v cc >/dev/null 2>&1 || { echo "a C compiler (cc) is required for the amd64 Core build with HCNetSDK support" >&2; exit 2; }\nfi
 
 rm -rf "$STAGE"
 mkdir -p "$STAGE/DEBIAN" "$STAGE/usr/bin" "$STAGE/usr/libexec/home-ai-core" "$STAGE/usr/share/home-ai-core/web" \
