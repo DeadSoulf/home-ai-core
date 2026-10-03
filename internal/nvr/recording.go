@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/csv"
 	"errors"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
