@@ -8,11 +8,11 @@ import (
 
 func TestDetectCameraVendor(t *testing.T) {
 	cases := map[string]string{
-		"HIKVISION WebComponents":            "Hikvision",
-		"Dahua Technology":                   "Dahua",
-		"UNIVIEW Network Camera":             "Uniview",
-		"Wisenet Hanwha Vision":              "Hanwha",
-		"AXIS Communications video":          "Axis",
+		"HIKVISION WebComponents":             "Hikvision",
+		"Dahua Technology":                    "Dahua",
+		"UNIVIEW Network Camera":              "Uniview",
+		"Wisenet Hanwha Vision":               "Hanwha",
+		"AXIS Communications video":           "Axis",
 		"Bosch Security Systems video device": "Bosch",
 	}
 	for input, want := range cases {
