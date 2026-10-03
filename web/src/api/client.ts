@@ -29,6 +29,7 @@ import type {
   AIMessage,
   AIAction,
   NVRStatus,
+  NVRStorageTarget,
   NVRCamera,
   NVRCameraConfig,
   NVRCameraInput,
@@ -154,6 +155,20 @@ export const api = {
   nvrCameras: async () => {
     const result = await request<{cameras: NVRCamera[]}>("/api/v1/nvr/cameras");
     return result.cameras;
+  },
+
+  nvrStorage: async () => {
+    const result = await request<{targets: NVRStorageTarget[]}>("/api/v1/nvr/storage");
+    return result.targets;
+  },
+
+  setNVRStorage: async (device: string, reservePercent: number) => {
+    const result = await postJSON<{target: NVRStorageTarget}>(
+      "/api/v1/nvr/storage",
+      {device, reserve_percent: reservePercent},
+      true,
+    );
+    return result.target;
   },
 
   nvrCamera: async (cameraId: string) => {
