@@ -79,7 +79,7 @@ export function ModulesPage({revision, canManage}: {revision: number; canManage:
             </div>
             <p>{module.manifest.description || t("noDescription")}</p>
             {module.error && <div className="form-error">{module.error}</div>}
-            {(module.manifest.id === "ai.agent" || module.manifest.id === "ai.cloud") && canManage && (
+            {(module.manifest.id === "ai.agent" || module.manifest.id === "ai.cloud" || module.manifest.id === "cameras") && canManage && (
               <div className="module-actions">
                 {module.status === "disabled" || module.status === "error" || module.status === "registered" ? (
                   <button
