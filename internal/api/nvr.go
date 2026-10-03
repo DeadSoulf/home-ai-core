@@ -68,7 +68,7 @@ func (s *server) nvrStatus(
 				}
 				return s.nvr.ActiveLiveStreams()
 			}(),
-			RecordingReady:   s.nvr != nil && s.nvr.RecordingReady(),
+			RecordingReady: s.nvr != nil && s.nvr.RecordingReady(),
 			ActiveRecordings: func() int {
 				if s.nvr == nil {
 					return 0
@@ -125,8 +125,8 @@ func (s *server) nvrCameras(
 				}
 				return s.nvr.CameraRecording(camera.ID)
 			}(),
-			CreatedAt:      camera.CreatedAt,
-			UpdatedAt:      camera.UpdatedAt,
+			CreatedAt: camera.CreatedAt,
+			UpdatedAt: camera.UpdatedAt,
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"cameras": out})
