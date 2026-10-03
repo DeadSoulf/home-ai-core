@@ -41,6 +41,16 @@ type CameraStore interface {
 		time.Time,
 	) (state.NVRONVIFSourceRecord, error)
 	NVRONVIFSource(context.Context, string) (state.NVRONVIFSourceRecord, error)
+	ActiveNVRStorageTarget(context.Context) (state.NVRStorageTargetRecord, error)
+	CreateNVRRecordingSegment(
+		context.Context,
+		string, string,
+		time.Time, time.Time,
+		string, string,
+		int, int, int64,
+		bool, string,
+		time.Time,
+	) (state.NVRRecordingSegmentRecord, error)
 }
 
 type Service struct {
@@ -63,6 +73,11 @@ type Service struct {
 	liveSource      LiveSource
 	liveSessions    map[string]*liveSession
 	liveIdleTimeout time.Duration
+
+	recordingMu       sync.Mutex
+	recorder           RecorderSource
+	recordingSessions map[string]*recordingSession
+	recordingStatus   map[string]RecordingStatus
 }
 
 type CameraInput struct {
@@ -145,9 +160,12 @@ func newService(
 		runtime:         map[string]CameraRuntimeStatus{},
 		healthInterval:  30 * time.Second,
 		retryDelays:     []time.Duration{2 * time.Second, 5 * time.Second, 15 * time.Second, 30 * time.Second},
-		liveSource:      NewFFmpegMJPEGSource(),
-		liveSessions:    map[string]*liveSession{},
-		liveIdleTimeout: 5 * time.Second,
+		liveSource:        NewFFmpegMJPEGSource(),
+		liveSessions:      map[string]*liveSession{},
+		liveIdleTimeout:   5 * time.Second,
+		recorder:          NewFFmpegSegmentRecorder(),
+		recordingSessions: map[string]*recordingSession{},
+		recordingStatus:   map[string]RecordingStatus{},
 	}
 }
 
