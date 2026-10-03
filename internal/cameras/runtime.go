@@ -180,7 +180,7 @@ func (s *Service) AddCamera(ctx context.Context, request LoginRequest, name stri
 		name = request.Address
 	}
 	item := Camera{
-		ID: fmt.Sprintf("cam-%d", time.Now().UnixNano()),
+		ID:        fmt.Sprintf("cam-%d", time.Now().UnixNano()),
 		Name:      name,
 		Address:   result.Address,
 		Port:      result.Port,
