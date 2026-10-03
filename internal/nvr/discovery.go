@@ -36,8 +36,9 @@ type CameraDiscoveryDevice struct {
 	Confidence      string                   `json:"confidence"`
 	Sources         []string                 `json:"sources"`
 	Services        []CameraDiscoveryService `json:"services"`
-	ONVIFAddress    string                   `json:"onvif_address,omitempty"`
-	RTSPAddressHint string                   `json:"rtsp_address_hint,omitempty"`
+	ONVIFAddress         string                   `json:"onvif_address,omitempty"`
+	RTSPAddressHint      string                   `json:"rtsp_address_hint,omitempty"`
+	SubstreamAddressHint string                   `json:"substream_address_hint,omitempty"`
 }
 
 type CameraDiscoveryEngine struct {
