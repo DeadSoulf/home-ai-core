@@ -77,7 +77,6 @@ func TestDiscoveryBindIPsFallsBackToWildcard(t *testing.T) {
 	}
 }
 
-
 func TestWSDiscoveryProbesCoverLegacyModernAndGeneric(t *testing.T) {
 	probes, err := wsDiscoveryProbes()
 	if err != nil {
