@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.153-dev
+
+- Build the Linux amd64 Core with CGO enabled so the native Hikvision HCNetSDK runtime is included instead of the unsupported stub.
+- Keep arm64 Core and the privileged updater helper CGO-disabled.
+- Require a C compiler when producing amd64 Debian/update packages so HCNetSDK support cannot be silently omitted.
+
 ## 0.1.152-dev
 
 - Start a fresh first-party `cameras` module instead of reactivating the retired `nvr` product module.
