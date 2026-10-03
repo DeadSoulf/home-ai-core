@@ -14,7 +14,6 @@ type CamerasService interface {
 	Status() cameras.Status
 	Refresh() cameras.Status
 	TestLogin(context.Context, cameras.LoginRequest) (cameras.LoginResult, error)
-	InstallRuntime(io.Reader, int64) (cameras.InstallResult, error)
 }
 
 func (s *server) camerasStatus(
@@ -113,7 +112,14 @@ func (s *server) camerasInstallRuntime(
 		writeAPIError(w, r, http.StatusRequestEntityTooLarge, "camera_sdk_archive_invalid", "HCNetSDK ZIP must be smaller than 256 MiB", nil)
 		return
 	}
-	result, err := s.cameras.InstallRuntime(io.LimitReader(r.Body, (256<<20)+1), r.ContentLength)
+	installer, ok := s.cameras.(interface {
+		InstallRuntime(io.Reader, int64) (cameras.InstallResult, error)
+	})
+	if !ok {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "camera_sdk_install_unavailable", "HCNetSDK installation is unavailable", nil)
+		return
+	}
+	result, err := installer.InstallRuntime(io.LimitReader(r.Body, (256<<20)+1), r.ContentLength)
 	if err != nil {
 		writeAPIError(w, r, http.StatusBadRequest, "camera_sdk_install_failed", err.Error(), nil)
 		return
