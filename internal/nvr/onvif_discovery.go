@@ -41,13 +41,13 @@ type WSDiscovery struct {
 }
 
 func NewWSDiscovery() *WSDiscovery {
-	return &WSDiscovery{timeout: 2500 * time.Millisecond}
+	return &WSDiscovery{timeout: 5 * time.Second}
 }
 
 func (d *WSDiscovery) Discover(ctx context.Context) ([]ONVIFDevice, error) {
 	timeout := d.timeout
 	if timeout <= 0 {
-		timeout = 2500 * time.Millisecond
+		timeout = 5 * time.Second
 	}
 	discoverCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -55,7 +55,7 @@ func (d *WSDiscovery) Discover(ctx context.Context) ([]ONVIFDevice, error) {
 	localIPs, err := localDiscoveryIPv4()
 	localIPs = discoveryBindIPs(localIPs, err)
 
-	probe, err := wsDiscoveryProbe()
+	probes, err := wsDiscoveryProbes()
 	if err != nil {
 		return nil, err
 	}
@@ -63,22 +63,32 @@ func (d *WSDiscovery) Discover(ctx context.Context) ([]ONVIFDevice, error) {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	found := make(map[string]ONVIFDevice)
+	addDevices := func(devices []ONVIFDevice) {
+		mu.Lock()
+		defer mu.Unlock()
+		for _, device := range devices {
+			if len(found) >= 128 {
+				break
+			}
+			mergeDiscoveredONVIFDevice(found, device)
+		}
+	}
+
 	for _, localIP := range localIPs {
 		localIP := append(net.IP(nil), localIP...)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			devices := discoverONVIFOnIP(discoverCtx, localIP, probe)
-			mu.Lock()
-			for _, device := range devices {
-				if len(found) >= 64 {
-					break
-				}
-				found[device.Address] = device
-			}
-			mu.Unlock()
+			addDevices(discoverONVIFOnIP(discoverCtx, localIP, probes))
 		}()
 	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		addDevices(discoverONVIFHTTPFallback(discoverCtx))
+	}()
+
 	wg.Wait()
 
 	result := make([]ONVIFDevice, 0, len(found))
@@ -92,6 +102,32 @@ func (d *WSDiscovery) Discover(ctx context.Context) ([]ONVIFDevice, error) {
 		return result[i].Name < result[j].Name
 	})
 	return result, nil
+}
+
+func mergeDiscoveredONVIFDevice(found map[string]ONVIFDevice, device ONVIFDevice) {
+	if strings.TrimSpace(device.Address) == "" {
+		return
+	}
+	key := strings.TrimSpace(device.IP)
+	if key == "" {
+		key = strings.TrimSpace(device.Address)
+	}
+	existing, ok := found[key]
+	if !ok {
+		found[key] = device
+		return
+	}
+	if strings.HasPrefix(existing.Name, "ONVIF ") && !strings.HasPrefix(device.Name, "ONVIF ") {
+		existing.Name = device.Name
+	}
+	if len(device.Scopes) > len(existing.Scopes) {
+		existing.Scopes = append([]string(nil), device.Scopes...)
+	}
+	if strings.Contains(strings.ToLower(device.Address), "/onvif/") &&
+		!strings.Contains(strings.ToLower(existing.Address), "/onvif/") {
+		existing.Address = device.Address
+	}
+	found[key] = existing
 }
 
 func discoveryBindIPs(localIPs []net.IP, discoveryErr error) []net.IP {
@@ -137,6 +173,58 @@ func localDiscoveryIPv4() ([]net.IP, error) {
 }
 
 func wsDiscoveryProbe() ([]byte, error) {
+	return buildWSDiscoveryProbe(
+		"http://schemas.xmlsoap.org/ws/2004/08/addressing",
+		"http://schemas.xmlsoap.org/ws/2005/04/discovery",
+		"urn:schemas-xmlsoap-org:ws:2005:04:discovery",
+		"http://schemas.xmlsoap.org/ws/2005/04/discovery/Probe",
+		"dn:NetworkVideoTransmitter",
+	)
+}
+
+func wsDiscoveryProbes() ([][]byte, error) {
+	type variant struct {
+		addressingNS string
+		discoveryNS  string
+		to           string
+		action       string
+		types        string
+	}
+	versions := []variant{
+		{
+			addressingNS: "http://schemas.xmlsoap.org/ws/2004/08/addressing",
+			discoveryNS:  "http://schemas.xmlsoap.org/ws/2005/04/discovery",
+			to:           "urn:schemas-xmlsoap-org:ws:2005:04:discovery",
+			action:       "http://schemas.xmlsoap.org/ws/2005/04/discovery/Probe",
+		},
+		{
+			addressingNS: "http://www.w3.org/2005/08/addressing",
+			discoveryNS:  "http://docs.oasis-open.org/ws-dd/ns/discovery/2009/01",
+			to:           "urn:docs-oasis-open-org:ws-dd:ns:discovery:2009:01",
+			action:       "http://docs.oasis-open.org/ws-dd/ns/discovery/2009/01/Probe",
+		},
+	}
+	typeFilters := []string{"dn:NetworkVideoTransmitter", "tds:Device", ""}
+	result := make([][]byte, 0, len(versions)*len(typeFilters))
+	for _, version := range versions {
+		for _, types := range typeFilters {
+			probe, err := buildWSDiscoveryProbe(
+				version.addressingNS,
+				version.discoveryNS,
+				version.to,
+				version.action,
+				types,
+			)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, probe)
+		}
+	}
+	return result, nil
+}
+
+func buildWSDiscoveryProbe(addressingNS, discoveryNS, to, action, types string) ([]byte, error) {
 	raw := make([]byte, 16)
 	if _, err := rand.Read(raw); err != nil {
 		return nil, fmt.Errorf("generate ONVIF discovery id: %w", err)
@@ -149,19 +237,24 @@ func wsDiscoveryProbe() ([]byte, error) {
 		raw[8:10],
 		raw[10:16],
 	)
+	typeElement := ""
+	if types != "" {
+		typeElement = "<d:Types>" + types + "</d:Types>"
+	}
 	message := `<?xml version="1.0" encoding="UTF-8"?>` +
 		`<e:Envelope xmlns:e="http://www.w3.org/2003/05/soap-envelope"` +
-		` xmlns:w="http://schemas.xmlsoap.org/ws/2004/08/addressing"` +
-		` xmlns:d="http://schemas.xmlsoap.org/ws/2005/04/discovery"` +
-		` xmlns:dn="http://www.onvif.org/ver10/network/wsdl">` +
+		` xmlns:w="` + addressingNS + `"` +
+		` xmlns:d="` + discoveryNS + `"` +
+		` xmlns:dn="http://www.onvif.org/ver10/network/wsdl"` +
+		` xmlns:tds="http://www.onvif.org/ver10/device/wsdl">` +
 		`<e:Header><w:MessageID>` + id + `</w:MessageID>` +
-		`<w:To e:mustUnderstand="true">urn:schemas-xmlsoap-org:ws:2005:04:discovery</w:To>` +
-		`<w:Action e:mustUnderstand="true">http://schemas.xmlsoap.org/ws/2005/04/discovery/Probe</w:Action>` +
-		`</e:Header><e:Body><d:Probe><d:Types>dn:NetworkVideoTransmitter</d:Types></d:Probe></e:Body></e:Envelope>`
+		`<w:To e:mustUnderstand="true">` + to + `</w:To>` +
+		`<w:Action e:mustUnderstand="true">` + action + `</w:Action>` +
+		`</e:Header><e:Body><d:Probe>` + typeElement + `</d:Probe></e:Body></e:Envelope>`
 	return []byte(message), nil
 }
 
-func discoverONVIFOnIP(ctx context.Context, localIP net.IP, probe []byte) []ONVIFDevice {
+func discoverONVIFOnIP(ctx context.Context, localIP net.IP, probes [][]byte) []ONVIFDevice {
 	conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: localIP, Port: 0})
 	if err != nil {
 		return nil
@@ -169,11 +262,24 @@ func discoverONVIFOnIP(ctx context.Context, localIP net.IP, probe []byte) []ONVI
 	defer conn.Close()
 
 	target := &net.UDPAddr{IP: net.IPv4(239, 255, 255, 250), Port: 3702}
-	if _, err := conn.WriteToUDP(probe, target); err != nil {
+	sent := false
+	for round := 0; round < 2; round++ {
+		for _, probe := range probes {
+			if _, err := conn.WriteToUDP(probe, target); err == nil {
+				sent = true
+			}
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(20 * time.Millisecond):
+			}
+		}
+	}
+	if !sent {
 		return nil
 	}
 
-	result := make([]ONVIFDevice, 0, 4)
+	result := make([]ONVIFDevice, 0, 8)
 	buffer := make([]byte, 64<<10)
 	for {
 		deadline := time.Now().Add(250 * time.Millisecond)
@@ -199,10 +305,9 @@ func discoverONVIFOnIP(ctx context.Context, localIP net.IP, probe []byte) []ONVI
 		if sender == nil || sender.IP == nil || n <= 0 {
 			continue
 		}
-		devices := parseWSDiscoveryResponse(buffer[:n], sender.IP)
-		result = append(result, devices...)
-		if len(result) >= 64 {
-			return result[:64]
+		result = append(result, parseWSDiscoveryResponse(buffer[:n], sender.IP)...)
+		if len(result) >= 128 {
+			return result[:128]
 		}
 	}
 }
@@ -229,6 +334,9 @@ func parseWSDiscoveryResponse(raw []byte, senderIP net.IP) []ONVIFDevice {
 	result := make([]ONVIFDevice, 0, len(envelope.Body.ProbeMatches.Matches))
 	for _, match := range envelope.Body.ProbeMatches.Matches {
 		scopes := strings.Fields(strings.TrimSpace(match.Scopes))
+		if !looksLikeONVIFDiscoveryMatch(scopes, match.XAddrs) {
+			continue
+		}
 		for _, candidate := range strings.Fields(strings.TrimSpace(match.XAddrs)) {
 			address, err := normalizeDiscoveredONVIFAddress(candidate, senderIP)
 			if err != nil {
@@ -248,6 +356,22 @@ func parseWSDiscoveryResponse(raw []byte, senderIP net.IP) []ONVIFDevice {
 		}
 	}
 	return result
+}
+
+func looksLikeONVIFDiscoveryMatch(scopes []string, xaddrs string) bool {
+	for _, scope := range scopes {
+		lower := strings.ToLower(scope)
+		if strings.Contains(lower, "onvif.org") || strings.Contains(lower, "networkvideotransmitter") {
+			return true
+		}
+	}
+	for _, candidate := range strings.Fields(strings.TrimSpace(xaddrs)) {
+		lower := strings.ToLower(candidate)
+		if strings.Contains(lower, "/onvif/") || strings.Contains(lower, "onvif") {
+			return true
+		}
+	}
+	return false
 }
 
 func normalizeDiscoveredONVIFAddress(value string, senderIP net.IP) (string, error) {
