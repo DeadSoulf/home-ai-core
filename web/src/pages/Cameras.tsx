@@ -153,6 +153,8 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
   const [liveErrors, setLiveErrors] = useState<Record<string, boolean>>({});
   const [discoveryOpen, setDiscoveryOpen] = useState(false);
   const [discoveryDevices, setDiscoveryDevices] = useState<NVRCameraDiscoveryDevice[]>([]);
+  const [discoveryCIDR, setDiscoveryCIDR] = useState("");
+  const [discoveryMode, setDiscoveryMode] = useState<"quick" | "deep">("quick");
   const [onvifOpen, setONVIFOpen] = useState(false);
   const [onvifDevices, setONVIFDevices] = useState<NVRONVIFDevice[]>([]);
   const [onvifDevice, setONVIFDevice] = useState<NVRONVIFDevice>();
@@ -193,11 +195,12 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
     setDiscoveryDevices([]);
   };
 
-  const discoverCameras = async () => {
+  const discoverCameras = async (mode: "quick" | "deep" = "quick") => {
     setBusy("discovery");
+    setDiscoveryMode(mode);
     setFormError("");
     try {
-      const devices = await api.discoverCameras();
+      const devices = await api.discoverCameras(mode, mode === "deep" ? discoveryCIDR : "");
       setDiscoveryDevices(devices);
       setDiscoveryOpen(true);
     } catch (reason) {
@@ -711,27 +714,49 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
 
       <Panel title={t("cameraList")}>
         {globalManage && !editorOpen && !onvifOpen && !discoveryOpen && (
-          <div className="nvr-toolbar">
-            <button type="button" className="button primary" onClick={openCreate}>
-              {t("nvrAddCamera")}
-            </button>
-            <button
-              type="button"
-              className="button primary"
-              disabled={Boolean(busy)}
-              onClick={() => void discoverCameras()}
-            >
-              {busy === "discovery" ? t("nvrDiscoveryScanning") : t("nvrDiscoverNetwork")}
-            </button>
-            <button
-              type="button"
-              className="button secondary"
-              disabled={Boolean(busy) || !data.status.onvif_ready}
-              onClick={() => void discoverONVIF()}
-            >
-              {busy === "onvif:discover" ? t("working") : t("nvrDiscoverONVIF")}
-            </button>
-          </div>
+          <>
+            <div className="nvr-toolbar">
+              <button type="button" className="button primary" onClick={openCreate}>
+                {t("nvrAddCamera")}
+              </button>
+              <button
+                type="button"
+                className="button primary"
+                disabled={Boolean(busy)}
+                onClick={() => void discoverCameras("quick")}
+              >
+                {busy === "discovery" && discoveryMode === "quick" ? t("nvrDiscoveryScanning") : t("nvrDiscoveryQuick")}
+              </button>
+              <button
+                type="button"
+                className="button primary"
+                disabled={Boolean(busy)}
+                onClick={() => void discoverCameras("deep")}
+              >
+                {busy === "discovery" && discoveryMode === "deep" ? t("nvrDiscoveryDeepScanning") : t("nvrDiscoveryDeep")}
+              </button>
+              <button
+                type="button"
+                className="button secondary"
+                disabled={Boolean(busy) || !data.status.onvif_ready}
+                onClick={() => void discoverONVIF()}
+              >
+                {busy === "onvif:discover" ? t("working") : t("nvrDiscoverONVIF")}
+              </button>
+            </div>
+            <div className="notice">
+              <label className="nvr-address-field">
+                {t("nvrDiscoveryCIDR")}
+                <input
+                  inputMode="text"
+                  placeholder="192.168.1.0/24"
+                  value={discoveryCIDR}
+                  onChange={(event) => setDiscoveryCIDR(event.target.value)}
+                />
+              </label>
+              <p>{t("nvrDiscoveryCIDRHint")}</p>
+            </div>
+          </>
         )}
 
         {data.cameras.length === 0 ? (
@@ -874,8 +899,10 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
             </div>
           )}
           <div className="nvr-form-actions">
-            <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={() => void discoverCameras()}>
-              {busy === "discovery" ? t("nvrDiscoveryScanning") : t("refresh")}
+            <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={() => void discoverCameras(discoveryMode)}>
+              {busy === "discovery"
+                ? discoveryMode === "deep" ? t("nvrDiscoveryDeepScanning") : t("nvrDiscoveryScanning")
+                : t("refresh")}
             </button>
             <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={resetDiscovery}>
               {t("cancel")}
