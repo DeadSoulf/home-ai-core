@@ -51,11 +51,15 @@ func NewFFProbe() *FFProbe {
 }
 
 func (p *FFProbe) Available() bool {
-	return p != nil && p.path != ""
+	return p != nil && resolveRuntimeExecutable(p.path, "ffprobe") != ""
 }
 
 func (p *FFProbe) Probe(ctx context.Context, request ProbeRequest) (ProbeResult, error) {
-	if !p.Available() {
+	path := ""
+	if p != nil {
+		path = resolveRuntimeExecutable(p.path, "ffprobe")
+	}
+	if path == "" {
 		return ProbeResult{}, ErrMediaRuntimeUnavailable
 	}
 	address, err := normalizeRTSPAddress(request.Address)
@@ -82,7 +86,7 @@ func (p *FFProbe) Probe(ctx context.Context, request ProbeRequest) (ProbeResult,
 
 	command := exec.CommandContext(
 		probeCtx,
-		p.path,
+		path,
 		"-v", "error",
 		"-f", "concat",
 		"-safe", "0",
