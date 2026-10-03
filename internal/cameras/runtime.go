@@ -2,8 +2,8 @@ package cameras
 
 import (
 	"context"
-	"errors"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -162,7 +162,6 @@ func validateLoginRequest(request LoginRequest) error {
 	return nil
 }
 
-
 func (s *Service) Cameras() []Camera {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -173,14 +172,22 @@ func (s *Service) Cameras() []Camera {
 
 func (s *Service) AddCamera(ctx context.Context, request LoginRequest, name string) (Camera, error) {
 	result, err := s.TestLogin(ctx, request)
-	if err != nil { return Camera{}, err }
+	if err != nil {
+		return Camera{}, err
+	}
 	name = strings.TrimSpace(name)
-	if name == "" { name = request.Address }
+	if name == "" {
+		name = request.Address
+	}
 	item := Camera{
 		ID: fmt.Sprintf("cam-%d", time.Now().UnixNano()),
-		Name: name, Address: result.Address, Port: result.Port,
-		Username: request.Username, Password: request.Password,
-		Backend: result.Backend, CreatedAt: time.Now().UTC().Format(time.RFC3339),
+		Name:      name,
+		Address:   result.Address,
+		Port:      result.Port,
+		Username:  request.Username,
+		Password:  request.Password,
+		Backend:   result.Backend,
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -201,16 +208,26 @@ func (s *Service) cameraStorePath() string { return filepath.Join(s.runtimeRoot,
 
 func (s *Service) loadCameras() error {
 	data, err := os.ReadFile(s.cameraStorePath())
-	if errors.Is(err, os.ErrNotExist) { return nil }
-	if err != nil { return err }
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
 	return json.Unmarshal(data, &s.cameras)
 }
 
 func (s *Service) saveCamerasLocked() error {
-	if err := os.MkdirAll(s.runtimeRoot, 0700); err != nil { return err }
+	if err := os.MkdirAll(s.runtimeRoot, 0700); err != nil {
+		return err
+	}
 	data, err := json.MarshalIndent(s.cameras, "", "  ")
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	tmp := s.cameraStorePath() + ".tmp"
-	if err := os.WriteFile(tmp, data, 0600); err != nil { return err }
+	if err := os.WriteFile(tmp, data, 0600); err != nil {
+		return err
+	}
 	return os.Rename(tmp, s.cameraStorePath())
 }
