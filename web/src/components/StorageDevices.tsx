@@ -94,7 +94,7 @@ export function StorageDevices({
   showDiskToolbar?: boolean;
   mode?: "tree" | "diskActions" | "partitions";
 }) {
-  const {t, locale} = useI18n();
+  const {t} = useI18n();
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -183,7 +183,7 @@ export function StorageDevices({
     else if (normalized.includes("device is already mounted")) friendly = t("storageErrorAlreadyMounted");
     else if (normalized.includes("mount device") || normalized.includes("wrong fs type") || normalized.includes("bad superblock") || normalized.includes("filesystem diagnostic")) friendly = t("storageErrorMount");
     else if (normalized.includes("filesystem verification") || normalized.includes("format device")) friendly = t("storageErrorFormat");
-    setError(friendly ? (locale === "ru" ? friendly : friendly + "\n" + t("technicalDetails") + ": " + detail) : detail);
+    setError(friendly ? friendly + "\n" + t("technicalDetails") + ": " + detail : detail);
   }
 
   function resizeColumn(column: StorageColumn, event: ReactPointerEvent<HTMLSpanElement>) {
