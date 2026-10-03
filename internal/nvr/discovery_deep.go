@@ -656,6 +656,9 @@ func mergeCameraDiscoveryDevice(
 	if current.RTSPAddressHint == "" {
 		current.RTSPAddressHint = incoming.RTSPAddressHint
 	}
+	if current.SubstreamAddressHint == "" {
+		current.SubstreamAddressHint = incoming.SubstreamAddressHint
+	}
 	for _, source := range incoming.Sources {
 		addDiscoverySource(current, source)
 	}
