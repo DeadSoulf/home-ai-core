@@ -31,6 +31,7 @@ type CameraSummary struct {
 	AudioEnabled   bool                `json:"audio_enabled"`
 	HasCredentials bool                `json:"has_credentials"`
 	Runtime        CameraRuntimeStatus `json:"runtime"`
+	Recording      RecordingStatus     `json:"recording"`
 	CreatedAt      time.Time           `json:"created_at"`
 	UpdatedAt      time.Time           `json:"updated_at"`
 }
@@ -59,6 +60,8 @@ type Status struct {
 	MediaRuntimeReady bool   `json:"media_runtime_ready"`
 	LiveRuntimeReady  bool   `json:"live_runtime_ready"`
 	ActiveLiveStreams int    `json:"active_live_streams"`
+	RecordingReady    bool   `json:"recording_ready"`
+	ActiveRecordings  int    `json:"active_recordings"`
 	SecretStoreReady  bool   `json:"secret_store_ready"`
 	ONVIFReady        bool   `json:"onvif_ready"`
 	FoundationStage   string `json:"foundation_stage"`
