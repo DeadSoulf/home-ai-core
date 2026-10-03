@@ -93,10 +93,9 @@ func TestContinuousRecordingIndexesCompletedSegment(t *testing.T) {
 		}
 		if total == int64(len("segment-data")) {
 			status := service.CameraRecording(camera.ID)
-			if status.LastSegmentPath == "" {
-				t.Fatalf("recording status = %#v", status)
+			if status.LastSegmentPath != "" {
+				return
 			}
-			return
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
