@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/cameras"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
@@ -108,6 +109,15 @@ func (s *server) camerasInstallRuntime(
 		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
 		return
 	}
+	// SDK archives are large and may be uploaded over slow remote links. The
+	// server-wide ReadTimeout protects ordinary API requests, but would abort
+	// this bounded upload before the body is received.
+	controller := http.NewResponseController(w)
+	if err := controller.SetReadDeadline(time.Time{}); err != nil {
+		writeAPIError(w, r, http.StatusInternalServerError, "camera_sdk_upload_deadline", "could not prepare long SDK upload", nil)
+		return
+	}
+
 	if r.ContentLength <= 0 || r.ContentLength > 256<<20 {
 		writeAPIError(w, r, http.StatusRequestEntityTooLarge, "camera_sdk_archive_invalid", "HCNetSDK ZIP must be smaller than 256 MiB", nil)
 		return
