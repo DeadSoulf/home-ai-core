@@ -674,7 +674,14 @@ func (s *server) writeNVRError(w http.ResponseWriter, r *http.Request, err error
 	case errors.Is(err, nvrpkg.ErrONVIFInvalidEndpoint):
 		writeAPIError(w, r, http.StatusBadRequest, "onvif_invalid_endpoint", "ONVIF endpoint must be a local/private HTTP or HTTPS address", nil)
 	case errors.Is(err, nvrpkg.ErrONVIFAuthentication):
-		writeAPIError(w, r, http.StatusBadGateway, "onvif_authentication_failed", "ONVIF authentication failed", nil)
+		writeAPIError(
+			w,
+			r,
+			http.StatusBadGateway,
+			"onvif_authentication_failed",
+			"ONVIF authentication failed; Hikvision/HiWatch cameras may require ONVIF to be enabled and a separate ONVIF user",
+			nil,
+		)
 	case errors.Is(err, nvrpkg.ErrONVIFNoMediaProfiles):
 		writeAPIError(w, r, http.StatusUnprocessableEntity, "onvif_no_profiles", "ONVIF device returned no media profiles", nil)
 	case errors.Is(err, nvrpkg.ErrONVIFConnection):

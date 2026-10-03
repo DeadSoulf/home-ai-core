@@ -213,6 +213,24 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
   };
 
   const useDiscoveredDevice = (device: NVRCameraDiscoveryDevice) => {
+    const hikvisionFamily =
+      device.vendor?.toLowerCase().includes("hikvision") ||
+      device.vendor?.toLowerCase().includes("hiwatch") ||
+      device.sources.some((source) => source === "hikvision:sadp");
+
+    if (hikvisionFamily && device.rtsp_address_hint) {
+      resetEditor();
+      setEditor({
+        ...emptyEditor(),
+        name: device.name || [device.vendor, device.model].filter(Boolean).join(" ") || device.ip,
+        address: device.rtsp_address_hint,
+        substreamAddress: device.substream_address_hint || "",
+      });
+      setDiscoveryOpen(false);
+      setEditorOpen(true);
+      return;
+    }
+
     if (device.onvif_address) {
       setDiscoveryOpen(false);
       setONVIFOpen(true);
@@ -230,6 +248,7 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
       ...emptyEditor(),
       name: device.name || [device.vendor, device.model].filter(Boolean).join(" ") || device.ip,
       address: device.rtsp_address_hint || "",
+      substreamAddress: device.substream_address_hint || "",
     });
     setDiscoveryOpen(false);
     setEditorOpen(true);

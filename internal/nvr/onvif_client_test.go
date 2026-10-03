@@ -1,6 +1,8 @@
 package nvr
 
 import (
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 )
@@ -80,5 +82,84 @@ func TestONVIFSecurityHeaderDoesNotUsePlaintextPassword(t *testing.T) {
 	}
 	if !strings.Contains(header, "PasswordDigest") || !strings.Contains(header, "viewer") {
 		t.Fatalf("unexpected WS-Security header: %s", header)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return fn(request)
+}
+
+func TestONVIFProfilesRetriesWithHTTPDigest(t *testing.T) {
+	const challenge = `Digest realm="IP Camera", nonce="abcdef0123456789", qop="auth", algorithm=MD5`
+	transport := roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		body, _ := io.ReadAll(request.Body)
+		if !strings.HasPrefix(request.Header.Get("Authorization"), "Digest ") {
+			return &http.Response{
+				StatusCode: http.StatusUnauthorized,
+				Header: http.Header{
+					"Www-Authenticate": []string{challenge},
+				},
+				Body:    io.NopCloser(strings.NewReader("")),
+				Request: request,
+			}, nil
+		}
+
+		var response string
+		switch {
+		case strings.Contains(string(body), "GetCapabilities"):
+			response = `<Envelope><Body><GetCapabilitiesResponse><Capabilities><Media XAddr="http://192.168.1.40/onvif/media_service"/></Capabilities></GetCapabilitiesResponse></Body></Envelope>`
+		case strings.Contains(string(body), "GetProfiles"):
+			response = `<Envelope><Body><GetProfilesResponse><Profiles token="main"><Name>Main</Name><VideoEncoderConfiguration><Encoding>H264</Encoding><Resolution><Width>1920</Width><Height>1080</Height></Resolution></VideoEncoderConfiguration></Profiles></GetProfilesResponse></Body></Envelope>`
+		case strings.Contains(string(body), "GetStreamUri"):
+			response = `<Envelope><Body><GetStreamUriResponse><MediaUri><Uri>rtsp://192.168.1.40:554/Streaming/Channels/101</Uri></MediaUri></GetStreamUriResponse></Body></Envelope>`
+		default:
+			t.Fatalf("unexpected SOAP request: %s", body)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/soap+xml"}},
+			Body:       io.NopCloser(strings.NewReader(response)),
+			Request:    request,
+		}, nil
+	})
+
+	client := NewSOAPONVIFClient()
+	client.client = &http.Client{Transport: transport}
+	profiles, err := client.Profiles(
+		t.Context(),
+		"http://192.168.1.40/onvif/device_service",
+		CameraCredential{Username: "onvif-user", Password: "secret"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(profiles) != 1 || profiles[0].StreamURI != "rtsp://192.168.1.40:554/Streaming/Channels/101" {
+		t.Fatalf("profiles = %#v", profiles)
+	}
+}
+
+func TestHTTPDigestAuthorizationDoesNotLeakPassword(t *testing.T) {
+	header, err := buildHTTPDigestAuthorization(
+		`Digest realm="IP Camera", nonce="abcdef", qop="auth", algorithm=MD5`,
+		"viewer",
+		"super-secret",
+		"POST",
+		"/onvif/device_service",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(header, "Digest ") {
+		t.Fatalf("authorization = %q", header)
+	}
+	if strings.Contains(header, "super-secret") {
+		t.Fatalf("authorization leaked password: %s", header)
+	}
+	if !strings.Contains(header, `username="viewer"`) ||
+		!strings.Contains(header, `uri="/onvif/device_service"`) ||
+		!strings.Contains(header, "qop=auth") {
+		t.Fatalf("unexpected authorization: %s", header)
 	}
 }

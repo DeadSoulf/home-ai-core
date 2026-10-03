@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.150-dev
+
+- Add HTTP Digest authentication fallback to ONVIF SOAP requests for Hikvision/HiWatch cameras that answer the initial WS-Security request with HTTP 401.
+- Support MD5/MD5-sess and SHA-256/SHA-256-sess Digest challenges with qop=auth without exposing camera passwords in logs or stored URLs.
+- For Hikvision-family SADP discoveries, prefill the documented RTSP main/substream paths `/Streaming/Channels/101` and `/Streaming/Channels/102`.
+- Prefer direct RTSP onboarding for Hikvision/HiWatch SADP results so cameras can be added even when ONVIF is disabled or uses a separate ONVIF account.
+- Preserve ONVIF onboarding for other cameras and for Hikvision-family devices that are discovered only through ONVIF.
+- Improve ONVIF authentication errors with a Hikvision/HiWatch-specific hint about enabling ONVIF and creating an ONVIF user.
+
 ## 0.1.149-dev
 
 - Simplify the Cameras toolbar to two primary actions: Add camera and Search.

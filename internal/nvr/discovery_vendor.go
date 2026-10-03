@@ -136,9 +136,17 @@ func parseHikvisionSADPResponse(raw []byte, senderIP net.IP) (CameraDiscoveryDev
 		"http://"+hostPortForDiscovery(ipText, httpPort, 80),
 	)
 	if rtspPort := intField(fields, "RtspPort", "RTSPPort"); rtspPort > 0 {
-		address := fmt.Sprintf("rtsp://%s/", hostPortForDiscovery(ipText, rtspPort, 554))
-		addDiscoveryService(&device, "rtsp", rtspPort, address)
-		device.RTSPAddressHint = address
+		mainAddress := fmt.Sprintf(
+			"rtsp://%s/Streaming/Channels/101",
+			hostPortForDiscovery(ipText, rtspPort, 554),
+		)
+		subAddress := fmt.Sprintf(
+			"rtsp://%s/Streaming/Channels/102",
+			hostPortForDiscovery(ipText, rtspPort, 554),
+		)
+		addDiscoveryService(&device, "rtsp", rtspPort, mainAddress)
+		device.RTSPAddressHint = mainAddress
+		device.SubstreamAddressHint = subAddress
 	}
 	if commandPort := intField(fields, "CommandPort", "SDKPort"); commandPort > 0 {
 		addDiscoveryService(&device, "hikvision-sdk", commandPort, "")

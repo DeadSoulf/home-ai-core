@@ -182,34 +182,83 @@ func (c *SOAPONVIFClient) soap(
 		`<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">` +
 		securityHeader + `<s:Body>` + body + `</s:Body></s:Envelope>`
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, parsed.String(), bytes.NewBufferString(payload))
-	if err != nil {
-		return nil, fmt.Errorf("%w: build request", ErrONVIFConnection)
+	type responseData struct {
+		status int
+		header http.Header
+		raw    []byte
 	}
-	req.Header.Set("Content-Type", "application/soap+xml; charset=utf-8")
-	req.Header.Set("Accept", "application/soap+xml, application/xml, text/xml")
-	req.Header.Set("User-Agent", "Home-AI-Core ONVIF")
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return nil, fmt.Errorf("%w: timeout", ErrONVIFConnection)
+	request := func(authorization string) (responseData, error) {
+		req, err := http.NewRequestWithContext(
+			ctx,
+			http.MethodPost,
+			parsed.String(),
+			bytes.NewBufferString(payload),
+		)
+		if err != nil {
+			return responseData{}, fmt.Errorf("%w: build request", ErrONVIFConnection)
 		}
-		return nil, fmt.Errorf("%w: request failed", ErrONVIFConnection)
+		req.Header.Set("Content-Type", "application/soap+xml; charset=utf-8")
+		req.Header.Set("Accept", "application/soap+xml, application/xml, text/xml")
+		req.Header.Set("User-Agent", "Home-AI-Core ONVIF")
+		if authorization != "" {
+			req.Header.Set("Authorization", authorization)
+		}
+
+		resp, err := c.client.Do(req)
+		if err != nil {
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				return responseData{}, fmt.Errorf("%w: timeout", ErrONVIFConnection)
+			}
+			return responseData{}, fmt.Errorf("%w: request failed", ErrONVIFConnection)
+		}
+		defer resp.Body.Close()
+		raw, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+		if err != nil {
+			return responseData{}, fmt.Errorf("%w: read response", ErrONVIFConnection)
+		}
+		return responseData{
+			status: resp.StatusCode,
+			header: resp.Header.Clone(),
+			raw:    raw,
+		}, nil
 	}
-	defer resp.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+
+	result, err := request("")
 	if err != nil {
-		return nil, fmt.Errorf("%w: read response", ErrONVIFConnection)
+		return nil, err
 	}
-	switch resp.StatusCode {
+	if result.status == http.StatusUnauthorized &&
+		strings.TrimSpace(credential.Username) != "" {
+		for _, challenge := range result.header.Values("WWW-Authenticate") {
+			if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(challenge)), "digest ") {
+				continue
+			}
+			authorization, authErr := buildHTTPDigestAuthorization(
+				challenge,
+				credential.Username,
+				credential.Password,
+				http.MethodPost,
+				parsed.RequestURI(),
+			)
+			if authErr != nil {
+				continue
+			}
+			result, err = request(authorization)
+			if err != nil {
+				return nil, err
+			}
+			break
+		}
+	}
+
+	switch result.status {
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return nil, ErrONVIFAuthentication
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("%w: HTTP %d", ErrONVIFConnection, resp.StatusCode)
+	if result.status < 200 || result.status >= 300 {
+		return nil, fmt.Errorf("%w: HTTP %d", ErrONVIFConnection, result.status)
 	}
-	if fault := parseSOAPFault(raw); fault != "" {
+	if fault := parseSOAPFault(result.raw); fault != "" {
 		lower := strings.ToLower(fault)
 		if strings.Contains(lower, "notauthorized") ||
 			strings.Contains(lower, "unauthorized") ||
@@ -218,7 +267,7 @@ func (c *SOAPONVIFClient) soap(
 		}
 		return nil, fmt.Errorf("%w: %s", ErrONVIFConnection, fault)
 	}
-	return raw, nil
+	return result.raw, nil
 }
 
 func onvifSecurityHeader(credential CameraCredential) (string, error) {
