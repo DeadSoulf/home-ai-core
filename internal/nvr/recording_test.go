@@ -13,6 +13,15 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/state"
 )
 
+type fakeMountChecker struct {
+	mounted bool
+	err     error
+}
+
+func (f fakeMountChecker) Mounted(string) (bool, error) {
+	return f.mounted, f.err
+}
+
 type fakeRecorderSource struct {
 	started chan string
 }
@@ -72,6 +81,7 @@ func TestContinuousRecordingIndexesCompletedSegment(t *testing.T) {
 	}}
 	service := NewServiceWithDependencies(store, newFakeCredentialStore(), prober)
 	service.recorder = &fakeRecorderSource{started: make(chan string, 1)}
+	service.mountChecker = fakeMountChecker{mounted: true}
 	service.healthInterval = time.Hour
 
 	camera, _, err := service.CreateCamera(ctx, "", CameraInput{
@@ -413,6 +423,7 @@ func TestContinuousRecordingRestartsAfterRecorderProcessLoss(t *testing.T) {
 		&fakeProber{result: ProbeResult{Codec: "h264", Width: 1920, Height: 1080}},
 	)
 	service.recorder = recorder
+	service.mountChecker = fakeMountChecker{mounted: true}
 	service.retryDelays = []time.Duration{time.Millisecond}
 	service.healthInterval = time.Hour
 
@@ -446,4 +457,47 @@ func TestContinuousRecordingRestartsAfterRecorderProcessLoss(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatalf("recorder did not recover: calls=%d status=%#v", recorder.Calls(), service.CameraRecording(camera.ID))
+}
+
+
+func TestContinuousRecordingRejectsUnmountedArchiveTarget(t *testing.T) {
+	ctx := context.Background()
+	store, err := state.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	mountpoint := t.TempDir()
+	if _, err := store.SetNVRStorageTarget(
+		ctx, "/dev/unmounted-video", "uuid-unmounted-video", mountpoint, 10, true, time.Now(),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewServiceWithDependencies(
+		store,
+		newFakeCredentialStore(),
+		&fakeProber{result: ProbeResult{Codec: "h264"}},
+	)
+	service.recorder = &fakeRecorderSource{}
+	service.mountChecker = fakeMountChecker{mounted: false}
+
+	camera, _, err := service.CreateCamera(ctx, "", CameraInput{
+		Name:          "Unmounted archive",
+		Address:       "rtsp://192.0.2.121/main",
+		Transport:     "tcp",
+		RecordingMode: "continuous",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := store.NVRCamera(ctx, camera.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := service.startRecording(ctx, record); !errors.Is(err, ErrRecordingStorageUnmounted) {
+		t.Fatalf("start recording error = %v, want %v", err, ErrRecordingStorageUnmounted)
+	}
 }
