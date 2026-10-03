@@ -77,7 +77,7 @@ type Service struct {
 	liveIdleTimeout time.Duration
 
 	recordingMu       sync.Mutex
-	recorder           RecorderSource
+	recorder          RecorderSource
 	recordingSessions map[string]*recordingSession
 	recordingStatus   map[string]RecordingStatus
 	spaceChecker      SpaceChecker
@@ -153,16 +153,16 @@ func newService(
 	prober CameraProber,
 ) *Service {
 	return &Service{
-		store:           store,
-		credentials:     credentials,
-		prober:          prober,
-		discoverer:      NewWSDiscovery(),
-		onvif:           NewSOAPONVIFClient(),
-		now:             time.Now,
-		workers:         map[string]cameraWorker{},
-		runtime:         map[string]CameraRuntimeStatus{},
-		healthInterval:  30 * time.Second,
-		retryDelays:     []time.Duration{2 * time.Second, 5 * time.Second, 15 * time.Second, 30 * time.Second},
+		store:             store,
+		credentials:       credentials,
+		prober:            prober,
+		discoverer:        NewWSDiscovery(),
+		onvif:             NewSOAPONVIFClient(),
+		now:               time.Now,
+		workers:           map[string]cameraWorker{},
+		runtime:           map[string]CameraRuntimeStatus{},
+		healthInterval:    30 * time.Second,
+		retryDelays:       []time.Duration{2 * time.Second, 5 * time.Second, 15 * time.Second, 30 * time.Second},
 		liveSource:        NewFFmpegMJPEGSource(),
 		liveSessions:      map[string]*liveSession{},
 		liveIdleTimeout:   5 * time.Second,
