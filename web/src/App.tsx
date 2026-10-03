@@ -8,7 +8,6 @@ import { FirstRunPage, LoginPage } from "./pages/Auth";
 import { AccountPage } from "./pages/Account";
 import { AIPage } from "./pages/AI";
 import { AuditPage } from "./pages/Audit";
-import { CamerasPage } from "./pages/Cameras";
 import { Dashboard } from "./pages/Dashboard";
 import { FilesPage } from "./pages/Files";
 import { JobsPage } from "./pages/Jobs";
@@ -217,9 +216,6 @@ export default function App() {
       break;
     case "/account":
       page = accountPage;
-      break;
-    case "/modules/nvr":
-      page = <CamerasPage revision={revision} actor={actor} />;
       break;
     case "/files":
     case "/files/storage":
