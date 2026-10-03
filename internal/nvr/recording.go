@@ -18,7 +18,8 @@ import (
 var (
 	ErrRecordingUnavailable = errors.New("NVR recording runtime is unavailable")
 	ErrRecordingNoStorage   = errors.New("NVR recording storage is not configured")
-	ErrRecordingStorageFull = errors.New("NVR recording storage reserve cannot be restored")
+	ErrRecordingStorageFull      = errors.New("NVR recording storage reserve cannot be restored")
+	ErrRecordingStorageUnmounted = errors.New("NVR recording storage is not mounted")
 )
 
 type RecordedSegment struct {
@@ -212,6 +213,9 @@ func (s *Service) startRecording(ctx context.Context, camera state.NVRCameraReco
 	if err != nil {
 		return ErrRecordingNoStorage
 	}
+	if err := s.ensureRecordingMount(target); err != nil {
+		return err
+	}
 	if err := s.enforceStorageReserve(ctx, target); err != nil {
 		return err
 	}
@@ -275,6 +279,9 @@ func (s *Service) startRecordingAttempt(
 	target state.NVRStorageTargetRecord,
 	credential CameraCredential,
 ) (recordingAttempt, error) {
+	if err := s.ensureRecordingMount(target); err != nil {
+		return recordingAttempt{}, err
+	}
 	if err := s.enforceStorageReserve(ctx, target); err != nil {
 		return recordingAttempt{}, err
 	}
@@ -541,6 +548,24 @@ func (s *Service) RefreshRecordings(ctx context.Context) error {
 		if err := s.startRecording(ctx, camera); err != nil {
 			s.setRecordingError(camera.ID, runtimeRecordingErrorMessage(err))
 		}
+	}
+	return nil
+}
+
+func (s *Service) ensureRecordingMount(target state.NVRStorageTargetRecord) error {
+	mountpoint := filepath.Clean(strings.TrimSpace(target.Mountpoint))
+	if mountpoint == "." || mountpoint == "" || mountpoint == string(filepath.Separator) || !filepath.IsAbs(mountpoint) {
+		return ErrRecordingStorageUnmounted
+	}
+	if s == nil || s.mountChecker == nil {
+		return ErrRecordingStorageUnmounted
+	}
+	mounted, err := s.mountChecker.Mounted(mountpoint)
+	if err != nil {
+		return err
+	}
+	if !mounted {
+		return ErrRecordingStorageUnmounted
 	}
 	return nil
 }
