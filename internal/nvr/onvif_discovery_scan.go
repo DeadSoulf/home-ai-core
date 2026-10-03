@@ -93,10 +93,9 @@ func discoverONVIFHTTPFallback(ctx context.Context) []ONVIFDevice {
 
 	found := make(map[string]ONVIFDevice)
 	for device := range results {
-		if len(found) >= 128 {
-			break
+		if len(found) < 128 {
+			mergeDiscoveredONVIFDevice(found, device)
 		}
-		mergeDiscoveredONVIFDevice(found, device)
 	}
 	out := make([]ONVIFDevice, 0, len(found))
 	for _, device := range found {
