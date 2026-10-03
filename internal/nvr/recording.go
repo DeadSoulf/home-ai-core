@@ -16,8 +16,8 @@ import (
 )
 
 var (
-	ErrRecordingUnavailable = errors.New("NVR recording runtime is unavailable")
-	ErrRecordingNoStorage   = errors.New("NVR recording storage is not configured")
+	ErrRecordingUnavailable      = errors.New("NVR recording runtime is unavailable")
+	ErrRecordingNoStorage        = errors.New("NVR recording storage is not configured")
 	ErrRecordingStorageFull      = errors.New("NVR recording storage reserve cannot be restored")
 	ErrRecordingStorageUnmounted = errors.New("NVR recording storage is not mounted")
 )
