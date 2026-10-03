@@ -64,7 +64,6 @@ func TestWSDiscoveryProbeTargetsONVIFNetworkVideoTransmitter(t *testing.T) {
 	}
 }
 
-
 func TestDiscoveryBindIPsFallsBackToWildcard(t *testing.T) {
 	got := discoveryBindIPs(nil, nil)
 	if len(got) != 1 || !got[0].Equal(net.IPv4zero) {
