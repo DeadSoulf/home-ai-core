@@ -5,6 +5,7 @@ import type {
   NVRCamera,
   NVRCameraInput,
   NVRProbe,
+  NVRStorageTarget,
   NVRONVIFDevice,
   NVRONVIFProfile,
 } from "../api/types";
@@ -85,6 +86,18 @@ function hasCameraLive(actor: Actor, cameraID: string): boolean {
   );
 }
 
+function formatStorageBytes(value?: number): string {
+  if (!value || value <= 0) return "0 B";
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+  let amount = value;
+  let index = 0;
+  while (amount >= 1024 && index < units.length - 1) {
+    amount /= 1024;
+    index++;
+  }
+  return `${amount.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+}
+
 function probeText(probe: NVRProbe): string {
   const size = probe.width > 0 && probe.height > 0 ? `${probe.width}×${probe.height}` : "—";
   const fps = probe.fps > 0 ? `${probe.fps.toFixed(2)} FPS` : "—";
@@ -94,10 +107,15 @@ function probeText(probe: NVRProbe): string {
 
 export function CamerasPage({revision, actor}: {revision: number; actor: Actor}) {
   const {t, date} = useI18n();
+  const storageManage = actor.permissions.includes("nvr.storage.manage");
   const load = useCallback(async () => {
-    const [status, cameras] = await Promise.all([api.nvrStatus(), api.nvrCameras()]);
-    return {status, cameras};
-  }, []);
+    const [status, cameras, storage] = await Promise.all([
+      api.nvrStatus(),
+      api.nvrCameras(),
+      storageManage ? api.nvrStorage() : Promise.resolve([] as NVRStorageTarget[]),
+    ]);
+    return {status, cameras, storage};
+  }, [storageManage]);
   const resource = useResource(load, revision);
 
   const [editorOpen, setEditorOpen] = useState(false);
@@ -121,6 +139,8 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
   const [onvifTransport, setONVIFTransport] = useState<"tcp" | "udp">("tcp");
   const [onvifRecordingMode, setONVIFRecordingMode] = useState<"off" | "continuous" | "motion">("off");
   const [onvifAudioEnabled, setONVIFAudioEnabled] = useState(false);
+  const [storageDevice, setStorageDevice] = useState("");
+  const [storageReserve, setStorageReserve] = useState(0);
 
   const globalManage = actor.permissions.includes("camera.manage");
   const currentFingerprint = useMemo(() => probeFingerprint(editor), [editor]);
@@ -365,10 +385,36 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
     setLiveErrors({});
   };
 
+  const saveStorage = async () => {
+    const active = resource.data?.storage.find((target) => target.active);
+    const fallback = resource.data?.storage.find((target) => target.ready);
+    const device = storageDevice || active?.device || fallback?.device || "";
+    const reservePercent = storageReserve || active?.reserve_percent || 5;
+    if (!device) return;
+
+    setBusy("storage");
+    setFormError("");
+    try {
+      const target = await api.setNVRStorage(device, reservePercent);
+      setStorageDevice(target.device);
+      setStorageReserve(target.reserve_percent);
+      resource.reload();
+    } catch (reason) {
+      setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  };
+
   if (resource.loading && !resource.data) return <LoadingState />;
   if (resource.error && !resource.data) return <ErrorState message={resource.error} />;
 
   const data = resource.data!;
+  const activeStorage = data.storage.find((target) => target.active);
+  const defaultStorage = activeStorage || data.storage.find((target) => target.ready);
+  const selectedStorageDevice = storageDevice || defaultStorage?.device || "";
+  const selectedStorageReserve = storageReserve || activeStorage?.reserve_percent || 5;
+
   return (
     <div className="page">
       <PageHeading title={t("cameras")} subtitle={t("camerasSubtitle")} />
@@ -399,9 +445,75 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
           <strong>{data.status.live_runtime_ready ? t("available") : t("nvrNotYet")}</strong>
           <small>{t("nvrLiveStreams")}: {data.status.active_live_streams}</small>
         </div>
+        <div className="metric">
+          <span>{t("nvrRecordingRuntime")}</span>
+          <strong>{data.status.recording_ready ? t("available") : t("nvrNotYet")}</strong>
+          <small>{t("nvrActiveRecordings")}: {data.status.active_recordings}</small>
+        </div>
       </div>
 
       {formError && <div className="form-error">{formError}</div>}
+
+      {storageManage && (
+        <Panel title={t("nvrVideoStorage")}>
+          {data.storage.length === 0 ? (
+            <EmptyState>{t("nvrNoVideoStorage")}</EmptyState>
+          ) : (
+            <>
+              <div className="nvr-storage-grid">
+                <label>
+                  {t("nvrStorageDevice")}
+                  <select
+                    value={selectedStorageDevice}
+                    onChange={(event) => {
+                      setStorageDevice(event.target.value);
+                      const target = data.storage.find((item) => item.device === event.target.value);
+                      setStorageReserve(target?.active ? target.reserve_percent : 5);
+                    }}
+                  >
+                    {data.storage.map((target) => (
+                      <option key={target.device} value={target.device} disabled={!target.ready}>
+                        {target.label || target.device}
+                        {target.mountpoint ? ` · ${target.mountpoint}` : ""}
+                        {!target.ready ? ` · ${t("nvrStorageNotMounted")}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  {t("nvrStorageReserve")}
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={selectedStorageReserve}
+                    onChange={(event) => setStorageReserve(Number(event.target.value))}
+                  />
+                </label>
+              </div>
+              {defaultStorage && (
+                <div className="notice">
+                  <p>
+                    {t("nvrStorageFree")}: {defaultStorage.free_known ? formatStorageBytes(defaultStorage.free_bytes) : "—"}
+                    {" · "}{t("nvrStorageArchive")}: {formatStorageBytes(defaultStorage.archive_bytes)}
+                    {" · "}{t("nvrStorageReserve")}: {selectedStorageReserve}%
+                  </p>
+                </div>
+              )}
+              <div className="nvr-form-actions">
+                <button
+                  type="button"
+                  className="button primary"
+                  disabled={Boolean(busy) || !selectedStorageDevice}
+                  onClick={() => void saveStorage()}
+                >
+                  {busy === "storage" ? t("working") : t("nvrStorageSave")}
+                </button>
+              </div>
+            </>
+          )}
+        </Panel>
+      )}
 
       <Panel title={t("nvrLive")}>
         {!data.status.live_runtime_ready ? (
@@ -500,10 +612,14 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
                       {" · "}{runtimeLabel}
                       {camera.runtime.last_seen_at ? <>{" · "}{t("nvrLastSeen")}: {date(camera.runtime.last_seen_at)}</> : null}
                       {camera.runtime.reconnect_count > 0 ? <>{" · "}{t("nvrReconnects")}: {camera.runtime.reconnect_count}</> : null}
+                      {camera.recording.active ? <>{" · "}{t("nvrRecordingActive")}</> : null}
                       {" · "}{t("modified")}: {date(camera.updated_at)}
                     </span>
                     {camera.runtime.last_error && (
                       <span className="muted">{camera.runtime.last_error}</span>
+                    )}
+                    {camera.recording.last_error && (
+                      <span className="muted">{camera.recording.last_error}</span>
                     )}
                   </div>
                   <div className="nvr-camera-actions">
