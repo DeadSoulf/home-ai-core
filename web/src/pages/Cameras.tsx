@@ -413,6 +413,7 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
   const activeStorage = data.storage.find((target) => target.active);
   const defaultStorage = activeStorage || data.storage.find((target) => target.ready);
   const selectedStorageDevice = storageDevice || defaultStorage?.device || "";
+  const selectedStorage = data.storage.find((target) => target.device === selectedStorageDevice) || defaultStorage;
   const selectedStorageReserve = storageReserve || activeStorage?.reserve_percent || 5;
 
   return (
@@ -491,11 +492,11 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
                   />
                 </label>
               </div>
-              {defaultStorage && (
+              {selectedStorage && (
                 <div className="notice">
                   <p>
-                    {t("nvrStorageFree")}: {defaultStorage.free_known ? formatStorageBytes(defaultStorage.free_bytes) : "—"}
-                    {" · "}{t("nvrStorageArchive")}: {formatStorageBytes(defaultStorage.archive_bytes)}
+                    {t("nvrStorageFree")}: {selectedStorage.free_known ? formatStorageBytes(selectedStorage.free_bytes) : "—"}
+                    {" · "}{t("nvrStorageArchive")}: {formatStorageBytes(selectedStorage.archive_bytes)}
                     {" · "}{t("nvrStorageReserve")}: {selectedStorageReserve}%
                   </p>
                 </div>
