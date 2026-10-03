@@ -159,6 +159,13 @@ type recordingSession struct {
 	done   chan struct{}
 }
 
+type recordingAttempt struct {
+	cancel      context.CancelFunc
+	startedAt   time.Time
+	segments    <-chan RecordedSegment
+	processDone <-chan error
+}
+
 type RecordingStatus struct {
 	Active          bool       `json:"active"`
 	LastSegmentAt   *time.Time `json:"last_segment_at,omitempty"`
@@ -176,7 +183,13 @@ func (s *Service) ActiveRecordings() int {
 	}
 	s.recordingMu.Lock()
 	defer s.recordingMu.Unlock()
-	return len(s.recordingSessions)
+	active := 0
+	for _, status := range s.recordingStatus {
+		if status.Active {
+			active++
+		}
+	}
+	return active
 }
 
 func (s *Service) CameraRecording(cameraID string) RecordingStatus {
@@ -220,22 +233,20 @@ func (s *Service) startRecording(ctx context.Context, camera state.NVRCameraReco
 	if main.SourceURI == "" {
 		main.SourceURI = camera.Address
 	}
-	startedAt := s.now().UTC()
-	cameraRoot := filepath.Join(target.Mountpoint, "home-ai-nvr", camera.ID)
-	if err := cleanupPartialSegments(cameraRoot); err != nil {
-		return err
-	}
-	outputDir := filepath.Join(cameraRoot, strconv.FormatInt(startedAt.UnixNano(), 10))
+
 	recordingCtx, cancel := context.WithCancel(context.Background())
-	segments, processDone, err := s.recorder.Start(recordingCtx, ProbeRequest{
-		Address:    main.SourceURI,
-		Transport:  camera.Transport,
-		Credential: credential,
-	}, outputDir, camera.AudioEnabled)
+	attempt, err := s.startRecordingAttempt(
+		recordingCtx,
+		camera,
+		main,
+		target,
+		credential,
+	)
 	if err != nil {
 		cancel()
 		return err
 	}
+
 	session := &recordingSession{cancel: cancel, done: make(chan struct{})}
 	s.recordingMu.Lock()
 	if current := s.recordingSessions[camera.ID]; current != nil {
@@ -245,21 +256,145 @@ func (s *Service) startRecording(ctx context.Context, camera state.NVRCameraReco
 	s.recordingStatus[camera.ID] = RecordingStatus{Active: true}
 	s.recordingMu.Unlock()
 
-	go s.runRecordingSession(session, camera, main, target, startedAt, segments, processDone)
+	go s.runRecordingWorker(
+		recordingCtx,
+		session,
+		camera,
+		main,
+		target,
+		credential,
+		attempt,
+	)
 	return nil
 }
 
-func (s *Service) runRecordingSession(
+func (s *Service) startRecordingAttempt(
+	ctx context.Context,
+	camera state.NVRCameraRecord,
+	profile state.NVRStreamProfileRecord,
+	target state.NVRStorageTargetRecord,
+	credential CameraCredential,
+) (recordingAttempt, error) {
+	if err := s.enforceStorageReserve(ctx, target); err != nil {
+		return recordingAttempt{}, err
+	}
+
+	cameraRoot := filepath.Join(target.Mountpoint, "home-ai-nvr", camera.ID)
+	if err := cleanupPartialSegments(cameraRoot); err != nil {
+		return recordingAttempt{}, err
+	}
+	startedAt := s.now().UTC()
+	outputDir := filepath.Join(cameraRoot, strconv.FormatInt(startedAt.UnixNano(), 10))
+
+	attemptCtx, attemptCancel := context.WithCancel(ctx)
+	segments, processDone, err := s.recorder.Start(attemptCtx, ProbeRequest{
+		Address:    profile.SourceURI,
+		Transport:  camera.Transport,
+		Credential: credential,
+	}, outputDir, camera.AudioEnabled)
+	if err != nil {
+		attemptCancel()
+		return recordingAttempt{}, err
+	}
+	return recordingAttempt{
+		cancel:      attemptCancel,
+		startedAt:   startedAt,
+		segments:    segments,
+		processDone: processDone,
+	}, nil
+}
+
+func (s *Service) runRecordingWorker(
+	ctx context.Context,
 	session *recordingSession,
 	camera state.NVRCameraRecord,
 	profile state.NVRStreamProfileRecord,
 	target state.NVRStorageTargetRecord,
-	startedAt time.Time,
-	segments <-chan RecordedSegment,
-	processDone <-chan error,
+	credential CameraCredential,
+	attempt recordingAttempt,
 ) {
 	defer close(session.done)
-	for segment := range segments {
+
+	retryIndex := 0
+	for {
+		hadSegment, processErr := s.consumeRecordingAttempt(
+			session,
+			camera,
+			profile,
+			target,
+			attempt,
+		)
+		attempt.cancel()
+
+		if ctx.Err() != nil {
+			break
+		}
+		if errors.Is(processErr, ErrRecordingStorageFull) {
+			s.setRecordingState(camera.ID, false, runtimeRecordingErrorMessage(processErr))
+			break
+		}
+		if processErr == nil {
+			processErr = errors.New("recording process stopped")
+		}
+		s.setRecordingState(camera.ID, false, "recording process stopped")
+
+		if hadSegment {
+			retryIndex = 0
+		}
+		if !waitRuntime(ctx, s.retryDelay(retryIndex)) {
+			break
+		}
+		if retryIndex < len(s.retryDelays)-1 {
+			retryIndex++
+		}
+
+		for {
+			next, err := s.startRecordingAttempt(ctx, camera, profile, target, credential)
+			if err == nil {
+				attempt = next
+				s.setRecordingState(camera.ID, true, "")
+				break
+			}
+			if ctx.Err() != nil {
+				break
+			}
+			if errors.Is(err, ErrRecordingStorageFull) {
+				s.setRecordingState(camera.ID, false, runtimeRecordingErrorMessage(err))
+				processErr = err
+				break
+			}
+			s.setRecordingState(camera.ID, false, runtimeRecordingErrorMessage(err))
+			if !waitRuntime(ctx, s.retryDelay(retryIndex)) {
+				break
+			}
+			if retryIndex < len(s.retryDelays)-1 {
+				retryIndex++
+			}
+		}
+		if ctx.Err() != nil || errors.Is(processErr, ErrRecordingStorageFull) {
+			break
+		}
+	}
+
+	s.recordingMu.Lock()
+	if current := s.recordingSessions[camera.ID]; current == session {
+		delete(s.recordingSessions, camera.ID)
+		status := s.recordingStatus[camera.ID]
+		status.Active = false
+		s.recordingStatus[camera.ID] = status
+	}
+	s.recordingMu.Unlock()
+}
+
+func (s *Service) consumeRecordingAttempt(
+	session *recordingSession,
+	camera state.NVRCameraRecord,
+	profile state.NVRStreamProfileRecord,
+	target state.NVRStorageTargetRecord,
+	attempt recordingAttempt,
+) (bool, error) {
+	hadSegment := false
+	for segment := range attempt.segments {
 		segmentPath, err := finalizeRecordedSegment(segment.Path)
 		if err != nil {
 			s.setRecordingError(camera.ID, "recording segment finalize failed")
@@ -273,8 +408,8 @@ func (s *Service) runRecordingSession(
 		if err != nil || rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
 			continue
 		}
-		startAt := startedAt.Add(segment.StartOffset)
-		endAt := startedAt.Add(segment.EndOffset)
+		startAt := attempt.startedAt.Add(segment.StartOffset)
+		endAt := attempt.startedAt.Add(segment.EndOffset)
 		if endAt.Before(startAt) {
 			continue
 		}
@@ -297,10 +432,10 @@ func (s *Service) runRecordingSession(
 			s.setRecordingError(camera.ID, "recording segment index failed")
 			continue
 		}
+		hadSegment = true
 		if err := s.enforceStorageReserve(context.Background(), target); err != nil {
-			s.setRecordingError(camera.ID, runtimeRecordingErrorMessage(err))
-			session.cancel()
-			break
+			attempt.cancel()
+			return hadSegment, err
 		}
 		now := s.now().UTC()
 		s.recordingMu.Lock()
@@ -312,20 +447,22 @@ func (s *Service) runRecordingSession(
 		s.recordingStatus[camera.ID] = status
 		s.recordingMu.Unlock()
 	}
-	var processErr error
-	if processDone != nil {
-		processErr = <-processDone
+	if attempt.processDone == nil {
+		return hadSegment, nil
 	}
+	processErr := <-attempt.processDone
+	if errors.Is(processErr, context.Canceled) && session != nil {
+		return hadSegment, processErr
+	}
+	return hadSegment, processErr
+}
+
+func (s *Service) setRecordingState(cameraID string, active bool, message string) {
 	s.recordingMu.Lock()
-	if current := s.recordingSessions[camera.ID]; current == session {
-		delete(s.recordingSessions, camera.ID)
-		status := s.recordingStatus[camera.ID]
-		status.Active = false
-		if processErr != nil && !errors.Is(processErr, context.Canceled) {
-			status.LastError = "recording process stopped"
-		}
-		s.recordingStatus[camera.ID] = status
-	}
+	status := s.recordingStatus[cameraID]
+	status.Active = active
+	status.LastError = message
+	s.recordingStatus[cameraID] = status
 	s.recordingMu.Unlock()
 }
 
