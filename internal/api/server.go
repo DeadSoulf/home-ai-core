@@ -25,6 +25,7 @@ type server struct {
 	modules             ModuleService
 	ai                  *aiagent.Service
 	nvr                 *nvr.Service
+	cameras             CamerasService
 	updater             UpdaterService
 	realtime            *realtime.Hub
 	mux                 *http.ServeMux
@@ -53,6 +54,7 @@ func New(
 		updaterService,
 		realtimeHub,
 		nil,
+		nil,
 		aiProviders...,
 	)
 }
@@ -68,6 +70,7 @@ func NewWithNVR(
 	updaterService UpdaterService,
 	realtimeHub *realtime.Hub,
 	nvrService *nvr.Service,
+	cameraService CamerasService,
 	aiProviders ...aiagent.Provider,
 ) http.Handler {
 	return newServer(
@@ -81,6 +84,36 @@ func NewWithNVR(
 		updaterService,
 		realtimeHub,
 		nvrService,
+		nil,
+		aiProviders...,
+	)
+}
+
+func NewWithCameras(
+	nodeID string,
+	logger *slog.Logger,
+	state State,
+	securityService SecurityService,
+	jobService JobService,
+	eventHistoryService EventHistoryService,
+	moduleService ModuleService,
+	updaterService UpdaterService,
+	realtimeHub *realtime.Hub,
+	cameraService CamerasService,
+	aiProviders ...aiagent.Provider,
+) http.Handler {
+	return newServer(
+		nodeID,
+		logger,
+		state,
+		securityService,
+		jobService,
+		eventHistoryService,
+		moduleService,
+		updaterService,
+		realtimeHub,
+		nil,
+		cameraService,
 		aiProviders...,
 	)
 }
@@ -119,6 +152,7 @@ func newServer(
 		modules:             moduleService,
 		ai:                  aiService,
 		nvr:                 nvrService,
+		cameras:             cameraService,
 		updater:             updaterService,
 		realtime:            realtimeHub,
 		mux:                 http.NewServeMux(),
@@ -163,6 +197,10 @@ func newServer(
 	s.mux.HandleFunc("POST /api/v1/modules/ai.cloud/test", s.requireAuth("modules.manage", s.cloudAIModuleTest))
 	s.mux.HandleFunc("POST /api/v1/modules/{moduleID}/control", s.requireAuth("modules.manage", s.moduleControl))
 	s.mux.HandleFunc("/api/v1/modules/", s.requireAuth("modules.read", s.moduleResource))
+	if cameraService != nil {
+		s.mux.HandleFunc("GET /api/v1/cameras/status", s.requireAuth("security.self.read", s.camerasStatus))
+		s.mux.HandleFunc("POST /api/v1/cameras/test-login", s.requireAuth("camera.manage", s.camerasTestLogin))
+	}
 	if nvrService != nil {
 		s.mux.HandleFunc("GET /api/v1/nvr/status", s.requireAuth("security.self.read", s.nvrStatus))
 		s.mux.HandleFunc("POST /api/v1/nvr/runtime/install", s.requireAuth("security.self.read", s.nvrRuntimeInstall))
