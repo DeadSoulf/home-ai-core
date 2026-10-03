@@ -170,6 +170,7 @@ func newServer(
 	s.mux.HandleFunc("GET /api/v1/nvr/cameras", s.requireAuth("security.self.read", s.nvrCameras))
 	s.mux.HandleFunc("POST /api/v1/nvr/cameras", s.requireAuth("security.self.read", s.nvrCameraCreate))
 	s.mux.HandleFunc("POST /api/v1/nvr/cameras/test", s.requireAuth("security.self.read", s.nvrCameraTest))
+	s.mux.HandleFunc("POST /api/v1/nvr/discovery", s.requireAuth("security.self.read", s.nvrCameraDiscover))
 	s.mux.HandleFunc("POST /api/v1/nvr/onvif/discover", s.requireAuth("security.self.read", s.nvrONVIFDiscover))
 	s.mux.HandleFunc("POST /api/v1/nvr/onvif/profiles", s.requireAuth("security.self.read", s.nvrONVIFProfiles))
 	s.mux.HandleFunc("POST /api/v1/nvr/onvif/import", s.requireAuth("security.self.read", s.nvrONVIFImport))
