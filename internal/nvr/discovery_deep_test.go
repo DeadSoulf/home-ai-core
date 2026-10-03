@@ -55,8 +55,11 @@ func TestParseHikvisionSADPResponse(t *testing.T) {
 	if device.MAC != "4C:BD:8F:12:34:56" {
 		t.Fatalf("MAC = %q", device.MAC)
 	}
-	if device.RTSPAddressHint != "rtsp://192.168.10.64/" {
+	if device.RTSPAddressHint != "rtsp://192.168.10.64/Streaming/Channels/101" {
 		t.Fatalf("RTSP hint = %q", device.RTSPAddressHint)
+	}
+	if device.SubstreamAddressHint != "rtsp://192.168.10.64/Streaming/Channels/102" {
+		t.Fatalf("substream hint = %q", device.SubstreamAddressHint)
 	}
 	if !containsDiscoverySource(device.Sources, "hikvision:sadp") {
 		t.Fatalf("sources = %#v", device.Sources)
