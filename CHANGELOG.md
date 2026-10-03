@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.149-dev
+
+- Simplify the Cameras toolbar to two primary actions: Add camera and Search.
+- Remove the separate Quick Scan and Find ONVIF cameras buttons from the main camera list UI.
+- Make Search run the full Deep Scan engine so ONVIF, RTSP, HTTP/HTTPS, SADP, DHIP, SSDP and subnet scanning remain enabled behind one action.
+- Rename the visible Deep Scan wording to Search and simplify the optional CIDR label.
+
 ## 0.1.148-dev
 
 - Fix Deep Scan on appliance kernels where Go interface enumeration fails with `netlinkrib: address family not supported by protocol`.
