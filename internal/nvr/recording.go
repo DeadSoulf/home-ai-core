@@ -357,6 +357,26 @@ func (s *Service) stopAllRecordings() {
 	}
 }
 
+func (s *Service) RefreshRecordings(ctx context.Context) error {
+	if s == nil {
+		return nil
+	}
+	s.stopAllRecordings()
+	cameras, err := s.store.ListNVRCameras(ctx)
+	if err != nil {
+		return err
+	}
+	for _, camera := range cameras {
+		if !camera.Enabled || camera.RecordingMode != "continuous" {
+			continue
+		}
+		if err := s.startRecording(ctx, camera); err != nil {
+			s.setRecordingError(camera.ID, runtimeRecordingErrorMessage(err))
+		}
+	}
+	return nil
+}
+
 func (s *Service) enforceStorageReserve(
 	ctx context.Context,
 	target state.NVRStorageTargetRecord,
