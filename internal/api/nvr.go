@@ -68,6 +68,13 @@ func (s *server) nvrStatus(
 				}
 				return s.nvr.ActiveLiveStreams()
 			}(),
+			RecordingReady:   s.nvr != nil && s.nvr.RecordingReady(),
+			ActiveRecordings: func() int {
+				if s.nvr == nil {
+					return 0
+				}
+				return s.nvr.ActiveRecordings()
+			}(),
 			SecretStoreReady: s.nvr != nil && s.nvr.SecretStoreReady(),
 			ONVIFReady:       s.nvr != nil && s.nvr.ONVIFReady(),
 			FoundationStage:  nvrFoundationStage(s.nvr),
@@ -112,6 +119,12 @@ func (s *server) nvrCameras(
 			AudioEnabled:   camera.AudioEnabled,
 			HasCredentials: camera.CredentialRef != "",
 			Runtime:        runtime,
+			Recording: func() nvrpkg.RecordingStatus {
+				if s.nvr == nil {
+					return nvrpkg.RecordingStatus{}
+				}
+				return s.nvr.CameraRecording(camera.ID)
+			}(),
 			CreatedAt:      camera.CreatedAt,
 			UpdatedAt:      camera.UpdatedAt,
 		})
@@ -146,6 +159,9 @@ func (s *server) visibleNVRCameras(ctx context.Context, actor security.Actor) ([
 func nvrFoundationStage(service *nvrpkg.Service) string {
 	if service == nil {
 		return "nvr-0"
+	}
+	if service.RecordingReady() {
+		return "nvr-2-recording"
 	}
 	if service.LiveReady() {
 		return "nvr-1-live"
