@@ -15,6 +15,7 @@ type CamerasService interface {
 	Status() cameras.Status
 	Refresh() cameras.Status
 	TestLogin(context.Context, cameras.LoginRequest) (cameras.LoginResult, error)
+	Discover(context.Context) ([]cameras.DiscoveredDevice, error)
 }
 
 func (s *server) camerasStatus(
@@ -145,4 +146,14 @@ func (s *server) camerasInstallRuntime(
 		map[string]any{"path": result.Path, "initialized": result.Status.SDK.Initialized},
 	)
 	writeJSON(w, http.StatusOK, map[string]any{"result": result})
+}
+
+
+func (s *server) camerasDiscover(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
+	items, err := s.cameras.Discover(r.Context())
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadGateway, "camera_discovery_failed", err.Error(), nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"devices": items})
 }
