@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"path/filepath"
@@ -12,6 +13,18 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/state"
 	"github.com/DeadSoulf/home-ai-core/internal/systeminfo"
 )
+
+type nvrStorageState interface {
+	SetNVRStorageTarget(
+		ctx context.Context,
+		devicePath, filesystemUUID, mountpoint string,
+		reservePercent int,
+		active bool,
+		now time.Time,
+	) (state.NVRStorageTargetRecord, error)
+	ActiveNVRStorageTarget(ctx context.Context) (state.NVRStorageTargetRecord, error)
+	NVRArchiveBytes(ctx context.Context, storageTargetID string) (int64, error)
+}
 
 type nvrStorageTargetResponse struct {
 	ID             string   `json:"id,omitempty"`
@@ -59,13 +72,18 @@ func (s *server) nvrStorage(
 }
 
 func (s *server) nvrStorageGet(w http.ResponseWriter, r *http.Request) {
+	store, ok := s.state.(nvrStorageState)
+	if !ok {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_storage_unavailable", "NVR storage is unavailable", nil)
+		return
+	}
 	records, err := s.state.ListStoragePurposes(r.Context())
 	if err != nil {
 		writeAPIError(w, r, http.StatusInternalServerError, "nvr_storage_unavailable", "NVR storage is unavailable", nil)
 		return
 	}
 	var active state.NVRStorageTargetRecord
-	active, activeErr := s.state.ActiveNVRStorageTarget(r.Context())
+	active, activeErr := store.ActiveNVRStorageTarget(r.Context())
 	if activeErr != nil && !errors.Is(activeErr, state.ErrNVRStorageTargetNotFound) {
 		writeAPIError(w, r, http.StatusInternalServerError, "nvr_storage_unavailable", "NVR storage is unavailable", nil)
 		return
@@ -82,7 +100,7 @@ func (s *server) nvrStorageGet(w http.ResponseWriter, r *http.Request) {
 			response.ID = active.ID
 			response.Active = true
 			response.ReservePercent = active.ReservePercent
-			if bytes, err := s.state.NVRArchiveBytes(r.Context(), active.ID); err == nil {
+			if bytes, err := store.NVRArchiveBytes(r.Context(), active.ID); err == nil {
 				response.ArchiveBytes = bytes
 			}
 		}
@@ -92,6 +110,11 @@ func (s *server) nvrStorageGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) nvrStorageSet(w http.ResponseWriter, r *http.Request, actor security.Actor) {
+	store, ok := s.state.(nvrStorageState)
+	if !ok {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_storage_unavailable", "NVR storage is unavailable", nil)
+		return
+	}
 	var input struct {
 		Device         string `json:"device"`
 		ReservePercent int    `json:"reserve_percent"`
@@ -152,7 +175,7 @@ func (s *server) nvrStorageSet(w http.ResponseWriter, r *http.Request, actor sec
 		return
 	}
 
-	target, err := s.state.SetNVRStorageTarget(
+	target, err := store.SetNVRStorageTarget(
 		r.Context(),
 		node.Path,
 		node.UUID,
@@ -191,7 +214,7 @@ func (s *server) nvrStorageSet(w http.ResponseWriter, r *http.Request, actor sec
 	response.ID = target.ID
 	response.Active = true
 	response.ReservePercent = target.ReservePercent
-	if bytes, err := s.state.NVRArchiveBytes(r.Context(), target.ID); err == nil {
+	if bytes, err := store.NVRArchiveBytes(r.Context(), target.ID); err == nil {
 		response.ArchiveBytes = bytes
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"target": response})
