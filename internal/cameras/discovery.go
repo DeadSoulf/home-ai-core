@@ -2,6 +2,8 @@ package cameras
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/xml"
 	"fmt"
 	"net"
@@ -9,8 +11,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type DiscoveredDevice struct {
@@ -39,7 +39,9 @@ func (s *Service) Discover(ctx context.Context) ([]DiscoveredDevice, error) {
 	if err != nil { return nil, fmt.Errorf("open ONVIF discovery socket: %w", err) }
 	defer conn.Close()
 
-	id := uuid.NewString()
+	rawID := make([]byte, 16)
+	_, _ = rand.Read(rawID)
+	id := hex.EncodeToString(rawID)
 	probe := `<?xml version="1.0" encoding="UTF-8"?><e:Envelope xmlns:e="http://www.w3.org/2003/05/soap-envelope" xmlns:w="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:d="http://schemas.xmlsoap.org/ws/2005/04/discovery" xmlns:dn="http://www.onvif.org/ver10/network/wsdl"><e:Header><w:MessageID>uuid:`+id+`</w:MessageID><w:To e:mustUnderstand="true">urn:schemas-xmlsoap-org:ws:2005:04:discovery</w:To><w:Action e:mustUnderstand="true">http://schemas.xmlsoap.org/ws/2005/04/discovery/Probe</w:Action></e:Header><e:Body><d:Probe><d:Types>dn:NetworkVideoTransmitter</d:Types></d:Probe></e:Body></e:Envelope>`
 	dst := &net.UDPAddr{IP: net.IPv4(239,255,255,250), Port: 3702}
 	if _, err := conn.WriteToUDP([]byte(probe), dst); err != nil { return nil, fmt.Errorf("send ONVIF discovery: %w", err) }
