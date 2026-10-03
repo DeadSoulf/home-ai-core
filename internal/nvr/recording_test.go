@@ -287,3 +287,52 @@ func TestRingRetentionStopsWhenOnlyProtectedSegmentsRemain(t *testing.T) {
 		t.Fatalf("protected segment was removed: %v", err)
 	}
 }
+
+
+func TestFinalizeRecordedSegmentRenamesPartialFile(t *testing.T) {
+	root := t.TempDir()
+	partial := filepath.Join(root, "segment.partial.mp4")
+	if err := os.WriteFile(partial, []byte("video"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+
+	finalPath, err := finalizeRecordedSegment(partial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Base(finalPath) != "segment.mp4" {
+		t.Fatalf("final path = %q", finalPath)
+	}
+	if _, err := os.Stat(partial); !os.IsNotExist(err) {
+		t.Fatalf("partial segment still exists: %v", err)
+	}
+	if _, err := os.Stat(finalPath); err != nil {
+		t.Fatalf("final segment missing: %v", err)
+	}
+}
+
+func TestCleanupPartialSegmentsPreservesCompletedArchive(t *testing.T) {
+	root := t.TempDir()
+	cameraRoot := filepath.Join(root, "home-ai-nvr", "cam_test", "session")
+	if err := os.MkdirAll(cameraRoot, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	partial := filepath.Join(cameraRoot, "broken.partial.mp4")
+	complete := filepath.Join(cameraRoot, "complete.mp4")
+	if err := os.WriteFile(partial, []byte("partial"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(complete, []byte("complete"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cleanupPartialSegments(filepath.Join(root, "home-ai-nvr", "cam_test")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(partial); !os.IsNotExist(err) {
+		t.Fatalf("partial segment survived recovery cleanup: %v", err)
+	}
+	if _, err := os.Stat(complete); err != nil {
+		t.Fatalf("completed segment was removed: %v", err)
+	}
+}
