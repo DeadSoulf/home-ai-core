@@ -139,7 +139,6 @@ func TestContinuousRecordingWithoutTargetDoesNotFailNVRStart(t *testing.T) {
 	}
 }
 
-
 type fakeSpaceChecker struct {
 	values []FilesystemSpace
 	index  int
