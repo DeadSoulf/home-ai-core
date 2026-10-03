@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.151-dev
+
+- Remove Cameras / NVR from the active Home-AI product surface for now.
+- Stop registering or starting the `nvr` module and camera supervisor in the production Core startup path.
+- Remove the Cameras Web route, NVR-specific navigation mapping and NVR runtime controls from the Modules page.
+- Publish NVR API routes only when an NVR runtime is explicitly injected; normal production Core no longer exposes them.
+- Add migration 024 that removes only the stale `nvr` Module Registry row on upgraded installations.
+- Preserve all NVR schema, camera/storage metadata, permissions and `internal/nvr` RTSP/ONVIF/discovery/recording groundwork without destructive cleanup.
+- Update the project map to treat Cameras/NVR as not yet implemented; prior NVR dev slices are retained only as experimental prototype history.
+
 ## 0.1.150-dev
 
 - Add HTTP Digest authentication fallback to ONVIF SOAP requests for Hikvision/HiWatch cameras that answer the initial WS-Security request with HTTP 401.

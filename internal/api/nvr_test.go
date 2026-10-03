@@ -54,7 +54,8 @@ func TestNVRCameraListDoesNotExposeSourceOrCredentialReference(t *testing.T) {
 	sec.actor.Permissions = append(sec.actor.Permissions, nvr.PermissionCameraList)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	const nodeID = "00000000-0000-4000-8000-000000000000"
-	handler := New(
+	nvrService := nvr.NewServiceWithDependencies(store, nil, nil)
+	handler := NewWithNVR(
 		nodeID,
 		logger,
 		store,
@@ -64,6 +65,7 @@ func TestNVRCameraListDoesNotExposeSourceOrCredentialReference(t *testing.T) {
 		registry,
 		nil,
 		realtime.New(nodeID, logger),
+		nvrService,
 	)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/nvr/cameras", nil)
@@ -99,11 +101,11 @@ func TestNVRCameraListDoesNotExposeSourceOrCredentialReference(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &statusBody); err != nil {
 		t.Fatal(err)
 	}
-	if statusBody.NVR.CameraCount != 1 || statusBody.NVR.FoundationStage != "nvr-0" {
+	if statusBody.NVR.CameraCount != 1 || statusBody.NVR.FoundationStage != "nvr-1-onboarding" {
 		t.Fatalf("NVR status = %#v", statusBody.NVR)
 	}
 	if statusBody.NVR.MediaRuntimeReady || statusBody.NVR.SecretStoreReady {
-		t.Fatalf("NVR-0 incorrectly reports unfinished runtime ready: %#v", statusBody.NVR)
+		t.Fatalf("dormant NVR groundwork incorrectly reports unfinished runtime ready: %#v", statusBody.NVR)
 	}
 }
 
@@ -145,7 +147,8 @@ func TestNVRCameraListHonorsScopedCameraAccess(t *testing.T) {
 	}}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	const nodeID = "00000000-0000-4000-8000-000000000000"
-	handler := New(
+	nvrService := nvr.NewServiceWithDependencies(store, nil, nil)
+	handler := NewWithNVR(
 		nodeID,
 		logger,
 		store,
@@ -155,6 +158,7 @@ func TestNVRCameraListHonorsScopedCameraAccess(t *testing.T) {
 		registry,
 		nil,
 		realtime.New(nodeID, logger),
+		nvrService,
 	)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/nvr/cameras", nil)
@@ -175,7 +179,7 @@ func TestNVRCameraListHonorsScopedCameraAccess(t *testing.T) {
 	}
 }
 
-func TestNVRModuleControlAndNavigation(t *testing.T) {
+func TestDormantNVRModuleIsNotControllableOrNavigable(t *testing.T) {
 	ctx := context.Background()
 	store, err := state.Open(ctx, t.TempDir())
 	if err != nil {
@@ -216,15 +220,19 @@ func TestNVRModuleControlAndNavigation(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("NVR enable status = %d: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusConflict ||
+		!strings.Contains(rec.Body.String(), "module_control_unsupported") {
+		t.Fatalf("NVR control status = %d: %s", rec.Code, rec.Body.String())
 	}
 
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/modules/navigation", nil)
 	req.Header.Set("Authorization", "Bearer test")
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"/modules/nvr"`) {
-		t.Fatalf("NVR navigation = %d: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("module navigation status = %d: %s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), `"/modules/nvr"`) {
+		t.Fatalf("dormant NVR leaked into navigation: %s", rec.Body.String())
 	}
 }

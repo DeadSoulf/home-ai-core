@@ -18,7 +18,6 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/identity"
 	"github.com/DeadSoulf/home-ai-core/internal/jobs"
 	"github.com/DeadSoulf/home-ai-core/internal/modules"
-	"github.com/DeadSoulf/home-ai-core/internal/nvr"
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
@@ -86,14 +85,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := moduleRegistry.Register(startupCtx, nvr.NewModule()); err != nil {
-		logger.Error("failed to register Cameras / NVR module", "error", err)
-		os.Exit(1)
-	}
-	if item, err := moduleRegistry.Get(startupCtx, nvr.ModuleID); err == nil && item.Status == "registered" {
-		_ = moduleRegistry.SetStatus(startupCtx, nvr.ModuleID, "disabled", "")
-	}
-
 	var localProvider aiagent.Provider
 	if cfg.AIProvider == "ollama" {
 		provider, err := aiagent.NewOllamaProvider(cfg.AIEndpoint, cfg.AIModel)
@@ -112,49 +103,6 @@ func main() {
 			os.Exit(1)
 		}
 		cloudProvider = provider
-	}
-
-	var nvrService *nvr.Service
-	if service, serviceErr := nvr.NewService(cfg.StateDir, store); serviceErr != nil {
-		logger.Error("failed to initialize NVR onboarding runtime", "error", serviceErr)
-		_ = moduleRegistry.SetStatus(startupCtx, nvr.ModuleID, "error", "NVR credential store is unavailable")
-	} else {
-		nvrService = service
-		nvrService.SetRuntimeEventHandler(func(event nvr.RuntimeEvent) {
-			eventType := ""
-			switch event.State {
-			case nvr.RuntimeOnline:
-				eventType = "nvr.camera.online"
-			case nvr.RuntimeOffline:
-				eventType = "nvr.camera.offline"
-			}
-			if eventType == "" {
-				return
-			}
-			if _, err := eventService.Publish(context.Background(), events.Input{
-				Type:      eventType,
-				Component: "nvr",
-				Data: map[string]any{
-					"camera_id":       event.CameraID,
-					"state":           event.State,
-					"previous_state":  event.PreviousState,
-					"reconnect_count": event.Status.ReconnectCount,
-				},
-			}); err != nil {
-				logger.Warn("failed to publish NVR camera runtime event",
-					"camera_id", event.CameraID,
-					"state", event.State,
-					"error", err,
-				)
-			}
-		})
-		if item, itemErr := moduleRegistry.Get(startupCtx, nvr.ModuleID); itemErr == nil && item.Status == "enabled" {
-			if startErr := nvrService.Start(startupCtx); startErr != nil {
-				logger.Error("failed to start NVR camera supervisor", "error", startErr)
-				_ = moduleRegistry.SetStatus(startupCtx, nvr.ModuleID, "error", "NVR camera supervisor failed to start")
-			}
-		}
-		defer nvrService.Stop()
 	}
 
 	var aiProvider aiagent.Provider
@@ -185,7 +133,7 @@ func main() {
 		}
 	}()
 
-	apiHandler := api.NewWithNVR(
+	apiHandler := api.New(
 		nodeID,
 		logger,
 		store,
@@ -195,7 +143,6 @@ func main() {
 		moduleRegistry,
 		updaterService,
 		realtimeHub,
-		nvrService,
 		aiProvider,
 	)
 	handler := webui.New(apiHandler, cfg.WebDir)
