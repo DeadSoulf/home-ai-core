@@ -12,13 +12,9 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
   const resource = useResource(load, revision);
   const canManage = actor.permissions.includes("camera.manage");
 
-  const [address, setAddress] = useState("");
-  const [port, setPort] = useState("8000");
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [testError, setTestError] = useState("");
-  const [testMessage, setTestMessage] = useState("");
+  const [devices, setDevices] = useState<Array<{address: string; port: number; name?: string; xaddr?: string}>>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
   const [sdkFile, setSDKFile] = useState<File>();
   const [installing, setInstalling] = useState(false);
   const [installError, setInstallError] = useState("");
@@ -40,27 +36,16 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
     }
   };
 
-  const testLogin = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!canManage || busy) return;
-    setBusy(true);
-    setTestError("");
-    setTestMessage("");
+  const discover = async () => {
+    if (searching) return;
+    setSearching(true);
+    setSearchError("");
     try {
-      const parsedPort = Number(port);
-      const result = await api.testCameraSDKLogin({
-        address: address.trim(),
-        port: Number.isFinite(parsedPort) ? parsedPort : undefined,
-        username: username.trim(),
-        password,
-      });
-      if (result.ok) {
-        setTestMessage(t("camerasSDKTestSuccess"));
-      }
+      setDevices(await api.discoverCameras());
     } catch (reason) {
-      setTestError(reason instanceof Error ? reason.message : t("requestFailed"));
+      setSearchError(reason instanceof Error ? reason.message : t("requestFailed"));
     } finally {
-      setBusy(false);
+      setSearching(false);
     }
   };
 
@@ -124,59 +109,29 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
         )}
       </Panel>
 
-      <Panel title={t("camerasSDKConnectionTest")}>
-        <p className="muted">{t("camerasSDKConnectionHint")}</p>
-        {testError && <ErrorState message={testError} />}
-        {testMessage && <div className="notice success">{testMessage}</div>}
-        <form className="network-profile-form" onSubmit={testLogin}>
-          <label>
-            {t("camerasSDKAddress")}
-            <input
-              value={address}
-              onChange={(event) => setAddress(event.target.value)}
-              placeholder="192.168.1.64"
-              autoComplete="off"
-              required
-            />
-          </label>
-          <label>
-            {t("camerasSDKPort")}
-            <input
-              type="number"
-              min="1"
-              max="65535"
-              value={port}
-              onChange={(event) => setPort(event.target.value)}
-              required
-            />
-          </label>
-          <label>
-            {t("username")}
-            <input
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              autoComplete="username"
-              required
-            />
-          </label>
-          <label>
-            {t("password")}
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              autoComplete="current-password"
-            />
-          </label>
-          <button
-            type="submit"
-            className="button primary"
-            disabled={!canManage || busy || !sdkReady}
-          >
-            {busy ? t("working") : t("camerasSDKTest")}
-          </button>
-        </form>
-        {!canManage && <p className="muted">{t("camerasSDKManageRequired")}</p>}
+      <Panel title="Камеры">
+        <p className="muted">Поиск доступных ONVIF-камер в локальной сети. Hikvision/HiWatch после добавления будут работать через HCNetSDK.</p>
+        {searchError && <ErrorState message={searchError} />}
+        <button type="button" className="button primary" onClick={discover} disabled={searching || !sdkReady}>
+          {searching ? "Поиск…" : "Поиск"}
+        </button>
+        {!searching && devices.length === 0 && <p className="muted">Нажмите «Поиск», чтобы найти камеры.</p>}
+        {devices.length > 0 && (
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Камера</th><th>IP</th><th>Порт</th></tr></thead>
+              <tbody>
+                {devices.map((device) => (
+                  <tr key={device.address}>
+                    <td>{device.name || "ONVIF камера"}</td>
+                    <td className="mono">{device.address}</td>
+                    <td>{device.port}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Panel>
     </div>
   );
