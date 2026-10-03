@@ -56,6 +56,11 @@ func (s *server) storagePurposes(
 		for _, record := range records {
 			response := storagePurposeResponseFor(record, nodes)
 			response.UsedBy = storageUsageForPurposeRecord(record, nodes, pools)
+			if node, ok := blockNodeForStoragePurpose(nodes, record); ok {
+				if nvrUsage, active := s.activeNVRStorageUsage(r.Context(), node); active {
+					response.UsedBy = append(response.UsedBy, nvrUsage)
+				}
+			}
 			response.InUse = len(response.UsedBy) > 0
 			assignments = append(assignments, response)
 		}
