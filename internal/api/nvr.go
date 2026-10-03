@@ -356,7 +356,12 @@ func (s *server) nvrCameraDiscover(
 		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
 		return
 	}
-	devices, err := s.nvr.DiscoverCameras(r.Context())
+	var input nvrpkg.CameraDiscoveryInput
+	if err := decodeJSON(w, r, &input); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_request", err.Error(), nil)
+		return
+	}
+	devices, err := s.nvr.DiscoverCameras(r.Context(), input)
 	if err != nil {
 		s.writeNVRError(w, r, err)
 		return
