@@ -74,7 +74,7 @@ func (r *FFmpegSegmentRecorder) Start(
 	if segmentSeconds <= 0 {
 		segmentSeconds = 60
 	}
-	pattern := filepath.Join(outputDir, "%Y%m%dT%H%M%SZ.mp4")
+	pattern := filepath.Join(outputDir, "%Y%m%dT%H%M%SZ.partial.mp4")
 	command := exec.CommandContext(
 		ctx,
 		r.path,
@@ -214,9 +214,13 @@ func (s *Service) startRecording(ctx context.Context, camera state.NVRCameraReco
 	if main.SourceURI == "" {
 		main.SourceURI = camera.Address
 	}
-	outputDir := filepath.Join(target.Mountpoint, "home-ai-nvr", camera.ID)
-	recordingCtx, cancel := context.WithCancel(context.Background())
 	startedAt := s.now().UTC()
+	cameraRoot := filepath.Join(target.Mountpoint, "home-ai-nvr", camera.ID)
+	if err := cleanupPartialSegments(cameraRoot); err != nil {
+		return err
+	}
+	outputDir := filepath.Join(cameraRoot, strconv.FormatInt(startedAt.UnixNano(), 10))
+	recordingCtx, cancel := context.WithCancel(context.Background())
 	segments, processDone, err := s.recorder.Start(recordingCtx, ProbeRequest{
 		Address:    main.SourceURI,
 		Transport:  camera.Transport,
@@ -250,11 +254,16 @@ func (s *Service) runRecordingSession(
 ) {
 	defer close(session.done)
 	for segment := range segments {
-		info, err := os.Stat(segment.Path)
+		segmentPath, err := finalizeRecordedSegment(segment.Path)
+		if err != nil {
+			s.setRecordingError(camera.ID, "recording segment finalize failed")
+			continue
+		}
+		info, err := os.Stat(segmentPath)
 		if err != nil || !info.Mode().IsRegular() {
 			continue
 		}
-		rel, err := filepath.Rel(target.Mountpoint, segment.Path)
+		rel, err := filepath.Rel(target.Mountpoint, segmentPath)
 		if err != nil || rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
 			continue
 		}
@@ -435,4 +444,49 @@ func (s *Service) enforceStorageReserve(
 			return ErrRecordingStorageFull
 		}
 	}
+}
+
+func finalizeRecordedSegment(path string) (string, error) {
+	path = filepath.Clean(strings.TrimSpace(path))
+	if path == "." || path == "" {
+		return "", errors.New("recording segment path is empty")
+	}
+	const partialSuffix = ".partial.mp4"
+	if !strings.HasSuffix(strings.ToLower(path), partialSuffix) {
+		return path, nil
+	}
+	finalPath := path[:len(path)-len(partialSuffix)] + ".mp4"
+	if _, err := os.Stat(finalPath); err == nil {
+		finalPath = path[:len(path)-len(partialSuffix)] + "-" + strconv.FormatInt(time.Now().UTC().UnixNano(), 10) + ".mp4"
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+	if err := os.Rename(path, finalPath); err != nil {
+		return "", err
+	}
+	return finalPath, nil
+}
+
+func cleanupPartialSegments(root string) error {
+	root = filepath.Clean(strings.TrimSpace(root))
+	if root == "." || root == "" {
+		return nil
+	}
+	if _, err := os.Stat(root); errors.Is(err, os.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	return filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(strings.ToLower(entry.Name()), ".partial.mp4") {
+			return nil
+		}
+		return os.Remove(path)
+	})
 }
