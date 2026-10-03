@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.146-dev
+
+- Start the full Camera Discovery Engine (option C) instead of treating ONVIF WS-Discovery as the only network camera discovery path.
+- Scan the bounded local IPv4 segment for common camera/web/RTSP/vendor ports and actively confirm RTSP endpoints with an RTSP OPTIONS exchange.
+- Combine ONVIF, HTTP, HTTPS, RTSP, MAC/ARP evidence and vendor fingerprints into one deduplicated discovery result per IP.
+- Classify discovered devices as camera, recorder or possible camera with explicit confidence and detected services/sources.
+- Add initial vendor fingerprint adapters for Hikvision, Dahua, Uniview, Hanwha/Wisenet, Axis and Bosch while keeping the engine extensible for vendor-specific discovery transports.
+- Add a new camera-discovery API and Web workflow; ONVIF-capable results open the existing profile importer, while RTSP-only candidates open manual RTSP onboarding with the host/port prefilled.
+- Keep the existing dedicated ONVIF discovery/import flow for compatibility and troubleshooting.
+
 ## 0.1.145-dev
 
 - Broaden ONVIF discovery across camera vendors with legacy WS-Discovery 2005/04 and modern 2009/01 probes, including `NetworkVideoTransmitter`, `Device` and generic probe variants.

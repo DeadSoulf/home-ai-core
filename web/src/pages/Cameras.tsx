@@ -6,6 +6,7 @@ import type {
   NVRCameraInput,
   NVRProbe,
   NVRStorageTarget,
+  NVRCameraDiscoveryDevice,
   NVRONVIFDevice,
   NVRONVIFProfile,
 } from "../api/types";
@@ -150,6 +151,8 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
   const [testedFingerprint, setTestedFingerprint] = useState("");
   const [liveIDs, setLiveIDs] = useState<string[]>([]);
   const [liveErrors, setLiveErrors] = useState<Record<string, boolean>>({});
+  const [discoveryOpen, setDiscoveryOpen] = useState(false);
+  const [discoveryDevices, setDiscoveryDevices] = useState<NVRCameraDiscoveryDevice[]>([]);
   const [onvifOpen, setONVIFOpen] = useState(false);
   const [onvifDevices, setONVIFDevices] = useState<NVRONVIFDevice[]>([]);
   const [onvifDevice, setONVIFDevice] = useState<NVRONVIFDevice>();
@@ -182,6 +185,50 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
 
   const openCreate = () => {
     resetEditor();
+    setEditorOpen(true);
+  };
+
+  const resetDiscovery = () => {
+    setDiscoveryOpen(false);
+    setDiscoveryDevices([]);
+  };
+
+  const discoverCameras = async () => {
+    setBusy("discovery");
+    setFormError("");
+    try {
+      const devices = await api.discoverCameras();
+      setDiscoveryDevices(devices);
+      setDiscoveryOpen(true);
+    } catch (reason) {
+      setDiscoveryDevices([]);
+      setDiscoveryOpen(true);
+      setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const useDiscoveredDevice = (device: NVRCameraDiscoveryDevice) => {
+    if (device.onvif_address) {
+      setDiscoveryOpen(false);
+      setONVIFOpen(true);
+      chooseONVIFDevice({
+        id: device.id,
+        name: device.name || device.vendor || device.ip,
+        address: device.onvif_address,
+        ip: device.ip,
+      });
+      return;
+    }
+
+    resetEditor();
+    setEditor({
+      ...emptyEditor(),
+      name: device.name || [device.vendor, device.model].filter(Boolean).join(" ") || device.ip,
+      address: device.rtsp_address_hint || "",
+    });
+    setDiscoveryOpen(false);
     setEditorOpen(true);
   };
 
@@ -663,10 +710,18 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
       </Panel>
 
       <Panel title={t("cameraList")}>
-        {globalManage && !editorOpen && !onvifOpen && (
+        {globalManage && !editorOpen && !onvifOpen && !discoveryOpen && (
           <div className="nvr-toolbar">
             <button type="button" className="button primary" onClick={openCreate}>
               {t("nvrAddCamera")}
+            </button>
+            <button
+              type="button"
+              className="button primary"
+              disabled={Boolean(busy)}
+              onClick={() => void discoverCameras()}
+            >
+              {busy === "discovery" ? t("nvrDiscoveryScanning") : t("nvrDiscoverNetwork")}
             </button>
             <button
               type="button"
@@ -760,6 +815,74 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
           </div>
         )}
       </Panel>
+
+      {discoveryOpen && (
+        <Panel title={t("nvrDiscoveryTitle")} className="wide">
+          <div className="notice">
+            <strong>{t("nvrDiscoveryFound").replace("{count}", String(discoveryDevices.length))}</strong>
+            <p>{t("nvrDiscoveryHint")}</p>
+          </div>
+          {discoveryDevices.length === 0 ? (
+            <EmptyState>{t("nvrDiscoveryEmpty")}</EmptyState>
+          ) : (
+            <div className="list">
+              {discoveryDevices.map((device) => (
+                <div className="list-row nvr-camera-row" key={device.id}>
+                  <div>
+                    <strong>
+                      {device.name || device.ip}
+                      {device.vendor ? <> · {device.vendor}</> : null}
+                      {device.model ? <> · {device.model}</> : null}
+                    </strong>
+                    <span>
+                      {device.ip}
+                      {device.mac ? <> · {device.mac}</> : null}
+                      {" · "}{t(
+                        device.device_type === "recorder"
+                          ? "nvrDiscoveryRecorder"
+                          : device.device_type === "camera"
+                            ? "nvrDiscoveryCamera"
+                            : "nvrDiscoveryPossibleCamera"
+                      )}
+                      {" · "}{t("nvrDiscoveryConfidence")}: {t(
+                        device.confidence === "high"
+                          ? "nvrDiscoveryHigh"
+                          : device.confidence === "medium"
+                            ? "nvrDiscoveryMedium"
+                            : "nvrDiscoveryPossible"
+                      )}
+                    </span>
+                    <span className="muted">
+                      {t("nvrDiscoverySources")}: {device.sources.join(", ") || "—"}
+                      {" · "}{t("nvrDiscoveryServices")}: {device.services.map((service) =>
+                        service.protocol.toUpperCase() + ":" + service.port
+                      ).join(", ") || "—"}
+                    </span>
+                  </div>
+                  <div className="nvr-camera-actions">
+                    <button
+                      type="button"
+                      className="button primary compact"
+                      disabled={Boolean(busy)}
+                      onClick={() => useDiscoveredDevice(device)}
+                    >
+                      {device.onvif_address ? t("nvrDiscoveryOpenONVIF") : t("nvrDiscoveryAddRTSP")}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="nvr-form-actions">
+            <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={() => void discoverCameras()}>
+              {busy === "discovery" ? t("nvrDiscoveryScanning") : t("refresh")}
+            </button>
+            <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={resetDiscovery}>
+              {t("cancel")}
+            </button>
+          </div>
+        </Panel>
+      )}
 
       {onvifOpen && (
         <Panel title={t("nvrONVIFDiscovery")} className="wide">

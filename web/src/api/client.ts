@@ -35,6 +35,7 @@ import type {
   NVRCameraInput,
   NVRProbe,
   NVRONVIFDevice,
+  NVRCameraDiscoveryDevice,
   NVRONVIFProfile,
   NVRONVIFImportInput,
 } from "./types";
@@ -215,6 +216,15 @@ export const api = {
       true,
     );
     return result;
+  },
+
+  discoverCameras: async () => {
+    const result = await postJSON<{devices: NVRCameraDiscoveryDevice[]}>(
+      "/api/v1/nvr/discovery",
+      {},
+      true,
+    );
+    return result.devices;
   },
 
   discoverONVIF: async () => {

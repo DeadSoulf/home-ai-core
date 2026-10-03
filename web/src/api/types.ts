@@ -596,6 +596,27 @@ export type NVRCameraInput = {
 };
 
 
+export type NVRCameraDiscoveryService = {
+  protocol: string;
+  port: number;
+  address?: string;
+};
+
+export type NVRCameraDiscoveryDevice = {
+  id: string;
+  name: string;
+  ip: string;
+  mac?: string;
+  vendor?: string;
+  model?: string;
+  device_type: "camera" | "recorder" | "possible_camera";
+  confidence: "high" | "medium" | "possible";
+  sources: string[];
+  services: NVRCameraDiscoveryService[];
+  onvif_address?: string;
+  rtsp_address_hint?: string;
+};
+
 export type NVRONVIFDevice = {
   id: string;
   name: string;

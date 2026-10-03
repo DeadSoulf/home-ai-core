@@ -339,6 +339,31 @@ func (s *server) nvrCameraTest(
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "probe": probe})
 }
 
+func (s *server) nvrCameraDiscover(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if !s.nvrEnabled(w, r) {
+		return
+	}
+	if !actor.Has(nvrpkg.PermissionCameraManage) {
+		writeAPIError(w, r, http.StatusForbidden, "permission_denied", "camera management permission required", nil)
+		return
+	}
+	if !validMutationCSRF(actor, source, r) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	devices, err := s.nvr.DiscoverCameras(r.Context())
+	if err != nil {
+		s.writeNVRError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"devices": devices})
+}
+
 func (s *server) nvrONVIFDiscover(
 	w http.ResponseWriter,
 	r *http.Request,
