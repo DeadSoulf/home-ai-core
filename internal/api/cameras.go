@@ -1,0 +1,97 @@
+package api
+
+import (
+	"context"
+	"errors"
+	"net/http"
+
+	"github.com/DeadSoulf/home-ai-core/internal/cameras"
+	"github.com/DeadSoulf/home-ai-core/internal/security"
+)
+
+type CamerasService interface {
+	Status() cameras.Status
+	Refresh() cameras.Status
+	TestLogin(context.Context, cameras.LoginRequest) (cameras.LoginResult, error)
+}
+
+func (s *server) camerasStatus(
+	w http.ResponseWriter,
+	r *http.Request,
+	_ security.Actor,
+	_ authSource,
+) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w, r, http.MethodGet)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"cameras": s.cameras.Status()})
+}
+
+func (s *server) camerasTestLogin(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	if !validMutationCSRF(actor, source, r) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	item, err := s.modules.Get(r.Context(), cameras.ModuleID)
+	if err != nil || item.Status != "enabled" {
+		writeAPIError(w, r, http.StatusConflict, "cameras_module_disabled", "Cameras module is disabled", nil)
+		return
+	}
+
+	var request cameras.LoginRequest
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_request", err.Error(), nil)
+		return
+	}
+	result, err := s.cameras.TestLogin(r.Context(), request)
+	if err != nil {
+		switch {
+		case errors.Is(err, cameras.ErrInvalidTarget):
+			writeAPIError(w, r, http.StatusBadRequest, "camera_target_invalid", err.Error(), nil)
+		case errors.Is(err, cameras.ErrSDKUnsupported):
+			writeAPIError(w, r, http.StatusServiceUnavailable, "camera_sdk_unsupported", err.Error(), nil)
+		case errors.Is(err, cameras.ErrSDKUnavailable):
+			writeAPIError(w, r, http.StatusServiceUnavailable, "camera_sdk_unavailable", err.Error(), nil)
+		default:
+			var sdkErr cameras.SDKError
+			if errors.As(err, &sdkErr) {
+				switch sdkErr.Code {
+				case 1:
+					writeAPIError(w, r, http.StatusBadGateway, "camera_authentication_failed", "HCNetSDK rejected the camera username or password", map[string]any{"sdk_error_code": sdkErr.Code})
+				case 7:
+					writeAPIError(w, r, http.StatusBadGateway, "camera_connection_failed", "HCNetSDK could not connect to the camera SDK service", map[string]any{"sdk_error_code": sdkErr.Code})
+				default:
+					writeAPIError(w, r, http.StatusBadGateway, "camera_sdk_login_failed", "HCNetSDK camera login failed", map[string]any{"sdk_error_code": sdkErr.Code})
+				}
+				return
+			}
+			writeAPIError(w, r, http.StatusBadGateway, "camera_sdk_login_failed", "HCNetSDK camera login failed", nil)
+		}
+		return
+	}
+
+	s.security.RecordAudit(
+		context.WithoutCancel(r.Context()),
+		s.securityRequestContext(r),
+		actor,
+		"camera.sdk.test",
+		"camera",
+		result.Address,
+		"success",
+		map[string]any{
+			"backend": result.Backend,
+			"port":    result.Port,
+		},
+	)
+	writeJSON(w, http.StatusOK, map[string]any{"result": result})
+}
