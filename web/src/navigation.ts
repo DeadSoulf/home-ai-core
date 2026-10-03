@@ -46,7 +46,9 @@ function dynamicModuleItems(modules?: ModuleNavigationState[]): NavigationItem[]
       path: item.route,
       label: module.module_id === "ai.cloud"
         ? ("cloudAI" as StringKey)
-        : undefined,
+        : module.module_id === "cameras"
+          ? ("cameras" as StringKey)
+          : undefined,
       title: item.title,
       permission: "security.self.read",
       moduleId: module.module_id,

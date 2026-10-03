@@ -260,6 +260,30 @@ export type AIStatus = {
   conversation_store_ready: boolean;
 };
 
+export type CamerasSDKStatus = {
+  architecture: string;
+  supported: boolean;
+  available: boolean;
+  initialized: boolean;
+  library_path?: string;
+  error?: string;
+};
+
+export type CamerasStatus = {
+  module_id: string;
+  version: string;
+  backend: string;
+  sdk: CamerasSDKStatus;
+};
+
+export type CameraSDKLoginResult = {
+  ok: boolean;
+  address: string;
+  port: number;
+  backend: string;
+  sdk_error_code?: number;
+};
+
 export type ModuleNavigationState = {
   module_id: string;
   status: "registered" | "enabled" | "disabled" | "error";

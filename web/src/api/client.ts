@@ -25,6 +25,8 @@ import type {
   SMBStatus,
   WireGuardStatus,
   AIStatus,
+  CamerasStatus,
+  CameraSDKLoginResult,
   AIConversation,
   AIMessage,
   AIAction,
@@ -879,6 +881,25 @@ export const api = {
   rollbackUpdate: async () => {
     const result = await postJSON<{state: UpdaterState}>("/api/v1/update/rollback", undefined, true);
     return result.state;
+  },
+
+  camerasStatus: async () => {
+    const result = await request<{cameras: CamerasStatus}>("/api/v1/cameras/status");
+    return result.cameras;
+  },
+
+  testCameraSDKLogin: async (input: {
+    address: string;
+    port?: number;
+    username: string;
+    password: string;
+  }) => {
+    const result = await postJSON<{result: CameraSDKLoginResult}>(
+      "/api/v1/cameras/test-login",
+      input,
+      true,
+    );
+    return result.result;
   },
 
   modules: async () => {

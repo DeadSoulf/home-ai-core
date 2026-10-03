@@ -12,6 +12,7 @@ import (
 
 	"github.com/DeadSoulf/home-ai-core/internal/aiagent"
 	"github.com/DeadSoulf/home-ai-core/internal/api"
+	"github.com/DeadSoulf/home-ai-core/internal/cameras"
 	"github.com/DeadSoulf/home-ai-core/internal/cloudai"
 	"github.com/DeadSoulf/home-ai-core/internal/config"
 	"github.com/DeadSoulf/home-ai-core/internal/events"
@@ -85,6 +86,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := moduleRegistry.Register(startupCtx, cameras.NewModule()); err != nil {
+		logger.Error("failed to register Cameras module", "error", err)
+		os.Exit(1)
+	}
+	if item, err := moduleRegistry.Get(startupCtx, cameras.ModuleID); err == nil && item.Status == "registered" {
+		_ = moduleRegistry.SetStatus(startupCtx, cameras.ModuleID, "disabled", "")
+	}
+
 	var localProvider aiagent.Provider
 	if cfg.AIProvider == "ollama" {
 		provider, err := aiagent.NewOllamaProvider(cfg.AIEndpoint, cfg.AIModel)
@@ -124,6 +133,9 @@ func main() {
 	} else if item, err := moduleRegistry.Get(startupCtx, "ai.cloud"); err == nil && item.Status == "registered" {
 		_ = moduleRegistry.SetStatus(startupCtx, "ai.cloud", "disabled", "")
 	}
+	cameraService := cameras.NewService()
+	defer cameraService.Close()
+
 	updaterService := updater.New(version.Version, cfg.StateDir)
 	jobCtx, jobCancel := context.WithCancel(context.Background())
 	defer jobCancel()
@@ -133,7 +145,7 @@ func main() {
 		}
 	}()
 
-	apiHandler := api.New(
+	apiHandler := api.NewWithCameras(
 		nodeID,
 		logger,
 		store,
@@ -143,6 +155,7 @@ func main() {
 		moduleRegistry,
 		updaterService,
 		realtimeHub,
+		cameraService,
 		aiProvider,
 	)
 	handler := webui.New(apiHandler, cfg.WebDir)
