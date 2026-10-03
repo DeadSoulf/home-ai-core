@@ -251,26 +251,6 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
     setONVIFAudioEnabled(false);
   };
 
-  const discoverONVIF = async () => {
-    setBusy("onvif:discover");
-    setFormError("");
-    try {
-      const devices = await api.discoverONVIF();
-      setONVIFDevices(devices);
-      setONVIFDevice(undefined);
-      setONVIFProfiles([]);
-      setONVIFOpen(true);
-    } catch (reason) {
-      setONVIFDevices([]);
-      setONVIFDevice(undefined);
-      setONVIFProfiles([]);
-      setONVIFOpen(true);
-      setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
-    } finally {
-      setBusy("");
-    }
-  };
-
   const chooseONVIFDevice = (device: NVRONVIFDevice) => {
     setONVIFDevice(device);
     setONVIFName(device.name);
@@ -723,25 +703,9 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
                 type="button"
                 className="button primary"
                 disabled={Boolean(busy)}
-                onClick={() => void discoverCameras("quick")}
-              >
-                {busy === "discovery" && discoveryMode === "quick" ? t("nvrDiscoveryScanning") : t("nvrDiscoveryQuick")}
-              </button>
-              <button
-                type="button"
-                className="button primary"
-                disabled={Boolean(busy)}
                 onClick={() => void discoverCameras("deep")}
               >
-                {busy === "discovery" && discoveryMode === "deep" ? t("nvrDiscoveryDeepScanning") : t("nvrDiscoveryDeep")}
-              </button>
-              <button
-                type="button"
-                className="button secondary"
-                disabled={Boolean(busy) || !data.status.onvif_ready}
-                onClick={() => void discoverONVIF()}
-              >
-                {busy === "onvif:discover" ? t("working") : t("nvrDiscoverONVIF")}
+                {busy === "discovery" ? t("nvrDiscoverySearching") : t("nvrDiscoverySearch")}
               </button>
             </div>
             <div className="notice">
