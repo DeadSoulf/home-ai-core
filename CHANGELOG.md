@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.144-dev
+
+- Make ONVIF WS-Discovery fall back to the host default IPv4 route when Core cannot enumerate a usable interface instead of reporting discovery as unavailable.
+- Keep the ONVIF onboarding panel usable after automatic discovery fails and add manual onboarding by private camera IP or full ONVIF device-service URL.
+- Normalize an IP-only manual address to `/onvif/device_service`; existing server-side private/local endpoint validation remains enforced.
+
 ## 0.1.143-dev
 
 - Add a Cameras action to install the missing FFmpeg media runtime through the privileged typed updater helper, without SSH or arbitrary shell input.
