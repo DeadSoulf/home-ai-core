@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.152-dev
+
+- Start a fresh first-party `cameras` module instead of reactivating the retired `nvr` product module.
+- Base the new camera runtime on the supplied Hikvision HCNetSDK Linux 64-bit package; keep HCWebSDK only as a Web/ISAPI reference because its browser playback path requires the vendor Windows plugin.
+- Add a Linux amd64 dynamic loader for `libhcnetsdk.so` so Home-AI does not link proprietary SDK binaries into normal builds.
+- Add runtime detection for HCNetSDK support, library path, availability and initialization state.
+- Add the first native SDK probe using `NET_DVR_Init`, optional `NET_DVR_SetConnectTime`, `NET_DVR_Login_V30`, `NET_DVR_GetLastError`, `NET_DVR_Logout` and cleanup.
+- Restrict the first SDK login probe to literal private/link-local camera IPs; default Hikvision private SDK port is 8000.
+- Add `GET /api/v1/cameras/status` and permission/CSRF-protected `POST /api/v1/cameras/test-login`.
+- Add a new Cameras Web page that shows SDK readiness and performs an HCNetSDK credential/login test.
+- Keep the previous NVR schema/media/discovery groundwork dormant and disconnected from the new module.
+- Document the new SDK architecture in `docs/CAMERAS_SDK_ARCHITECTURE.md`.
+
 ## 0.1.151-dev
 
 - Remove Cameras / NVR from the active Home-AI product surface for now.
