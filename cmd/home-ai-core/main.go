@@ -133,7 +133,7 @@ func main() {
 	} else if item, err := moduleRegistry.Get(startupCtx, "ai.cloud"); err == nil && item.Status == "registered" {
 		_ = moduleRegistry.SetStatus(startupCtx, "ai.cloud", "disabled", "")
 	}
-	cameraService := cameras.NewService()
+	cameraService := cameras.NewService(cfg.StateDir)
 	defer cameraService.Close()
 
 	updaterService := updater.New(version.Version, cfg.StateDir)

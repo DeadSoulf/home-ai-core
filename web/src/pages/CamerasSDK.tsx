@@ -19,6 +19,24 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
   const [busy, setBusy] = useState(false);
   const [testError, setTestError] = useState("");
   const [testMessage, setTestMessage] = useState("");
+  const [sdkFile, setSDKFile] = useState<File>();
+  const [installing, setInstalling] = useState(false);
+  const [installError, setInstallError] = useState("");
+
+  const installSDK = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!canManage || !sdkFile || installing) return;
+    setInstalling(true);
+    setInstallError("");
+    try {
+      await api.installCameraSDK(sdkFile);
+      await resource.reload();
+    } catch (reason) {
+      setInstallError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setInstalling(false);
+    }
+  };
 
   const testLogin = async (event: FormEvent) => {
     event.preventDefault();
@@ -74,11 +92,27 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
           )}
         </dl>
         {!sdkReady && status.sdk.supported && (
-          <div className="notice">
-            {t("camerasSDKInstallHint")}
-            <br />
-            <code>/opt/home-ai/hikvision/lib/libhcnetsdk.so</code>
-          </div>
+          <>
+            <div className="notice">
+              Загрузите оригинальный Linux64 ZIP-пакет HCNetSDK от Hikvision. Home AI Core установит runtime в своё защищённое хранилище автоматически.
+            </div>
+            {installError && <ErrorState message={installError} />}
+            <form className="network-profile-form" onSubmit={installSDK}>
+              <label>
+                HCNetSDK Linux64 ZIP
+                <input
+                  type="file"
+                  accept=".zip,application/zip"
+                  onChange={(event) => setSDKFile(event.target.files?.[0])}
+                  disabled={!canManage || installing}
+                  required
+                />
+              </label>
+              <button type="submit" className="button primary" disabled={!canManage || !sdkFile || installing}>
+                {installing ? t("working") : "Установить HCNetSDK"}
+              </button>
+            </form>
+          </>
         )}
       </Panel>
 

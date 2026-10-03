@@ -200,6 +200,7 @@ func newServer(
 	if cameraService != nil {
 		s.mux.HandleFunc("GET /api/v1/cameras/status", s.requireAuth("security.self.read", s.camerasStatus))
 		s.mux.HandleFunc("POST /api/v1/cameras/test-login", s.requireAuth("camera.manage", s.camerasTestLogin))
+		s.mux.HandleFunc("POST /api/v1/cameras/sdk/install", s.requireAuth("camera.manage", s.camerasInstallRuntime))
 	}
 	if nvrService != nil {
 		s.mux.HandleFunc("GET /api/v1/nvr/status", s.requireAuth("security.self.read", s.nvrStatus))

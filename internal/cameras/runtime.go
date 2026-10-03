@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -62,11 +64,14 @@ type sdkRuntime interface {
 }
 
 type Service struct {
-	runtime sdkRuntime
+	runtime     sdkRuntime
+	runtimeRoot string
 }
 
-func NewService() *Service {
-	return &Service{runtime: newHCNetSDKRuntime()}
+func NewService(stateDir string) *Service {
+	runtimeRoot := filepath.Join(stateDir, "hikvision")
+	_ = os.Setenv("HOME_AI_HCNETSDK_DIR", runtimeRoot)
+	return &Service{runtime: newHCNetSDKRuntime(), runtimeRoot: runtimeRoot}
 }
 
 func NewServiceWithRuntime(runtime sdkRuntime) *Service {

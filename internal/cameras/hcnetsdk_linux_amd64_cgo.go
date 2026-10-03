@@ -15,6 +15,7 @@ typedef unsigned int (*hai_NET_DVR_GetLastError_t)(void);
 typedef int (*hai_NET_DVR_Login_V30_t)(char*, unsigned short, char*, char*, void*);
 typedef int (*hai_NET_DVR_Logout_t)(int);
 typedef int (*hai_NET_DVR_SetConnectTime_t)(unsigned int, unsigned int);
+typedef int (*hai_NET_DVR_SetSDKInitCfg_t)(int, void*);
 
 static void *hai_hcnetsdk_handle = NULL;
 static hai_NET_DVR_Init_t hai_NET_DVR_Init = NULL;
@@ -23,6 +24,7 @@ static hai_NET_DVR_GetLastError_t hai_NET_DVR_GetLastError = NULL;
 static hai_NET_DVR_Login_V30_t hai_NET_DVR_Login_V30 = NULL;
 static hai_NET_DVR_Logout_t hai_NET_DVR_Logout = NULL;
 static hai_NET_DVR_SetConnectTime_t hai_NET_DVR_SetConnectTime = NULL;
+static hai_NET_DVR_SetSDKInitCfg_t hai_NET_DVR_SetSDKInitCfg = NULL;
 
 static const char* hai_hcnetsdk_dlerror(void) {
 	const char *err = dlerror();
@@ -46,6 +48,7 @@ static int hai_hcnetsdk_load(const char *path) {
 	hai_NET_DVR_Login_V30 = (hai_NET_DVR_Login_V30_t)dlsym(hai_hcnetsdk_handle, "NET_DVR_Login_V30");
 	hai_NET_DVR_Logout = (hai_NET_DVR_Logout_t)dlsym(hai_hcnetsdk_handle, "NET_DVR_Logout");
 	hai_NET_DVR_SetConnectTime = (hai_NET_DVR_SetConnectTime_t)dlsym(hai_hcnetsdk_handle, "NET_DVR_SetConnectTime");
+	hai_NET_DVR_SetSDKInitCfg = (hai_NET_DVR_SetSDKInitCfg_t)dlsym(hai_hcnetsdk_handle, "NET_DVR_SetSDKInitCfg");
 
 	if (hai_NET_DVR_Init == NULL ||
 		hai_NET_DVR_Cleanup == NULL ||
@@ -60,9 +63,18 @@ static int hai_hcnetsdk_load(const char *path) {
 		hai_NET_DVR_Login_V30 = NULL;
 		hai_NET_DVR_Logout = NULL;
 		hai_NET_DVR_SetConnectTime = NULL;
+		hai_NET_DVR_SetSDKInitCfg = NULL;
 		return -1;
 	}
 	return 1;
+}
+
+static int hai_hcnetsdk_set_sdk_path(const char *path) {
+	if (hai_NET_DVR_SetSDKInitCfg == NULL || path == NULL) return 1;
+	struct { char sPath[256]; unsigned char byRes[128]; } cfg;
+	memset(&cfg, 0, sizeof(cfg));
+	strncpy(cfg.sPath, path, sizeof(cfg.sPath)-1);
+	return hai_NET_DVR_SetSDKInitCfg(2, &cfg);
 }
 
 static int hai_hcnetsdk_init(void) {
@@ -124,6 +136,7 @@ static void hai_hcnetsdk_close(void) {
 	hai_NET_DVR_Login_V30 = NULL;
 	hai_NET_DVR_Logout = NULL;
 	hai_NET_DVR_SetConnectTime = NULL;
+	hai_NET_DVR_SetSDKInitCfg = NULL;
 }
 */
 import "C"
@@ -207,6 +220,11 @@ func (r *hcNetSDKRuntime) detectAndLoadLocked() SDKStatus {
 		status.Error = detail
 		return status
 	}
+
+	sdkDir := filepath.Dir(path)
+	cSDKDir := C.CString(sdkDir)
+	C.hai_hcnetsdk_set_sdk_path(cSDKDir)
+	C.free(unsafe.Pointer(cSDKDir))
 
 	if int(C.hai_hcnetsdk_init()) == 0 {
 		code := uint32(C.hai_hcnetsdk_last_error())
