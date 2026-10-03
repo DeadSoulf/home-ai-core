@@ -26,18 +26,18 @@ type CameraDiscoveryService struct {
 }
 
 type CameraDiscoveryDevice struct {
-	ID             string                   `json:"id"`
-	Name           string                   `json:"name"`
-	IP             string                   `json:"ip"`
-	MAC            string                   `json:"mac,omitempty"`
-	Vendor         string                   `json:"vendor,omitempty"`
-	Model          string                   `json:"model,omitempty"`
-	DeviceType     string                   `json:"device_type"`
-	Confidence     string                   `json:"confidence"`
-	Sources        []string                 `json:"sources"`
-	Services       []CameraDiscoveryService `json:"services"`
-	ONVIFAddress   string                   `json:"onvif_address,omitempty"`
-	RTSPAddressHint string                  `json:"rtsp_address_hint,omitempty"`
+	ID              string                   `json:"id"`
+	Name            string                   `json:"name"`
+	IP              string                   `json:"ip"`
+	MAC             string                   `json:"mac,omitempty"`
+	Vendor          string                   `json:"vendor,omitempty"`
+	Model           string                   `json:"model,omitempty"`
+	DeviceType      string                   `json:"device_type"`
+	Confidence      string                   `json:"confidence"`
+	Sources         []string                 `json:"sources"`
+	Services        []CameraDiscoveryService `json:"services"`
+	ONVIFAddress    string                   `json:"onvif_address,omitempty"`
+	RTSPAddressHint string                   `json:"rtsp_address_hint,omitempty"`
 }
 
 type CameraDiscoveryEngine struct {
