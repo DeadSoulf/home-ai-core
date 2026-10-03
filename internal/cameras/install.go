@@ -44,7 +44,9 @@ func (s *Service) InstallRuntime(reader io.Reader, size int64) (InstallResult, e
 	}
 
 	zr, err := zip.OpenReader(tmpName)
-	if err != nil { return InstallResult{}, fmt.Errorf("open HCNetSDK archive: %w", err) }
+	if err != nil {
+		return InstallResult{}, fmt.Errorf("open HCNetSDK archive: %w", err)
+	}
 	defer zr.Close()
 
 	prefix := ""
