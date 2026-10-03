@@ -41,7 +41,7 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
     setSearching(true);
     setSearchError("");
     try {
-      setDevices(await api.discoverCameras());
+      setDevices(await api.discoverSDKCameras());
     } catch (reason) {
       setSearchError(reason instanceof Error ? reason.message : t("requestFailed"));
     } finally {
