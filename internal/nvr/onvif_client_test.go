@@ -85,7 +85,6 @@ func TestONVIFSecurityHeaderDoesNotUsePlaintextPassword(t *testing.T) {
 	}
 }
 
-
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (fn roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -102,7 +101,7 @@ func TestONVIFProfilesRetriesWithHTTPDigest(t *testing.T) {
 				Header: http.Header{
 					"WWW-Authenticate": []string{challenge},
 				},
-				Body: io.NopCloser(strings.NewReader("")),
+				Body:    io.NopCloser(strings.NewReader("")),
 				Request: request,
 			}, nil
 		}
@@ -120,9 +119,9 @@ func TestONVIFProfilesRetriesWithHTTPDigest(t *testing.T) {
 		}
 		return &http.Response{
 			StatusCode: http.StatusOK,
-			Header: http.Header{"Content-Type": []string{"application/soap+xml"}},
-			Body: io.NopCloser(strings.NewReader(response)),
-			Request: request,
+			Header:     http.Header{"Content-Type": []string{"application/soap+xml"}},
+			Body:       io.NopCloser(strings.NewReader(response)),
+			Request:    request,
 		}, nil
 	})
 
