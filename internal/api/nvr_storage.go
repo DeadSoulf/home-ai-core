@@ -265,3 +265,26 @@ func sameStorageIdentity(deviceA, uuidA, deviceB, uuidB string) bool {
 	}
 	return strings.TrimSpace(deviceA) != "" && strings.TrimSpace(deviceA) == strings.TrimSpace(deviceB)
 }
+
+func (s *server) activeNVRStorageUsage(
+	ctx context.Context,
+	node systeminfo.BlockNode,
+) (storagePurposeUsageResponse, bool) {
+	store, ok := s.state.(nvrStorageState)
+	if !ok {
+		return storagePurposeUsageResponse{}, false
+	}
+	target, err := store.ActiveNVRStorageTarget(ctx)
+	if err != nil {
+		return storagePurposeUsageResponse{}, false
+	}
+	if !sameStorageIdentity(target.DevicePath, target.FilesystemUUID, node.Path, node.UUID) {
+		return storagePurposeUsageResponse{}, false
+	}
+	return storagePurposeUsageResponse{
+		Type:     "nvr_archive",
+		ID:       target.ID,
+		Name:     "NVR archive",
+		RootPath: target.Mountpoint,
+	}, true
+}
