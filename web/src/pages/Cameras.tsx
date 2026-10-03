@@ -58,6 +58,26 @@ function cameraInput(editor: CameraEditor): NVRCameraInput {
   };
 }
 
+function normalizeManualONVIFAddress(value: string): {address: string; host: string} | undefined {
+  let raw = value.trim();
+  if (!raw) return undefined;
+  if (!/^https?:\/\//i.test(raw)) raw = "http://" + raw;
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return undefined;
+    if (!parsed.hostname) return undefined;
+    if (parsed.pathname === "/" || parsed.pathname === "") {
+      parsed.pathname = "/onvif/device_service";
+    }
+    parsed.username = "";
+    parsed.password = "";
+    parsed.hash = "";
+    return {address: parsed.toString(), host: parsed.hostname};
+  } catch {
+    return undefined;
+  }
+}
+
 function probeFingerprint(editor: CameraEditor): string {
   return [
     editor.address.trim(),
@@ -137,6 +157,7 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
   const [onvifName, setONVIFName] = useState("");
   const [onvifUsername, setONVIFUsername] = useState("");
   const [onvifPassword, setONVIFPassword] = useState("");
+  const [onvifManualAddress, setONVIFManualAddress] = useState("");
   const [onvifMainToken, setONVIFMainToken] = useState("");
   const [onvifSubToken, setONVIFSubToken] = useState("");
   const [onvifTransport, setONVIFTransport] = useState<"tcp" | "udp">("tcp");
@@ -172,6 +193,7 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
     setONVIFName("");
     setONVIFUsername("");
     setONVIFPassword("");
+    setONVIFManualAddress("");
     setONVIFMainToken("");
     setONVIFSubToken("");
     setONVIFTransport("tcp");
@@ -189,6 +211,10 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
       setONVIFProfiles([]);
       setONVIFOpen(true);
     } catch (reason) {
+      setONVIFDevices([]);
+      setONVIFDevice(undefined);
+      setONVIFProfiles([]);
+      setONVIFOpen(true);
       setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
     } finally {
       setBusy("");
@@ -203,6 +229,21 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
     setONVIFSubToken("");
     setONVIFUsername("");
     setONVIFPassword("");
+  };
+
+  const chooseManualONVIF = () => {
+    const normalized = normalizeManualONVIFAddress(onvifManualAddress);
+    if (!normalized) {
+      setFormError(t("nvrONVIFManualInvalid"));
+      return;
+    }
+    setFormError("");
+    chooseONVIFDevice({
+      id: "manual:" + normalized.address,
+      name: "ONVIF " + normalized.host,
+      address: normalized.address,
+      ip: normalized.host,
+    });
   };
 
   const loadONVIFProfiles = async () => {
