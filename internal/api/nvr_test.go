@@ -101,11 +101,11 @@ func TestNVRCameraListDoesNotExposeSourceOrCredentialReference(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &statusBody); err != nil {
 		t.Fatal(err)
 	}
-	if statusBody.NVR.CameraCount != 1 || statusBody.NVR.FoundationStage != "nvr-0" {
+	if statusBody.NVR.CameraCount != 1 || statusBody.NVR.FoundationStage != "nvr-1-onboarding" {
 		t.Fatalf("NVR status = %#v", statusBody.NVR)
 	}
 	if statusBody.NVR.MediaRuntimeReady || statusBody.NVR.SecretStoreReady {
-		t.Fatalf("NVR-0 incorrectly reports unfinished runtime ready: %#v", statusBody.NVR)
+		t.Fatalf("dormant NVR groundwork incorrectly reports unfinished runtime ready: %#v", statusBody.NVR)
 	}
 }
 
