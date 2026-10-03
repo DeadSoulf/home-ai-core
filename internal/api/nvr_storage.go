@@ -278,7 +278,18 @@ func (s *server) activeNVRStorageUsage(
 	if err != nil {
 		return storagePurposeUsageResponse{}, false
 	}
-	if !sameStorageIdentity(target.DevicePath, target.FilesystemUUID, node.Path, node.UUID) {
+	mountpoints := make([]string, 0)
+	paths := map[string]bool{}
+	uuids := map[string]bool{}
+	collectStorageIdentity(node, &mountpoints, paths, uuids)
+
+	matched := false
+	if strings.TrimSpace(target.FilesystemUUID) != "" {
+		matched = uuids[target.FilesystemUUID]
+	} else {
+		matched = paths[target.DevicePath]
+	}
+	if !matched {
 		return storagePurposeUsageResponse{}, false
 	}
 	return storagePurposeUsageResponse{
