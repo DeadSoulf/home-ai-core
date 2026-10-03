@@ -364,7 +364,7 @@ export type NetworkProfileStatus = {
 export type StoragePurpose = "files" | "video";
 
 export type StoragePurposeUsage = {
-  type: "file_pool";
+  type: "file_pool" | "nvr_archive";
   id: string;
   name: string;
   root_path?: string;
