@@ -16,15 +16,6 @@ type State interface {
 	SetStoragePurpose(ctx context.Context, devicePath, filesystemUUID, purpose string, now time.Time) (state.StoragePurposeRecord, error)
 	ClearStoragePurpose(ctx context.Context, devicePath, filesystemUUID string) error
 	ListStoragePurposes(ctx context.Context) ([]state.StoragePurposeRecord, error)
-	SetNVRStorageTarget(
-		ctx context.Context,
-		devicePath, filesystemUUID, mountpoint string,
-		reservePercent int,
-		active bool,
-		now time.Time,
-	) (state.NVRStorageTargetRecord, error)
-	ActiveNVRStorageTarget(ctx context.Context) (state.NVRStorageTargetRecord, error)
-	NVRArchiveBytes(ctx context.Context, storageTargetID string) (int64, error)
 
 	CreateNASPool(ctx context.Context, name, rootPath, storageDevicePath, storageFilesystemUUID, createdBy string, now time.Time) (state.NASPoolRecord, error)
 	NASPool(ctx context.Context, poolID string) (state.NASPoolRecord, error)
