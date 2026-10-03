@@ -86,13 +86,16 @@ func (s *server) storageOperation(
 				return
 			}
 			usage := storageUsageForNode(node, pools)
+			if nvrUsage, active := s.activeNVRStorageUsage(r.Context(), node); active {
+				usage = append(usage, nvrUsage)
+			}
 			if len(usage) > 0 {
 				writeAPIError(
 					w,
 					r,
 					http.StatusConflict,
 					"storage_in_use",
-					"storage is used by a Home-AI file pool and cannot be unmounted, formatted or deleted",
+					"storage is used by Home-AI and cannot be unmounted, formatted or deleted",
 					map[string]any{"used_by": usage},
 				)
 				return
