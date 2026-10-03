@@ -21,6 +21,7 @@ func (f *fakeRecorderSource) Start(
 	ctx context.Context,
 	_ ProbeRequest,
 	outputDir string,
+	_ bool,
 ) (<-chan RecordedSegment, <-chan error, error) {
 	if err := os.MkdirAll(outputDir, 0o750); err != nil {
 		return nil, nil, err
