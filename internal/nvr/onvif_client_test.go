@@ -99,7 +99,7 @@ func TestONVIFProfilesRetriesWithHTTPDigest(t *testing.T) {
 			return &http.Response{
 				StatusCode: http.StatusUnauthorized,
 				Header: http.Header{
-					"WWW-Authenticate": []string{challenge},
+					"Www-Authenticate": []string{challenge},
 				},
 				Body:    io.NopCloser(strings.NewReader("")),
 				Request: request,
