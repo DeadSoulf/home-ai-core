@@ -54,14 +54,14 @@ func (e *CameraDiscoveryEngine) discoverDeep(
 	defer cancel()
 
 	var (
-		quickDevices  []CameraDiscoveryDevice
-		network       map[string]*cameraNetworkEvidence
-		hikvision     []CameraDiscoveryDevice
-		dahua         []CameraDiscoveryDevice
-		ssdp          []CameraDiscoveryDevice
-		quickErr      error
-		networkErr    error
-		wg            sync.WaitGroup
+		quickDevices []CameraDiscoveryDevice
+		network      map[string]*cameraNetworkEvidence
+		hikvision    []CameraDiscoveryDevice
+		dahua        []CameraDiscoveryDevice
+		ssdp         []CameraDiscoveryDevice
+		quickErr     error
+		networkErr   error
+		wg           sync.WaitGroup
 	)
 
 	wg.Add(5)
