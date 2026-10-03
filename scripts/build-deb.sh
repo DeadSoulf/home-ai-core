@@ -20,7 +20,10 @@ esac
 
 command -v go >/dev/null 2>&1 || { echo "go is required" >&2; exit 2; }
 command -v npm >/dev/null 2>&1 || { echo "npm is required" >&2; exit 2; }
-command -v dpkg-deb >/dev/null 2>&1 || { echo "dpkg-deb is required" >&2; exit 2; }\nif [ "$CORE_CGO" = "1" ]; then\n  command -v cc >/dev/null 2>&1 || { echo "a C compiler (cc) is required for the amd64 Core build with HCNetSDK support" >&2; exit 2; }\nfi
+command -v dpkg-deb >/dev/null 2>&1 || { echo "dpkg-deb is required" >&2; exit 2; }
+if [ "$CORE_CGO" = "1" ]; then
+  command -v cc >/dev/null 2>&1 || { echo "a C compiler (cc) is required for the amd64 Core build with HCNetSDK support" >&2; exit 2; }
+fi
 
 rm -rf "$STAGE"
 mkdir -p "$STAGE/DEBIAN" "$STAGE/usr/bin" "$STAGE/usr/libexec/home-ai-core" "$STAGE/usr/share/home-ai-core/web" \
@@ -36,7 +39,7 @@ test -f "$ROOT/web/dist/index.html"
 cp -a "$ROOT/web/dist/." "$STAGE/usr/share/home-ai-core/web/"
 
 cd "$ROOT"
-GOOS=linux GOARCH="$GOARCH" CGO_ENABLED=0 go build \
+GOOS=linux GOARCH="$GOARCH" CGO_ENABLED="$CORE_CGO" go build \
   -trimpath \
   -ldflags "-s -w -X github.com/DeadSoulf/home-ai-core/internal/version.Version=$VERSION" \
   -o "$STAGE/usr/bin/home-ai-core" \
