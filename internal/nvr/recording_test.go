@@ -288,7 +288,6 @@ func TestRingRetentionStopsWhenOnlyProtectedSegmentsRemain(t *testing.T) {
 	}
 }
 
-
 func TestFinalizeRecordedSegmentRenamesPartialFile(t *testing.T) {
 	root := t.TempDir()
 	partial := filepath.Join(root, "segment.partial.mp4")
