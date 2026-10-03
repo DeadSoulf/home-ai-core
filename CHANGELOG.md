@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.141-dev
+
+- Always show the underlying technical storage-operation error in the Web UI, including the Russian locale, so mount failures expose the real filesystem/helper diagnostic instead of only a generic message.
+- No automatic filesystem repair or destructive formatting is performed by this diagnostic hotfix.
+
 ## 0.1.140-dev
 
 - Start NVR-2 with a usable continuous recording and video-storage foundation.
