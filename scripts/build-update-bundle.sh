@@ -9,8 +9,8 @@ STAGE="$ROOT/build/update-$ARCH"
 BUNDLE="$OUT_DIR/home-ai-core-update_${VERSION}_${ARCH}.tar.gz"
 
 case "$ARCH" in
-  amd64) GOARCH=amd64 ;;
-  arm64) GOARCH=arm64 ;;
+  amd64) GOARCH=amd64; CORE_CGO=1 ;;
+  arm64) GOARCH=arm64; CORE_CGO=0 ;;
   *)
     echo "unsupported architecture: $ARCH" >&2
     exit 2
@@ -23,6 +23,9 @@ command -v python3 >/dev/null 2>&1 || { echo "python3 is required" >&2; exit 2; 
 command -v tar >/dev/null 2>&1 || { echo "tar is required" >&2; exit 2; }
 command -v gzip >/dev/null 2>&1 || { echo "gzip is required" >&2; exit 2; }
 command -v sha256sum >/dev/null 2>&1 || { echo "sha256sum is required" >&2; exit 2; }
+if [ "$CORE_CGO" = "1" ]; then
+  command -v cc >/dev/null 2>&1 || { echo "a C compiler (cc) is required for the amd64 Core build with HCNetSDK support" >&2; exit 2; }
+fi
 
 rm -rf "$STAGE"
 mkdir -p "$STAGE/bin" "$STAGE/helper" "$STAGE/web" "$OUT_DIR"
@@ -37,7 +40,7 @@ test -f "$ROOT/web/dist/index.html"
 cp -a "$ROOT/web/dist/." "$STAGE/web/"
 
 cd "$ROOT"
-GOOS=linux GOARCH="$GOARCH" CGO_ENABLED=0 go build \
+GOOS=linux GOARCH="$GOARCH" CGO_ENABLED="$CORE_CGO" go build \
   -trimpath \
   -ldflags "-s -w -X github.com/DeadSoulf/home-ai-core/internal/version.Version=$VERSION" \
   -o "$STAGE/bin/home-ai-core" \
