@@ -2,9 +2,11 @@ package nvr
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -335,4 +337,113 @@ func TestCleanupPartialSegmentsPreservesCompletedArchive(t *testing.T) {
 	if _, err := os.Stat(complete); err != nil {
 		t.Fatalf("completed segment was removed: %v", err)
 	}
+}
+
+
+type retryRecorderSource struct {
+	mu    sync.Mutex
+	calls int
+}
+
+func (r *retryRecorderSource) Available() bool { return true }
+
+func (r *retryRecorderSource) Start(
+	ctx context.Context,
+	_ ProbeRequest,
+	outputDir string,
+	_ bool,
+) (<-chan RecordedSegment, <-chan error, error) {
+	r.mu.Lock()
+	r.calls++
+	call := r.calls
+	r.mu.Unlock()
+
+	segments := make(chan RecordedSegment, 1)
+	done := make(chan error, 1)
+	if call == 1 {
+		close(segments)
+		done <- errors.New("simulated RTSP loss")
+		close(done)
+		return segments, done, nil
+	}
+
+	if err := os.MkdirAll(outputDir, 0o750); err != nil {
+		return nil, nil, err
+	}
+	path := filepath.Join(outputDir, "recovered.mp4")
+	if err := os.WriteFile(path, []byte("recovered-segment"), 0o640); err != nil {
+		return nil, nil, err
+	}
+	segments <- RecordedSegment{Path: path, EndOffset: time.Minute}
+	close(segments)
+	go func() {
+		<-ctx.Done()
+		done <- ctx.Err()
+		close(done)
+	}()
+	return segments, done, nil
+}
+
+func (r *retryRecorderSource) Calls() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.calls
+}
+
+func TestContinuousRecordingRestartsAfterRecorderProcessLoss(t *testing.T) {
+	ctx := context.Background()
+	store, err := state.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	mountpoint := t.TempDir()
+	target, err := store.SetNVRStorageTarget(
+		ctx, "/dev/retry-video", "uuid-retry-video", mountpoint, 10, true, time.Now(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder := &retryRecorderSource{}
+	service := NewServiceWithDependencies(
+		store,
+		newFakeCredentialStore(),
+		&fakeProber{result: ProbeResult{Codec: "h264", Width: 1920, Height: 1080}},
+	)
+	service.recorder = recorder
+	service.retryDelays = []time.Duration{time.Millisecond}
+	service.healthInterval = time.Hour
+
+	camera, _, err := service.CreateCamera(ctx, "", CameraInput{
+		Name:          "Reconnect recorder",
+		Address:       "rtsp://192.0.2.120/main",
+		Transport:     "tcp",
+		RecordingMode: "continuous",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer service.Stop()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		total, err := store.NVRArchiveBytes(ctx, target.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if recorder.Calls() >= 2 && total == int64(len("recovered-segment")) {
+			status := service.CameraRecording(camera.ID)
+			if !status.Active || status.LastSegmentPath == "" {
+				t.Fatalf("recording status after reconnect = %#v", status)
+			}
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("recorder did not recover: calls=%d status=%#v", recorder.Calls(), service.CameraRecording(camera.ID))
 }
