@@ -140,7 +140,6 @@ func containsDiscoverySource(values []string, want string) bool {
 	return false
 }
 
-
 func TestParseProcNetRouteNetworks(t *testing.T) {
 	raw := strings.NewReader(
 		"Iface\tDestination\tGateway\tFlags\tRefCnt\tUse\tMetric\tMask\tMTU\tWindow\tIRTT\n" +
