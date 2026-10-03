@@ -58,6 +58,26 @@ function cameraInput(editor: CameraEditor): NVRCameraInput {
   };
 }
 
+function normalizeManualONVIFAddress(value: string): {address: string; host: string} | undefined {
+  let raw = value.trim();
+  if (!raw) return undefined;
+  if (!/^https?:\/\//i.test(raw)) raw = "http://" + raw;
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return undefined;
+    if (!parsed.hostname) return undefined;
+    if (parsed.pathname === "/" || parsed.pathname === "") {
+      parsed.pathname = "/onvif/device_service";
+    }
+    parsed.username = "";
+    parsed.password = "";
+    parsed.hash = "";
+    return {address: parsed.toString(), host: parsed.hostname};
+  } catch {
+    return undefined;
+  }
+}
+
 function probeFingerprint(editor: CameraEditor): string {
   return [
     editor.address.trim(),
@@ -137,6 +157,7 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
   const [onvifName, setONVIFName] = useState("");
   const [onvifUsername, setONVIFUsername] = useState("");
   const [onvifPassword, setONVIFPassword] = useState("");
+  const [onvifManualAddress, setONVIFManualAddress] = useState("");
   const [onvifMainToken, setONVIFMainToken] = useState("");
   const [onvifSubToken, setONVIFSubToken] = useState("");
   const [onvifTransport, setONVIFTransport] = useState<"tcp" | "udp">("tcp");
@@ -172,6 +193,7 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
     setONVIFName("");
     setONVIFUsername("");
     setONVIFPassword("");
+    setONVIFManualAddress("");
     setONVIFMainToken("");
     setONVIFSubToken("");
     setONVIFTransport("tcp");
@@ -189,6 +211,10 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
       setONVIFProfiles([]);
       setONVIFOpen(true);
     } catch (reason) {
+      setONVIFDevices([]);
+      setONVIFDevice(undefined);
+      setONVIFProfiles([]);
+      setONVIFOpen(true);
       setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
     } finally {
       setBusy("");
@@ -203,6 +229,21 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
     setONVIFSubToken("");
     setONVIFUsername("");
     setONVIFPassword("");
+  };
+
+  const chooseManualONVIF = () => {
+    const normalized = normalizeManualONVIFAddress(onvifManualAddress);
+    if (!normalized) {
+      setFormError(t("nvrONVIFManualInvalid"));
+      return;
+    }
+    setFormError("");
+    chooseONVIFDevice({
+      id: "manual:" + normalized.address,
+      name: "ONVIF " + normalized.host,
+      address: normalized.address,
+      ip: normalized.host,
+    });
   };
 
   const loadONVIFProfiles = async () => {
@@ -722,27 +763,64 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
 
       {onvifOpen && (
         <Panel title={t("nvrONVIFDiscovery")} className="wide">
-          {onvifDevices.length === 0 ? (
-            <div className="notice"><p>{t("nvrONVIFNoDevices")}</p></div>
-          ) : !onvifDevice ? (
-            <div className="list">
-              {onvifDevices.map((device) => (
-                <div className="list-row" key={device.id}>
-                  <div>
-                    <strong>{device.name}</strong>
-                    <span>{device.ip} · {device.address}</span>
-                  </div>
-                  <button type="button" className="button primary compact" onClick={() => chooseONVIFDevice(device)}>
-                    {t("select")}
+          {!onvifDevice ? (
+            <>
+              {onvifDevices.length === 0 ? (
+                <div className="notice"><p>{t("nvrONVIFNoDevices")}</p></div>
+              ) : (
+                <div className="list">
+                  {onvifDevices.map((device) => (
+                    <div className="list-row" key={device.id}>
+                      <div>
+                        <strong>{device.name}</strong>
+                        <span>{device.ip} · {device.address}</span>
+                      </div>
+                      <button type="button" className="button primary compact" onClick={() => chooseONVIFDevice(device)}>
+                        {t("select")}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="notice">
+                <strong>{t("nvrONVIFManual")}</strong>
+                <p>{t("nvrONVIFManualHint")}</p>
+                <label className="nvr-address-field">
+                  {t("nvrONVIFAddress")}
+                  <input
+                    inputMode="url"
+                    placeholder="192.168.1.50"
+                    value={onvifManualAddress}
+                    onChange={(event) => setONVIFManualAddress(event.target.value)}
+                  />
+                </label>
+                <div className="nvr-form-actions">
+                  <button
+                    type="button"
+                    className="button primary"
+                    disabled={Boolean(busy) || !onvifManualAddress.trim()}
+                    onClick={chooseManualONVIF}
+                  >
+                    {t("nvrONVIFUseAddress")}
                   </button>
                 </div>
-              ))}
-            </div>
+              </div>
+
+              <div className="nvr-form-actions">
+                <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={() => void discoverONVIF()}>
+                  {busy === "onvif:discover" ? t("working") : t("refresh")}
+                </button>
+                <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={resetONVIF}>
+                  {t("cancel")}
+                </button>
+              </div>
+            </>
           ) : (
             <form className="nvr-camera-form" onSubmit={importONVIF}>
               <div className="notice">
                 <strong>{onvifDevice.name}</strong>
-                <span>{onvifDevice.ip}</span>
+                <span>{onvifDevice.ip} · {onvifDevice.address}</span>
               </div>
               <label>
                 {t("nvrCameraName")}
@@ -839,16 +917,6 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
                 </>
               )}
             </form>
-          )}
-          {!onvifDevice && (
-            <div className="nvr-form-actions">
-              <button type="button" className="button secondary" onClick={() => void discoverONVIF()}>
-                {t("refresh")}
-              </button>
-              <button type="button" className="button secondary" onClick={resetONVIF}>
-                {t("cancel")}
-              </button>
-            </div>
           )}
         </Panel>
       )}

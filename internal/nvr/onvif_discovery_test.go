@@ -63,3 +63,16 @@ func TestWSDiscoveryProbeTargetsONVIFNetworkVideoTransmitter(t *testing.T) {
 		t.Fatalf("unexpected WS-Discovery probe: %s", probe)
 	}
 }
+
+func TestDiscoveryBindIPsFallsBackToWildcard(t *testing.T) {
+	got := discoveryBindIPs(nil, nil)
+	if len(got) != 1 || !got[0].Equal(net.IPv4zero) {
+		t.Fatalf("fallback = %#v, want 0.0.0.0", got)
+	}
+
+	want := net.ParseIP("192.168.1.20").To4()
+	got = discoveryBindIPs([]net.IP{want}, nil)
+	if len(got) != 1 || !got[0].Equal(want) {
+		t.Fatalf("specific bind IPs changed: %#v", got)
+	}
+}
