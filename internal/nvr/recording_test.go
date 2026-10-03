@@ -349,7 +349,6 @@ func TestCleanupPartialSegmentsPreservesCompletedArchive(t *testing.T) {
 	}
 }
 
-
 type retryRecorderSource struct {
 	mu    sync.Mutex
 	calls int
@@ -458,7 +457,6 @@ func TestContinuousRecordingRestartsAfterRecorderProcessLoss(t *testing.T) {
 	}
 	t.Fatalf("recorder did not recover: calls=%d status=%#v", recorder.Calls(), service.CameraRecording(camera.ID))
 }
-
 
 func TestContinuousRecordingRejectsUnmountedArchiveTarget(t *testing.T) {
 	ctx := context.Background()
