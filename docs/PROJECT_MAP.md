@@ -7,10 +7,10 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.139-dev` — NVR ONVIF discovery/import\
-**Текущий срез:** `0.1.140-dev` — NVR-2 continuous recording + video storage + reserve/ring retention реализован в коде; требуется live acceptance на реальных камерах и диске.\
-**Следующий engineering milestone:** после acceptance NVR-2 — **NVR-3: motion recording + archive timeline + protect/bookmark/snapshot + clip export**.\
-**Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.\
+**Последний опубликованный релиз:** `0.1.151-dev` — экспериментальный Cameras/NVR модуль снят из продукта; задел в Core сохранён.  
+**Текущий срез:** Cameras/NVR считается **не реализованным продуктовым модулем**. Регистрация, runtime, Web-route и публичное подключение NVR отключены; schema/state/media/discovery/storage groundwork сохранён для будущего отдельного этапа.  
+**Следующий engineering milestone:** Docker runtime для дополнительных модулей; Cameras/NVR вернётся в план отдельным этапом после фиксации новой модульной архитектуры.  
+**Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.  
 **Обновлено:** 2026-10-03
 
 ### Итог этапа AI Agent — зафиксировано на 0.1.133-dev
@@ -40,7 +40,13 @@
 - ✅ Релизы `0.1.115-dev` → `0.1.133-dev` прошли соответствующие Web/Go/Core/Debian/Windows CI и публикацию release artifacts.
 - ⏸ AI Agent считается функционально достаточным для текущего этапа; дальнейшее расширение tools, streaming и provider UI отложено до отдельного цикла.
 
-### Выпуск 0.1.139-dev — NVR ONVIF discovery/import
+### Архив экспериментального Cameras/NVR прототипа
+
+> Важно: записи ниже описывают экспериментальные dev-срезы и технический задел.  
+> С `0.1.151-dev` они **не считаются реализованным продуктовым модулем Cameras/NVR**.  
+> Код и schema сохранены в Core как groundwork, но модуль не регистрируется, не запускается и не показывается пользователю.
+
+#### Выпуск 0.1.139-dev — NVR ONVIF discovery/import
 
 - ✅ Добавлен bounded local WS-Discovery для ONVIF NetworkVideoTransmitter камер.
 - ✅ Discovery работает только по активным локальным IPv4 interfaces, с коротким timeout и лимитом результатов.
@@ -1245,66 +1251,22 @@ Home Assistant не является основой.
 - permission-scoped actions;
 - events/audit.
 
-### 🚧 F4 — Cameras / NVR
+### ⏸ F4 — Cameras / NVR — пока не реализовано
 
-Архитектура зафиксирована в [NVR_ARCHITECTURE.md](NVR_ARCHITECTURE.md) и [ADR-0037](decisions/0037-cameras-nvr-media-plane.md).
+Cameras/NVR **не является текущим продуктовым модулем Home-AI**.
 
-Ключевые решения:
+Что зафиксировано на текущем этапе:
 
-- first-party module ID `nvr`, Web route `/modules/nvr`;
-- Core остаётся control plane: identity, permissions, metadata, jobs/events/audit;
-- RTSP/live/recording идут отдельным media data plane и не проходят через SQLite/WebSocket event history;
-- camera является resource-scoped объектом Core;
-- recording не зависит от AI/Internet/cloud;
-- main stream используется для архива, substream — для preview/motion/будущего detection, когда доступен;
-- архив строится из time-bounded segments, media-файлы лежат вне SQLite;
-- NVR использует только storage с purpose `video`;
-- NVR v1 использует один активный video archive target;
-- reserve + ring retention удаляет только самые старые **незащищённые** segments;
-- protected evidence никогда не удаляется retention автоматически;
-- camera credentials не попадают в API/audit/events; persistent camera config хранит только secret reference;
-- FFmpeg/FFprobe допускаются как первый managed media backend за typed Go abstraction;
-- browser live transport отделён от archive contract и может развиваться независимо;
-- AI/object/face/LPR/semantic search строятся как downstream vision/enrichment слои после надёжного архива.
+- модуль `nvr` не регистрируется в Module Registry;
+- NVR runtime и camera supervisor не запускаются при старте Core;
+- Web-раздел Cameras и route `/modules/nvr` не подключены к приложению;
+- NVR API не публикуется обычным Core runtime;
+- существующая запись `nvr` удаляется только из таблицы Module Registry при обновлении;
+- camera/NVR данные, schema и permissions **не удаляются**;
+- `internal/nvr`, RTSP/ONVIF/discovery, recorder, storage target, retention и security groundwork остаются в кодовой базе;
+- архитектурные документы [NVR_ARCHITECTURE.md](NVR_ARCHITECTURE.md) и [ADR-0037](decisions/0037-cameras-nvr-media-plane.md) сохраняются как исследовательский задел, а не как описание готового модуля.
 
-**Точный NVR v1 scope:**
-
-1. модуль `nvr` enable/disable;
-2. permissions и camera resource scopes;
-3. manual RTSP CRUD;
-4. bounded ONVIF discovery/import;
-5. connection test перед сохранением;
-6. protected server-side camera credentials;
-7. main/sub stream probe;
-8. single live view;
-9. multi-camera grid;
-10. health + automatic reconnect;
-11. выбор одного ready `video` storage target;
-12. continuous recording с packet-copy/remux где возможно;
-13. basic motion recording;
-14. pre/post event buffer;
-15. segmented archive;
-16. reserve + ring overwrite;
-17. protected recordings;
-18. timeline с gaps/recording/motion markers;
-19. grouping motion bursts в review events;
-20. snapshot;
-21. protect/unprotect range;
-22. export clip через persistent Job Engine;
-23. per-camera live/archive/export/manage authorization;
-24. audit без credentials/media leakage;
-25. automatic runtime/archive recovery после restart.
-
-**Implementation slices:**
-
-- **NVR-0:** module contract, permissions, schema, API types, secret-reference contract;
-- **NVR-1:** RTSP/ONVIF onboarding, probe, runtime supervisor, live/grid, reconnect;
-- **NVR-2:** video storage target, segment recorder, recovery, reserve/ring retention;
-- **NVR-3:** motion, pre/post buffer, review grouping, timeline, protect/snapshot/export;
-- **NVR-4:** permission UI, restart/storage-full failure tests, soak/load/live acceptance;
-- **NVR-5 после v1:** object detection, zones/tripwires, accelerators, face/LPR, semantic search и NVR tools для AI Agent.
-
-После stable NVR v1: локальная база известных лиц, face recognition, LPR, semantic/natural-language search, advanced PTZ, incident/case manager, multi-storage и cluster/failover.
+Таким образом, в карте проекта Cameras/NVR считается **ещё не сделанным**. Когда вернёмся к этапу камер, реализация будет собрана заново поверх сохранённого Core groundwork и актуальной модульной/container архитектуры.
 
 ### ⏭ F5 — Full Local AI Agent
 
