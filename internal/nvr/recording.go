@@ -29,7 +29,7 @@ type RecordedSegment struct {
 
 type RecorderSource interface {
 	Available() bool
-	Start(context.Context, ProbeRequest, string) (<-chan RecordedSegment, <-chan error, error)
+	Start(context.Context, ProbeRequest, string, bool) (<-chan RecordedSegment, <-chan error, error)
 }
 
 type FFmpegSegmentRecorder struct {
@@ -50,6 +50,7 @@ func (r *FFmpegSegmentRecorder) Start(
 	ctx context.Context,
 	request ProbeRequest,
 	outputDir string,
+	audioEnabled bool,
 ) (<-chan RecordedSegment, <-chan error, error) {
 	if !r.Available() {
 		return nil, nil, ErrRecordingUnavailable
@@ -75,9 +76,7 @@ func (r *FFmpegSegmentRecorder) Start(
 		segmentSeconds = 60
 	}
 	pattern := filepath.Join(outputDir, "%Y%m%dT%H%M%SZ.partial.mp4")
-	command := exec.CommandContext(
-		ctx,
-		r.path,
+	args := []string{
 		"-hide_banner",
 		"-loglevel", "error",
 		"-f", "concat",
@@ -85,7 +84,13 @@ func (r *FFmpegSegmentRecorder) Start(
 		"-protocol_whitelist", "file,pipe,rtsp,tcp,udp,rtp,tls,http,https,crypto",
 		"-i", "pipe:0",
 		"-map", "0:v:0",
-		"-map", "0:a?",
+	}
+	if audioEnabled {
+		args = append(args, "-map", "0:a?")
+	} else {
+		args = append(args, "-an")
+	}
+	args = append(args,
 		"-c", "copy",
 		"-f", "segment",
 		"-segment_time", strconv.Itoa(segmentSeconds),
@@ -95,6 +100,7 @@ func (r *FFmpegSegmentRecorder) Start(
 		"-segment_list_type", "csv",
 		pattern,
 	)
+	command := exec.CommandContext(ctx, r.path, args...)
 	command.Stdin = strings.NewReader(ffconcatRTSPInput(sourceURL, transport))
 	stdout, err := command.StdoutPipe()
 	if err != nil {
@@ -225,7 +231,7 @@ func (s *Service) startRecording(ctx context.Context, camera state.NVRCameraReco
 		Address:    main.SourceURI,
 		Transport:  camera.Transport,
 		Credential: credential,
-	}, outputDir)
+	}, outputDir, camera.AudioEnabled)
 	if err != nil {
 		cancel()
 		return err
