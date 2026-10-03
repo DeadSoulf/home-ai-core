@@ -684,6 +684,7 @@ func (s *Service) CameraConfig(ctx context.Context, cameraID string) (CameraConf
 		Profiles:      make([]StreamProfile, 0, len(profiles)),
 	}
 	out.Runtime = s.CameraRuntime(camera.ID)
+	out.Recording = s.CameraRecording(camera.ID)
 	for _, profile := range profiles {
 		if profile.Role == "sub" {
 			out.SubstreamAddress = profile.SourceURI
