@@ -152,6 +152,15 @@ export const api = {
     return result.nvr;
   },
 
+  installNVRRuntime: async () => {
+    return postJSON<{
+      message: string;
+      media_runtime_ready: boolean;
+      live_runtime_ready: boolean;
+      recording_ready: boolean;
+    }>("/api/v1/nvr/runtime/install", {}, true);
+  },
+
   nvrCameras: async () => {
     const result = await request<{cameras: NVRCamera[]}>("/api/v1/nvr/cameras");
     return result.cameras;
