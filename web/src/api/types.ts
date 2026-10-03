@@ -615,6 +615,7 @@ export type NVRCameraDiscoveryDevice = {
   services: NVRCameraDiscoveryService[];
   onvif_address?: string;
   rtsp_address_hint?: string;
+  substream_address_hint?: string;
 };
 
 export type NVRONVIFDevice = {
