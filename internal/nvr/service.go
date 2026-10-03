@@ -194,11 +194,14 @@ func (s *Service) DiscoverONVIF(ctx context.Context) ([]ONVIFDevice, error) {
 	return s.discoverer.Discover(ctx)
 }
 
-func (s *Service) DiscoverCameras(ctx context.Context) ([]CameraDiscoveryDevice, error) {
+func (s *Service) DiscoverCameras(
+	ctx context.Context,
+	input CameraDiscoveryInput,
+) ([]CameraDiscoveryDevice, error) {
 	if s == nil {
 		return nil, ErrONVIFDiscoveryUnavailable
 	}
-	return NewCameraDiscoveryEngine(s.discoverer).Discover(ctx)
+	return NewCameraDiscoveryEngine(s.discoverer).DiscoverWithInput(ctx, input)
 }
 
 func (s *Service) ONVIFProfiles(
