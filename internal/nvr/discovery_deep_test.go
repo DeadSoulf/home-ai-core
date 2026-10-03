@@ -139,3 +139,39 @@ func containsDiscoverySource(values []string, want string) bool {
 	}
 	return false
 }
+
+
+func TestParseProcNetRouteNetworks(t *testing.T) {
+	raw := strings.NewReader(
+		"Iface\tDestination\tGateway\tFlags\tRefCnt\tUse\tMetric\tMask\tMTU\tWindow\tIRTT\n" +
+			"eth0\t0001A8C0\t00000000\t0001\t0\t0\t0\t00FFFFFF\t0\t0\t0\n" +
+			"eth0\t00000000\t0101A8C0\t0003\t0\t0\t0\t00000000\t0\t0\t0\n",
+	)
+	networks := parseProcNetRouteNetworks(raw)
+	if len(networks) != 1 {
+		t.Fatalf("networks = %#v", networks)
+	}
+	if got := networks[0].String(); got != "192.168.1.0/24" {
+		t.Fatalf("network = %q", got)
+	}
+}
+
+func TestParseProcRouteIPv4UsesLinuxLittleEndian(t *testing.T) {
+	if got := parseProcRouteIPv4("0001A8C0").String(); got != "192.168.1.0" {
+		t.Fatalf("route IP = %q", got)
+	}
+	if got := parseProcRouteIPv4("00FFFFFF").String(); got != "255.255.255.0" {
+		t.Fatalf("route mask = %q", got)
+	}
+}
+
+func TestBoundedAutoScanNetworkKeepsPrivate24(t *testing.T) {
+	_, network, err := net.ParseCIDR("10.20.30.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := boundedAutoScanNetwork(network)
+	if got == nil || got.String() != "10.20.30.0/24" {
+		t.Fatalf("bounded network = %#v", got)
+	}
+}
