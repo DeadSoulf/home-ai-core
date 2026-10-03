@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.147-dev
+
+- Add a dedicated Deep Scan mode with an optional private IPv4 CIDR target from /20 to /30; when omitted, connected private networks are scanned automatically with bounded host counts.
+- Expand camera port probing beyond the quick scan and use a two-stage scan so large local ranges remain bounded: common camera ports first, then additional HTTP/HTTPS/RTSP/vendor ports only on responsive hosts.
+- Add real Hikvision SADP discovery over UDP 37020 multicast and parse model, IP, MAC, HTTP/RTSP/SDK port hints.
+- Add real Dahua DHIP discovery over multicast 239.255.255.251:37810 using the DHDiscover.search frame and parse returned device metadata.
+- Add SSDP/UPnP discovery as another camera evidence source while filtering generic routers and unrelated UPnP devices.
+- Merge quick ONVIF discovery, Deep Scan, SADP, DHIP, SSDP, RTSP, HTTP/HTTPS, ARP/MAC and vendor fingerprints into one deduplicated device list.
+- Add Quick Scan / Deep Scan controls and an optional CIDR field to Cameras so routed or non-default camera subnets can be scanned explicitly.
+- Keep automatic scans private/local only and reject public IPv4 CIDRs.
+
 ## 0.1.146-dev
 
 - Start the full Camera Discovery Engine (option C) instead of treating ONVIF WS-Discovery as the only network camera discovery path.
