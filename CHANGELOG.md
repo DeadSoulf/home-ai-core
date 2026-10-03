@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.143-dev
+
+- Add a Cameras action to install the missing FFmpeg media runtime through the privileged typed updater helper, without SSH or arbitrary shell input.
+- Install only the allowlisted Debian `ffmpeg` package, which provides both `ffmpeg` and `ffprobe`, using the same serialized package-install path already used by Samba/WireGuard tooling.
+- Make FFmpeg/FFprobe availability dynamic so a media package installed after Core startup becomes usable immediately without restarting Home-AI-Core.
+- Refresh continuous recording workers after media runtime installation and report installation failures directly in the Cameras UI.
+- Enrich NVR video-storage status with privileged filesystem capacity data and show total, used and free space alongside archive size and reserve.
+
 ## 0.1.142-dev
 
 - Make NVR video-storage selection visibly confirm success in Cameras instead of appearing to do nothing.

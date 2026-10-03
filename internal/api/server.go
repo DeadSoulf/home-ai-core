@@ -164,6 +164,7 @@ func newServer(
 	s.mux.HandleFunc("POST /api/v1/modules/{moduleID}/control", s.requireAuth("modules.manage", s.moduleControl))
 	s.mux.HandleFunc("/api/v1/modules/", s.requireAuth("modules.read", s.moduleResource))
 	s.mux.HandleFunc("GET /api/v1/nvr/status", s.requireAuth("security.self.read", s.nvrStatus))
+	s.mux.HandleFunc("POST /api/v1/nvr/runtime/install", s.requireAuth("security.self.read", s.nvrRuntimeInstall))
 	s.mux.HandleFunc("GET /api/v1/nvr/storage", s.requireAuth("security.self.read", s.nvrStorage))
 	s.mux.HandleFunc("POST /api/v1/nvr/storage", s.requireAuth("security.self.read", s.nvrStorage))
 	s.mux.HandleFunc("GET /api/v1/nvr/cameras", s.requireAuth("security.self.read", s.nvrCameras))

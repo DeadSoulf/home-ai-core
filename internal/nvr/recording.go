@@ -44,7 +44,7 @@ func NewFFmpegSegmentRecorder() *FFmpegSegmentRecorder {
 }
 
 func (r *FFmpegSegmentRecorder) Available() bool {
-	return r != nil && r.path != ""
+	return r != nil && resolveRuntimeExecutable(r.path, "ffmpeg") != ""
 }
 
 func (r *FFmpegSegmentRecorder) Start(
@@ -53,7 +53,11 @@ func (r *FFmpegSegmentRecorder) Start(
 	outputDir string,
 	audioEnabled bool,
 ) (<-chan RecordedSegment, <-chan error, error) {
-	if !r.Available() {
+	path := ""
+	if r != nil {
+		path = resolveRuntimeExecutable(r.path, "ffmpeg")
+	}
+	if path == "" {
 		return nil, nil, ErrRecordingUnavailable
 	}
 	address, err := normalizeRTSPAddress(request.Address)
@@ -101,7 +105,7 @@ func (r *FFmpegSegmentRecorder) Start(
 		"-segment_list_type", "csv",
 		pattern,
 	)
-	command := exec.CommandContext(ctx, r.path, args...)
+	command := exec.CommandContext(ctx, path, args...)
 	command.Stdin = strings.NewReader(ffconcatRTSPInput(sourceURL, transport))
 	stdout, err := command.StdoutPipe()
 	if err != nil {

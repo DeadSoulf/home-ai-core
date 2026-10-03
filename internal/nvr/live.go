@@ -31,14 +31,18 @@ func NewFFmpegMJPEGSource() *FFmpegMJPEGSource {
 }
 
 func (s *FFmpegMJPEGSource) Available() bool {
-	return s != nil && s.path != ""
+	return s != nil && resolveRuntimeExecutable(s.path, "ffmpeg") != ""
 }
 
 func (s *FFmpegMJPEGSource) Start(
 	ctx context.Context,
 	request ProbeRequest,
 ) (io.ReadCloser, <-chan error, error) {
-	if !s.Available() {
+	path := ""
+	if s != nil {
+		path = resolveRuntimeExecutable(s.path, "ffmpeg")
+	}
+	if path == "" {
 		return nil, nil, ErrLiveUnavailable
 	}
 	address, err := normalizeRTSPAddress(request.Address)
@@ -56,7 +60,7 @@ func (s *FFmpegMJPEGSource) Start(
 
 	command := exec.CommandContext(
 		ctx,
-		s.path,
+		path,
 		"-hide_banner",
 		"-loglevel", "error",
 		"-f", "concat",

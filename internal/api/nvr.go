@@ -82,6 +82,79 @@ func (s *server) nvrStatus(
 	})
 }
 
+func (s *server) nvrRuntimeInstall(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if !s.nvrEnabled(w, r) {
+		return
+	}
+	if !actor.Has(nvrpkg.PermissionSettingsManage) {
+		writeAPIError(w, r, http.StatusForbidden, "permission_denied", "NVR settings management permission required", nil)
+		return
+	}
+	if !validMutationCSRF(actor, source, r) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+
+	message, err := nvrpkg.InstallMediaRuntime(r.Context())
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadGateway, "nvr_runtime_install_failed", err.Error(), nil)
+		return
+	}
+	if s.nvr != nil {
+		_ = s.nvr.RefreshRecordings(r.Context())
+	}
+
+	mediaReady := s.nvr != nil && s.nvr.MediaProbeReady()
+	liveReady := s.nvr != nil && s.nvr.LiveReady()
+	recordingReady := s.nvr != nil && s.nvr.RecordingReady()
+	if !mediaReady || !liveReady || !recordingReady {
+		writeAPIError(
+			w,
+			r,
+			http.StatusBadGateway,
+			"nvr_runtime_install_incomplete",
+			"FFmpeg installation completed but the NVR runtime is still unavailable",
+			map[string]any{
+				"media_runtime_ready": mediaReady,
+				"live_runtime_ready":  liveReady,
+				"recording_ready":     recordingReady,
+			},
+		)
+		return
+	}
+
+	s.security.RecordAudit(
+		context.WithoutCancel(r.Context()),
+		s.securityRequestContext(r),
+		actor,
+		"nvr.runtime.install",
+		"module",
+		nvrpkg.ModuleID,
+		"success",
+		nil,
+	)
+	s.realtime.Publish(
+		"nvr.runtime.changed",
+		map[string]any{
+			"media_runtime_ready": true,
+			"live_runtime_ready":  true,
+			"recording_ready":     true,
+		},
+		requestIDFromContext(r.Context()),
+	)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"message":             message,
+		"media_runtime_ready": true,
+		"live_runtime_ready":  true,
+		"recording_ready":     true,
+	})
+}
+
 func (s *server) nvrCameras(
 	w http.ResponseWriter,
 	r *http.Request,

@@ -108,6 +108,7 @@ function probeText(probe: NVRProbe): string {
 export function CamerasPage({revision, actor}: {revision: number; actor: Actor}) {
   const {t, date} = useI18n();
   const storageManage = actor.permissions.includes("nvr.storage.manage");
+  const runtimeManage = actor.permissions.includes("nvr.settings.manage");
   const load = useCallback(async () => {
     const [status, cameras, storage] = await Promise.all([
       api.nvrStatus(),
@@ -124,6 +125,7 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
   const [busy, setBusy] = useState("");
   const [formError, setFormError] = useState("");
   const [storageMessage, setStorageMessage] = useState("");
+  const [runtimeMessage, setRuntimeMessage] = useState("");
   const [probe, setProbe] = useState<NVRProbe>();
   const [testedFingerprint, setTestedFingerprint] = useState("");
   const [liveIDs, setLiveIDs] = useState<string[]>([]);
@@ -386,6 +388,21 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
     setLiveErrors({});
   };
 
+  const installRuntime = async () => {
+    setBusy("runtime:install");
+    setFormError("");
+    setRuntimeMessage("");
+    try {
+      const result = await api.installNVRRuntime();
+      setRuntimeMessage(result.message || t("nvrRuntimeInstalled"));
+      resource.reload();
+    } catch (reason) {
+      setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setBusy("");
+    }
+  };
+
   const saveStorage = async () => {
     const active = resource.data?.storage.find((target) => target.active);
     const fallback = resource.data?.storage.find((target) => target.ready);
@@ -418,6 +435,9 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
   const selectedStorageDevice = storageDevice || defaultStorage?.device || "";
   const selectedStorage = data.storage.find((target) => target.device === selectedStorageDevice) || defaultStorage;
   const selectedStorageReserve = storageReserve || activeStorage?.reserve_percent || 5;
+  const selectedStorageUsed = selectedStorage?.free_known && selectedStorage.size_bytes !== undefined && selectedStorage.free_bytes !== undefined
+    ? Math.max(0, selectedStorage.size_bytes - selectedStorage.free_bytes)
+    : undefined;
 
   return (
     <div className="page">
@@ -457,6 +477,26 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
       </div>
 
       {formError && <div className="form-error">{formError}</div>}
+
+      {runtimeMessage && <div className="storage-success">{runtimeMessage}</div>}
+
+      {(!data.status.media_runtime_ready || !data.status.live_runtime_ready || !data.status.recording_ready) && (
+        <div className="notice warning">
+          <p>{t("nvrRuntimeMissing")}</p>
+          {runtimeManage && (
+            <div className="nvr-form-actions">
+              <button
+                type="button"
+                className="button primary"
+                disabled={Boolean(busy)}
+                onClick={() => void installRuntime()}
+              >
+                {busy === "runtime:install" ? t("nvrRuntimeInstalling") : t("nvrRuntimeInstall")}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {storageManage && (
         <Panel title={t("nvrVideoStorage")}>
@@ -502,7 +542,9 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
                 <div className="notice">
                   <p>
                     {selectedStorage.active && <><span className="status-badge status-success">{t("nvrStorageActive")}</span>{" · "}</>}
-                    {t("nvrStorageFree")}: {selectedStorage.free_known ? formatStorageBytes(selectedStorage.free_bytes) : "—"}
+                    {t("nvrStorageTotal")}: {selectedStorage.size_bytes ? formatStorageBytes(selectedStorage.size_bytes) : "—"}
+                    {" · "}{t("nvrStorageUsed")}: {selectedStorageUsed !== undefined ? formatStorageBytes(selectedStorageUsed) : "—"}
+                    {" · "}{t("nvrStorageFree")}: {selectedStorage.free_known ? formatStorageBytes(selectedStorage.free_bytes) : "—"}
                     {" · "}{t("nvrStorageArchive")}: {formatStorageBytes(selectedStorage.archive_bytes)}
                     {" · "}{t("nvrStorageReserve")}: {selectedStorageReserve}%
                   </p>
