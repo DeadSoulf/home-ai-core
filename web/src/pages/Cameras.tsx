@@ -123,6 +123,7 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
   const [editor, setEditor] = useState<CameraEditor>(emptyEditor);
   const [busy, setBusy] = useState("");
   const [formError, setFormError] = useState("");
+  const [storageMessage, setStorageMessage] = useState("");
   const [probe, setProbe] = useState<NVRProbe>();
   const [testedFingerprint, setTestedFingerprint] = useState("");
   const [liveIDs, setLiveIDs] = useState<string[]>([]);
@@ -394,10 +395,12 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
 
     setBusy("storage");
     setFormError("");
+    setStorageMessage("");
     try {
       const target = await api.setNVRStorage(device, reservePercent);
       setStorageDevice(target.device);
       setStorageReserve(target.reserve_percent);
+      setStorageMessage(t("nvrStorageSaved"));
       resource.reload();
     } catch (reason) {
       setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
@@ -467,6 +470,7 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
                   <select
                     value={selectedStorageDevice}
                     onChange={(event) => {
+                      setStorageMessage("");
                       setStorageDevice(event.target.value);
                       const target = data.storage.find((item) => item.device === event.target.value);
                       setStorageReserve(target?.active ? target.reserve_percent : 5);
@@ -477,6 +481,7 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
                         {target.label || target.device}
                         {target.mountpoint ? ` · ${target.mountpoint}` : ""}
                         {!target.ready ? ` · ${t("nvrStorageNotMounted")}` : ""}
+                        {target.active ? ` · ${t("nvrStorageActive")}` : ""}
                       </option>
                     ))}
                   </select>
@@ -492,9 +497,11 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
                   />
                 </label>
               </div>
+              {storageMessage && <div className="storage-success">{storageMessage}</div>}
               {selectedStorage && (
                 <div className="notice">
                   <p>
+                    {selectedStorage.active && <><span className="status-badge status-success">{t("nvrStorageActive")}</span>{" · "}</>}
                     {t("nvrStorageFree")}: {selectedStorage.free_known ? formatStorageBytes(selectedStorage.free_bytes) : "—"}
                     {" · "}{t("nvrStorageArchive")}: {formatStorageBytes(selectedStorage.archive_bytes)}
                     {" · "}{t("nvrStorageReserve")}: {selectedStorageReserve}%
@@ -508,7 +515,7 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
                   disabled={Boolean(busy) || !selectedStorageDevice}
                   onClick={() => void saveStorage()}
                 >
-                  {busy === "storage" ? t("working") : t("nvrStorageSave")}
+                  {busy === "storage" ? t("working") : selectedStorage?.active ? t("nvrStorageUpdate") : t("nvrStorageSave")}
                 </button>
               </div>
             </>

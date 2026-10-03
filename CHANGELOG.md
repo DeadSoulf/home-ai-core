@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.142-dev
+
+- Make NVR video-storage selection visibly confirm success in Cameras instead of appearing to do nothing.
+- Mark the active archive target in both the selector and storage summary, and keep reserve settings editable after activation.
+- Change the action label after activation so it is clear that subsequent clicks save storage settings rather than re-select the disk.
+
 ## 0.1.141-dev
 
 - Always show the underlying technical storage-operation error in the Web UI, including the Russian locale, so mount failures expose the real filesystem/helper diagnostic instead of only a generic message.
