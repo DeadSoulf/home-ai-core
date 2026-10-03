@@ -218,10 +218,10 @@ export const api = {
     return result;
   },
 
-  discoverCameras: async () => {
+  discoverCameras: async (mode: "quick" | "deep" = "quick", cidr = "") => {
     const result = await postJSON<{devices: NVRCameraDiscoveryDevice[]}>(
       "/api/v1/nvr/discovery",
-      {},
+      {mode, cidr: cidr.trim() || undefined},
       true,
     );
     return result.devices;
