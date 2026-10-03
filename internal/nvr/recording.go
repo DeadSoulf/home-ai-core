@@ -193,6 +193,9 @@ func (s *Service) startRecording(ctx context.Context, camera state.NVRCameraReco
 	if err != nil {
 		return ErrRecordingNoStorage
 	}
+	if err := s.enforceStorageReserve(ctx, target); err != nil {
+		return err
+	}
 	credential, err := s.resolveCredential(ctx, camera.CredentialRef)
 	if err != nil {
 		return err
