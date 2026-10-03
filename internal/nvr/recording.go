@@ -346,7 +346,7 @@ func (s *Service) StopRecording(cameraID string) {
 	s.recordingStatus[cameraID] = status
 	s.recordingMu.Unlock()
 	if session != nil {
-		session.cancel()
+		stopRecordingSession(session)
 	}
 }
 
@@ -365,7 +365,20 @@ func (s *Service) stopAllRecordings() {
 	}
 	s.recordingMu.Unlock()
 	for _, session := range sessions {
-		session.cancel()
+		stopRecordingSession(session)
+	}
+}
+
+func stopRecordingSession(session *recordingSession) {
+	if session == nil {
+		return
+	}
+	session.cancel()
+	timer := time.NewTimer(3 * time.Second)
+	defer timer.Stop()
+	select {
+	case <-session.done:
+	case <-timer.C:
 	}
 }
 
