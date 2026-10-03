@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 
 	"github.com/DeadSoulf/home-ai-core/internal/cameras"
@@ -13,6 +14,7 @@ type CamerasService interface {
 	Status() cameras.Status
 	Refresh() cameras.Status
 	TestLogin(context.Context, cameras.LoginRequest) (cameras.LoginResult, error)
+	InstallRuntime(io.Reader, int64) (cameras.InstallResult, error)
 }
 
 func (s *server) camerasStatus(
@@ -92,6 +94,39 @@ func (s *server) camerasTestLogin(
 			"backend": result.Backend,
 			"port":    result.Port,
 		},
+	)
+	writeJSON(w, http.StatusOK, map[string]any{"result": result})
+}
+
+
+func (s *server) camerasInstallRuntime(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if !validMutationCSRF(actor, source, r) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	if r.ContentLength <= 0 || r.ContentLength > 256<<20 {
+		writeAPIError(w, r, http.StatusRequestEntityTooLarge, "camera_sdk_archive_invalid", "HCNetSDK ZIP must be smaller than 256 MiB", nil)
+		return
+	}
+	result, err := s.cameras.InstallRuntime(io.LimitReader(r.Body, (256<<20)+1), r.ContentLength)
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "camera_sdk_install_failed", err.Error(), nil)
+		return
+	}
+	s.security.RecordAudit(
+		context.WithoutCancel(r.Context()),
+		s.securityRequestContext(r),
+		actor,
+		"camera.sdk.install",
+		"camera",
+		"hcnetsdk",
+		"success",
+		map[string]any{"path": result.Path, "initialized": result.Status.SDK.Initialized},
 	)
 	writeJSON(w, http.StatusOK, map[string]any{"result": result})
 }
