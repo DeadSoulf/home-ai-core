@@ -146,3 +146,20 @@ func (s *server) camerasInstallRuntime(
 	)
 	writeJSON(w, http.StatusOK, map[string]any{"result": result})
 }
+
+
+func (s *server) camerasDiscover(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
+	discoverer, ok := s.cameras.(interface {
+		Discover(context.Context) ([]cameras.DiscoveredDevice, error)
+	})
+	if !ok {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "camera_discovery_unavailable", "Camera discovery is unavailable", nil)
+		return
+	}
+	items, err := discoverer.Discover(r.Context())
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadGateway, "camera_discovery_failed", err.Error(), nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"devices": items})
+}

@@ -888,6 +888,13 @@ export const api = {
     return result.cameras;
   },
 
+  discoverCameras: async () => {
+    const result = await request<{devices: Array<{address: string; port: number; name?: string; scopes?: string; endpoint?: string; xaddr?: string}>}>(
+      "/api/v1/cameras/discover",
+    );
+    return result.devices;
+  },
+
   installCameraSDK: async (file: File, onProgress?: (percent: number) => void) => {
     return new Promise<{installed: boolean; path: string; status: CamerasStatus}>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
