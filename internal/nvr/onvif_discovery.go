@@ -343,9 +343,8 @@ func parseWSDiscoveryResponse(raw []byte, senderIP net.IP) []ONVIFDevice {
 				continue
 			}
 			ipText := senderIP.String()
-			sum := sha256.Sum256([]byte(address))
 			device := ONVIFDevice{
-				ID:      "onvif_" + hex.EncodeToString(sum[:8]),
+				ID:      discoveredONVIFID(address),
 				Name:    onvifNameFromScopes(scopes, ipText),
 				Address: address,
 				IP:      ipText,
@@ -372,6 +371,11 @@ func looksLikeONVIFDiscoveryMatch(scopes []string, xaddrs string) bool {
 		}
 	}
 	return false
+}
+
+func discoveredONVIFID(address string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(address)))
+	return "onvif_" + hex.EncodeToString(sum[:8])
 }
 
 func normalizeDiscoveredONVIFAddress(value string, senderIP net.IP) (string, error) {
