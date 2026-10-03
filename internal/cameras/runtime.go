@@ -2,6 +2,7 @@ package cameras
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -9,6 +10,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
+	"time"
 )
 
 var (
@@ -63,15 +66,30 @@ type sdkRuntime interface {
 	Close() error
 }
 
+type Camera struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Address   string `json:"address"`
+	Port      int    `json:"port"`
+	Username  string `json:"username"`
+	Password  string `json:"-"`
+	Backend   string `json:"backend"`
+	CreatedAt string `json:"created_at"`
+}
+
 type Service struct {
 	runtime     sdkRuntime
 	runtimeRoot string
+	mu          sync.Mutex
+	cameras     []Camera
 }
 
 func NewService(stateDir string) *Service {
 	runtimeRoot := filepath.Join(stateDir, "hikvision")
 	_ = os.Setenv("HOME_AI_HCNETSDK_DIR", runtimeRoot)
-	return &Service{runtime: newHCNetSDKRuntime(), runtimeRoot: runtimeRoot}
+	s := &Service{runtime: newHCNetSDKRuntime(), runtimeRoot: runtimeRoot}
+	_ = s.loadCameras()
+	return s
 }
 
 func NewServiceWithRuntime(runtime sdkRuntime) *Service {
@@ -142,4 +160,74 @@ func validateLoginRequest(request LoginRequest) error {
 		return fmt.Errorf("%w: username is required", ErrInvalidTarget)
 	}
 	return nil
+}
+
+func (s *Service) Cameras() []Camera {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]Camera, len(s.cameras))
+	copy(out, s.cameras)
+	return out
+}
+
+func (s *Service) AddCamera(ctx context.Context, request LoginRequest, name string) (Camera, error) {
+	result, err := s.TestLogin(ctx, request)
+	if err != nil {
+		return Camera{}, err
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = request.Address
+	}
+	item := Camera{
+		ID:        fmt.Sprintf("cam-%d", time.Now().UnixNano()),
+		Name:      name,
+		Address:   result.Address,
+		Port:      result.Port,
+		Username:  request.Username,
+		Password:  request.Password,
+		Backend:   result.Backend,
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, existing := range s.cameras {
+		if existing.Address == item.Address && existing.Port == item.Port {
+			return Camera{}, fmt.Errorf("%w: camera already added", ErrInvalidTarget)
+		}
+	}
+	s.cameras = append(s.cameras, item)
+	if err := s.saveCamerasLocked(); err != nil {
+		s.cameras = s.cameras[:len(s.cameras)-1]
+		return Camera{}, err
+	}
+	return item, nil
+}
+
+func (s *Service) cameraStorePath() string { return filepath.Join(s.runtimeRoot, "cameras.json") }
+
+func (s *Service) loadCameras() error {
+	data, err := os.ReadFile(s.cameraStorePath())
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, &s.cameras)
+}
+
+func (s *Service) saveCamerasLocked() error {
+	if err := os.MkdirAll(s.runtimeRoot, 0700); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(s.cameras, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := s.cameraStorePath() + ".tmp"
+	if err := os.WriteFile(tmp, data, 0600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, s.cameraStorePath())
 }

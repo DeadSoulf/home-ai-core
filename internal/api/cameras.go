@@ -98,7 +98,6 @@ func (s *server) camerasTestLogin(
 	writeJSON(w, http.StatusOK, map[string]any{"result": result})
 }
 
-
 func (s *server) camerasInstallRuntime(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -147,7 +146,6 @@ func (s *server) camerasInstallRuntime(
 	writeJSON(w, http.StatusOK, map[string]any{"result": result})
 }
 
-
 func (s *server) camerasDiscover(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
 	discoverer, ok := s.cameras.(interface {
 		Discover(context.Context) ([]cameras.DiscoveredDevice, error)
@@ -162,4 +160,49 @@ func (s *server) camerasDiscover(w http.ResponseWriter, r *http.Request, _ secur
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"devices": items})
+}
+
+func (s *server) camerasList(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
+	provider, ok := s.cameras.(interface {
+		Cameras() []cameras.Camera
+	})
+	if !ok {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "cameras_unavailable", "Camera storage is unavailable", nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"cameras": provider.Cameras()})
+}
+
+func (s *server) camerasAdd(w http.ResponseWriter, r *http.Request, actor security.Actor, source authSource) {
+	if !validMutationCSRF(actor, source, r) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	adder, ok := s.cameras.(interface {
+		AddCamera(context.Context, cameras.LoginRequest, string) (cameras.Camera, error)
+	})
+	if !ok {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "cameras_unavailable", "Camera storage is unavailable", nil)
+		return
+	}
+	var request struct {
+		Name     string `json:"name"`
+		Address  string `json:"address"`
+		Port     int    `json:"port"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_request", err.Error(), nil)
+		return
+	}
+	item, err := adder.AddCamera(r.Context(), cameras.LoginRequest{
+		Address: request.Address, Port: request.Port, Username: request.Username, Password: request.Password,
+	}, request.Name)
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadGateway, "camera_add_failed", err.Error(), nil)
+		return
+	}
+	s.security.RecordAudit(context.WithoutCancel(r.Context()), s.securityRequestContext(r), actor, "camera.add", "camera", item.ID, "success", map[string]any{"address": item.Address, "backend": item.Backend})
+	writeJSON(w, http.StatusCreated, map[string]any{"camera": item})
 }

@@ -198,7 +198,10 @@ func newServer(
 	s.mux.HandleFunc("POST /api/v1/modules/{moduleID}/control", s.requireAuth("modules.manage", s.moduleControl))
 	s.mux.HandleFunc("/api/v1/modules/", s.requireAuth("modules.read", s.moduleResource))
 	if cameraService != nil {
+		s.mux.HandleFunc("GET /api/v1/cameras", s.requireAuth("security.self.read", s.camerasList))
+		s.mux.HandleFunc("POST /api/v1/cameras", s.requireAuth("camera.manage", s.camerasAdd))
 		s.mux.HandleFunc("GET /api/v1/cameras/status", s.requireAuth("security.self.read", s.camerasStatus))
+		s.mux.HandleFunc("GET /api/v1/cameras/discover", s.requireAuth("security.self.read", s.camerasDiscover))
 		s.mux.HandleFunc("POST /api/v1/cameras/test-login", s.requireAuth("camera.manage", s.camerasTestLogin))
 		s.mux.HandleFunc("POST /api/v1/cameras/sdk/install", s.requireAuth("camera.manage", s.camerasInstallRuntime))
 	}

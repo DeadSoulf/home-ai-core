@@ -888,7 +888,7 @@ export const api = {
     return result.cameras;
   },
 
-  discoverCameras: async () => {
+  discoverSDKCameras: async () => {
     const result = await request<{devices: Array<{address: string; port: number; name?: string; scopes?: string; endpoint?: string; xaddr?: string}>}>(
       "/api/v1/cameras/discover",
     );
