@@ -227,6 +227,21 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		return
 	}
 
+	if strings.HasPrefix(request.Operation, "nvr.") {
+		_ = conn.SetDeadline(time.Now().Add(12 * time.Minute))
+		ctx, cancel := context.WithTimeout(parent, 10*time.Minute)
+		defer cancel()
+		message, err := performNVROperation(ctx, request)
+		if err != nil {
+			logger.Error("NVR operation failed", "operation", request.Operation, "error", err)
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})
+			return
+		}
+		logger.Info("NVR operation completed", "operation", request.Operation)
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{OK: true, Message: message})
+		return
+	}
+
 	if request.Operation == "smb.inspect" {
 		_ = conn.SetDeadline(time.Now().Add(45 * time.Second))
 		ctx, cancel := context.WithTimeout(parent, 40*time.Second)
