@@ -53,12 +53,7 @@ func (d *WSDiscovery) Discover(ctx context.Context) ([]ONVIFDevice, error) {
 	defer cancel()
 
 	localIPs, err := localDiscoveryIPv4()
-	if err != nil {
-		return nil, err
-	}
-	if len(localIPs) == 0 {
-		return nil, ErrONVIFDiscoveryUnavailable
-	}
+	localIPs = discoveryBindIPs(localIPs, err)
 
 	probe, err := wsDiscoveryProbe()
 	if err != nil {
@@ -97,6 +92,13 @@ func (d *WSDiscovery) Discover(ctx context.Context) ([]ONVIFDevice, error) {
 		return result[i].Name < result[j].Name
 	})
 	return result, nil
+}
+
+func discoveryBindIPs(localIPs []net.IP, discoveryErr error) []net.IP {
+	if discoveryErr == nil && len(localIPs) > 0 {
+		return localIPs
+	}
+	return []net.IP{append(net.IP(nil), net.IPv4zero...)}
 }
 
 func localDiscoveryIPv4() ([]net.IP, error) {
