@@ -8,8 +8,8 @@
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.151-dev` — экспериментальный Cameras/NVR модуль снят из продукта; задел в Core сохранён.  
-**Текущий срез:** Cameras/NVR считается **не реализованным продуктовым модулем**. Регистрация, runtime, Web-route и публичное подключение NVR отключены; schema/state/media/discovery/storage groundwork сохранён для будущего отдельного этапа.  
-**Следующий engineering milestone:** Docker runtime для дополнительных модулей; Cameras/NVR вернётся в план отдельным этапом после фиксации новой модульной архитектуры.  
+**Текущий срез:** `0.1.152-dev` — начат новый модуль **Cameras** с чистого листа на основе Hikvision HCNetSDK; старый `nvr` runtime не возвращается.  
+**Следующий engineering milestone:** установка vendor SDK на сервер → `NET_DVR_Login_V40` и device/channel metadata → native live stream через HCNetSDK.  
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.  
 **Обновлено:** 2026-10-03
 
@@ -1251,22 +1251,37 @@ Home Assistant не является основой.
 - permission-scoped actions;
 - events/audit.
 
-### ⏸ F4 — Cameras / NVR — пока не реализовано
+### 🚧 F4 — Cameras — HCNetSDK reboot
 
-Cameras/NVR **не является текущим продуктовым модулем Home-AI**.
+Новый продуктовый модуль камер начат заново. Старый `nvr` модуль и его runtime не возвращаются в продукт.
 
-Что зафиксировано на текущем этапе:
+Архитектура нового этапа: [CAMERAS_SDK_ARCHITECTURE.md](CAMERAS_SDK_ARCHITECTURE.md).
 
-- модуль `nvr` не регистрируется в Module Registry;
-- NVR runtime и camera supervisor не запускаются при старте Core;
-- Web-раздел Cameras и route `/modules/nvr` не подключены к приложению;
-- NVR API не публикуется обычным Core runtime;
-- существующая запись `nvr` удаляется только из таблицы Module Registry при обновлении;
-- camera/NVR данные, schema и permissions **не удаляются**;
-- `internal/nvr`, RTSP/ONVIF/discovery, recorder, storage target, retention и security groundwork остаются в кодовой базе;
-- архитектурные документы [NVR_ARCHITECTURE.md](NVR_ARCHITECTURE.md) и [ADR-0037](decisions/0037-cameras-nvr-media-plane.md) сохраняются как исследовательский задел, а не как описание готового модуля.
+Текущий первый срез:
 
-Таким образом, в карте проекта Cameras/NVR считается **ещё не сделанным**. Когда вернёмся к этапу камер, реализация будет собрана заново поверх сохранённого Core groundwork и актуальной модульной/container архитектуры.
+- новый first-party module ID `cameras`;
+- Web route `/modules/cameras`;
+- основной backend — нативный Hikvision **HCNetSDK**;
+- supplied Linux SDK используется как первичный server-side runtime;
+- HCWebSDK используется только как справочник по Web/ISAPI сценарию, без Windows browser plugin в Home-AI;
+- Linux amd64 `libhcnetsdk.so` загружается динамически, без link-time зависимости обычной сборки Core;
+- runtime показывает supported / available / initialized / library path / error;
+- первый реальный probe: `NET_DVR_Init` → `NET_DVR_Login_V30` → `NET_DVR_GetLastError` → logout;
+- стандартный SDK port по умолчанию — `8000`;
+- login test принимает credentials отдельно и не возвращает пароль в Web/API/audit;
+- targets первого этапа ограничены private/link-local literal IP;
+- старые NVR tables, storage/media/discovery code остаются dormant groundwork и не подключены к новому модулю.
+
+Следующие срезы:
+
+1. безопасная установка HCNetSDK runtime из vendor package;
+2. `NET_DVR_Login_V40` + модель/серийный номер/firmware/device metadata;
+3. channel enumeration, включая DVR/NVR;
+4. native discovery там, где это реально предоставляет SDK/API;
+5. `NET_DVR_RealPlay_V40` и серверный live ingest;
+6. новое persistent camera storage + encrypted credentials;
+7. browser live без HCWebSDK Windows plugin;
+8. запись/архив отдельным последующим этапом.
 
 ### ⏭ F5 — Full Local AI Agent
 
