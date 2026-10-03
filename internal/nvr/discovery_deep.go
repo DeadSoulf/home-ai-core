@@ -1,10 +1,13 @@
 package nvr
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -147,10 +150,6 @@ func deepCameraTargets(cidr string) ([]net.IP, error) {
 		return expandIPv4Network(network, 4096), nil
 	}
 
-	interfaces, err := net.Interfaces()
-	if err != nil {
-		return nil, fmt.Errorf("list camera discovery interfaces: %w", err)
-	}
 	seen := make(map[string]bool)
 	result := make([]net.IP, 0, 1024)
 	add := func(ip net.IP) {
@@ -165,45 +164,176 @@ func deepCameraTargets(cidr string) ([]net.IP, error) {
 		seen[key] = true
 		result = append(result, append(net.IP(nil), ip...))
 	}
+	addNetwork := func(network *net.IPNet) {
+		network = boundedAutoScanNetwork(network)
+		if network == nil {
+			return
+		}
+		for _, candidate := range expandIPv4Network(network, 4096) {
+			add(candidate)
+		}
+	}
 
-	for _, iface := range interfaces {
-		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
-			continue
-		}
-		addresses, err := iface.Addrs()
-		if err != nil {
-			continue
-		}
-		for _, address := range addresses {
-			ipNet, ok := address.(*net.IPNet)
-			if !ok {
+	interfaces, interfaceErr := net.Interfaces()
+	if interfaceErr == nil {
+		for _, iface := range interfaces {
+			if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
 				continue
 			}
-			ip := ipNet.IP.To4()
-			if ip == nil || (!ip.IsPrivate() && !ip.IsLinkLocalUnicast()) {
+			addresses, err := iface.Addrs()
+			if err != nil {
 				continue
 			}
-			ones, bits := ipNet.Mask.Size()
-			if bits != 32 || ones > 30 {
-				continue
-			}
-			mask := ipNet.Mask
-			if ones < 20 {
-				mask = net.CIDRMask(20, 32)
-			}
-			network := &net.IPNet{IP: ip.Mask(mask), Mask: mask}
-			for _, candidate := range expandIPv4Network(network, 4096) {
-				add(candidate)
+			for _, address := range addresses {
+				ipNet, ok := address.(*net.IPNet)
+				if !ok {
+					continue
+				}
+				ip := ipNet.IP.To4()
+				if ip == nil || (!ip.IsPrivate() && !ip.IsLinkLocalUnicast()) {
+					continue
+				}
+				addNetwork(&net.IPNet{IP: ip, Mask: ipNet.Mask})
 			}
 		}
 	}
+
+	// Some appliance kernels expose IPv4 routing but reject the netlink
+	// interface enumeration used by net.Interfaces(). /proc/net/route is a
+	// stable fallback for connected IPv4 networks and avoids making Deep Scan
+	// depend on that netlink family.
+	if interfaceErr != nil || len(result) == 0 {
+		if file, err := os.Open("/proc/net/route"); err == nil {
+			for _, network := range parseProcNetRouteNetworks(file) {
+				addNetwork(network)
+			}
+			_ = file.Close()
+		}
+	}
+
+	// The ARP cache is the last fallback and also contributes networks that
+	// have recently been reached through a route that was not enumerable.
 	for ip := range readARPTable() {
-		add(net.ParseIP(ip))
+		parsed := net.ParseIP(ip).To4()
+		if parsed == nil || (!parsed.IsPrivate() && !parsed.IsLinkLocalUnicast()) {
+			continue
+		}
+		addNetwork(&net.IPNet{IP: parsed, Mask: net.CIDRMask(24, 32)})
+	}
+
+	if len(result) == 0 {
+		if interfaceErr != nil {
+			return nil, fmt.Errorf(
+				"camera discovery could not determine a private IPv4 network automatically; enter CIDR manually: %w",
+				interfaceErr,
+			)
+		}
+		return nil, errors.New("camera discovery could not determine a private IPv4 network automatically; enter CIDR manually")
 	}
 	if len(result) > 8192 {
 		result = result[:8192]
 	}
 	return result, nil
+}
+
+func boundedAutoScanNetwork(network *net.IPNet) *net.IPNet {
+	if network == nil {
+		return nil
+	}
+	base := network.IP.To4()
+	if base == nil || (!base.IsPrivate() && !base.IsLinkLocalUnicast()) {
+		return nil
+	}
+	ones, bits := network.Mask.Size()
+	if bits != 32 || ones <= 0 || ones > 30 {
+		return nil
+	}
+	if ones >= 20 {
+		return &net.IPNet{IP: base.Mask(network.Mask), Mask: network.Mask}
+	}
+
+	// For broad routes such as /16, identify the actual local source address
+	// selected by the kernel and bound the scan to the containing /20.
+	if local := localIPv4ForNetwork(network); local != nil {
+		mask := net.CIDRMask(20, 32)
+		return &net.IPNet{IP: local.Mask(mask), Mask: mask}
+	}
+	return nil
+}
+
+func localIPv4ForNetwork(network *net.IPNet) net.IP {
+	if network == nil {
+		return nil
+	}
+	base := network.IP.To4()
+	if base == nil {
+		return nil
+	}
+	target := append(net.IP(nil), base...)
+	target[3]++
+	conn, err := net.DialUDP("udp4", nil, &net.UDPAddr{IP: target, Port: 9})
+	if err != nil {
+		return nil
+	}
+	defer conn.Close()
+	local, ok := conn.LocalAddr().(*net.UDPAddr)
+	if !ok || local.IP == nil {
+		return nil
+	}
+	ip := local.IP.To4()
+	if ip == nil || !network.Contains(ip) {
+		return nil
+	}
+	return append(net.IP(nil), ip...)
+}
+
+func parseProcNetRouteNetworks(reader io.Reader) []*net.IPNet {
+	scanner := bufio.NewScanner(reader)
+	result := make([]*net.IPNet, 0, 8)
+	first := true
+	for scanner.Scan() {
+		if first {
+			first = false
+			continue
+		}
+		fields := strings.Fields(scanner.Text())
+		if len(fields) < 8 {
+			continue
+		}
+		flags, err := strconv.ParseUint(fields[3], 16, 32)
+		if err != nil || flags&0x1 == 0 {
+			continue
+		}
+		destination := parseProcRouteIPv4(fields[1])
+		maskIP := parseProcRouteIPv4(fields[7])
+		if destination == nil || maskIP == nil {
+			continue
+		}
+		mask := net.IPMask(maskIP.To4())
+		ones, bits := mask.Size()
+		if bits != 32 || ones <= 0 || ones > 30 {
+			continue
+		}
+		networkIP := destination.Mask(mask)
+		if networkIP == nil || (!networkIP.IsPrivate() && !networkIP.IsLinkLocalUnicast()) {
+			continue
+		}
+		result = append(result, &net.IPNet{IP: networkIP, Mask: mask})
+	}
+	return result
+}
+
+func parseProcRouteIPv4(value string) net.IP {
+	number, err := strconv.ParseUint(strings.TrimSpace(value), 16, 32)
+	if err != nil {
+		return nil
+	}
+	return net.IPv4(
+		byte(number),
+		byte(number>>8),
+		byte(number>>16),
+		byte(number>>24),
+	).To4()
 }
 
 func expandIPv4Network(network *net.IPNet, limit int) []net.IP {
