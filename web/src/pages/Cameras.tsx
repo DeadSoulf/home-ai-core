@@ -435,6 +435,9 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
   const selectedStorageDevice = storageDevice || defaultStorage?.device || "";
   const selectedStorage = data.storage.find((target) => target.device === selectedStorageDevice) || defaultStorage;
   const selectedStorageReserve = storageReserve || activeStorage?.reserve_percent || 5;
+  const selectedStorageUsed = selectedStorage?.free_known && selectedStorage.size_bytes !== undefined && selectedStorage.free_bytes !== undefined
+    ? Math.max(0, selectedStorage.size_bytes - selectedStorage.free_bytes)
+    : undefined;
 
   return (
     <div className="page">
@@ -539,7 +542,9 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
                 <div className="notice">
                   <p>
                     {selectedStorage.active && <><span className="status-badge status-success">{t("nvrStorageActive")}</span>{" · "}</>}
-                    {t("nvrStorageFree")}: {selectedStorage.free_known ? formatStorageBytes(selectedStorage.free_bytes) : "—"}
+                    {t("nvrStorageTotal")}: {selectedStorage.size_bytes ? formatStorageBytes(selectedStorage.size_bytes) : "—"}
+                    {" · "}{t("nvrStorageUsed")}: {selectedStorageUsed !== undefined ? formatStorageBytes(selectedStorageUsed) : "—"}
+                    {" · "}{t("nvrStorageFree")}: {selectedStorage.free_known ? formatStorageBytes(selectedStorage.free_bytes) : "—"}
                     {" · "}{t("nvrStorageArchive")}: {formatStorageBytes(selectedStorage.archive_bytes)}
                     {" · "}{t("nvrStorageReserve")}: {selectedStorageReserve}%
                   </p>
