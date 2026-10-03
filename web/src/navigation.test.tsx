@@ -78,6 +78,23 @@ describe("navigation access", () => {
 
 
 
+  it("shows the fresh Cameras module only while it is enabled", () => {
+    const reader = actor(allReads);
+    const enabled = [{
+      module_id: "cameras",
+      status: "enabled" as const,
+      items: [{id: "cameras", title: "Cameras", route: "/modules/cameras", order: 20}],
+    }];
+    const paths = visibleNavigation(reader, enabled).flatMap((group) => group.items.map((item) => item.path));
+    expect(paths).toContain("/modules/cameras");
+    expect(accessiblePath(reader, "/modules/cameras", enabled)).toBe("/modules/cameras");
+
+    const disabled = [{module_id: "cameras", status: "disabled" as const, items: []}];
+    expect(visibleNavigation(reader, disabled).flatMap((group) => group.items.map((item) => item.path)))
+      .not.toContain("/modules/cameras");
+    expect(accessiblePath(reader, "/modules/cameras", disabled)).toBe("/");
+  });
+
   it("does not infer access from owner role or a similar permission name", () => {
     const restrictedOwner = actor(["system.read.extra", "updates.manage"]);
     expect(hasPermission(restrictedOwner, "system.read")).toBe(false);
