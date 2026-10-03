@@ -51,6 +51,8 @@ type CameraStore interface {
 		bool, string,
 		time.Time,
 	) (state.NVRRecordingSegmentRecord, error)
+	OldestNVRRetentionSegments(context.Context, string, int) ([]state.NVRRecordingSegmentRecord, error)
+	DeleteNVRRecordingSegment(context.Context, string) error
 }
 
 type Service struct {
@@ -78,6 +80,7 @@ type Service struct {
 	recorder           RecorderSource
 	recordingSessions map[string]*recordingSession
 	recordingStatus   map[string]RecordingStatus
+	spaceChecker      SpaceChecker
 }
 
 type CameraInput struct {
@@ -166,6 +169,7 @@ func newService(
 		recorder:          NewFFmpegSegmentRecorder(),
 		recordingSessions: map[string]*recordingSession{},
 		recordingStatus:   map[string]RecordingStatus{},
+		spaceChecker:      osSpaceChecker{},
 	}
 }
 
