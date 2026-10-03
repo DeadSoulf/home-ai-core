@@ -763,27 +763,64 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
 
       {onvifOpen && (
         <Panel title={t("nvrONVIFDiscovery")} className="wide">
-          {onvifDevices.length === 0 ? (
-            <div className="notice"><p>{t("nvrONVIFNoDevices")}</p></div>
-          ) : !onvifDevice ? (
-            <div className="list">
-              {onvifDevices.map((device) => (
-                <div className="list-row" key={device.id}>
-                  <div>
-                    <strong>{device.name}</strong>
-                    <span>{device.ip} · {device.address}</span>
-                  </div>
-                  <button type="button" className="button primary compact" onClick={() => chooseONVIFDevice(device)}>
-                    {t("select")}
+          {!onvifDevice ? (
+            <>
+              {onvifDevices.length === 0 ? (
+                <div className="notice"><p>{t("nvrONVIFNoDevices")}</p></div>
+              ) : (
+                <div className="list">
+                  {onvifDevices.map((device) => (
+                    <div className="list-row" key={device.id}>
+                      <div>
+                        <strong>{device.name}</strong>
+                        <span>{device.ip} · {device.address}</span>
+                      </div>
+                      <button type="button" className="button primary compact" onClick={() => chooseONVIFDevice(device)}>
+                        {t("select")}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="notice">
+                <strong>{t("nvrONVIFManual")}</strong>
+                <p>{t("nvrONVIFManualHint")}</p>
+                <label className="nvr-address-field">
+                  {t("nvrONVIFAddress")}
+                  <input
+                    inputMode="url"
+                    placeholder="192.168.1.50"
+                    value={onvifManualAddress}
+                    onChange={(event) => setONVIFManualAddress(event.target.value)}
+                  />
+                </label>
+                <div className="nvr-form-actions">
+                  <button
+                    type="button"
+                    className="button primary"
+                    disabled={Boolean(busy) || !onvifManualAddress.trim()}
+                    onClick={chooseManualONVIF}
+                  >
+                    {t("nvrONVIFUseAddress")}
                   </button>
                 </div>
-              ))}
-            </div>
+              </div>
+
+              <div className="nvr-form-actions">
+                <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={() => void discoverONVIF()}>
+                  {busy === "onvif:discover" ? t("working") : t("refresh")}
+                </button>
+                <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={resetONVIF}>
+                  {t("cancel")}
+                </button>
+              </div>
+            </>
           ) : (
             <form className="nvr-camera-form" onSubmit={importONVIF}>
               <div className="notice">
                 <strong>{onvifDevice.name}</strong>
-                <span>{onvifDevice.ip}</span>
+                <span>{onvifDevice.ip} · {onvifDevice.address}</span>
               </div>
               <label>
                 {t("nvrCameraName")}
@@ -880,16 +917,6 @@ export function CamerasPage({revision, actor}: {revision: number; actor: Actor})
                 </>
               )}
             </form>
-          )}
-          {!onvifDevice && (
-            <div className="nvr-form-actions">
-              <button type="button" className="button secondary" onClick={() => void discoverONVIF()}>
-                {t("refresh")}
-              </button>
-              <button type="button" className="button secondary" onClick={resetONVIF}>
-                {t("cancel")}
-              </button>
-            </div>
           )}
         </Panel>
       )}
