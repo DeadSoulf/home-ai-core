@@ -18,6 +18,7 @@ import (
 var (
 	ErrRecordingUnavailable = errors.New("NVR recording runtime is unavailable")
 	ErrRecordingNoStorage   = errors.New("NVR recording storage is not configured")
+	ErrRecordingStorageFull = errors.New("NVR recording storage reserve cannot be restored")
 )
 
 type RecordedSegment struct {
@@ -278,6 +279,11 @@ func (s *Service) runRecordingSession(
 			s.setRecordingError(camera.ID, "recording segment index failed")
 			continue
 		}
+		if err := s.enforceStorageReserve(context.Background(), target); err != nil {
+			s.setRecordingError(camera.ID, runtimeRecordingErrorMessage(err))
+			session.cancel()
+			break
+		}
 		now := s.now().UTC()
 		s.recordingMu.Lock()
 		status := s.recordingStatus[camera.ID]
@@ -351,3 +357,61 @@ func (s *Service) stopAllRecordings() {
 	}
 }
 
+
+
+func (s *Service) enforceStorageReserve(
+	ctx context.Context,
+	target state.NVRStorageTargetRecord,
+) error {
+	if s == nil || s.spaceChecker == nil {
+		return nil
+	}
+	for {
+		space, err := s.spaceChecker.Space(target.Mountpoint)
+		if err != nil {
+			return err
+		}
+		if space.TotalBytes == 0 {
+			return nil
+		}
+		reserveBytes := space.TotalBytes * uint64(target.ReservePercent) / 100
+		if space.AvailableBytes >= reserveBytes {
+			return nil
+		}
+
+		candidates, err := s.store.OldestNVRRetentionSegments(ctx, target.ID, 32)
+		if err != nil {
+			return err
+		}
+		if len(candidates) == 0 {
+			return ErrRecordingStorageFull
+		}
+
+		deletedAny := false
+		for _, candidate := range candidates {
+			fullPath := filepath.Join(target.Mountpoint, filepath.FromSlash(candidate.RelativePath))
+			rel, err := filepath.Rel(target.Mountpoint, fullPath)
+			if err != nil || rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+				continue
+			}
+			if err := os.Remove(fullPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			if err := s.store.DeleteNVRRecordingSegment(ctx, candidate.ID); err != nil {
+				return err
+			}
+			deletedAny = true
+
+			space, err = s.spaceChecker.Space(target.Mountpoint)
+			if err != nil {
+				return err
+			}
+			if space.AvailableBytes >= reserveBytes {
+				return nil
+			}
+		}
+		if !deletedAny {
+			return ErrRecordingStorageFull
+		}
+	}
+}
