@@ -1,8 +1,8 @@
 # Home-AI Cameras / NVR Architecture
 
-**Status:** NVR-0 + NVR-1 onboarding/live foundation published through `0.1.139-dev`; ONVIF live acceptance pending; NVR-2 recording/storage next  
-**Baseline:** Home-AI-Core 0.1.139-dev  
-**Date:** 2026-10-02
+**Status:** NVR-0 + NVR-1 published through `0.1.139-dev`; NVR-2 recording/storage foundation implemented for `0.1.140-dev`; real-camera/storage acceptance pending  
+**Baseline:** Home-AI-Core 0.1.140-dev  
+**Date:** 2026-10-03
 
 ## 1. Goal
 
@@ -678,9 +678,9 @@ Implemented in `0.1.134-dev`:
 - Cameras foundation Web page and module-aware navigation;
 - privacy, scoped-access, schema and navigation regression tests.
 
-### NVR-1 — Camera onboarding and live 🚧
+### NVR-1 — Camera onboarding and live ✅
 
-Implemented and published through `0.1.137-dev`:
+Implemented and published through `0.1.139-dev`:
 
 - ✅ RTSP test/probe;
 - ✅ manual camera CRUD;
@@ -690,22 +690,36 @@ Implemented and published through `0.1.137-dev`:
 - ✅ shared local live restream;
 - ✅ single/grid live preview;
 - ✅ exact `camera.live` authorization;
-- ✅ RTSP credentials kept out of ffprobe/ffmpeg argv.
+- ✅ RTSP credentials kept out of ffprobe/ffmpeg argv;
+- ✅ ONVIF discovery/import;
+- ✅ explicit main/sub stream discovery and selection.
 
-Remaining in NVR-1:
+Real-camera ONVIF/live compatibility acceptance remains part of NVR-4 hardening.
 
-- ONVIF discovery/import;
-- explicit main/sub stream discovery and selection;
-- live acceptance/tuning on real camera hardware.
+### NVR-2 — Recording and storage 🚧
 
-### NVR-2 — Recording and storage
+Implemented for `0.1.140-dev`:
 
-- select `video` target;
-- archive directories;
-- segment recording;
-- startup recovery;
-- reserve/ring retention;
-- archive health/usage.
+- ✅ select one mounted `purpose=video` target;
+- ✅ Web/API storage target and reserve controls;
+- ✅ per-camera archive/session directories;
+- ✅ continuous main-stream packet-copy segment recording;
+- ✅ camera audio setting respected;
+- ✅ completed segment metadata/index and archive byte accounting;
+- ✅ startup crash cleanup for unfinished `.partial.mp4` segments;
+- ✅ automatic recorder restart with bounded backoff after process/RTSP loss;
+- ✅ free-space reserve and oldest-unprotected ring retention;
+- ✅ protected segments excluded from automatic deletion;
+- ✅ refuse recording when the configured archive mount is not actually mounted;
+- ✅ active NVR target protected from reassignment and destructive storage operations;
+- ✅ recorder/storage/crash/reconnect regression coverage.
+
+Remaining acceptance/hardening before calling NVR-2 published:
+
+- real camera continuous-recording acceptance;
+- real disk mount/reboot/remount acceptance;
+- storage-full and protected-only full-disk acceptance;
+- long-running multi-camera soak and archive timestamp validation.
 
 ### NVR-3 — Timeline and event recording
 

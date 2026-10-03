@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.140-dev
+
+- Start NVR-2 with a usable continuous recording and video-storage foundation.
+- Add one active archive target selected only from discovered, mounted storage explicitly assigned to `purpose=video`; arbitrary browser-supplied mount paths are not accepted.
+- Add Cameras Web controls for video target selection, free-space reserve, archive usage, recorder readiness and per-camera recording state.
+- Record each enabled `continuous` camera from its main RTSP stream through managed FFmpeg packet-copy/remux into approximately 60-second MP4 segments.
+- Respect each camera's `audio_enabled` setting while preserving the main video stream without transcoding.
+- Persist completed segment metadata in SQLite while keeping media payloads on the selected video filesystem.
+- Preserve a configurable filesystem free-space reserve with ring retention over the oldest complete, unprotected segments only.
+- Never select protected recordings for automatic deletion; stop recording with a visible storage-full state when the reserve cannot be restored safely.
+- Refuse to record through a stale/unmounted archive path so a missing video mount cannot silently redirect recordings onto the system filesystem.
+- Automatically restart the FFmpeg recorder with bounded backoff after an RTSP/process interruption.
+- Add crash-safe `.partial.mp4` handling: completed segments are atomically finalized and stale partial files are discarded before that camera resumes recording.
+- Protect the active NVR archive target from purpose reassignment, unmount, format and partition deletion, including destructive operations against its parent disk.
+- Add state, recorder, retention, crash-recovery, storage-validation and reconnect regression coverage.
+- NVR-2 still requires real-camera/storage soak and full-disk acceptance; NVR-3 adds motion recording, timeline, evidence protection UI and clip export.
+
 ## 0.1.139-dev
 
 - Complete the ONVIF discovery/import portion of NVR-1.

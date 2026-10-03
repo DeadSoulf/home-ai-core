@@ -71,6 +71,14 @@ func (s *Service) Start(ctx context.Context) error {
 		}
 	}
 	s.runtimeMu.Unlock()
+
+	for _, camera := range cameras {
+		if camera.Enabled && camera.RecordingMode == "continuous" {
+			if err := s.startRecording(ctx, camera); err != nil {
+				s.setRecordingError(camera.ID, runtimeRecordingErrorMessage(err))
+			}
+		}
+	}
 	return nil
 }
 
@@ -79,6 +87,7 @@ func (s *Service) Stop() {
 		return
 	}
 	s.stopAllLive()
+	s.stopAllRecordings()
 	s.runtimeMu.Lock()
 	cancel := s.supervisorCancel
 	s.supervisorCancel = nil
@@ -106,6 +115,7 @@ func (s *Service) RefreshCamera(ctx context.Context, cameraID string) error {
 		return nil
 	}
 	s.StopLive(cameraID)
+	s.StopRecording(cameraID)
 	camera, err := s.store.NVRCamera(ctx, cameraID)
 	if err != nil {
 		return err
@@ -127,6 +137,11 @@ func (s *Service) RefreshCamera(ctx context.Context, cameraID string) error {
 	s.workers[cameraID] = cameraWorker{cancel: cancel}
 	s.runtime[cameraID] = CameraRuntimeStatus{State: RuntimeConnecting}
 	go s.runCameraWorker(workerCtx, cameraID)
+	if camera.RecordingMode == "continuous" {
+		if err := s.startRecording(ctx, camera); err != nil {
+			s.setRecordingError(camera.ID, runtimeRecordingErrorMessage(err))
+		}
+	}
 	return nil
 }
 
@@ -135,6 +150,7 @@ func (s *Service) RemoveCameraRuntime(cameraID string) {
 		return
 	}
 	s.StopLive(cameraID)
+	s.StopRecording(cameraID)
 	s.runtimeMu.Lock()
 	if worker, ok := s.workers[cameraID]; ok {
 		worker.cancel()
@@ -281,6 +297,23 @@ func runtimeErrorMessage(err error) string {
 		return "camera health check timed out"
 	default:
 		return "camera health check failed"
+	}
+}
+
+func runtimeRecordingErrorMessage(err error) string {
+	switch {
+	case errors.Is(err, ErrRecordingNoStorage):
+		return "recording storage is not configured"
+	case errors.Is(err, ErrRecordingUnavailable):
+		return "recording runtime is unavailable"
+	case errors.Is(err, ErrRecordingStorageFull):
+		return "recording storage reserve cannot be restored"
+	case errors.Is(err, ErrRecordingStorageUnmounted):
+		return "recording storage is not mounted"
+	case errors.Is(err, ErrSecretStoreUnavailable):
+		return "camera credential store is unavailable"
+	default:
+		return "recording could not start"
 	}
 }
 

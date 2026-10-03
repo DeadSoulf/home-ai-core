@@ -8,10 +8,10 @@
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
 **Последний опубликованный релиз:** `0.1.139-dev` — NVR ONVIF discovery/import\
-**Текущий срез:** `0.1.139-dev` опубликован; NVR-1 onboarding/live foundation завершён в коде, ONVIF требует live acceptance на реальных камерах.\
-**Следующий engineering milestone:** **NVR-2 — video storage target + continuous segmented recording + reserve/ring retention**.\
+**Текущий срез:** `0.1.140-dev` — NVR-2 continuous recording + video storage + reserve/ring retention реализован в коде; требуется live acceptance на реальных камерах и диске.\
+**Следующий engineering milestone:** после acceptance NVR-2 — **NVR-3: motion recording + archive timeline + protect/bookmark/snapshot + clip export**.\
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.\
-**Обновлено:** 2026-10-02
+**Обновлено:** 2026-10-03
 
 ### Итог этапа AI Agent — зафиксировано на 0.1.133-dev
 

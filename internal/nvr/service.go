@@ -41,6 +41,18 @@ type CameraStore interface {
 		time.Time,
 	) (state.NVRONVIFSourceRecord, error)
 	NVRONVIFSource(context.Context, string) (state.NVRONVIFSourceRecord, error)
+	ActiveNVRStorageTarget(context.Context) (state.NVRStorageTargetRecord, error)
+	CreateNVRRecordingSegment(
+		context.Context,
+		string, string,
+		time.Time, time.Time,
+		string, string,
+		int, int, int64,
+		bool, string,
+		time.Time,
+	) (state.NVRRecordingSegmentRecord, error)
+	OldestNVRRetentionSegments(context.Context, string, int) ([]state.NVRRecordingSegmentRecord, error)
+	DeleteNVRRecordingSegment(context.Context, string) error
 }
 
 type Service struct {
@@ -63,6 +75,13 @@ type Service struct {
 	liveSource      LiveSource
 	liveSessions    map[string]*liveSession
 	liveIdleTimeout time.Duration
+
+	recordingMu       sync.Mutex
+	recorder          RecorderSource
+	recordingSessions map[string]*recordingSession
+	recordingStatus   map[string]RecordingStatus
+	spaceChecker      SpaceChecker
+	mountChecker      MountChecker
 }
 
 type CameraInput struct {
@@ -135,19 +154,24 @@ func newService(
 	prober CameraProber,
 ) *Service {
 	return &Service{
-		store:           store,
-		credentials:     credentials,
-		prober:          prober,
-		discoverer:      NewWSDiscovery(),
-		onvif:           NewSOAPONVIFClient(),
-		now:             time.Now,
-		workers:         map[string]cameraWorker{},
-		runtime:         map[string]CameraRuntimeStatus{},
-		healthInterval:  30 * time.Second,
-		retryDelays:     []time.Duration{2 * time.Second, 5 * time.Second, 15 * time.Second, 30 * time.Second},
-		liveSource:      NewFFmpegMJPEGSource(),
-		liveSessions:    map[string]*liveSession{},
-		liveIdleTimeout: 5 * time.Second,
+		store:             store,
+		credentials:       credentials,
+		prober:            prober,
+		discoverer:        NewWSDiscovery(),
+		onvif:             NewSOAPONVIFClient(),
+		now:               time.Now,
+		workers:           map[string]cameraWorker{},
+		runtime:           map[string]CameraRuntimeStatus{},
+		healthInterval:    30 * time.Second,
+		retryDelays:       []time.Duration{2 * time.Second, 5 * time.Second, 15 * time.Second, 30 * time.Second},
+		liveSource:        NewFFmpegMJPEGSource(),
+		liveSessions:      map[string]*liveSession{},
+		liveIdleTimeout:   5 * time.Second,
+		recorder:          NewFFmpegSegmentRecorder(),
+		recordingSessions: map[string]*recordingSession{},
+		recordingStatus:   map[string]RecordingStatus{},
+		spaceChecker:      osSpaceChecker{},
+		mountChecker:      osMountChecker{},
 	}
 }
 
@@ -662,6 +686,7 @@ func (s *Service) CameraConfig(ctx context.Context, cameraID string) (CameraConf
 		Profiles:      make([]StreamProfile, 0, len(profiles)),
 	}
 	out.Runtime = s.CameraRuntime(camera.ID)
+	out.Recording = s.CameraRecording(camera.ID)
 	for _, profile := range profiles {
 		if profile.Role == "sub" {
 			out.SubstreamAddress = profile.SourceURI
