@@ -357,7 +357,6 @@ func (s *Service) stopAllRecordings() {
 	}
 }
 
-
 func (s *Service) enforceStorageReserve(
 	ctx context.Context,
 	target state.NVRStorageTargetRecord,
