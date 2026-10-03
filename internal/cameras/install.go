@@ -94,8 +94,8 @@ func (s *Service) InstallRuntime(reader io.Reader, size int64) (InstallResult, e
 		}
 		src, err := f.Open()
 		if err != nil {
-		return InstallResult{}, err
-	}
+			return InstallResult{}, err
+		}
 		out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0640)
 		if err != nil {
 			src.Close()
