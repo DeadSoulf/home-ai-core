@@ -15,7 +15,6 @@ type CamerasService interface {
 	Status() cameras.Status
 	Refresh() cameras.Status
 	TestLogin(context.Context, cameras.LoginRequest) (cameras.LoginResult, error)
-	Discover(context.Context) ([]cameras.DiscoveredDevice, error)
 }
 
 func (s *server) camerasStatus(
@@ -150,7 +149,14 @@ func (s *server) camerasInstallRuntime(
 
 
 func (s *server) camerasDiscover(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
-	items, err := s.cameras.Discover(r.Context())
+	discoverer, ok := s.cameras.(interface {
+		Discover(context.Context) ([]cameras.DiscoveredDevice, error)
+	})
+	if !ok {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "camera_discovery_unavailable", "Camera discovery is unavailable", nil)
+		return
+	}
+	items, err := discoverer.Discover(r.Context())
 	if err != nil {
 		writeAPIError(w, r, http.StatusBadGateway, "camera_discovery_failed", err.Error(), nil)
 		return
