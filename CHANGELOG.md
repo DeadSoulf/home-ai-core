@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.148-dev
+
+- Fix Deep Scan on appliance kernels where Go interface enumeration fails with `netlinkrib: address family not supported by protocol`.
+- Fall back to Linux `/proc/net/route` connected IPv4 routes and ARP-neighbor-derived local subnets instead of aborting discovery when netlink interface listing is unavailable.
+- Keep automatic scan ranges private/local and bounded; if no safe network can be inferred, return an actionable message asking for an explicit CIDR.
+- Add spacing and wrapping to the Cameras toolbar so Add / Quick Scan / Deep Scan / ONVIF buttons no longer touch each other on wide or narrow layouts.
+
 ## 0.1.147-dev
 
 - Add a dedicated Deep Scan mode with an optional private IPv4 CIDR target from /20 to /30; when omitted, connected private networks are scanned automatically with bounded host counts.
