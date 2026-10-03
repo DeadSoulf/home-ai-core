@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/state"
@@ -114,9 +113,6 @@ func (r *FFmpegSegmentRecorder) Start(
 		for {
 			row, err := reader.Read()
 			if err != nil {
-				if !errors.Is(err, io.EOF) && ctx.Err() == nil {
-					done <- err
-				}
 				break
 			}
 			if len(row) < 3 {
@@ -356,4 +352,3 @@ func (s *Service) stopAllRecordings() {
 	}
 }
 
-var _ = sync.Mutex{}
