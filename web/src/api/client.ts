@@ -895,6 +895,22 @@ export const api = {
     return result.devices;
   },
 
+  camerasList: async () => {
+    const result = await request<{cameras: Array<{id: string; name: string; address: string; port: number; username: string; backend: string; created_at: string}>}>(
+      "/api/v1/cameras",
+    );
+    return result.cameras;
+  },
+
+  addSDKCamera: async (input: {name?: string; address: string; port?: number; username: string; password: string}) => {
+    const result = await postJSON<{camera: {id: string; name: string; address: string; port: number; username: string; backend: string; created_at: string}}>(
+      "/api/v1/cameras",
+      input,
+      true,
+    );
+    return result.camera;
+  },
+
   installCameraSDK: async (file: File, onProgress?: (percent: number) => void) => {
     return new Promise<{installed: boolean; path: string; status: CamerasStatus}>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
