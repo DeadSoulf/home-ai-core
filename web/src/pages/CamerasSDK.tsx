@@ -21,7 +21,7 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
   const [uploadProgress, setUploadProgress] = useState(0);
   const [adding, setAdding] = useState<string>("");
   const [addError, setAddError] = useState("");
-  const [credentials, setCredentials] = useState<{address: string; name: string; username: string; password: string} | null>(null);
+  const [credentials, setCredentials] = useState<{address: string; port: number; name: string; username: string; password: string} | null>(null);
   const [savedCameras, setSavedCameras] = useState<Array<{id: string; name: string; address: string; port: number; username: string; backend: string}>>([]);
 
   const installSDK = async (event: FormEvent) => {
@@ -49,7 +49,7 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
       await api.addSDKCamera({
         name: credentials.name,
         address: credentials.address,
-        port: 8000,
+        port: credentials.port,
         username: credentials.username,
         password: credentials.password,
       });
@@ -144,7 +144,7 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
               <button type="submit" className="button primary" disabled={!!adding}>{adding ? "Подключение…" : "Добавить через HCNetSDK"}</button>
               <button type="button" className="button" onClick={() => setCredentials(null)} disabled={!!adding}>Отмена</button>
             </div>
-            <p className="muted">Для Hikvision/HiWatch используется SDK-порт 8000. ONVIF-порт из поиска не используется для HCNetSDK.</p>
+            <p className="muted">Hikvision/HiWatch, найденные через SADP, используют обнаруженный SDK-порт. Для камер, найденных только через ONVIF, по умолчанию используется HCNetSDK-порт 8000.</p>
           </form>
         )}
         {savedCameras.length > 0 && (
@@ -169,7 +169,7 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
                     <td>{device.name || "ONVIF камера"}</td>
                     <td className="mono">{device.address}</td>
                     <td>{device.port}</td>
-                    <td><button type="button" className="button" disabled={!canManage} onClick={() => setCredentials({address: device.address, name: device.name || "", username: "admin", password: ""})}>Добавить</button></td>
+                    <td><button type="button" className="button" disabled={!canManage} onClick={() => setCredentials({address: device.address, port: device.scopes?.startsWith("hikvision:sadp") ? device.port : 8000, name: device.name || "", username: "admin", password: ""})}>Добавить</button></td>
                   </tr>
                 ))}
               </tbody>
