@@ -82,18 +82,18 @@ func TestSendWebSDKRequestUsesDigestAndReturnsXML(t *testing.T) {
 
 	service := NewServiceWithRuntime(&fakeSDKRuntime{})
 	request := WebSDKRawRequest{
-		Address: "127.0.0.1",
-		Port: 80,
+		Address:  "127.0.0.1",
+		Port:     80,
 		Username: "admin",
 		Password: "secret",
-		Method: http.MethodGet,
-		Path: "/ISAPI/System/deviceInfo",
+		Method:   http.MethodGet,
+		Path:     "/ISAPI/System/deviceInfo",
 	}
 	// Use the httptest transport/base URL directly because validateWebSDKRequest
 	// intentionally rejects loopback targets in production.
 	client := &webSDKClient{
-		client: server.Client(),
-		baseURL: server.URL,
+		client:   server.Client(),
+		baseURL:  server.URL,
 		username: request.Username,
 		password: request.Password,
 	}

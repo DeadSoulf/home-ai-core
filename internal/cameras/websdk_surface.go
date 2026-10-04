@@ -129,9 +129,9 @@ func WebSDKFunctions() []WebSDKFunctionDescriptor {
 
 func (s *Service) SendWebSDKRequest(ctx context.Context, request WebSDKRawRequest) (WebSDKRawResponse, error) {
 	probe := WebSDKProbeRequest{
-		Address: request.Address,
-		Port: request.Port,
-		HTTPS: request.HTTPS,
+		Address:  request.Address,
+		Port:     request.Port,
+		HTTPS:    request.HTTPS,
 		Username: request.Username,
 		Password: request.Password,
 	}
@@ -180,7 +180,7 @@ func (s *Service) SendWebSDKRequest(ctx context.Context, request WebSDKRawReques
 	}
 
 	result := WebSDKRawResponse{
-		Status: status,
+		Status:      status,
 		ContentType: contentType,
 	}
 	if webSDKContentIsText(contentType, payload) {
