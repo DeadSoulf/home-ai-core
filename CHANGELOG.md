@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.161-dev
+
+- Inventory the complete public surface of the supplied Hikvision WebSDK V3.3.1: all 79 `I_*` functions from `webVideoCtrl.js`.
+- Add a first-class function catalog with category, Home-AI backend and implementation/mapping status so no SDK capability is silently dropped.
+- Add a safe, audited server-side equivalent of WebSDK `I_SendHTTPRequest` supporting GET/POST/PUT/DELETE, XML/JSON and bounded binary responses.
+- Restrict the generic dispatcher to Hikvision `/ISAPI/`, `/SDK/` and the required ZeroStreaming PSIA namespace; reject absolute URLs, path traversal, proxy use, redirects and non-private/non-link-local targets.
+- Add `GET /api/v1/cameras/websdk/functions` and `POST /api/v1/cameras/websdk/request`.
+- Add a Web panel that displays all 79 functions with category/backend/status and an administrator-only advanced WebSDK/ISAPI request console.
+- Keep plugin-only media functions explicit: they are mapped to HCNetSDK/browser backends rather than falsely reported as complete before the media transport exists.
+- PR #160 passed full Core/Web/Linux/Windows/Debian CI before the release bump.
+
 ## 0.1.160-dev
 
 - Promote the supplied Hikvision HCWebSDK WebSDK V3.3.1 from reference material to the Cameras module's server-side Web/ISAPI control-plane contract.

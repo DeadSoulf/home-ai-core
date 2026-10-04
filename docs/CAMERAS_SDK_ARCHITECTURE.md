@@ -1,6 +1,6 @@
 # Cameras SDK architecture
 
-> Status: HCNetSDK V40 + server-side HCWebSDK WebSDK V3.3.1 / ISAPI control-plane implemented through `0.1.160-dev`. This is a fresh product module and does not reuse the retired `nvr` module runtime.
+> Status: HCNetSDK V40 + server-side HCWebSDK WebSDK V3.3.1 / ISAPI control-plane + complete 79-function public WebSDK surface implemented through `0.1.161-dev`. This is a fresh product module and does not reuse the retired `nvr` module runtime.
 
 ## Source SDKs
 
@@ -140,11 +140,35 @@ The Cameras Web page now treats WebSDK/ISAPI as the preferred device/control pro
 
 HCNetSDK remains the native Linux media backend and will be used for `NET_DVR_RealPlay_V40`; WebSDK/ISAPI supplies device/channel/control metadata around that media path.
 
+## Slice 4: complete WebSDK V3.3.1 function surface
+
+The supplied `webVideoCtrl.js` exposes **79 public `I_*` functions**. `0.1.161-dev` inventories every one of them in a first-class Home-AI function catalog.
+
+Each function is assigned to its real Home-AI backend instead of pretending that the Windows local-service plugin exists on Linux:
+
+- `core-isapi` — Hikvision HTTP/ISAPI operations executed and audited by Core;
+- `hcnetsdk-media` — native live/playback/talk operations that belong in the HCNetSDK data plane;
+- `home-ai-browser` — window/layout/fullscreen/local browser actions;
+- `core-transfer` — long-running download/upload operations that require progress/cancel semantics.
+
+Core now implements a generic audited equivalent of WebSDK `I_SendHTTPRequest`. It supports GET/POST/PUT/DELETE and text or bounded binary bodies/responses. It accepts only relative Hikvision API paths under:
+
+- `/ISAPI/`;
+- `/SDK/`;
+- `/PSIA/Custom/SelfExt/ContentMgmt/ZeroStreaming/`.
+
+Absolute URLs, proxying, redirects, path traversal and non-private/non-link-local camera targets are rejected. Credentials stay request-only and never appear in API responses or audit metadata.
+
+This makes the whole HTTP/control surface from WebSDK V3.3.1 immediately reachable without copying the Windows `HCWebSDKPlugin.exe` into the product. Plugin-only media functions remain explicitly marked `mapped` until their HCNetSDK/browser implementation is complete; this is intentional and visible in the Web UI.
+
+The Cameras page can display all 79 functions with category/backend/status and includes an administrator-only advanced WebSDK/ISAPI request panel for real-device diagnostics and operations.
+
 ## Next slices
 
-1. live acceptance of the WebSDK/ISAPI probe against real Hikvision/HiWatch cameras and recorders;
-2. `NET_DVR_RealPlay_V40` server-side live ingest using confirmed channel/stream identifiers;
-3. encrypted persistent credentials and automatic WebSDK/HCNetSDK session recovery;
-4. browser live transport without `HCWebSDKPlugin.exe`;
-5. PTZ, presets and configuration operations through the same official WebSDK/ISAPI endpoint map;
-6. recording/archive as a later independent layer.
+1. live acceptance of the complete WebSDK catalog/dispatcher against real Hikvision/HiWatch hardware;
+2. implement `I_StartRealPlay` with `NET_DVR_RealPlay_V40` and browser live transport;
+3. implement playback controls and reverse/frame/speed/OSD compatibility;
+4. implement talk/audio/local capture/record compatibility;
+5. implement streamed record download, configuration import/export and firmware upgrade with progress/cancel;
+6. encrypted persistent credentials and automatic session recovery;
+7. recording/archive as a later independent layer.

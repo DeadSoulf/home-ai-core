@@ -7,9 +7,9 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.160-dev` — интегрирован server-side Hikvision WebSDK V3.3.1 / ISAPI control-plane; требуется live-проверка на реальной камере или регистраторе.
-**Текущий срез:** `0.1.160-dev` — WebSDK/ISAPI используется как основной Web/control-plane для device info, каналов, статуса, service ports и streaming profiles; HCNetSDK остаётся native media backend.
-**Следующий engineering milestone:** live acceptance `0.1.160-dev` через WebSDK/ISAPI на реальном Hikvision/HiWatch устройстве → использовать подтверждённые channel/stream IDs в `NET_DVR_RealPlay_V40`.
+**Последний опубликованный релиз:** `0.1.161-dev` — полный публичный WebSDK V3.3.1 surface (79 `I_*` функций) заведён в Cameras; весь HTTP/ISAPI control-plane исполняется server-side, plugin/media функции явно сопоставлены с HCNetSDK/browser backend.
+**Текущий срез:** `0.1.161-dev` — полный WebSDK function catalog + безопасный audited server-side эквивалент `I_SendHTTPRequest` для `/ISAPI`, `/SDK` и нужного ZeroStreaming PSIA namespace.
+**Следующий engineering milestone:** реализовать `mapped` media surface (`I_StartRealPlay`, playback/audio/record/download) поверх HCNetSDK + browser live transport; HTTP/control функции уже доступны через Core.
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.  
 **Обновлено:** 2026-10-04
 
@@ -1272,6 +1272,13 @@ Home Assistant не является основой.
 - есть локальный ONVIF discovery для поиска устройств и persistent camera definition store; пароль в текущем store намеренно не сохраняется;
 - `0.1.159-dev`: основной login probe переведён на `NET_DVR_Login_V40`;
 - `0.1.160-dev`: официальный WebSDK V3.3.1 workflow перенесён в Core как server-side ISAPI adapter;
+- `0.1.161-dev`: проинвентаризирован весь публичный surface supplied `webVideoCtrl.js` — **79 `I_*` функций**;
+- Core публикует полный function catalog с category/backend/status, поэтому ни одна функция SDK не теряется и видно, какой runtime за неё отвечает;
+- реализован server-side audited эквивалент `I_SendHTTPRequest`: GET/POST/PUT/DELETE, XML/JSON и bounded binary response через Base64;
+- dispatcher разрешает только Hikvision `/ISAPI/`, `/SDK/` и требуемый `/PSIA/Custom/SelfExt/ContentMgmt/ZeroStreaming/`; абсолютные URL, path traversal, proxy и redirects запрещены;
+- весь HTTP/control surface WebSDK теперь можно выполнять через Core без `HCWebSDKPlugin.exe`;
+- plugin-only функции live/playback/audio/local recording/window controls не выдаются за готовые: они сохранены в полном каталоге и явно mapped на `hcnetsdk-media` или `home-ai-browser` для следующих media slices;
+- Web показывает все 79 функций и их backend/status, плюс предоставляет admin-only advanced WebSDK/ISAPI dispatcher;
 - WebSDK probe выполняет `/ISAPI/Security/userCheck?format=json`, `/ISAPI/System/deviceInfo`, analog inputs, InputProxy channels/status, `/ISAPI/Security/adminAccesses` и Streaming/StreamingProxy channels;
 - поддерживаются HTTP Digest (MD5/SHA-256, включая sess) и Basic challenges без раскрытия credentials;
 - WebSDK targets ограничены private/link-local literal IP, HTTP proxy и redirects отключены, response size bounded;
@@ -1287,12 +1294,13 @@ Home Assistant не является основой.
 
 Следующие срезы:
 
-1. live acceptance `0.1.160-dev` на реальной Hikvision/HiWatch камере и/или DVR/NVR: WebSDK device info, ports, channels/status и stream profiles;
-2. `NET_DVR_RealPlay_V40` и серверный native live ingest с использованием подтверждённых WebSDK channel/stream IDs;
-3. encrypted persistent camera credentials + автоматическое восстановление WebSDK/HCNetSDK sessions;
-4. browser live transport без Windows HCWebSDK plugin;
-5. PTZ/presets/configuration через официальные WebSDK/ISAPI endpoints;
-6. запись/архив отдельным последующим этапом.
+1. live acceptance `0.1.161-dev` на реальном Hikvision/HiWatch устройстве: full WebSDK catalog, probe и audited ISAPI dispatcher;
+2. `I_StartRealPlay` / `NET_DVR_RealPlay_V40` + browser live transport;
+3. playback surface: search/start/reverse/pause/resume/frame/speed/OSD time;
+4. audio/talk/local capture/record compatibility;
+5. record download, device-config transfer и firmware upload with streaming progress/cancel;
+6. encrypted persistent credentials + automatic WebSDK/HCNetSDK session recovery;
+7. recording/archive as a later independent layer.
 
 ### ⏭ F5 — Full Local AI Agent
 
