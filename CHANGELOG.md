@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.158-dev
+
+- Document the mandatory AI-assisted development workflow after initial Core installation and updater setup: AI agent changes the project in GitHub, CI builds a new release, the user installs it through the normal updater, and the change becomes live-verified only after explicit user confirmation on the real server.
+- Define the canonical acceptance states: implemented → CI passed → release published → installed on real server → user-confirmed.
+- Publish this as a documentation-only test release to validate the complete GitHub build/update/live-acceptance loop; runtime behavior is unchanged.
+
 ## 0.1.153-dev
 
 - Build the Linux amd64 Core with CGO enabled so the native Hikvision HCNetSDK runtime is included instead of the unsupported stub.
