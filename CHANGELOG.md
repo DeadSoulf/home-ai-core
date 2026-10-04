@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.162-dev
+
+- Add a separate Cameras `/modules/cameras/viewer` route for Hikvision WebSDK V3.3.1 Live and Archive viewing.
+- Add authenticated installation of the user's original WebSDK V3.3.1 ZIP; Core extracts only the required vendor JS/plugin assets into its protected state directory and does not commit proprietary files to Git.
+- Use the official WebSDK sequence for Live: `I_InitPlugin`, `I_InsertOBJECTPlugin`, `I_Login`, channel discovery, `I_GetDevicePort` and `I_StartRealPlay`.
+- Add Main/Sub/Third stream selection and analog/IP/zero channel discovery using the vendor WebSDK APIs.
+- Add archive search with `I_RecordSearch` plus `I_StartPlayback`, `I_ReversePlayback`, pause, resume, frame, slow and fast controls.
+- Expose the original `HCWebSDKPlugin.exe` from the installed user-supplied ZIP to authenticated users for installation on the Windows viewing PC.
+- Isolate the vendor player in a same-origin iframe with its own compatibility CSP for the WebSDK localhost service while preserving the strict CSP of the main Home-AI UI.
+- Keep camera credentials inside the vendor browser/plugin viewer; they are not submitted to Home-AI Core.
+- Add a second module navigation item, `Live / Archive`, and WebSDK runtime readiness/install controls to Cameras settings.
+- PR #161 passed full Core/Web/Linux/Windows/Debian CI before the release bump; real-device/plugin live acceptance remains required.
+
 ## 0.1.161-dev
 
 - Inventory the complete public surface of the supplied Hikvision WebSDK V3.3.1: all 79 `I_*` functions from `webVideoCtrl.js`.

@@ -1,6 +1,6 @@
 # Cameras SDK architecture
 
-> Status: HCNetSDK V40 + server-side HCWebSDK WebSDK V3.3.1 / ISAPI control-plane + complete 79-function public WebSDK surface implemented through `0.1.161-dev`. This is a fresh product module and does not reuse the retired `nvr` module runtime.
+> Status: HCNetSDK V40 + server-side WebSDK/ISAPI control-plane + complete 79-function surface + original WebSDK V3.3.1 Live/Archive compatibility viewer implemented through `0.1.162-dev`. This is a fresh product module and does not reuse the retired `nvr` module runtime.
 
 ## Source SDKs
 
@@ -14,8 +14,9 @@ The implementation is based on the supplied Hikvision SDK packages:
 - HCWebSDK WebSDK V3.3.1:
   - its official ISAPI endpoint map and control workflow are implemented server-side in Home-AI Core;
   - `webVideoCtrl.js` shows that the original browser SDK routes HTTP through `JS_SubmitHttpRequest` and video through `JS_Play`;
-  - both calls depend on the Windows `HCWebSDKPlugin.exe`, so that executable is not embedded in Home-AI;
-  - Core replaces the plugin transport while preserving the documented WebSDK/ISAPI workflow.
+  - both calls depend on the Windows `HCWebSDKPlugin.exe`;
+  - Core replaces plugin transport for server-side control/ISAPI operations;
+  - for the explicit compatibility Live/Archive viewer, Home-AI imports the user's original WebSDK ZIP at runtime and serves the original vendor JS/plugin assets to the authenticated Windows client without committing proprietary binaries to the repository.
 
 ## Product boundary
 
@@ -163,12 +164,72 @@ This makes the whole HTTP/control surface from WebSDK V3.3.1 immediately reachab
 
 The Cameras page can display all 79 functions with category/backend/status and includes an administrator-only advanced WebSDK/ISAPI request panel for real-device diagnostics and operations.
 
+## Slice 5: original WebSDK Live / Archive compatibility viewer
+
+`0.1.162-dev` adds a dedicated route:
+
+- `/modules/cameras/viewer`
+
+This viewer intentionally follows the supplied Hikvision WebSDK V3.3.1 demo instead of reimplementing the media player.
+
+### Runtime installation
+
+The Cameras settings page can upload the user's original WebSDK V3.3.1 ZIP.
+
+Core extracts only a fixed whitelist into its protected state directory:
+
+- `jquery-1.7.1.min.js`;
+- `webVideoCtrl.js`;
+- `jsVideoPlugin-1.0.0.min.js`;
+- `HCWebSDKPlugin.exe`.
+
+The vendor files are not committed into Home-AI Git history or release source. Assets are served only through authenticated Cameras API routes.
+
+### Live workflow
+
+The viewer uses the same high-level calls as the official vendor demo:
+
+1. `I_InitPlugin`;
+2. `I_InsertOBJECTPlugin`;
+3. `I_Login`;
+4. `I_GetDevicePort`;
+5. `I_GetAnalogChannelInfo` / `I_GetDigitalChannelInfo` / `I_GetZeroChannelInfo`;
+6. `I_StartRealPlay`;
+7. `I_Stop` / `I_StopAllPlay`.
+
+Main, sub and third stream selectors are exposed.
+
+### Archive workflow
+
+Archive browsing/playback uses the vendor WebSDK surface:
+
+- `I_RecordSearch`;
+- `I_StartPlayback`;
+- `I_ReversePlayback`;
+- `I_Pause`;
+- `I_Resume`;
+- `I_Frame`;
+- `I_PlaySlow`;
+- `I_PlayFast`.
+
+Record search follows the WebSDK paging model and lists the returned recording intervals.
+
+### Browser/plugin boundary
+
+The supplied WebSDK V3.3.1 reports `I_SupportNoPlugin() == false`.
+
+Therefore this compatibility viewer requires the original Windows `HCWebSDKPlugin.exe` on the viewing computer. This is a client-side requirement only; the Home-AI Core server remains Linux.
+
+The vendor player is isolated in a same-origin iframe. The main Home-AI UI keeps its strict Content Security Policy. Only the viewer response receives the narrow compatibility CSP required by the vendor local service, including localhost WebSocket/HTTP access on the WebSDK service port range `34686-34690`.
+
+Camera username/password are entered inside the vendor viewer and are not submitted to Home-AI Core. Server-side WebSDK/ISAPI control operations continue to use the separately protected Core adapter.
+
 ## Next slices
 
-1. live acceptance of the complete WebSDK catalog/dispatcher against real Hikvision/HiWatch hardware;
-2. implement `I_StartRealPlay` with `NET_DVR_RealPlay_V40` and browser live transport;
-3. implement playback controls and reverse/frame/speed/OSD compatibility;
-4. implement talk/audio/local capture/record compatibility;
-5. implement streamed record download, configuration import/export and firmware upgrade with progress/cancel;
-6. encrypted persistent credentials and automatic session recovery;
-7. recording/archive as a later independent layer.
+1. live acceptance of `0.1.162-dev` against real Hikvision/HiWatch hardware using the original Windows plugin;
+2. fix device/firmware-specific compatibility issues found during acceptance;
+3. decide whether to add a parallel plugin-free browser data plane using `NET_DVR_RealPlay_V40`;
+4. complete talk/audio/capture/local-record compatibility;
+5. streamed download/config transfer/firmware upgrade progress and cancellation;
+6. encrypted persistent server-side credentials/session recovery;
+7. Home-AI recording/archive as an independent later layer.

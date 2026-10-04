@@ -7,9 +7,9 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.161-dev` — полный публичный WebSDK V3.3.1 surface (79 `I_*` функций) заведён в Cameras; весь HTTP/ISAPI control-plane исполняется server-side, plugin/media функции явно сопоставлены с HCNetSDK/browser backend.
-**Текущий срез:** `0.1.161-dev` — полный WebSDK function catalog + безопасный audited server-side эквивалент `I_SendHTTPRequest` для `/ISAPI`, `/SDK` и нужного ZeroStreaming PSIA namespace.
-**Следующий engineering milestone:** реализовать `mapped` media surface (`I_StartRealPlay`, playback/audio/record/download) поверх HCNetSDK + browser live transport; HTTP/control функции уже доступны через Core.
+**Последний опубликованный релиз:** `0.1.162-dev` — отдельная страница Cameras Live / Archive на оригинальном Hikvision WebSDK V3.3.1; vendor runtime устанавливается из пользовательского ZIP и не хранится в репозитории.
+**Текущий срез:** `0.1.162-dev` — `/modules/cameras/viewer`: Live через `I_StartRealPlay`, поиск архива через `I_RecordSearch`, playback/reverse/pause/resume/frame/speed через оригинальный WebSDK.
+**Следующий engineering milestone:** live acceptance `0.1.162-dev` на Windows-клиенте с `HCWebSDKPlugin.exe` и реальной Hikvision/HiWatch камерой или регистратором; затем решить, нужен ли параллельный plugin-free HCNetSDK browser transport.
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.  
 **Обновлено:** 2026-10-04
 
@@ -1264,7 +1264,7 @@ Home Assistant не является основой.
 - media/runtime backend — нативный Hikvision **HCNetSDK**;
 - Web/control-plane — supplied **HCWebSDK WebSDK V3.3.1 / ISAPI** workflow, реализованный server-side внутри Core;
 - supplied HCNetSDK V6.1.9.48 Linux64 используется как native server-side runtime;
-- Windows `HCWebSDKPlugin.exe` не встраивается: в оригинальном WebSDK он выполняет HTTP/video transport, а в Home-AI эту роль выполняет Core;
+- Windows `HCWebSDKPlugin.exe` не хранится в репозитории и не является server dependency; начиная с `0.1.162-dev` пользователь может импортировать оригинальный WebSDK ZIP, после чего Core авторизованно отдаёт vendor plugin/JS клиентскому Windows-браузеру для оригинального Live/Archive viewer;
 - Linux amd64 `libhcnetsdk.so` загружается динамически через `dlopen`, без link-time зависимости обычной сборки Core;
 - amd64 release builds включают CGO, arm64 остаётся explicit unsupported до появления соответствующего vendor SDK;
 - runtime показывает supported / available / initialized / library path / error;
@@ -1279,6 +1279,14 @@ Home Assistant не является основой.
 - весь HTTP/control surface WebSDK теперь можно выполнять через Core без `HCWebSDKPlugin.exe`;
 - plugin-only функции live/playback/audio/local recording/window controls не выдаются за готовые: они сохранены в полном каталоге и явно mapped на `hcnetsdk-media` или `home-ai-browser` для следующих media slices;
 - Web показывает все 79 функций и их backend/status, плюс предоставляет admin-only advanced WebSDK/ISAPI dispatcher;
+- `0.1.162-dev`: добавлена отдельная module route `/modules/cameras/viewer` с двумя режимами **Live** и **Архив**;
+- Core умеет принять оригинальный `WebSDK V3.3.1.zip` и извлекает только whitelist vendor assets: `jquery-1.7.1.min.js`, `webVideoCtrl.js`, `jsVideoPlugin-1.0.0.min.js`, `HCWebSDKPlugin.exe`;
+- proprietary WebSDK binaries/scripts не коммитятся в GitHub и хранятся только в защищённом state directory установленного Core;
+- viewer использует официальный WebSDK flow из vendor demo: `I_Login` → channel discovery / `I_GetDevicePort` → `I_StartRealPlay`;
+- архив использует `I_RecordSearch`, `I_StartPlayback`, `I_ReversePlayback`, `I_Pause`, `I_Resume`, `I_Frame`, `I_PlaySlow`, `I_PlayFast`;
+- supplied WebSDK V3.3.1 сообщает `I_SupportNoPlugin() == false`, поэтому этот compatibility viewer требует оригинальный `HCWebSDKPlugin.exe` на Windows viewing client;
+- vendor viewer изолирован в same-origin iframe с отдельной CSP, разрешающей только необходимый localhost service `127.0.0.1:34686-34690`; строгая CSP основного Home-AI UI не ослабляется;
+- camera credentials вводятся внутри vendor viewer и не передаются в Home-AI Core;
 - WebSDK probe выполняет `/ISAPI/Security/userCheck?format=json`, `/ISAPI/System/deviceInfo`, analog inputs, InputProxy channels/status, `/ISAPI/Security/adminAccesses` и Streaming/StreamingProxy channels;
 - поддерживаются HTTP Digest (MD5/SHA-256, включая sess) и Basic challenges без раскрытия credentials;
 - WebSDK targets ограничены private/link-local literal IP, HTTP proxy и redirects отключены, response size bounded;
@@ -1294,13 +1302,13 @@ Home Assistant не является основой.
 
 Следующие срезы:
 
-1. live acceptance `0.1.161-dev` на реальном Hikvision/HiWatch устройстве: full WebSDK catalog, probe и audited ISAPI dispatcher;
-2. `I_StartRealPlay` / `NET_DVR_RealPlay_V40` + browser live transport;
-3. playback surface: search/start/reverse/pause/resume/frame/speed/OSD time;
+1. live acceptance `0.1.162-dev` на реальном Hikvision/HiWatch устройстве и Windows viewing client с `HCWebSDKPlugin.exe`;
+2. по результату acceptance исправить vendor compatibility edge cases для конкретных camera/NVR firmware;
+3. решить, нужен ли дополнительный plugin-free viewer на `NET_DVR_RealPlay_V40` для Linux/macOS/mobile clients;
 4. audio/talk/local capture/record compatibility;
 5. record download, device-config transfer и firmware upload with streaming progress/cancel;
-6. encrypted persistent credentials + automatic WebSDK/HCNetSDK session recovery;
-7. recording/archive as a later independent layer.
+6. encrypted persistent credentials + automatic server-side WebSDK/HCNetSDK session recovery;
+7. собственный Home-AI recording/archive layer как отдельный последующий этап.
 
 ### ⏭ F5 — Full Local AI Agent
 
