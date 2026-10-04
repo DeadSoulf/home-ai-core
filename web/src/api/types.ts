@@ -359,6 +359,35 @@ export type CameraWebSDKProbeResult = {
   warnings?: string[];
 };
 
+export type CameraWebSDKFunction = {
+  name: string;
+  category: string;
+  backend: string;
+  status: "implemented" | "mapped";
+  description?: string;
+};
+
+export type CameraWebSDKRawRequest = {
+  address: string;
+  port?: number;
+  https?: boolean;
+  username: string;
+  password: string;
+  method: "GET" | "POST" | "PUT" | "DELETE";
+  path: string;
+  content_type?: string;
+  body?: string;
+  body_base64?: string;
+};
+
+export type CameraWebSDKRawResponse = {
+  status: number;
+  content_type?: string;
+  body?: string;
+  body_base64?: string;
+  binary: boolean;
+};
+
 export type ModuleNavigationState = {
   module_id: string;
   status: "registered" | "enabled" | "disabled" | "error";

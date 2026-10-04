@@ -1,6 +1,6 @@
 import {FormEvent, useCallback, useState} from "react";
 import {api} from "../api/client";
-import type {Actor, CameraSDKLoginResult, CameraWebSDKProbeResult} from "../api/types";
+import type {Actor, CameraSDKLoginResult, CameraWebSDKFunction, CameraWebSDKProbeResult, CameraWebSDKRawResponse} from "../api/types";
 import {ErrorState, LoadingState, Panel} from "../components/Panel";
 import {useResource} from "../hooks/useResource";
 import {useI18n} from "../i18n";
@@ -34,6 +34,15 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
   const [webProbing, setWebProbing] = useState(false);
   const [webError, setWebError] = useState("");
   const [webResult, setWebResult] = useState<CameraWebSDKProbeResult>();
+  const [webFunctions, setWebFunctions] = useState<CameraWebSDKFunction[]>([]);
+  const [webFunctionsLoading, setWebFunctionsLoading] = useState(false);
+  const [rawMethod, setRawMethod] = useState<"GET" | "POST" | "PUT" | "DELETE">("GET");
+  const [rawPath, setRawPath] = useState("/ISAPI/System/capabilities");
+  const [rawContentType, setRawContentType] = useState("application/xml");
+  const [rawBody, setRawBody] = useState("");
+  const [rawBusy, setRawBusy] = useState(false);
+  const [rawError, setRawError] = useState("");
+  const [rawResult, setRawResult] = useState<CameraWebSDKRawResponse>();
 
   const installSDK = async (event: FormEvent) => {
     event.preventDefault();
@@ -109,6 +118,44 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
       setWebError(reason instanceof Error ? reason.message : t("requestFailed"));
     } finally {
       setWebProbing(false);
+    }
+  };
+
+  const loadWebSDKFunctions = async () => {
+    if (webFunctionsLoading) return;
+    setWebFunctionsLoading(true);
+    try {
+      setWebFunctions(await api.cameraWebSDKFunctions());
+    } catch (reason) {
+      setWebError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setWebFunctionsLoading(false);
+    }
+  };
+
+  const sendRawWebSDKRequest = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!canManage || rawBusy) return;
+    setRawBusy(true);
+    setRawError("");
+    setRawResult(undefined);
+    try {
+      const result = await api.sendCameraWebSDKRequest({
+        address: webAddress.trim(),
+        port: Number(webPort || (webHTTPS ? "443" : "80")),
+        https: webHTTPS,
+        username: webUsername.trim(),
+        password: webPassword,
+        method: rawMethod,
+        path: rawPath.trim(),
+        content_type: rawBody ? rawContentType.trim() || "application/xml" : undefined,
+        body: rawBody || undefined,
+      });
+      setRawResult(result);
+    } catch (reason) {
+      setRawError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setRawBusy(false);
     }
   };
 
@@ -315,6 +362,99 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
                 </table>
               </div>
             )}
+          </>
+        )}
+      </Panel>
+
+      <Panel title="WebSDK V3.3.1 — полный API surface">
+        <p className="muted">
+          В архиве WebSDK V3.3.1 найдено 79 публичных I_* функций. HOME AI сохраняет весь surface:
+          HTTP/ISAPI операции выполняет Core, media-функции сопоставлены с HCNetSDK, а оконные/plugin-функции —
+          с обычным Web-интерфейсом без HCWebSDKPlugin.exe.
+        </p>
+        <button type="button" className="button secondary" onClick={loadWebSDKFunctions} disabled={webFunctionsLoading}>
+          {webFunctionsLoading ? "Загрузка…" : webFunctions.length ? "Обновить список функций" : "Показать все 79 функций"}
+        </button>
+        {webFunctions.length > 0 && (
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Функция</th><th>Группа</th><th>Backend</th><th>Статус</th></tr></thead>
+              <tbody>
+                {webFunctions.map((item) => (
+                  <tr key={item.name}>
+                    <td className="mono">{item.name}</td>
+                    <td>{item.category}</td>
+                    <td className="mono">{item.backend}</td>
+                    <td>{item.status === "implemented" ? "Готово" : "Привязано к backend"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <h3>Расширенный WebSDK / ISAPI запрос</h3>
+        <p className="muted">
+          Это серверный эквивалент I_SendHTTPRequest. Разрешены только Hikvision /ISAPI, /SDK и ZeroStreaming PSIA
+          на private/link-local IP; прокси и redirects отключены.
+        </p>
+        {rawError && <ErrorState message={rawError} />}
+        <form className="network-profile-form" onSubmit={sendRawWebSDKRequest}>
+          <label>
+            Метод
+            <select value={rawMethod} onChange={(event) => setRawMethod(event.target.value as typeof rawMethod)} disabled={!canManage || rawBusy}>
+              <option value="GET">GET</option>
+              <option value="POST">POST</option>
+              <option value="PUT">PUT</option>
+              <option value="DELETE">DELETE</option>
+            </select>
+          </label>
+          <label>
+            API path
+            <input
+              className="mono"
+              value={rawPath}
+              onChange={(event) => setRawPath(event.target.value)}
+              placeholder="/ISAPI/System/deviceInfo"
+              disabled={!canManage || rawBusy}
+              required
+            />
+          </label>
+          <label>
+            Content-Type
+            <input
+              className="mono"
+              value={rawContentType}
+              onChange={(event) => setRawContentType(event.target.value)}
+              disabled={!canManage || rawBusy}
+            />
+          </label>
+          <label>
+            XML / JSON body
+            <textarea
+              className="mono"
+              value={rawBody}
+              onChange={(event) => setRawBody(event.target.value)}
+              rows={8}
+              disabled={!canManage || rawBusy}
+            />
+          </label>
+          <button
+            type="submit"
+            className="button primary"
+            disabled={!canManage || rawBusy || !webAddress.trim() || !webUsername.trim() || !rawPath.trim()}
+          >
+            {rawBusy ? "Выполнение…" : "Выполнить WebSDK запрос"}
+          </button>
+        </form>
+        {rawResult && (
+          <>
+            <div className="notice success">
+              HTTP {rawResult.status} · {rawResult.content_type || "unknown content-type"} · {rawResult.binary ? "binary" : "text"}
+            </div>
+            <pre className="mono" style={{whiteSpace: "pre-wrap", overflowWrap: "anywhere"}}>
+              {rawResult.body || (rawResult.body_base64 ? `base64: ${rawResult.body_base64.slice(0, 4096)}${rawResult.body_base64.length > 4096 ? "…" : ""}` : "Пустой ответ")}
+            </pre>
           </>
         )}
       </Panel>
