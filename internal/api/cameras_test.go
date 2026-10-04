@@ -51,7 +51,6 @@ func (f *fakeCamerasService) TestLogin(
 	}, nil
 }
 
-
 func (f *fakeCamerasService) ProbeWebSDK(
 	_ context.Context,
 	request cameras.WebSDKProbeRequest,

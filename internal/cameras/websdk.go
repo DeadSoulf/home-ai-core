@@ -121,12 +121,12 @@ func (s *Service) ProbeWebSDK(ctx context.Context, request WebSDKProbeRequest) (
 	}
 
 	result := WebSDKProbeResult{
-		OK:      true,
-		Address: request.Address,
-		Port:    request.Port,
-		HTTPS:   request.HTTPS,
-		Backend: "HCWebSDK/ISAPI",
-		Device:  device,
+		OK:       true,
+		Address:  request.Address,
+		Port:     request.Port,
+		HTTPS:    request.HTTPS,
+		Backend:  "HCWebSDK/ISAPI",
+		Device:   device,
 		Channels: []WebSDKChannel{},
 		Streams:  []WebSDKStream{},
 	}
@@ -417,12 +417,12 @@ type webSDKDigitalChannelStatusXML struct {
 	Channels []struct {
 		ID         string `xml:"id"`
 		Descriptor struct {
-			ProxyProtocol        string `xml:"proxyProtocol"`
-			IPAddress            string `xml:"ipAddress"`
-			ManagePortNo         int    `xml:"managePortNo"`
-			SourceInputPort      string `xml:"srcInputPort"`
-			StreamType           string `xml:"streamType"`
-			Online               string `xml:"online"`
+			ProxyProtocol   string `xml:"proxyProtocol"`
+			IPAddress       string `xml:"ipAddress"`
+			ManagePortNo    int    `xml:"managePortNo"`
+			SourceInputPort string `xml:"srcInputPort"`
+			StreamType      string `xml:"streamType"`
+			Online          string `xml:"online"`
 		} `xml:"sourceInputPortDescriptor"`
 	} `xml:"InputProxyChannelStatus"`
 }
