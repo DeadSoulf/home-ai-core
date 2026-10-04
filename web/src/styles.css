@@ -1368,3 +1368,13 @@ button:focus-visible, summary:focus-visible { outline: 2px solid #8bb0ff; outlin
   .camera-viewer-shell { grid-template-columns: 1fr; }
   .camera-viewer-stage { min-height: 420px; }
 }
+
+
+.camera-viewer-page { max-width: 1680px; }
+.camera-websdk-frame {
+  width: 100%;
+  min-height: 820px;
+  border: 1px solid #303846;
+  border-radius: 13px;
+  background: #101318;
+}
