@@ -36,7 +36,7 @@ var webSDKAssets = map[string]string{
 	"jquery-1.7.1.min.js":        "demo/jquery-1.7.1.min.js",
 	"webVideoCtrl.js":            "demo/codebase/webVideoCtrl.js",
 	"jsVideoPlugin-1.0.0.min.js": "demo/codebase/jsVideoPlugin-1.0.0.min.js",
-	"HCWebSDKPlugin.exe":          "demo/codebase/HCWebSDKPlugin.exe",
+	"HCWebSDKPlugin.exe":         "demo/codebase/HCWebSDKPlugin.exe",
 }
 
 func (s *Service) webSDKStatus() WebSDKRuntimeStatus {

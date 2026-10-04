@@ -10,8 +10,8 @@ func TestInstallWebSDKAndReadAssets(t *testing.T) {
 	var archive bytes.Buffer
 	writer := zip.NewWriter(&archive)
 	files := map[string]string{
-		"WebSDK V3.3.1/demo/jquery-1.7.1.min.js":                "window.jQuery={};",
-		"WebSDK V3.3.1/demo/codebase/webVideoCtrl.js":           "window.WebVideoCtrl={version:'3.3.1'};",
+		"WebSDK V3.3.1/demo/jquery-1.7.1.min.js":                 "window.jQuery={};",
+		"WebSDK V3.3.1/demo/codebase/webVideoCtrl.js":            "window.WebVideoCtrl={version:'3.3.1'};",
 		"WebSDK V3.3.1/demo/codebase/jsVideoPlugin-1.0.0.min.js": "window.JSVideoPlugin=function(){};",
 		"WebSDK V3.3.1/demo/codebase/HCWebSDKPlugin.exe":         "MZ-test-plugin",
 	}
