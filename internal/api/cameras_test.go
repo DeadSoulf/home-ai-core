@@ -74,6 +74,17 @@ func (f *fakeCamerasService) ProbeWebSDK(
 	}, nil
 }
 
+func (f *fakeCamerasService) SendWebSDKRequest(
+	_ context.Context,
+	request cameras.WebSDKRawRequest,
+) (cameras.WebSDKRawResponse, error) {
+	return cameras.WebSDKRawResponse{
+		Status:      http.StatusOK,
+		ContentType: "application/xml",
+		Body:        "<ResponseStatus><statusCode>1</statusCode></ResponseStatus>",
+	}, nil
+}
+
 func TestCamerasSDKStatusAndLoginProbe(t *testing.T) {
 	ctx := context.Background()
 	store, err := state.Open(ctx, t.TempDir())
@@ -170,6 +181,36 @@ func TestCamerasSDKStatusAndLoginProbe(t *testing.T) {
 	}
 	if strings.Contains(rec.Body.String(), "secret-web-password") {
 		t.Fatalf("WebSDK camera password leaked in response: %s", rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/cameras/websdk/functions", nil)
+	req.Header.Set("Authorization", "Bearer test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("WebSDK functions response = %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "I_StartRealPlay") || !strings.Contains(rec.Body.String(), "I_SendHTTPRequest") {
+		t.Fatalf("WebSDK function catalog incomplete: %s", rec.Body.String())
+	}
+
+	req = httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/cameras/websdk/request",
+		strings.NewReader(`{"address":"192.168.1.64","port":80,"username":"admin","password":"secret-raw-password","method":"PUT","path":"/ISAPI/System/reboot"}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("WebSDK raw response = %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "ResponseStatus") {
+		t.Fatalf("WebSDK raw response missing body: %s", rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), "secret-raw-password") {
+		t.Fatalf("WebSDK raw password leaked in response: %s", rec.Body.String())
 	}
 }
 
