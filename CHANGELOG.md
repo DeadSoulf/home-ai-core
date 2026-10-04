@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.163-dev
+
+- Remove the experimental first-party `cameras` module from the active Home-AI product after the user rejected the current camera-module behavior.
+- Delete `internal/cameras` including HCNetSDK dynamic loading, SDK upload/install, WebSDK/ISAPI adapter, WebSDK function surface, vendor runtime import and the Live/Archive viewer.
+- Remove all `/api/v1/cameras*` routes and Cameras service wiring from Core startup.
+- Remove the `/modules/cameras` and `/modules/cameras/viewer` Web pages, navigation, API client/types, viewer styles and HCNetSDK/WebSDK UI strings.
+- Restore the normal Core build baseline so amd64 builds no longer require CGO/C compiler for HCNetSDK support.
+- Remove the dedicated `CAMERAS_SDK_ARCHITECTURE.md`; retain `NVR_ARCHITECTURE.md`, ADR-0037, `internal/nvr`, database schema and camera permissions only as dormant groundwork.
+- Do not automatically delete state directories created by earlier experimental camera releases; update/rollback must not perform irreversible user-data deletion.
+- Update PROJECT_MAP: Cameras/NVR is again not an implemented product module and F3 Native Smart Home returns as the next engineering milestone.
+- Code outside release history/project-map documentation matches the pre-new-Cameras `v0.1.151-dev` baseline.
+- PR #162 passed full Web/Go/Core/integration/Linux/Windows/Debian CI before this release bump.
+
 ## 0.1.162-dev
 
 - Add a separate Cameras `/modules/cameras/viewer` route for Hikvision WebSDK V3.3.1 Live and Archive viewing.

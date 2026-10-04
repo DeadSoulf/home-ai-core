@@ -7,8 +7,8 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.162-dev` — последний экспериментальный HCNetSDK/WebSDK Cameras-срез перед повторным снятием модуля из продукта.
-**Текущий срез:** активный модуль `cameras` вычищен из Core в рабочей ветке: registration/runtime/API/Web/HCNetSDK/WebSDK viewer удалены; следующий dev release должен вернуть продукт к состоянию без активного Cameras-модуля.
+**Последний опубликованный релиз:** `0.1.163-dev` — экспериментальный HCNetSDK/WebSDK модуль `cameras` полностью снят из активного продукта; старый NVR groundwork оставлен dormant.
+**Текущий срез:** Cameras/NVR снова считается **не реализованным продуктовым модулем**. Регистрация/runtime/API/Web нового `cameras` удалены; `internal/nvr`, schema/state/permissions остаются только как dormant groundwork.
 **Следующий engineering milestone:** **F3 — Native Smart Home**: собственная device/entity/state model и первый реальный protocol/discovery slice. Cameras/NVR остаётся отложенным отдельным этапом.
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.  
 **Обновлено:** 2026-10-04
