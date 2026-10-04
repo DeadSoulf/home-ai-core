@@ -98,6 +98,72 @@ func (s *server) camerasTestLogin(
 	writeJSON(w, http.StatusOK, map[string]any{"result": result})
 }
 
+func (s *server) camerasWebSDKProbe(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	if !validMutationCSRF(actor, source, r) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	item, err := s.modules.Get(r.Context(), cameras.ModuleID)
+	if err != nil || item.Status != "enabled" {
+		writeAPIError(w, r, http.StatusConflict, "cameras_module_disabled", "Cameras module is disabled", nil)
+		return
+	}
+	probe, ok := s.cameras.(interface {
+		ProbeWebSDK(context.Context, cameras.WebSDKProbeRequest) (cameras.WebSDKProbeResult, error)
+	})
+	if !ok {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "camera_websdk_unavailable", "WebSDK/ISAPI integration is unavailable", nil)
+		return
+	}
+	var request cameras.WebSDKProbeRequest
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_request", err.Error(), nil)
+		return
+	}
+	result, err := probe.ProbeWebSDK(r.Context(), request)
+	if err != nil {
+		if errors.Is(err, cameras.ErrInvalidTarget) {
+			writeAPIError(w, r, http.StatusBadRequest, "camera_target_invalid", err.Error(), nil)
+			return
+		}
+		var httpErr cameras.WebSDKHTTPError
+		if errors.As(err, &httpErr) {
+			if httpErr.Status == http.StatusUnauthorized || httpErr.Status == http.StatusForbidden {
+				writeAPIError(w, r, http.StatusBadGateway, "camera_websdk_authentication_failed", "Hikvision WebSDK/ISAPI rejected the camera credentials", nil)
+				return
+			}
+			writeAPIError(w, r, http.StatusBadGateway, "camera_websdk_request_failed", err.Error(), map[string]any{"status": httpErr.Status})
+			return
+		}
+		writeAPIError(w, r, http.StatusBadGateway, "camera_websdk_probe_failed", err.Error(), nil)
+		return
+	}
+	s.security.RecordAudit(
+		context.WithoutCancel(r.Context()),
+		s.securityRequestContext(r),
+		actor,
+		"camera.websdk.probe",
+		"camera",
+		result.Address,
+		"success",
+		map[string]any{
+			"backend": result.Backend,
+			"port":    result.Port,
+			"https":   result.HTTPS,
+		},
+	)
+	writeJSON(w, http.StatusOK, map[string]any{"result": result})
+}
+
 func (s *server) camerasInstallRuntime(
 	w http.ResponseWriter,
 	r *http.Request,

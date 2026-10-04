@@ -51,6 +51,29 @@ func (f *fakeCamerasService) TestLogin(
 	}, nil
 }
 
+func (f *fakeCamerasService) ProbeWebSDK(
+	_ context.Context,
+	request cameras.WebSDKProbeRequest,
+) (cameras.WebSDKProbeResult, error) {
+	return cameras.WebSDKProbeResult{
+		OK:      true,
+		Address: request.Address,
+		Port:    request.Port,
+		HTTPS:   request.HTTPS,
+		Backend: "HCWebSDK/ISAPI",
+		Device: cameras.WebSDKDeviceInfo{
+			DeviceName:      "Front NVR",
+			Model:           "DS-7608NI-K2",
+			SerialNumber:    "WEBSDK-TEST-001",
+			FirmwareVersion: "V4.72.109",
+		},
+		Ports: cameras.WebSDKPortInfo{HTTPPort: 80, RTSPPort: 554, DevicePort: 8000},
+		Channels: []cameras.WebSDKChannel{
+			{ID: "1", Kind: "digital", Name: "Gate"},
+		},
+	}, nil
+}
+
 func TestCamerasSDKStatusAndLoginProbe(t *testing.T) {
 	ctx := context.Background()
 	store, err := state.Open(ctx, t.TempDir())
@@ -128,6 +151,25 @@ func TestCamerasSDKStatusAndLoginProbe(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "DS-TEST-001") || !strings.Contains(rec.Body.String(), "DS-7608NI") {
 		t.Fatalf("camera metadata missing in response: %s", rec.Body.String())
+	}
+
+	req = httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/cameras/websdk/probe",
+		strings.NewReader(`{"address":"192.168.1.64","port":80,"username":"admin","password":"secret-web-password"}`),
+	)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("WebSDK probe response = %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "WEBSDK-TEST-001") || !strings.Contains(rec.Body.String(), "DS-7608NI-K2") {
+		t.Fatalf("WebSDK metadata missing in response: %s", rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), "secret-web-password") {
+		t.Fatalf("WebSDK camera password leaked in response: %s", rec.Body.String())
 	}
 }
 

@@ -27,6 +27,7 @@ import type {
   AIStatus,
   CamerasStatus,
   CameraSDKLoginResult,
+  CameraWebSDKProbeResult,
   AIConversation,
   AIMessage,
   AIAction,
@@ -931,6 +932,21 @@ export const api = {
   }) => {
     const result = await postJSON<{result: CameraSDKLoginResult}>(
       "/api/v1/cameras/test-login",
+      input,
+      true,
+    );
+    return result.result;
+  },
+
+  probeCameraWebSDK: async (input: {
+    address: string;
+    port?: number;
+    https?: boolean;
+    username: string;
+    password: string;
+  }) => {
+    const result = await postJSON<{result: CameraWebSDKProbeResult}>(
+      "/api/v1/cameras/websdk/probe",
       input,
       true,
     );
