@@ -25,12 +25,6 @@ import type {
   SMBStatus,
   WireGuardStatus,
   AIStatus,
-  CamerasStatus,
-  CameraSDKLoginResult,
-  CameraWebSDKProbeResult,
-  CameraWebSDKFunction,
-  CameraWebSDKRawRequest,
-  CameraWebSDKRawResponse,
   AIConversation,
   AIMessage,
   AIAction,
@@ -885,122 +879,6 @@ export const api = {
   rollbackUpdate: async () => {
     const result = await postJSON<{state: UpdaterState}>("/api/v1/update/rollback", undefined, true);
     return result.state;
-  },
-
-  camerasStatus: async () => {
-    const result = await request<{cameras: CamerasStatus}>("/api/v1/cameras/status");
-    return result.cameras;
-  },
-
-  discoverSDKCameras: async () => {
-    const result = await request<{devices: Array<{address: string; port: number; name?: string; scopes?: string; endpoint?: string; xaddr?: string}>}>(
-      "/api/v1/cameras/discover",
-    );
-    return result.devices;
-  },
-
-  installCameraSDK: async (file: File, onProgress?: (percent: number) => void) => {
-    return new Promise<{installed: boolean; path: string; status: CamerasStatus}>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", "/api/v1/cameras/sdk/install");
-      xhr.setRequestHeader("Content-Type", "application/zip");
-      xhr.setRequestHeader("Accept", "application/json");
-      const token = getCSRFToken();
-      if (token) xhr.setRequestHeader("X-CSRF-Token", token);
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable && onProgress) {
-          onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
-        }
-      };
-      xhr.onerror = () => reject(new Error("HCNetSDK upload failed"));
-      xhr.onload = () => {
-        let body: any = {};
-        try { body = xhr.responseText ? JSON.parse(xhr.responseText) : {}; } catch {}
-        if (xhr.status < 200 || xhr.status >= 300) {
-          reject(new APIError(xhr.status, body as APIErrorBody));
-          return;
-        }
-        onProgress?.(100);
-        resolve(body.result);
-      };
-      xhr.send(file);
-    });
-  },
-
-  installCameraWebSDK: async (file: File, onProgress?: (percent: number) => void) => {
-    return new Promise<{installed: boolean; version: string; status: {available: boolean; version?: string; error?: string}}>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", "/api/v1/cameras/websdk/install");
-      xhr.setRequestHeader("Content-Type", "application/zip");
-      xhr.setRequestHeader("Accept", "application/json");
-      const token = getCSRFToken();
-      if (token) xhr.setRequestHeader("X-CSRF-Token", token);
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable && onProgress) {
-          onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
-        }
-      };
-      xhr.onerror = () => reject(new Error("WebSDK upload failed"));
-      xhr.onload = () => {
-        let body: any = {};
-        try { body = xhr.responseText ? JSON.parse(xhr.responseText) : {}; } catch {}
-        if (xhr.status < 200 || xhr.status >= 300) {
-          reject(new APIError(xhr.status, body as APIErrorBody));
-          return;
-        }
-        onProgress?.(100);
-        resolve(body.result);
-      };
-      xhr.send(file);
-    });
-  },
-
-  cameraWebSDKAssetURL: (name: "jquery-1.7.1.min.js" | "webVideoCtrl.js" | "jsVideoPlugin-1.0.0.min.js" | "HCWebSDKPlugin.exe") =>
-    `/api/v1/cameras/websdk/assets/${encodeURIComponent(name)}`,
-
-  testCameraSDKLogin: async (input: {
-    address: string;
-    port?: number;
-    username: string;
-    password: string;
-  }) => {
-    const result = await postJSON<{result: CameraSDKLoginResult}>(
-      "/api/v1/cameras/test-login",
-      input,
-      true,
-    );
-    return result.result;
-  },
-
-  probeCameraWebSDK: async (input: {
-    address: string;
-    port?: number;
-    https?: boolean;
-    username: string;
-    password: string;
-  }) => {
-    const result = await postJSON<{result: CameraWebSDKProbeResult}>(
-      "/api/v1/cameras/websdk/probe",
-      input,
-      true,
-    );
-    return result.result;
-  },
-
-  cameraWebSDKFunctions: async () => {
-    const result = await request<{functions: CameraWebSDKFunction[]}>(
-      "/api/v1/cameras/websdk/functions",
-    );
-    return result.functions;
-  },
-
-  sendCameraWebSDKRequest: async (input: CameraWebSDKRawRequest) => {
-    const result = await postJSON<{result: CameraWebSDKRawResponse}>(
-      "/api/v1/cameras/websdk/request",
-      input,
-      true,
-    );
-    return result.result;
   },
 
   modules: async () => {

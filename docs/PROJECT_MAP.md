@@ -7,9 +7,9 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.162-dev` — отдельная страница Cameras Live / Archive на оригинальном Hikvision WebSDK V3.3.1; vendor runtime устанавливается из пользовательского ZIP и не хранится в репозитории.
-**Текущий срез:** `0.1.162-dev` — `/modules/cameras/viewer`: Live через `I_StartRealPlay`, поиск архива через `I_RecordSearch`, playback/reverse/pause/resume/frame/speed через оригинальный WebSDK.
-**Следующий engineering milestone:** live acceptance `0.1.162-dev` на Windows-клиенте с `HCWebSDKPlugin.exe` и реальной Hikvision/HiWatch камерой или регистратором; затем решить, нужен ли параллельный plugin-free HCNetSDK browser transport.
+**Последний опубликованный релиз:** `0.1.162-dev` — последний экспериментальный HCNetSDK/WebSDK Cameras-срез перед повторным снятием модуля из продукта.
+**Текущий срез:** активный модуль `cameras` вычищен из Core в рабочей ветке: registration/runtime/API/Web/HCNetSDK/WebSDK viewer удалены; следующий dev release должен вернуть продукт к состоянию без активного Cameras-модуля.
+**Следующий engineering milestone:** **F3 — Native Smart Home**: собственная device/entity/state model и первый реальный protocol/discovery slice. Cameras/NVR остаётся отложенным отдельным этапом.
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.  
 **Обновлено:** 2026-10-04
 
@@ -43,8 +43,17 @@
 ### Архив экспериментального Cameras/NVR прототипа
 
 > Важно: записи ниже описывают экспериментальные dev-срезы и технический задел.  
-> С `0.1.151-dev` они **не считаются реализованным продуктовым модулем Cameras/NVR**.  
-> Код и schema сохранены в Core как groundwork, но модуль не регистрируется, не запускается и не показывается пользователю.
+> Cameras/NVR **не считается реализованным продуктовым модулем**. Старый NVR groundwork остаётся dormant, но активная интеграция камер не регистрируется, не запускается и не показывается пользователю.
+
+#### Эксперимент 0.1.152-dev → 0.1.162-dev — HCNetSDK / WebSDK
+
+- Был создан отдельный first-party module ID `cameras` с HCNetSDK, server-side WebSDK/ISAPI и экспериментальным Live/Archive viewer.
+- Эксперимент подтвердил техническую доступность vendor SDK, но пользователь не принял поведение модуля как продуктовую реализацию.
+- После `0.1.162-dev` этот новый модуль снова снят из продукта: `internal/cameras`, Cameras API, Web routes/pages, HCNetSDK/WebSDK runtime integration и viewer удалены.
+- История релизов и выводы эксперимента остаются в Git/CHANGELOG; активный Core их больше не использует.
+- Persisted camera/NVR schema/permissions и старый `internal/nvr` groundwork не удаляются автоматически и остаются dormant для возможного будущего этапа.
+- Runtime state, ранее созданный установленными SDK в state directory, не удаляется автоматически при обновлении, чтобы release upgrade не выполнял необратимое удаление пользовательских данных.
+
 
 #### Выпуск 0.1.139-dev — NVR ONVIF discovery/import
 
@@ -1251,64 +1260,24 @@ Home Assistant не является основой.
 - permission-scoped actions;
 - events/audit.
 
-### 🚧 F4 — Cameras — HCNetSDK + WebSDK/ISAPI
+### ⏸ F4 — Cameras / NVR — снято из продукта
 
-Новый продуктовый модуль камер начат заново. Старый `nvr` модуль и его runtime не возвращаются в продукт.
+Cameras/NVR **не является текущим продуктовым модулем Home-AI**.
 
-Архитектура нового этапа: [CAMERAS_SDK_ARCHITECTURE.md](CAMERAS_SDK_ARCHITECTURE.md).
+После повторной оценки эксперимента `0.1.152-dev → 0.1.162-dev` зафиксировано:
 
-Текущий реализованный HCNetSDK foundation:
+- новый module ID `cameras` больше не регистрируется в Module Registry;
+- HCNetSDK/WebSDK runtime не создаётся и не загружается при старте Core;
+- `/api/v1/cameras*` не публикуется;
+- Web routes `/modules/cameras` и `/modules/cameras/viewer` удалены;
+- WebSDK/HCNetSDK upload/install и vendor viewer удалены из активного продукта;
+- сборка Core снова не требует CGO/C compiler ради Cameras;
+- старый module `nvr` по-прежнему не регистрируется и не запускается;
+- camera/NVR schema, permissions, state contracts и `internal/nvr` сохраняются как dormant groundwork;
+- архитектурные документы [NVR_ARCHITECTURE.md](NVR_ARCHITECTURE.md) и [ADR-0037](decisions/0037-cameras-nvr-media-plane.md) остаются исследовательским заделом, а не описанием готового продукта;
+- данные, которые прежние экспериментальные версии могли записать в Core state directory, не удаляются автоматически обновлением.
 
-- новый first-party module ID `cameras`;
-- Web route `/modules/cameras`;
-- media/runtime backend — нативный Hikvision **HCNetSDK**;
-- Web/control-plane — supplied **HCWebSDK WebSDK V3.3.1 / ISAPI** workflow, реализованный server-side внутри Core;
-- supplied HCNetSDK V6.1.9.48 Linux64 используется как native server-side runtime;
-- Windows `HCWebSDKPlugin.exe` не хранится в репозитории и не является server dependency; начиная с `0.1.162-dev` пользователь может импортировать оригинальный WebSDK ZIP, после чего Core авторизованно отдаёт vendor plugin/JS клиентскому Windows-браузеру для оригинального Live/Archive viewer;
-- Linux amd64 `libhcnetsdk.so` загружается динамически через `dlopen`, без link-time зависимости обычной сборки Core;
-- amd64 release builds включают CGO, arm64 остаётся explicit unsupported до появления соответствующего vendor SDK;
-- runtime показывает supported / available / initialized / library path / error;
-- оригинальный vendor ZIP HCNetSDK можно безопасно загрузить из Web; runtime разворачивается в защищённое state-хранилище Core с bounded archive/extraction checks;
-- есть локальный ONVIF discovery для поиска устройств и persistent camera definition store; пароль в текущем store намеренно не сохраняется;
-- `0.1.159-dev`: основной login probe переведён на `NET_DVR_Login_V40`;
-- `0.1.160-dev`: официальный WebSDK V3.3.1 workflow перенесён в Core как server-side ISAPI adapter;
-- `0.1.161-dev`: проинвентаризирован весь публичный surface supplied `webVideoCtrl.js` — **79 `I_*` функций**;
-- Core публикует полный function catalog с category/backend/status, поэтому ни одна функция SDK не теряется и видно, какой runtime за неё отвечает;
-- реализован server-side audited эквивалент `I_SendHTTPRequest`: GET/POST/PUT/DELETE, XML/JSON и bounded binary response через Base64;
-- dispatcher разрешает только Hikvision `/ISAPI/`, `/SDK/` и требуемый `/PSIA/Custom/SelfExt/ContentMgmt/ZeroStreaming/`; абсолютные URL, path traversal, proxy и redirects запрещены;
-- весь HTTP/control surface WebSDK теперь можно выполнять через Core без `HCWebSDKPlugin.exe`;
-- plugin-only функции live/playback/audio/local recording/window controls не выдаются за готовые: они сохранены в полном каталоге и явно mapped на `hcnetsdk-media` или `home-ai-browser` для следующих media slices;
-- Web показывает все 79 функций и их backend/status, плюс предоставляет admin-only advanced WebSDK/ISAPI dispatcher;
-- `0.1.162-dev`: добавлена отдельная module route `/modules/cameras/viewer` с двумя режимами **Live** и **Архив**;
-- Core умеет принять оригинальный `WebSDK V3.3.1.zip` и извлекает только whitelist vendor assets: `jquery-1.7.1.min.js`, `webVideoCtrl.js`, `jsVideoPlugin-1.0.0.min.js`, `HCWebSDKPlugin.exe`;
-- proprietary WebSDK binaries/scripts не коммитятся в GitHub и хранятся только в защищённом state directory установленного Core;
-- viewer использует официальный WebSDK flow из vendor demo: `I_Login` → channel discovery / `I_GetDevicePort` → `I_StartRealPlay`;
-- архив использует `I_RecordSearch`, `I_StartPlayback`, `I_ReversePlayback`, `I_Pause`, `I_Resume`, `I_Frame`, `I_PlaySlow`, `I_PlayFast`;
-- supplied WebSDK V3.3.1 сообщает `I_SupportNoPlugin() == false`, поэтому этот compatibility viewer требует оригинальный `HCWebSDKPlugin.exe` на Windows viewing client;
-- vendor viewer изолирован в same-origin iframe с отдельной CSP, разрешающей только необходимый localhost service `127.0.0.1:34686-34690`; строгая CSP основного Home-AI UI не ослабляется;
-- camera credentials вводятся внутри vendor viewer и не передаются в Home-AI Core;
-- WebSDK probe выполняет `/ISAPI/Security/userCheck?format=json`, `/ISAPI/System/deviceInfo`, analog inputs, InputProxy channels/status, `/ISAPI/Security/adminAccesses` и Streaming/StreamingProxy channels;
-- поддерживаются HTTP Digest (MD5/SHA-256, включая sess) и Basic challenges без раскрытия credentials;
-- WebSDK targets ограничены private/link-local literal IP, HTTP proxy и redirects отключены, response size bounded;
-- Web discovery/ISAPI control-plane больше не зависит от наличия локально установленного HCNetSDK runtime;
-- найденное устройство из Web сначала открывается через WebSDK/ISAPI; полученный `dev_manage` port автоматически подготавливает HCNetSDK V40 diagnostic probe;
-- `NET_DVR_DEVICEINFO_V40` используется для serial/device type и базовой channel topology;
-- при поддержке устройства выполняется optional `NET_DVR_GET_DEVICECFG_V40` для device name/model type/firmware и уточнения channel counts;
-- Web показывает адрес, имя устройства, модель/тип, serial, firmware и список analog/IP channels;
-- стандартный HCNetSDK port по умолчанию — `8000`;
-- credentials принимаются отдельно и не возвращаются в Web/API/audit;
-- targets первого этапа ограничены private/link-local literal IP;
-- старые NVR tables, storage/media/discovery code остаются dormant groundwork и не подключены к новому модулю.
-
-Следующие срезы:
-
-1. live acceptance `0.1.162-dev` на реальном Hikvision/HiWatch устройстве и Windows viewing client с `HCWebSDKPlugin.exe`;
-2. по результату acceptance исправить vendor compatibility edge cases для конкретных camera/NVR firmware;
-3. решить, нужен ли дополнительный plugin-free viewer на `NET_DVR_RealPlay_V40` для Linux/macOS/mobile clients;
-4. audio/talk/local capture/record compatibility;
-5. record download, device-config transfer и firmware upload with streaming progress/cancel;
-6. encrypted persistent credentials + automatic server-side WebSDK/HCNetSDK session recovery;
-7. собственный Home-AI recording/archive layer как отдельный последующий этап.
+Таким образом, Cameras/NVR снова считается **не реализованным продуктовым этапом**. Если к камерам вернёмся позже, архитектура будет выбрана заново по результатам отдельного продуктового решения, без обязательства продолжать HCNetSDK/WebSDK эксперимент.
 
 ### ⏭ F5 — Full Local AI Agent
 

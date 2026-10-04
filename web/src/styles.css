@@ -1349,32 +1349,3 @@ button:focus-visible, summary:focus-visible { outline: 2px solid #8bb0ff; outlin
   .nvr-camera-row { align-items: stretch; flex-direction: column; }
   .nvr-camera-actions { justify-content: flex-start; flex-wrap: wrap; grid-auto-flow: row; }
 }
-
-
-.camera-viewer-shell { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 16px; align-items: start; }
-.camera-viewer-sidebar { display: grid; gap: 16px; }
-.camera-viewer-stage {
-  width: 100%; min-height: 560px; overflow: hidden; border: 1px solid #303846; border-radius: 12px;
-  background: #080a0d;
-}
-.camera-viewer-tabs, .camera-viewer-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.camera-viewer-tabs .button.active { background: #31549a; color: #fff; border-color: #4268b4; }
-.camera-viewer-records { max-height: 360px; overflow: auto; }
-.camera-viewer-record { width: 100%; border: 0; background: transparent; color: inherit; text-align: left; padding: 0; }
-.camera-viewer-record:hover { color: #fff; }
-.camera-viewer-status { display: flex; flex-wrap: wrap; gap: 8px 16px; color: #8d9aad; font-size: 12px; }
-.camera-viewer-status strong { color: #e9edf5; }
-@media (max-width: 980px) {
-  .camera-viewer-shell { grid-template-columns: 1fr; }
-  .camera-viewer-stage { min-height: 420px; }
-}
-
-
-.camera-viewer-page { max-width: 1680px; }
-.camera-websdk-frame {
-  width: 100%;
-  min-height: 820px;
-  border: 1px solid #303846;
-  border-radius: 13px;
-  background: #101318;
-}
