@@ -40,6 +40,14 @@ func (f *fakeCamerasService) TestLogin(
 		Address: request.Address,
 		Port:    request.Port,
 		Backend: "HCNetSDK",
+		Device: &cameras.DeviceMetadata{
+			SerialNumber:       "DS-TEST-001",
+			DeviceTypeName:     "DS-7608NI",
+			Firmware:           "V5.7.18 build 20241004",
+			IPChannelCount:     8,
+			StartIPChannel:     33,
+			Channels:           []cameras.DeviceChannel{{Number: 33, Kind: "ip"}},
+		},
 	}, nil
 }
 
@@ -117,6 +125,9 @@ func TestCamerasSDKStatusAndLoginProbe(t *testing.T) {
 	}
 	if strings.Contains(rec.Body.String(), "secret-camera-password") {
 		t.Fatalf("camera password leaked in response: %s", rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "DS-TEST-001") || !strings.Contains(rec.Body.String(), "DS-7608NI") {
+		t.Fatalf("camera metadata missing in response: %s", rec.Body.String())
 	}
 }
 

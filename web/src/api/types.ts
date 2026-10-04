@@ -276,12 +276,35 @@ export type CamerasStatus = {
   sdk: CamerasSDKStatus;
 };
 
+export type CameraDeviceChannel = {
+  number: number;
+  kind: "analog" | "ip";
+};
+
+export type CameraDeviceMetadata = {
+  serial_number?: string;
+  device_name?: string;
+  device_type: number;
+  device_type_name?: string;
+  firmware?: string;
+  software_version?: number;
+  software_build_date?: number;
+  analog_channel_count: number;
+  ip_channel_count: number;
+  start_analog_channel?: number;
+  start_ip_channel?: number;
+  password_level?: number;
+  login_mode?: number;
+  channels: CameraDeviceChannel[];
+};
+
 export type CameraSDKLoginResult = {
   ok: boolean;
   address: string;
   port: number;
   backend: string;
   sdk_error_code?: number;
+  device?: CameraDeviceMetadata;
 };
 
 export type ModuleNavigationState = {

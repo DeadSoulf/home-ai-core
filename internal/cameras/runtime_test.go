@@ -33,7 +33,17 @@ func (f *fakeSDKRuntime) Close() error {
 func TestServiceDefaultsHCNetSDKPort(t *testing.T) {
 	fake := &fakeSDKRuntime{
 		status: SDKStatus{Supported: true, Available: true, Initialized: true},
-		login:  LoginResult{OK: true, Backend: "HCNetSDK"},
+		login: LoginResult{
+			OK:      true,
+			Backend: "HCNetSDK",
+			Device: &DeviceMetadata{
+				SerialNumber:       "DS-TEST-001",
+				AnalogChannelCount: 2,
+				IPChannelCount:     2,
+				StartAnalogChannel: 1,
+				StartIPChannel:     33,
+			},
+		},
 	}
 	service := NewServiceWithRuntime(fake)
 	result, err := service.TestLogin(context.Background(), LoginRequest{
@@ -78,5 +88,37 @@ func TestCameraModuleUsesFreshNamespace(t *testing.T) {
 	}
 	if len(manifest.Capabilities.Provides) == 0 {
 		t.Fatal("camera module capability missing")
+	}
+}
+
+
+func TestEnumerateDeviceChannels(t *testing.T) {
+	info := DeviceMetadata{
+		AnalogChannelCount: 2,
+		IPChannelCount:     3,
+		StartAnalogChannel: 1,
+		StartIPChannel:     33,
+	}
+	channels := enumerateDeviceChannels(info)
+	want := []DeviceChannel{
+		{Number: 1, Kind: "analog"},
+		{Number: 2, Kind: "analog"},
+		{Number: 33, Kind: "ip"},
+		{Number: 34, Kind: "ip"},
+		{Number: 35, Kind: "ip"},
+	}
+	if len(channels) != len(want) {
+		t.Fatalf("channels = %#v, want %#v", channels, want)
+	}
+	for i := range want {
+		if channels[i] != want[i] {
+			t.Fatalf("channels[%d] = %#v, want %#v", i, channels[i], want[i])
+		}
+	}
+}
+
+func TestFormatHCNetSDKFirmware(t *testing.T) {
+	if got := formatHCNetSDKFirmware(0x05070012, 0x07e80a04); got != "V5.7.18 build 20241004" {
+		t.Fatalf("firmware = %q", got)
 	}
 }

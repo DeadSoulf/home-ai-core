@@ -43,12 +43,35 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
+type DeviceChannel struct {
+	Number int    `json:"number"`
+	Kind   string `json:"kind"`
+}
+
+type DeviceMetadata struct {
+	SerialNumber       string          `json:"serial_number,omitempty"`
+	DeviceName         string          `json:"device_name,omitempty"`
+	DeviceType         uint16          `json:"device_type"`
+	DeviceTypeName     string          `json:"device_type_name,omitempty"`
+	Firmware           string          `json:"firmware,omitempty"`
+	SoftwareVersion    uint32          `json:"software_version,omitempty"`
+	SoftwareBuildDate  uint32          `json:"software_build_date,omitempty"`
+	AnalogChannelCount int             `json:"analog_channel_count"`
+	IPChannelCount     int             `json:"ip_channel_count"`
+	StartAnalogChannel int             `json:"start_analog_channel,omitempty"`
+	StartIPChannel     int             `json:"start_ip_channel,omitempty"`
+	PasswordLevel      int             `json:"password_level,omitempty"`
+	LoginMode          int             `json:"login_mode,omitempty"`
+	Channels           []DeviceChannel `json:"channels"`
+}
+
 type LoginResult struct {
-	OK           bool   `json:"ok"`
-	Address      string `json:"address"`
-	Port         int    `json:"port"`
-	Backend      string `json:"backend"`
-	SDKErrorCode uint32 `json:"sdk_error_code,omitempty"`
+	OK           bool            `json:"ok"`
+	Address      string          `json:"address"`
+	Port         int             `json:"port"`
+	Backend      string          `json:"backend"`
+	SDKErrorCode uint32          `json:"sdk_error_code,omitempty"`
+	Device       *DeviceMetadata `json:"device,omitempty"`
 }
 
 type SDKError struct {
@@ -74,7 +97,8 @@ type Camera struct {
 	Username  string `json:"username"`
 	Password  string `json:"-"`
 	Backend   string `json:"backend"`
-	CreatedAt string `json:"created_at"`
+	CreatedAt string          `json:"created_at"`
+	Device    *DeviceMetadata `json:"device,omitempty"`
 }
 
 type Service struct {
@@ -142,6 +166,48 @@ func (s *Service) Close() error {
 	return s.runtime.Close()
 }
 
+func enumerateDeviceChannels(info DeviceMetadata) []DeviceChannel {
+	const maxChannels = 512
+	channels := make([]DeviceChannel, 0, info.AnalogChannelCount+info.IPChannelCount)
+	appendRange := func(start, count int, kind string) {
+		if count <= 0 || len(channels) >= maxChannels {
+			return
+		}
+		if start <= 0 {
+			start = 1
+		}
+		if count > maxChannels-len(channels) {
+			count = maxChannels - len(channels)
+		}
+		for offset := 0; offset < count; offset++ {
+			channels = append(channels, DeviceChannel{Number: start + offset, Kind: kind})
+		}
+	}
+	appendRange(info.StartAnalogChannel, info.AnalogChannelCount, "analog")
+	appendRange(info.StartIPChannel, info.IPChannelCount, "ip")
+	return channels
+}
+
+func formatHCNetSDKFirmware(version, buildDate uint32) string {
+	if version == 0 && buildDate == 0 {
+		return ""
+	}
+	var value string
+	if version>>24 == 0 {
+		value = fmt.Sprintf("V%d.%d", (version>>16)&0xffff, version&0xffff)
+	} else {
+		value = fmt.Sprintf("V%d.%d.%d", version>>24, (version>>16)&0xff, version&0xffff)
+	}
+	if buildDate != 0 {
+		value += fmt.Sprintf(" build %04d%02d%02d", (buildDate>>16)&0xffff, (buildDate>>8)&0xff, buildDate&0xff)
+	}
+	return value
+}
+
+func cleanHCNetSDKText(value string) string {
+	return strings.TrimSpace(strings.ToValidUTF8(value, "�"))
+}
+
 func validateLoginRequest(request LoginRequest) error {
 	if request.Address == "" {
 		return fmt.Errorf("%w: camera address is required", ErrInvalidTarget)
@@ -188,6 +254,7 @@ func (s *Service) AddCamera(ctx context.Context, request LoginRequest, name stri
 		Password:  request.Password,
 		Backend:   result.Backend,
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+		Device:    result.Device,
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
