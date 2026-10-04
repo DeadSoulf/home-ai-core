@@ -1,6 +1,6 @@
 # Cameras SDK architecture
 
-> Status: first implementation slice. This is a fresh product module and does not reuse the retired `nvr` module runtime.
+> Status: HCNetSDK V40 metadata/channel slice implemented in `0.1.159-dev`. This is a fresh product module and does not reuse the retired `nvr` module runtime.
 
 ## Source SDKs
 
@@ -38,7 +38,7 @@ Library lookup order:
 5. `/opt/home-ai/hikvision/HCNetSDK/lib/libhcnetsdk.so`
 6. common local system library paths
 
-The vendor package's `HCNetSDKCom` and bundled runtime dependencies must be installed next to the SDK in a layout supported by Hikvision.
+The vendor package's `HCNetSDKCom` and bundled runtime dependencies must be installed next to the SDK in a layout supported by Hikvision. Home-AI can import the original Linux64 vendor ZIP from the authenticated Web UI and expands only the bounded `lib/` runtime subtree into the Core state directory.
 
 ## Slice 1: SDK readiness and login probe
 
@@ -76,13 +76,42 @@ The first page shows:
 - library/error diagnostics;
 - IP / SDK port / username / password login probe.
 
+## Supporting slices already implemented
+
+- authenticated Web upload/import of the original HCNetSDK Linux64 ZIP into the Core state directory;
+- runtime refresh after SDK installation without relinking Core;
+- bounded ONVIF WS-Discovery for local devices;
+- persistent camera definitions after successful HCNetSDK authentication; passwords are not persisted yet.
+
+## Slice 2: V40 device metadata and channel model
+
+`0.1.159-dev` moves the primary probe to `NET_DVR_Login_V40`.
+
+The Linux amd64 dynamic wrapper mirrors the ABI of the supplied HCNetSDK V6.1.9.48 structures without including or redistributing the proprietary vendor header in normal Core builds:
+
+- `NET_DVR_USER_LOGIN_INFO`;
+- `NET_DVR_DEVICEINFO_V30`;
+- `NET_DVR_DEVICEINFO_V40`;
+- `NET_DVR_DEVICECFG_V40`.
+
+After successful login Home-AI records safe device metadata from `NET_DVR_DEVICEINFO_V40`. When `NET_DVR_GetDVRConfig` is exported and the device accepts `NET_DVR_GET_DEVICECFG_V40`, the probe also reads:
+
+- device name;
+- serial number;
+- device/model type name;
+- software version and build date;
+- analog channel count/start;
+- IP channel count/start.
+
+The Web probe renders an explicit analog/IP channel list. This is the initial recorder-aware channel model needed before `NET_DVR_RealPlay_V40`.
+
+The password remains request-only. It is never returned by the API and is not written into the current camera JSON store.
+
 ## Next slices
 
-1. controlled installation of the supplied HCNetSDK runtime into `/opt/home-ai/hikvision`;
-2. `NET_DVR_Login_V40` and device metadata;
-3. channel enumeration for cameras and recorders;
-4. vendor-native device discovery where supported by the supplied SDK/API set;
-5. `NET_DVR_RealPlay_V40` live stream ingestion;
-6. persistence of camera definitions and encrypted credentials;
-7. browser live transport without HCWebSDK Windows plugin;
-8. recording/archive as a later independent layer.
+1. live acceptance of the V40 metadata/channel probe against real Hikvision/HiWatch hardware;
+2. `NET_DVR_RealPlay_V40` live stream ingestion for a selected channel;
+3. encrypted persistent camera credentials and automatic session recovery;
+4. browser live transport without the HCWebSDK Windows plugin;
+5. richer channel capability/online-state discovery for DVR/NVR devices;
+6. recording/archive as a later independent layer.

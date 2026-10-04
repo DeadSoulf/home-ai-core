@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.159-dev
+
+- Move the primary Hikvision/HiWatch device probe from `NET_DVR_Login_V30` to synchronous `NET_DVR_Login_V40`.
+- Mirror the required Linux amd64 HCNetSDK V6.1.9.48 ABI structures inside the dynamic wrapper while keeping `libhcnetsdk.so` runtime-loaded with `dlopen`.
+- Read safe device metadata from `NET_DVR_DEVICEINFO_V40` and optionally enrich it through `NET_DVR_GET_DEVICECFG_V40` when the device supports that command.
+- Return device name, serial number, numeric/model type, firmware version/build, analog/IP channel counts and start numbers.
+- Enumerate an initial recorder-aware analog/IP channel list for cameras, DVRs and NVRs.
+- Add a Web HCNetSDK V40 probe panel and a shortcut from discovered devices; camera passwords remain request-only and are never returned.
+- Add regression coverage for metadata responses, firmware formatting and channel enumeration.
+- PR #158 and the full Core/Web/Linux/Windows/Debian CI passed before the release bump; real-device live acceptance remains required.
+
 ## 0.1.158-dev
 
 - Document the mandatory AI-assisted development workflow after initial Core installation and updater setup: AI agent changes the project in GitHub, CI builds a new release, the user installs it through the normal updater, and the change becomes live-verified only after explicit user confirmation on the real server.
