@@ -80,7 +80,6 @@ func TestSendWebSDKRequestUsesDigestAndReturnsXML(t *testing.T) {
 	}))
 	defer server.Close()
 
-	service := NewServiceWithRuntime(&fakeSDKRuntime{})
 	request := WebSDKRawRequest{
 		Address:  "127.0.0.1",
 		Port:     80,

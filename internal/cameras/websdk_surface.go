@@ -201,6 +201,11 @@ func validateWebSDKPath(raw string) (string, error) {
 	if err != nil || parsed.IsAbs() || parsed.Host != "" {
 		return "", fmt.Errorf("%w: invalid WebSDK path", ErrInvalidTarget)
 	}
+	for _, segment := range strings.Split(parsed.Path, "/") {
+		if segment == "." || segment == ".." {
+			return "", fmt.Errorf("%w: WebSDK path traversal is not allowed", ErrInvalidTarget)
+		}
+	}
 	allowed := strings.HasPrefix(parsed.Path, "/ISAPI/") ||
 		strings.HasPrefix(parsed.Path, "/SDK/") ||
 		strings.HasPrefix(parsed.Path, "/PSIA/Custom/SelfExt/ContentMgmt/ZeroStreaming/")
