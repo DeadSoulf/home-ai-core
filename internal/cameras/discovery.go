@@ -36,7 +36,7 @@ type discoveryEnvelope struct {
 	} `xml:"Body"`
 }
 
-func (s *Service) Discover(ctx context.Context) ([]DiscoveredDevice, error) {
+func (s *Service) discoverONVIF(ctx context.Context) ([]DiscoveredDevice, error) {
 	conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
 	if err != nil {
 		return nil, fmt.Errorf("open ONVIF discovery socket: %w", err)
