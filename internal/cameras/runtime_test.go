@@ -82,8 +82,9 @@ func TestCameraModuleUsesFreshNamespace(t *testing.T) {
 	if manifest.API.Namespace != "cameras" {
 		t.Fatalf("API namespace = %q", manifest.API.Namespace)
 	}
-	if len(manifest.UI.Navigation) != 1 ||
-		manifest.UI.Navigation[0].Route != "/modules/cameras" {
+	if len(manifest.UI.Navigation) != 2 ||
+		manifest.UI.Navigation[0].Route != "/modules/cameras" ||
+		manifest.UI.Navigation[1].Route != "/modules/cameras/viewer" {
 		t.Fatalf("navigation = %#v", manifest.UI.Navigation)
 	}
 	if len(manifest.Capabilities.Provides) == 0 {

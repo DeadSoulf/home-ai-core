@@ -30,10 +30,11 @@ type SDKStatus struct {
 }
 
 type Status struct {
-	ModuleID string    `json:"module_id"`
-	Version  string    `json:"version"`
-	Backend  string    `json:"backend"`
-	SDK      SDKStatus `json:"sdk"`
+	ModuleID string              `json:"module_id"`
+	Version  string              `json:"version"`
+	Backend  string              `json:"backend"`
+	SDK      SDKStatus           `json:"sdk"`
+	WebSDK   WebSDKRuntimeStatus `json:"websdk"`
 }
 
 type LoginRequest struct {
@@ -104,14 +105,20 @@ type Camera struct {
 type Service struct {
 	runtime     sdkRuntime
 	runtimeRoot string
+	webSDKRoot  string
 	mu          sync.Mutex
 	cameras     []Camera
 }
 
 func NewService(stateDir string) *Service {
 	runtimeRoot := filepath.Join(stateDir, "hikvision")
+	webSDKRoot := filepath.Join(stateDir, "hikvision-websdk")
 	_ = os.Setenv("HOME_AI_HCNETSDK_DIR", runtimeRoot)
-	s := &Service{runtime: newHCNetSDKRuntime(), runtimeRoot: runtimeRoot}
+	s := &Service{
+		runtime:     newHCNetSDKRuntime(),
+		runtimeRoot: runtimeRoot,
+		webSDKRoot:  webSDKRoot,
+	}
 	_ = s.loadCameras()
 	return s
 }
@@ -129,12 +136,16 @@ func (s *Service) Status() Status {
 	if s != nil && s.runtime != nil {
 		status = s.runtime.Status()
 	}
-	return Status{
+	result := Status{
 		ModuleID: ModuleID,
 		Version:  ModuleVersion,
-		Backend:  "HCNetSDK",
+		Backend:  "HCNetSDK + HCWebSDK",
 		SDK:      status,
 	}
+	if s != nil {
+		result.WebSDK = s.webSDKStatus()
+	}
+	return result
 }
 
 func (s *Service) Refresh() Status {

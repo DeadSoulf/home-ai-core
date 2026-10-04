@@ -35,12 +35,20 @@ func (Module) Manifest() modules.Manifest {
 			Architectures: []string{"amd64"},
 		},
 		API: modules.APIContribution{Namespace: "cameras"},
-		UI: modules.UIContract{Navigation: []modules.NavigationItem{{
-			ID:    "cameras",
-			Title: "Cameras",
-			Route: "/modules/cameras",
-			Order: 20,
-		}}},
+		UI: modules.UIContract{Navigation: []modules.NavigationItem{
+			{
+				ID:    "cameras",
+				Title: "Cameras",
+				Route: "/modules/cameras",
+				Order: 20,
+			},
+			{
+				ID:    "cameras-viewer",
+				Title: "Live / Archive",
+				Route: "/modules/cameras/viewer",
+				Order: 21,
+			},
+		}},
 		Lifecycle: []string{"backup", "restore"},
 	}
 }

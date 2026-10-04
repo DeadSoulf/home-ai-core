@@ -269,11 +269,18 @@ export type CamerasSDKStatus = {
   error?: string;
 };
 
+export type CameraWebSDKRuntimeStatus = {
+  available: boolean;
+  version?: string;
+  error?: string;
+};
+
 export type CamerasStatus = {
   module_id: string;
   version: string;
   backend: string;
   sdk: CamerasSDKStatus;
+  websdk: CameraWebSDKRuntimeStatus;
 };
 
 export type CameraDeviceChannel = {

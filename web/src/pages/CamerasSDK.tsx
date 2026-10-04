@@ -6,7 +6,7 @@ import {useResource} from "../hooks/useResource";
 import {useI18n} from "../i18n";
 import {PageHeading} from "./Dashboard";
 
-export function CamerasSDKPage({revision, actor}: {revision: number; actor: Actor}) {
+export function CamerasSDKPage({revision, actor, onNavigate}: {revision: number; actor: Actor; onNavigate: (path: string) => void}) {
   const {t} = useI18n();
   const load = useCallback(() => api.camerasStatus(), []);
   const resource = useResource(load, revision);
@@ -19,6 +19,10 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
   const [installing, setInstalling] = useState(false);
   const [installError, setInstallError] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [webSDKFile, setWebSDKFile] = useState<File>();
+  const [webSDKInstalling, setWebSDKInstalling] = useState(false);
+  const [webSDKInstallError, setWebSDKInstallError] = useState("");
+  const [webSDKUploadProgress, setWebSDKUploadProgress] = useState(0);
   const [probeAddress, setProbeAddress] = useState("");
   const [probePort, setProbePort] = useState("8000");
   const [probeUsername, setProbeUsername] = useState("admin");
@@ -57,6 +61,22 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
       setInstallError(reason instanceof Error ? reason.message : t("requestFailed"));
     } finally {
       setInstalling(false);
+    }
+  };
+
+  const installWebSDK = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!canManage || !webSDKFile || webSDKInstalling) return;
+    setWebSDKInstalling(true);
+    setWebSDKInstallError("");
+    setWebSDKUploadProgress(0);
+    try {
+      await api.installCameraWebSDK(webSDKFile, setWebSDKUploadProgress);
+      await resource.reload();
+    } catch (reason) {
+      setWebSDKInstallError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setWebSDKInstalling(false);
     }
   };
 
@@ -216,6 +236,53 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
               )}
             </form>
           </>
+        )}
+      </Panel>
+
+      <Panel title="Hikvision WebSDK V3.3.1 runtime">
+        <div className={status.websdk.available ? "notice success" : "notice warning"}>
+          {status.websdk.available
+            ? `WebSDK V${status.websdk.version || "3.3.1"} установлен. Live и архив доступны на отдельной странице просмотра.`
+            : "Для оригинального Hikvision Live/Archive загрузите WebSDK V3.3.1 ZIP."}
+        </div>
+        {status.websdk.error && !status.websdk.available && <p className="muted">{status.websdk.error}</p>}
+        {webSDKInstallError && <ErrorState message={webSDKInstallError} />}
+        {!status.websdk.available && (
+          <form className="network-profile-form" onSubmit={installWebSDK}>
+            <label>
+              WebSDK V3.3.1 ZIP
+              <input
+                type="file"
+                accept=".zip,application/zip"
+                onChange={(event) => setWebSDKFile(event.target.files?.[0])}
+                disabled={!canManage || webSDKInstalling}
+                required
+              />
+            </label>
+            <button type="submit" className="button primary" disabled={!canManage || !webSDKFile || webSDKInstalling}>
+              {webSDKInstalling ? `Загрузка ${webSDKUploadProgress}%` : "Установить WebSDK"}
+            </button>
+            {webSDKInstalling && (
+              <div>
+                <progress value={webSDKUploadProgress} max={100} style={{width: "100%"}} />
+                <div className="muted">
+                  {webSDKUploadProgress < 100
+                    ? `Загружено: ${webSDKUploadProgress}%`
+                    : "Загрузка завершена, устанавливаю WebSDK…"}
+                </div>
+              </div>
+            )}
+          </form>
+        )}
+        {status.websdk.available && (
+          <div className="button-row">
+            <button type="button" className="button primary" onClick={() => onNavigate("/modules/cameras/viewer")}>
+              Открыть Live / Архив
+            </button>
+            <a className="button secondary" href={api.cameraWebSDKAssetURL("HCWebSDKPlugin.exe")}>
+              Скачать HCWebSDKPlugin.exe
+            </a>
+          </div>
         )}
       </Panel>
 
