@@ -9,6 +9,7 @@ import { AccountPage } from "./pages/Account";
 import { AIPage } from "./pages/AI";
 import { AuditPage } from "./pages/Audit";
 import { CamerasSDKPage } from "./pages/CamerasSDK";
+import { CamerasViewerPage } from "./pages/CamerasViewer";
 import { Dashboard } from "./pages/Dashboard";
 import { FilesPage } from "./pages/Files";
 import { JobsPage } from "./pages/Jobs";
@@ -21,7 +22,7 @@ type Phase = "loading" | "setup" | "login" | "app";
 function currentPath(): string {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
   const known = ["/", "/ai", "/files", "/files/storage", "/files/windows", "/system", "/modules", "/jobs", "/audit", "/users", "/account"];
-  const moduleRoute = /^\/modules\/[a-z][a-z0-9.-]*$/.test(path);
+  const moduleRoute = /^\/modules\/[a-z][a-z0-9.-]*(?:\/[a-z][a-z0-9.-]*)?$/.test(path);
   if (!known.includes(path) && !moduleRoute) return "/";
   return path + (path === "/system" || path === "/files" ? window.location.hash : "");
 }
@@ -219,7 +220,10 @@ export default function App() {
       page = accountPage;
       break;
     case "/modules/cameras":
-      page = <CamerasSDKPage revision={revision} actor={actor} />;
+      page = <CamerasSDKPage revision={revision} actor={actor} onNavigate={navigate} />;
+      break;
+    case "/modules/cameras/viewer":
+      page = <CamerasViewerPage revision={revision} onNavigate={navigate} />;
       break;
     case "/files":
     case "/files/storage":

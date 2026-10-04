@@ -927,6 +927,37 @@ export const api = {
     });
   },
 
+  installCameraWebSDK: async (file: File, onProgress?: (percent: number) => void) => {
+    return new Promise<{installed: boolean; version: string; status: {available: boolean; version?: string; error?: string}}>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/v1/cameras/websdk/install");
+      xhr.setRequestHeader("Content-Type", "application/zip");
+      xhr.setRequestHeader("Accept", "application/json");
+      const token = getCSRFToken();
+      if (token) xhr.setRequestHeader("X-CSRF-Token", token);
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && onProgress) {
+          onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+        }
+      };
+      xhr.onerror = () => reject(new Error("WebSDK upload failed"));
+      xhr.onload = () => {
+        let body: any = {};
+        try { body = xhr.responseText ? JSON.parse(xhr.responseText) : {}; } catch {}
+        if (xhr.status < 200 || xhr.status >= 300) {
+          reject(new APIError(xhr.status, body as APIErrorBody));
+          return;
+        }
+        onProgress?.(100);
+        resolve(body.result);
+      };
+      xhr.send(file);
+    });
+  },
+
+  cameraWebSDKAssetURL: (name: "jquery-1.7.1.min.js" | "webVideoCtrl.js" | "jsVideoPlugin-1.0.0.min.js" | "HCWebSDKPlugin.exe") =>
+    `/api/v1/cameras/websdk/assets/${encodeURIComponent(name)}`,
+
   testCameraSDKLogin: async (input: {
     address: string;
     port?: number;
