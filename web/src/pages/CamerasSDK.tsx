@@ -12,7 +12,7 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
   const resource = useResource(load, revision);
   const canManage = actor.permissions.includes("camera.manage");
 
-  const [devices, setDevices] = useState<Array<{address: string; port: number; name?: string; xaddr?: string}>>([]);
+  const [devices, setDevices] = useState<Array<{address: string; port: number; name?: string; scopes?: string; xaddr?: string}>>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [sdkFile, setSDKFile] = useState<File>();
