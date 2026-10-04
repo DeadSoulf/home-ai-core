@@ -1,6 +1,6 @@
 # Cameras SDK architecture
 
-> Status: HCNetSDK V40 metadata/channel slice implemented in `0.1.159-dev`. This is a fresh product module and does not reuse the retired `nvr` module runtime.
+> Status: HCNetSDK V40 + server-side HCWebSDK WebSDK V3.3.1 / ISAPI control-plane implemented through `0.1.160-dev`. This is a fresh product module and does not reuse the retired `nvr` module runtime.
 
 ## Source SDKs
 
@@ -12,8 +12,10 @@ The implementation is based on the supplied Hikvision SDK packages:
   - `incEn/HCNetSDK.h`
   - console example `GetStream.cpp`
 - HCWebSDK WebSDK V3.3.1:
-  - used only as an API/ISAPI/Web workflow reference;
-  - its browser playback path depends on the Windows HCWebSDK plugin and is not used as the Home-AI browser runtime.
+  - its official ISAPI endpoint map and control workflow are implemented server-side in Home-AI Core;
+  - `webVideoCtrl.js` shows that the original browser SDK routes HTTP through `JS_SubmitHttpRequest` and video through `JS_Play`;
+  - both calls depend on the Windows `HCWebSDKPlugin.exe`, so that executable is not embedded in Home-AI;
+  - Core replaces the plugin transport while preserving the documented WebSDK/ISAPI workflow.
 
 ## Product boundary
 
@@ -107,11 +109,42 @@ The Web probe renders an explicit analog/IP channel list. This is the initial re
 
 The password remains request-only. It is never returned by the API and is not written into the current camera JSON store.
 
+## Slice 3: HCWebSDK WebSDK V3.3.1 / ISAPI control-plane
+
+`0.1.160-dev` promotes the supplied WebSDK from reference material to the canonical Hikvision Web/control-plane contract.
+
+The original package was inspected directly. Its `webVideoCtrl.js` exposes the expected high-level operations such as device login/info, analog/digital channel queries, PTZ, playback and HTTP requests. In that package, ordinary HTTP is executed through the Windows plugin method `JS_SubmitHttpRequest`, and live playback through `JS_Play`. Therefore Home-AI does not copy the Windows plugin runtime into the product. Instead, Core performs the same ISAPI workflow directly on the server.
+
+The initial server-side WebSDK adapter uses the official paths from WebSDK V3.3.1:
+
+- `/ISAPI/Security/userCheck?format=json`;
+- `/ISAPI/System/deviceInfo`;
+- `/ISAPI/System/Video/inputs/channels`;
+- `/ISAPI/ContentMgmt/InputProxy/channels`;
+- `/ISAPI/ContentMgmt/InputProxy/channels/status`;
+- `/ISAPI/Security/adminAccesses`;
+- `/ISAPI/Streaming/channels` or `/ISAPI/ContentMgmt/StreamingProxy/channels`.
+
+The adapter returns device identity/model/firmware, analog and digital channel data, digital online state, source camera IP/manage port, HTTP/RTSP/private SDK service ports and streaming profile identifiers.
+
+Security boundary:
+
+- only literal private/link-local target IPs;
+- no HTTP proxy;
+- no redirects;
+- bounded response bodies and request timeout;
+- HTTP Digest MD5/SHA-256 (including `-sess`) and Basic challenge handling;
+- passwords are request-only and are never returned by API or audit.
+
+The Cameras Web page now treats WebSDK/ISAPI as the preferred device/control probe. ONVIF discovery is usable even if HCNetSDK has not yet been installed. The private `dev_manage` port obtained from WebSDK is reused to prepare the HCNetSDK V40 diagnostic path.
+
+HCNetSDK remains the native Linux media backend and will be used for `NET_DVR_RealPlay_V40`; WebSDK/ISAPI supplies device/channel/control metadata around that media path.
+
 ## Next slices
 
-1. live acceptance of the V40 metadata/channel probe against real Hikvision/HiWatch hardware;
-2. `NET_DVR_RealPlay_V40` live stream ingestion for a selected channel;
-3. encrypted persistent camera credentials and automatic session recovery;
-4. browser live transport without the HCWebSDK Windows plugin;
-5. richer channel capability/online-state discovery for DVR/NVR devices;
+1. live acceptance of the WebSDK/ISAPI probe against real Hikvision/HiWatch cameras and recorders;
+2. `NET_DVR_RealPlay_V40` server-side live ingest using confirmed channel/stream identifiers;
+3. encrypted persistent credentials and automatic WebSDK/HCNetSDK session recovery;
+4. browser live transport without `HCWebSDKPlugin.exe`;
+5. PTZ, presets and configuration operations through the same official WebSDK/ISAPI endpoint map;
 6. recording/archive as a later independent layer.

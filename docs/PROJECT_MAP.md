@@ -7,9 +7,9 @@
 **Последняя версия, на которой пользователь подтвердил работу сетевого UI:** `0.1.59-dev`  
 **Последняя версия, на которой пользователь подтвердил storage mount + создание файлового хранилища:** `0.1.102-dev`  
 **Последняя версия, на которой пользователь подтвердил полный `update → rollback → re-update` и сеть после reboot:** `0.1.109-dev`  
-**Последний опубликованный релиз:** `0.1.159-dev` — HCNetSDK V40 device probe: metadata, firmware и enumeration каналов; требуется live-проверка на реальной Hikvision/HiWatch камере или регистраторе.
-**Текущий срез:** `0.1.159-dev` — `NET_DVR_Login_V40` + `NET_DVR_DEVICEINFO_V40` + optional `NET_DVR_GET_DEVICECFG_V40`; Web показывает устройство и его analog/IP channels.
-**Следующий engineering milestone:** live acceptance `0.1.159-dev` на реальном устройстве → `NET_DVR_RealPlay_V40` и серверный native live ingest выбранного канала.
+**Последний опубликованный релиз:** `0.1.160-dev` — интегрирован server-side Hikvision WebSDK V3.3.1 / ISAPI control-plane; требуется live-проверка на реальной камере или регистраторе.
+**Текущий срез:** `0.1.160-dev` — WebSDK/ISAPI используется как основной Web/control-plane для device info, каналов, статуса, service ports и streaming profiles; HCNetSDK остаётся native media backend.
+**Следующий engineering milestone:** live acceptance `0.1.160-dev` через WebSDK/ISAPI на реальном Hikvision/HiWatch устройстве → использовать подтверждённые channel/stream IDs в `NET_DVR_RealPlay_V40`.
 **Состояние:** **CORE FOUNDATION COMPLETE** с 2026-10-01. Этап **AI Agent foundation / local+cloud providers** завершён на `0.1.133-dev`. Generic shell/root bypass отсутствует.  
 **Обновлено:** 2026-10-04
 
@@ -1251,7 +1251,7 @@ Home Assistant не является основой.
 - permission-scoped actions;
 - events/audit.
 
-### 🚧 F4 — Cameras — HCNetSDK reboot
+### 🚧 F4 — Cameras — HCNetSDK + WebSDK/ISAPI
 
 Новый продуктовый модуль камер начат заново. Старый `nvr` модуль и его runtime не возвращаются в продукт.
 
@@ -1261,15 +1261,22 @@ Home Assistant не является основой.
 
 - новый first-party module ID `cameras`;
 - Web route `/modules/cameras`;
-- основной backend — нативный Hikvision **HCNetSDK**;
-- supplied HCNetSDK V6.1.9.48 Linux64 используется как первичный server-side runtime;
-- HCWebSDK V3.3.1 используется только как справочник по Web/ISAPI сценарию, без Windows browser plugin в Home-AI;
+- media/runtime backend — нативный Hikvision **HCNetSDK**;
+- Web/control-plane — supplied **HCWebSDK WebSDK V3.3.1 / ISAPI** workflow, реализованный server-side внутри Core;
+- supplied HCNetSDK V6.1.9.48 Linux64 используется как native server-side runtime;
+- Windows `HCWebSDKPlugin.exe` не встраивается: в оригинальном WebSDK он выполняет HTTP/video transport, а в Home-AI эту роль выполняет Core;
 - Linux amd64 `libhcnetsdk.so` загружается динамически через `dlopen`, без link-time зависимости обычной сборки Core;
 - amd64 release builds включают CGO, arm64 остаётся explicit unsupported до появления соответствующего vendor SDK;
 - runtime показывает supported / available / initialized / library path / error;
 - оригинальный vendor ZIP HCNetSDK можно безопасно загрузить из Web; runtime разворачивается в защищённое state-хранилище Core с bounded archive/extraction checks;
 - есть локальный ONVIF discovery для поиска устройств и persistent camera definition store; пароль в текущем store намеренно не сохраняется;
 - `0.1.159-dev`: основной login probe переведён на `NET_DVR_Login_V40`;
+- `0.1.160-dev`: официальный WebSDK V3.3.1 workflow перенесён в Core как server-side ISAPI adapter;
+- WebSDK probe выполняет `/ISAPI/Security/userCheck?format=json`, `/ISAPI/System/deviceInfo`, analog inputs, InputProxy channels/status, `/ISAPI/Security/adminAccesses` и Streaming/StreamingProxy channels;
+- поддерживаются HTTP Digest (MD5/SHA-256, включая sess) и Basic challenges без раскрытия credentials;
+- WebSDK targets ограничены private/link-local literal IP, HTTP proxy и redirects отключены, response size bounded;
+- Web discovery/ISAPI control-plane больше не зависит от наличия локально установленного HCNetSDK runtime;
+- найденное устройство из Web сначала открывается через WebSDK/ISAPI; полученный `dev_manage` port автоматически подготавливает HCNetSDK V40 diagnostic probe;
 - `NET_DVR_DEVICEINFO_V40` используется для serial/device type и базовой channel topology;
 - при поддержке устройства выполняется optional `NET_DVR_GET_DEVICECFG_V40` для device name/model type/firmware и уточнения channel counts;
 - Web показывает адрес, имя устройства, модель/тип, serial, firmware и список analog/IP channels;
@@ -1280,11 +1287,11 @@ Home Assistant не является основой.
 
 Следующие срезы:
 
-1. live acceptance `0.1.159-dev` на реальной Hikvision/HiWatch камере и/или DVR/NVR;
-2. `NET_DVR_RealPlay_V40` и серверный native live ingest выбранного канала;
-3. encrypted persistent camera credentials + автоматическое восстановление device sessions;
-4. browser live transport без HCWebSDK Windows plugin;
-5. расширенная channel capability/online-state модель для регистраторов;
+1. live acceptance `0.1.160-dev` на реальной Hikvision/HiWatch камере и/или DVR/NVR: WebSDK device info, ports, channels/status и stream profiles;
+2. `NET_DVR_RealPlay_V40` и серверный native live ingest с использованием подтверждённых WebSDK channel/stream IDs;
+3. encrypted persistent camera credentials + автоматическое восстановление WebSDK/HCNetSDK sessions;
+4. browser live transport без Windows HCWebSDK plugin;
+5. PTZ/presets/configuration через официальные WebSDK/ISAPI endpoints;
 6. запись/архив отдельным последующим этапом.
 
 ### ⏭ F5 — Full Local AI Agent

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.160-dev
+
+- Promote the supplied Hikvision HCWebSDK WebSDK V3.3.1 from reference material to the Cameras module's server-side Web/ISAPI control-plane contract.
+- Add a Core WebSDK/ISAPI client that follows the official WebSDK workflow for userCheck, deviceInfo, analog channels, InputProxy digital channels/status, service ports and streaming channels.
+- Support Hikvision HTTP Digest MD5/SHA-256 authentication (including sess variants) plus Basic challenges without returning camera credentials.
+- Restrict WebSDK requests to literal private/link-local addresses, disable proxy use and redirects, bound response sizes and use request timeouts.
+- Return device name/type/model/serial/MAC/firmware, analog/digital channel metadata and online state, HTTP/RTSP/private SDK ports, and streaming profile identifiers.
+- Add `POST /api/v1/cameras/websdk/probe` and a dedicated WebSDK V3.3.1 / ISAPI panel in Cameras.
+- Let ONVIF discovery and WebSDK control probing work independently from HCNetSDK installation; discovered devices open through WebSDK first.
+- Keep the Windows-only `HCWebSDKPlugin.exe` out of Home-AI: Core replaces its HTTP transport, while HCNetSDK remains the native Linux media/live backend.
+- PR #159 passed the full Core/Web/Linux/Windows/Debian CI before the release bump; real-device live acceptance remains required.
+
 ## 0.1.159-dev
 
 - Move the primary Hikvision/HiWatch device probe from `NET_DVR_Login_V30` to synchronous `NET_DVR_Login_V40`.
