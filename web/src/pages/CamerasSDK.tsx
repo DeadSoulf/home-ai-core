@@ -19,6 +19,10 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
   const [installing, setInstalling] = useState(false);
   const [installError, setInstallError] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [adding, setAdding] = useState<string>("");
+  const [addError, setAddError] = useState("");
+  const [credentials, setCredentials] = useState<{address: string; name: string; username: string; password: string} | null>(null);
+  const [savedCameras, setSavedCameras] = useState<Array<{id: string; name: string; address: string; port: number; username: string; backend: string}>>([]);
 
   const installSDK = async (event: FormEvent) => {
     event.preventDefault();
@@ -33,6 +37,28 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
       setInstallError(reason instanceof Error ? reason.message : t("requestFailed"));
     } finally {
       setInstalling(false);
+    }
+  };
+
+  const addCamera = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!credentials || adding) return;
+    setAdding(credentials.address);
+    setAddError("");
+    try {
+      await api.addSDKCamera({
+        name: credentials.name,
+        address: credentials.address,
+        port: 8000,
+        username: credentials.username,
+        password: credentials.password,
+      });
+      setSavedCameras(await api.camerasList());
+      setCredentials(null);
+    } catch (reason) {
+      setAddError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setAdding("");
     }
   };
 
@@ -107,6 +133,23 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
             </form>
           </>
         )}
+        {credentials && (
+          <form className="network-profile-form" onSubmit={addCamera}>
+            <h3>Добавление камеры {credentials.address}</h3>
+            {addError && <ErrorState message={addError} />}
+            <label>Название<input value={credentials.name} onChange={(e) => setCredentials({...credentials, name: e.target.value})} /></label>
+            <label>Логин<input value={credentials.username} onChange={(e) => setCredentials({...credentials, username: e.target.value})} required /></label>
+            <label>Пароль<input type="password" value={credentials.password} onChange={(e) => setCredentials({...credentials, password: e.target.value})} /></label>
+            <div className="actions">
+              <button type="submit" className="button primary" disabled={!!adding}>{adding ? "Подключение…" : "Добавить через HCNetSDK"}</button>
+              <button type="button" className="button" onClick={() => setCredentials(null)} disabled={!!adding}>Отмена</button>
+            </div>
+            <p className="muted">Для Hikvision/HiWatch используется SDK-порт 8000. ONVIF-порт из поиска не используется для HCNetSDK.</p>
+          </form>
+        )}
+        {savedCameras.length > 0 && (
+          <div className="notice success">Добавлено камер: {savedCameras.length}. Следующий этап — получение каналов и Live View.</div>
+        )}
       </Panel>
 
       <Panel title="Камеры">
@@ -119,13 +162,14 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
         {devices.length > 0 && (
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Камера</th><th>IP</th><th>Порт</th></tr></thead>
+              <thead><tr><th>Камера</th><th>IP</th><th>ONVIF</th><th></th></tr></thead>
               <tbody>
                 {devices.map((device) => (
                   <tr key={device.address}>
                     <td>{device.name || "ONVIF камера"}</td>
                     <td className="mono">{device.address}</td>
                     <td>{device.port}</td>
+                    <td><button type="button" className="button" disabled={!canManage} onClick={() => setCredentials({address: device.address, name: device.name || "", username: "admin", password: ""})}>Добавить</button></td>
                   </tr>
                 ))}
               </tbody>
