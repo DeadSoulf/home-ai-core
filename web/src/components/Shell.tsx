@@ -25,6 +25,7 @@ export function Shell(props: {
   const isActivePath = (path: string) => {
     if (path === "/") return route === "/";
     if (path === "/modules") return route === "/modules";
+    if (path.startsWith("/modules/")) return route === path;
     return route === path || route.startsWith(path + "/");
   };
   const current = groups.flatMap((group) => group.items).find((item) => isActivePath(item.path));
