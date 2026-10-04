@@ -41,12 +41,12 @@ func (f *fakeCamerasService) TestLogin(
 		Port:    request.Port,
 		Backend: "HCNetSDK",
 		Device: &cameras.DeviceMetadata{
-			SerialNumber:       "DS-TEST-001",
-			DeviceTypeName:     "DS-7608NI",
-			Firmware:           "V5.7.18 build 20241004",
-			IPChannelCount:     8,
-			StartIPChannel:     33,
-			Channels:           []cameras.DeviceChannel{{Number: 33, Kind: "ip"}},
+			SerialNumber:   "DS-TEST-001",
+			DeviceTypeName: "DS-7608NI",
+			Firmware:       "V5.7.18 build 20241004",
+			IPChannelCount: 8,
+			StartIPChannel: 33,
+			Channels:       []cameras.DeviceChannel{{Number: 33, Kind: "ip"}},
 		},
 	}, nil
 }

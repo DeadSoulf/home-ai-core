@@ -90,13 +90,13 @@ type sdkRuntime interface {
 }
 
 type Camera struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Address   string `json:"address"`
-	Port      int    `json:"port"`
-	Username  string `json:"username"`
-	Password  string `json:"-"`
-	Backend   string `json:"backend"`
+	ID        string          `json:"id"`
+	Name      string          `json:"name"`
+	Address   string          `json:"address"`
+	Port      int             `json:"port"`
+	Username  string          `json:"username"`
+	Password  string          `json:"-"`
+	Backend   string          `json:"backend"`
 	CreatedAt string          `json:"created_at"`
 	Device    *DeviceMetadata `json:"device,omitempty"`
 }

@@ -91,7 +91,6 @@ func TestCameraModuleUsesFreshNamespace(t *testing.T) {
 	}
 }
 
-
 func TestEnumerateDeviceChannels(t *testing.T) {
 	info := DeviceMetadata{
 		AnalogChannelCount: 2,
