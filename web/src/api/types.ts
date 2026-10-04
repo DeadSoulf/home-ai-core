@@ -307,6 +307,58 @@ export type CameraSDKLoginResult = {
   device?: CameraDeviceMetadata;
 };
 
+export type CameraWebSDKDeviceInfo = {
+  device_name?: string;
+  device_id?: string;
+  device_type?: string;
+  model?: string;
+  serial_number?: string;
+  mac_address?: string;
+  firmware_version?: string;
+  firmware_released_date?: string;
+  encoder_version?: string;
+  encoder_released_date?: string;
+};
+
+export type CameraWebSDKPortInfo = {
+  http_port?: number;
+  rtsp_port?: number;
+  device_port?: number;
+};
+
+export type CameraWebSDKChannel = {
+  id: string;
+  kind: "analog" | "digital";
+  name?: string;
+  input_port?: string;
+  video_format?: string;
+  online?: boolean;
+  ip_address?: string;
+  manage_port?: number;
+  source_input_port?: string;
+  proxy_protocol?: string;
+  stream_type?: string;
+};
+
+export type CameraWebSDKStream = {
+  id: string;
+  name?: string;
+  enabled?: boolean;
+};
+
+export type CameraWebSDKProbeResult = {
+  ok: boolean;
+  address: string;
+  port: number;
+  https: boolean;
+  backend: string;
+  device: CameraWebSDKDeviceInfo;
+  ports: CameraWebSDKPortInfo;
+  channels: CameraWebSDKChannel[];
+  streams: CameraWebSDKStream[];
+  warnings?: string[];
+};
+
 export type ModuleNavigationState = {
   module_id: string;
   status: "registered" | "enabled" | "disabled" | "error";

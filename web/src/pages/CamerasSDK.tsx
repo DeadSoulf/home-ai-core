@@ -1,6 +1,6 @@
 import {FormEvent, useCallback, useState} from "react";
 import {api} from "../api/client";
-import type {Actor, CameraSDKLoginResult} from "../api/types";
+import type {Actor, CameraSDKLoginResult, CameraWebSDKProbeResult} from "../api/types";
 import {ErrorState, LoadingState, Panel} from "../components/Panel";
 import {useResource} from "../hooks/useResource";
 import {useI18n} from "../i18n";
@@ -26,6 +26,14 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
   const [probing, setProbing] = useState(false);
   const [probeError, setProbeError] = useState("");
   const [probeResult, setProbeResult] = useState<CameraSDKLoginResult>();
+  const [webAddress, setWebAddress] = useState("");
+  const [webPort, setWebPort] = useState("80");
+  const [webHTTPS, setWebHTTPS] = useState(false);
+  const [webUsername, setWebUsername] = useState("admin");
+  const [webPassword, setWebPassword] = useState("");
+  const [webProbing, setWebProbing] = useState(false);
+  const [webError, setWebError] = useState("");
+  const [webResult, setWebResult] = useState<CameraWebSDKProbeResult>();
 
   const installSDK = async (event: FormEvent) => {
     event.preventDefault();
@@ -75,6 +83,32 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
       setProbeError(reason instanceof Error ? reason.message : t("requestFailed"));
     } finally {
       setProbing(false);
+    }
+  };
+
+  const probeWebSDK = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!canManage || webProbing) return;
+    setWebProbing(true);
+    setWebError("");
+    setWebResult(undefined);
+    try {
+      const result = await api.probeCameraWebSDK({
+        address: webAddress.trim(),
+        port: Number(webPort || (webHTTPS ? "443" : "80")),
+        https: webHTTPS,
+        username: webUsername.trim(),
+        password: webPassword,
+      });
+      setWebResult(result);
+      setProbeAddress(result.address);
+      if (result.ports.device_port) setProbePort(String(result.ports.device_port));
+      setProbeUsername(webUsername.trim());
+      setProbePassword(webPassword);
+    } catch (reason) {
+      setWebError(reason instanceof Error ? reason.message : t("requestFailed"));
+    } finally {
+      setWebProbing(false);
     }
   };
 
@@ -141,7 +175,7 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
       <Panel title="Камеры">
         <p className="muted">Поиск доступных ONVIF-камер в локальной сети. Hikvision/HiWatch после добавления будут работать через HCNetSDK.</p>
         {searchError && <ErrorState message={searchError} />}
-        <button type="button" className="button primary" onClick={discover} disabled={searching || !sdkReady}>
+        <button type="button" className="button primary" onClick={discover} disabled={searching}>
           {searching ? "Поиск…" : "Поиск"}
         </button>
         {!searching && devices.length === 0 && <p className="muted">Нажмите «Поиск», чтобы найти камеры.</p>}
@@ -160,13 +194,13 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
                         type="button"
                         className="button secondary"
                         onClick={() => {
-                          setProbeAddress(device.address);
-                          setProbePort("8000");
-                          setProbeResult(undefined);
-                          setProbeError("");
+                          setWebAddress(device.address);
+                          setWebPort(String(device.port || 80));
+                          setWebResult(undefined);
+                          setWebError("");
                         }}
                       >
-                        Проверить через HCNetSDK
+                        Открыть через WebSDK
                       </button>
                     </td>
                   </tr>
@@ -174,6 +208,114 @@ export function CamerasSDKPage({revision, actor}: {revision: number; actor: Acto
               </tbody>
             </table>
           </div>
+        )}
+      </Panel>
+
+      <Panel title="WebSDK V3.3.1 / ISAPI — устройство и каналы">
+        <p className="muted">
+          HOME AI использует официальный Hikvision WebSDK workflow на сервере Core: userCheck, deviceInfo,
+          analog/digital channels, service ports и streaming channels. Windows HCWebSDKPlugin для этого не требуется.
+        </p>
+        {webError && <ErrorState message={webError} />}
+        <form className="network-profile-form" onSubmit={probeWebSDK}>
+          <label>
+            IP камеры / регистратора
+            <input
+              value={webAddress}
+              onChange={(event) => setWebAddress(event.target.value)}
+              placeholder="192.168.1.64"
+              disabled={!canManage || webProbing}
+              required
+            />
+          </label>
+          <label>
+            Web / ISAPI порт
+            <input
+              type="number"
+              min={1}
+              max={65535}
+              value={webPort}
+              onChange={(event) => setWebPort(event.target.value)}
+              disabled={!canManage || webProbing}
+              required
+            />
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={webHTTPS}
+              onChange={(event) => {
+                const enabled = event.target.checked;
+                setWebHTTPS(enabled);
+                if (webPort === "80" || webPort === "443") setWebPort(enabled ? "443" : "80");
+              }}
+              disabled={!canManage || webProbing}
+            />
+            HTTPS
+          </label>
+          <label>
+            Пользователь
+            <input
+              value={webUsername}
+              onChange={(event) => setWebUsername(event.target.value)}
+              disabled={!canManage || webProbing}
+              required
+            />
+          </label>
+          <label>
+            Пароль
+            <input
+              type="password"
+              value={webPassword}
+              onChange={(event) => setWebPassword(event.target.value)}
+              disabled={!canManage || webProbing}
+            />
+          </label>
+          <button type="submit" className="button primary" disabled={!canManage || webProbing}>
+            {webProbing ? "Чтение WebSDK…" : "Подключиться через WebSDK"}
+          </button>
+        </form>
+
+        {webResult && (
+          <>
+            <div className="notice success">WebSDK/ISAPI: устройство доступно.</div>
+            <dl className="details">
+              <dt>Адрес</dt><dd className="mono">{webResult.https ? "https" : "http"}://{webResult.address}:{webResult.port}</dd>
+              <dt>Имя устройства</dt><dd>{webResult.device.device_name || "—"}</dd>
+              <dt>Модель</dt><dd>{webResult.device.model || "—"}</dd>
+              <dt>Тип</dt><dd>{webResult.device.device_type || "—"}</dd>
+              <dt>Серийный номер</dt><dd className="mono">{webResult.device.serial_number || "—"}</dd>
+              <dt>Firmware</dt><dd>{webResult.device.firmware_version || "—"}</dd>
+              <dt>MAC</dt><dd className="mono">{webResult.device.mac_address || "—"}</dd>
+              <dt>HTTP</dt><dd>{webResult.ports.http_port || "—"}</dd>
+              <dt>RTSP</dt><dd>{webResult.ports.rtsp_port || "—"}</dd>
+              <dt>HCNetSDK</dt><dd>{webResult.ports.device_port || "—"}</dd>
+              <dt>Streaming profiles</dt><dd>{webResult.streams.length}</dd>
+            </dl>
+            {webResult.warnings?.map((warning) => (
+              <div className="notice warning" key={warning}>{warning}</div>
+            ))}
+            {webResult.channels.length > 0 && (
+              <div className="table-wrap">
+                <table>
+                  <thead><tr><th>ID</th><th>Тип</th><th>Имя</th><th>Состояние</th><th>Источник</th></tr></thead>
+                  <tbody>
+                    {webResult.channels.map((channel) => (
+                      <tr key={`${channel.kind}-${channel.id}`}>
+                        <td>{channel.id}</td>
+                        <td>{channel.kind === "digital" ? "IP" : "Аналоговый"}</td>
+                        <td>{channel.name || "—"}</td>
+                        <td>{channel.online === undefined ? "—" : channel.online ? "Online" : "Offline"}</td>
+                        <td className="mono">
+                          {channel.ip_address ? `${channel.ip_address}${channel.manage_port ? `:${channel.manage_port}` : ""}` : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </Panel>
 
