@@ -164,6 +164,88 @@ func (s *server) camerasWebSDKProbe(
 	writeJSON(w, http.StatusOK, map[string]any{"result": result})
 }
 
+func (s *server) camerasWebSDKFunctions(
+	w http.ResponseWriter,
+	r *http.Request,
+	_ security.Actor,
+	_ authSource,
+) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w, r, http.MethodGet)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"functions": cameras.WebSDKFunctions()})
+}
+
+func (s *server) camerasWebSDKRequest(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w, r, http.MethodPost)
+		return
+	}
+	if !validMutationCSRF(actor, source, r) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	item, err := s.modules.Get(r.Context(), cameras.ModuleID)
+	if err != nil || item.Status != "enabled" {
+		writeAPIError(w, r, http.StatusConflict, "cameras_module_disabled", "Cameras module is disabled", nil)
+		return
+	}
+	sender, ok := s.cameras.(interface {
+		SendWebSDKRequest(context.Context, cameras.WebSDKRawRequest) (cameras.WebSDKRawResponse, error)
+	})
+	if !ok {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "camera_websdk_unavailable", "WebSDK/ISAPI request dispatcher is unavailable", nil)
+		return
+	}
+	var request cameras.WebSDKRawRequest
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_request", err.Error(), nil)
+		return
+	}
+	result, err := sender.SendWebSDKRequest(r.Context(), request)
+	if err != nil {
+		if errors.Is(err, cameras.ErrInvalidTarget) {
+			writeAPIError(w, r, http.StatusBadRequest, "camera_target_invalid", err.Error(), nil)
+			return
+		}
+		var httpErr cameras.WebSDKHTTPError
+		if errors.As(err, &httpErr) {
+			if httpErr.Status == http.StatusUnauthorized || httpErr.Status == http.StatusForbidden {
+				writeAPIError(w, r, http.StatusBadGateway, "camera_websdk_authentication_failed", "Hikvision WebSDK/ISAPI rejected the camera credentials", nil)
+				return
+			}
+			writeAPIError(w, r, http.StatusBadGateway, "camera_websdk_request_failed", err.Error(), map[string]any{"status": httpErr.Status})
+			return
+		}
+		writeAPIError(w, r, http.StatusBadGateway, "camera_websdk_request_failed", err.Error(), nil)
+		return
+	}
+	s.security.RecordAudit(
+		context.WithoutCancel(r.Context()),
+		s.securityRequestContext(r),
+		actor,
+		"camera.websdk.request",
+		"camera",
+		request.Address,
+		"success",
+		map[string]any{
+			"method": request.Method,
+			"path":   request.Path,
+			"port":   request.Port,
+			"https":  request.HTTPS,
+			"status": result.Status,
+			"binary": result.Binary,
+		},
+	)
+	writeJSON(w, http.StatusOK, map[string]any{"result": result})
+}
+
 func (s *server) camerasInstallRuntime(
 	w http.ResponseWriter,
 	r *http.Request,

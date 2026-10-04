@@ -28,6 +28,9 @@ import type {
   CamerasStatus,
   CameraSDKLoginResult,
   CameraWebSDKProbeResult,
+  CameraWebSDKFunction,
+  CameraWebSDKRawRequest,
+  CameraWebSDKRawResponse,
   AIConversation,
   AIMessage,
   AIAction,
@@ -947,6 +950,22 @@ export const api = {
   }) => {
     const result = await postJSON<{result: CameraWebSDKProbeResult}>(
       "/api/v1/cameras/websdk/probe",
+      input,
+      true,
+    );
+    return result.result;
+  },
+
+  cameraWebSDKFunctions: async () => {
+    const result = await request<{functions: CameraWebSDKFunction[]}>(
+      "/api/v1/cameras/websdk/functions",
+    );
+    return result.functions;
+  },
+
+  sendCameraWebSDKRequest: async (input: CameraWebSDKRawRequest) => {
+    const result = await postJSON<{result: CameraWebSDKRawResponse}>(
+      "/api/v1/cameras/websdk/request",
       input,
       true,
     );

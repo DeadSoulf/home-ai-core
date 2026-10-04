@@ -204,6 +204,8 @@ func newServer(
 		s.mux.HandleFunc("GET /api/v1/cameras/discover", s.requireAuth("security.self.read", s.camerasDiscover))
 		s.mux.HandleFunc("POST /api/v1/cameras/test-login", s.requireAuth("camera.manage", s.camerasTestLogin))
 		s.mux.HandleFunc("POST /api/v1/cameras/websdk/probe", s.requireAuth("camera.manage", s.camerasWebSDKProbe))
+		s.mux.HandleFunc("GET /api/v1/cameras/websdk/functions", s.requireAuth("security.self.read", s.camerasWebSDKFunctions))
+		s.mux.HandleFunc("POST /api/v1/cameras/websdk/request", s.requireAuth("camera.manage", s.camerasWebSDKRequest))
 		s.mux.HandleFunc("POST /api/v1/cameras/sdk/install", s.requireAuth("camera.manage", s.camerasInstallRuntime))
 	}
 	if nvrService != nil {
