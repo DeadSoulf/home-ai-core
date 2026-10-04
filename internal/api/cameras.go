@@ -246,6 +246,79 @@ func (s *server) camerasWebSDKRequest(
 	writeJSON(w, http.StatusOK, map[string]any{"result": result})
 }
 
+func (s *server) camerasInstallWebSDK(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if !validMutationCSRF(actor, source, r) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	controller := http.NewResponseController(w)
+	if err := controller.SetReadDeadline(time.Time{}); err != nil {
+		writeAPIError(w, r, http.StatusInternalServerError, "camera_websdk_upload_deadline", "could not prepare long WebSDK upload", nil)
+		return
+	}
+	if r.ContentLength <= 0 || r.ContentLength > 64<<20 {
+		writeAPIError(w, r, http.StatusRequestEntityTooLarge, "camera_websdk_archive_invalid", "WebSDK ZIP must be smaller than 64 MiB", nil)
+		return
+	}
+	installer, ok := s.cameras.(interface {
+		InstallWebSDK(io.Reader, int64) (cameras.WebSDKInstallResult, error)
+	})
+	if !ok {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "camera_websdk_install_unavailable", "WebSDK installation is unavailable", nil)
+		return
+	}
+	result, err := installer.InstallWebSDK(io.LimitReader(r.Body, (64<<20)+1), r.ContentLength)
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "camera_websdk_install_failed", err.Error(), nil)
+		return
+	}
+	s.security.RecordAudit(
+		context.WithoutCancel(r.Context()),
+		s.securityRequestContext(r),
+		actor,
+		"camera.websdk.install",
+		"camera",
+		"websdk-v3.3.1",
+		"success",
+		map[string]any{"version": result.Version, "available": result.Status.Available},
+	)
+	writeJSON(w, http.StatusOK, map[string]any{"result": result})
+}
+
+func (s *server) camerasWebSDKAsset(
+	w http.ResponseWriter,
+	r *http.Request,
+	_ security.Actor,
+	_ authSource,
+) {
+	provider, ok := s.cameras.(interface {
+		WebSDKAsset(string) (cameras.WebSDKAsset, error)
+	})
+	if !ok {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "camera_websdk_assets_unavailable", "WebSDK assets are unavailable", nil)
+		return
+	}
+	asset, err := provider.WebSDKAsset(r.PathValue("name"))
+	if err != nil {
+		writeAPIError(w, r, http.StatusNotFound, "camera_websdk_asset_not_found", "WebSDK asset is not installed", nil)
+		return
+	}
+	if asset.ContentType != "" {
+		w.Header().Set("Content-Type", asset.ContentType)
+	}
+	w.Header().Set("Cache-Control", "private, no-store")
+	if asset.Download {
+		w.Header().Set("Content-Disposition", `attachment; filename="`+asset.Name+`"`)
+	}
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(asset.Data)
+}
+
 func (s *server) camerasInstallRuntime(
 	w http.ResponseWriter,
 	r *http.Request,
