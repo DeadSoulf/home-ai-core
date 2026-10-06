@@ -178,15 +178,10 @@ jobs:
 
           curl --fail --silent             http://127.0.0.1:18080/api/v1/security/setup-status             >/tmp/home-ai-setup.json
 
-          test -f "$STATE_DIR/bootstrap-token"
-          BOOTSTRAP_TOKEN="$(tr -d '\r\n' < "$STATE_DIR/bootstrap-token")"
-
           UNAUTH_STATUS="$(curl --silent --output /tmp/home-ai-unauth.json --write-out '%{http_code}'             http://127.0.0.1:18080/api/v1/system)"
           test "$UNAUTH_STATUS" = "401"
 
-          curl --fail --silent             --cookie-jar "$COOKIE_JAR"             -H "Content-Type: application/json"             -H "X-Home-AI-Bootstrap-Token: $BOOTSTRAP_TOKEN"             --data '{"username":"owner","display_name":"CI Owner","password":"integration-test-owner-passphrase","session_mode":"cookie"}'             http://127.0.0.1:18080/api/v1/security/bootstrap             >/tmp/home-ai-bootstrap.json
-
-          test ! -f "$STATE_DIR/bootstrap-token"
+          curl --fail --silent             --cookie-jar "$COOKIE_JAR"             -H "Content-Type: application/json"             --data '{"username":"owner","display_name":"CI Owner","password":"integration-test-owner-passphrase","session_mode":"cookie"}'             http://127.0.0.1:18080/api/v1/security/bootstrap             >/tmp/home-ai-bootstrap.json
 
           curl --fail --silent             --cookie "$COOKIE_JAR"             http://127.0.0.1:18080/api/v1/system             >/tmp/home-ai-system.json
 
