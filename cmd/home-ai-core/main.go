@@ -101,9 +101,7 @@ func main() {
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
-		// AI chat may legitimately run close to the 90s provider deadline,
-		// especially on older GPUs or during a bounded tool loop.
-		WriteTimeout: 120 * time.Second,
+		WriteTimeout:      120 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
 
