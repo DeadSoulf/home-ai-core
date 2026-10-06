@@ -35,6 +35,16 @@ Persistent state lives under:
 
 The network-facing Core runs as the unprivileged `home-ai-core` user. The updater/storage helper runs separately as root.
 
+## One-command installation
+
+On a clean Debian 13 server:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/DeadSoulf/home-ai-core/main/scripts/install.sh | sudo sh
+```
+
+The installer supports `amd64` and `arm64`, installs the required build toolchain, builds the Debian package, installs it, enables the services and verifies the Core health endpoint.
+
 ## Build
 
 ```sh
@@ -48,21 +58,15 @@ The GitHub Actions workflow `Build initial installer` builds downloadable amd64 
 
 ## First-run access
 
-The default listener is `127.0.0.1:8080`.
+The default listener is `0.0.0.0:8080`.
 
-Use an SSH tunnel for remote first-run access when needed:
-
-```sh
-ssh -L 8080:127.0.0.1:8080 user@server
-```
-
-The one-time bootstrap token is stored at:
+Open the Web UI from another computer on the same private local network:
 
 ```text
-/var/lib/home-ai-core/bootstrap-token
+http://SERVER-IP:8080/
 ```
 
-and is deleted after first-owner creation.
+Create the first owner account in the browser. No bootstrap token is generated or required. Once the first owner exists, first-run initialization is disabled.
 
 ## Normal updates
 
