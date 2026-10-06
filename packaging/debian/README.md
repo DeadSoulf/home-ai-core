@@ -40,7 +40,7 @@ The network-facing Core runs as the unprivileged `home-ai-core` user. The update
 On a clean Debian 13 server:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/DeadSoulf/home-ai-core/main/scripts/install.sh | sudo sh
+apt update && apt install -y curl ca-certificates && curl -fsSL https://raw.githubusercontent.com/DeadSoulf/home-ai-core/main/scripts/install.sh | sh
 ```
 
 The installer supports `amd64` and `arm64`, installs the required build toolchain, builds the Debian package, installs it, enables the services and verifies the Core health endpoint.
