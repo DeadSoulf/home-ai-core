@@ -82,6 +82,9 @@ fi
 install -d -o home-ai-core -g home-ai-core -m 0700 /var/lib/home-ai-core
 install -d -o home-ai-core -g home-ai-core -m 0700 /var/lib/home-ai-core/update
 install -d -o root -g home-ai-core -m 0750 /etc/home-ai-core
+if [ -f /etc/home-ai-core/home-ai-core.env ]; then
+  sed -i '/^HOME_AI_AI_/d;/^HOME_AI_CLOUD_AI_/d' /etc/home-ai-core/home-ai-core.env
+fi
 if command -v systemctl >/dev/null 2>&1; then
   systemctl daemon-reload || true
   systemctl enable home-ai-core.service >/dev/null 2>&1 || true
