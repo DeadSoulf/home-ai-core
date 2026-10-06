@@ -210,7 +210,6 @@ func (f fakeSecurity) Bootstrap(
 	string,
 	string,
 	string,
-	string,
 	security.RequestContext,
 ) (security.AuthResult, error) {
 	return security.AuthResult{}, errors.New("not implemented in fake")
