@@ -53,17 +53,40 @@ func (r *Registry) Register(ctx context.Context, module Module) error {
 	if _, exists := r.modules[manifest.ID]; exists {
 		return fmt.Errorf("module %q already registered", manifest.ID)
 	}
-
-	if err := r.store.UpsertModule(ctx, state.ModuleRecord{
-		ID:           manifest.ID,
-		Version:      manifest.Version,
-		Status:       "registered",
-		ManifestJSON: string(raw),
-	}); err != nil {
+	if err := r.persistManifest(ctx, manifest, raw); err != nil {
 		return err
 	}
 	r.modules[manifest.ID] = module
 	return nil
+}
+
+// RegisterManifest registers an independently packaged module without loading
+// module implementation code into the Core process.
+func (r *Registry) RegisterManifest(ctx context.Context, manifest Manifest) error {
+	if err := ValidateManifest(manifest); err != nil {
+		return err
+	}
+	raw, err := json.Marshal(manifest)
+	if err != nil {
+		return fmt.Errorf("encode module manifest: %w", err)
+	}
+
+	r.mu.RLock()
+	_, embedded := r.modules[manifest.ID]
+	r.mu.RUnlock()
+	if embedded {
+		return fmt.Errorf("module %q is already registered as an embedded runtime", manifest.ID)
+	}
+	return r.persistManifest(ctx, manifest, raw)
+}
+
+func (r *Registry) persistManifest(ctx context.Context, manifest Manifest, raw []byte) error {
+	return r.store.UpsertModule(ctx, state.ModuleRecord{
+		ID:           manifest.ID,
+		Version:      manifest.Version,
+		Status:       "registered",
+		ManifestJSON: string(raw),
+	})
 }
 
 func (r *Registry) Get(ctx context.Context, id string) (Registered, error) {
