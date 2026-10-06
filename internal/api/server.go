@@ -187,7 +187,7 @@ func newServer(
 		s.mux.HandleFunc("GET /api/v1/nvr/cameras/{cameraID}/live.mjpeg", s.requireAuth("security.self.read", s.nvrCameraLiveMJPEG))
 	}
 	if aiService != nil {
-	s.mux.HandleFunc("/api/v1/ai/status", s.requireAuth("", s.aiStatus))
+		s.mux.HandleFunc("/api/v1/ai/status", s.requireAuth("", s.aiStatus))
 		s.mux.HandleFunc("/api/v1/ai/tools", s.requireAuth("", s.aiTools))
 		s.mux.HandleFunc("/api/v1/ai/tools/", s.requireAuth("", s.aiToolResource))
 		s.mux.HandleFunc("/api/v1/ai/conversations", s.requireAuth("", s.aiConversations))
