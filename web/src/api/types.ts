@@ -226,6 +226,18 @@ export type RealtimeEvent = {
   data?: unknown;
 };
 
+export type ModuleNavigationState = {
+  module_id: string;
+  status: "registered" | "enabled" | "disabled" | "error";
+  items?: Array<{
+    id: string;
+    title: string;
+    route: string;
+    icon?: string;
+    order?: number;
+  }>;
+};
+
 export type UpdateStatus = {
   current_version: string;
   available_version?: string;
