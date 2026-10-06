@@ -115,14 +115,14 @@ func (s *server) moduleResource(
 func (s *server) moduleControl(
 	w http.ResponseWriter,
 	r *http.Request,
-	_ security.Actor,
+	actor security.Actor,
 	source authSource,
 ) {
 	if r.Method != http.MethodPost {
 		methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	if !validMutationCSRF(security.Actor{}, source, r) {
+	if !validMutationCSRF(actor, source, r) {
 		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
 		return
 	}
