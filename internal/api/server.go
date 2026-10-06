@@ -98,14 +98,17 @@ func newServer(
 	nvrService *nvr.Service,
 	aiProviders ...aiagent.Provider,
 ) http.Handler {
-	aiService := aiagent.NewService(nodeID, state, jobService, moduleService, securityService, aiProviders...)
-	if moduleService != nil {
-		if item, err := moduleService.Get(context.Background(), "ai.agent"); err == nil {
-			switch item.Status {
-			case "disabled", "error":
-				aiService.SetEnabled(false)
-			case "registered":
-				_ = moduleService.SetStatus(context.Background(), "ai.agent", "enabled", "")
+	var aiService *aiagent.Service
+	if len(aiProviders) > 0 {
+		aiService = aiagent.NewService(nodeID, state, jobService, moduleService, securityService, aiProviders...)
+		if moduleService != nil {
+			if item, err := moduleService.Get(context.Background(), "ai.agent"); err == nil {
+				switch item.Status {
+				case "disabled", "error":
+					aiService.SetEnabled(false)
+				case "registered":
+					_ = moduleService.SetStatus(context.Background(), "ai.agent", "enabled", "")
+				}
 			}
 		}
 	}
@@ -160,7 +163,9 @@ func newServer(
 	s.mux.HandleFunc("/api/v1/modules", s.requireAuth("modules.read", s.modulesCollection))
 	s.mux.HandleFunc("GET /api/v1/modules/navigation", s.requireAuth("", s.moduleNavigation))
 	s.mux.HandleFunc("/api/v1/modules/capabilities", s.requireAuth("modules.read", s.moduleCapabilities))
-	s.mux.HandleFunc("POST /api/v1/modules/ai.cloud/test", s.requireAuth("modules.manage", s.cloudAIModuleTest))
+	if aiService != nil {
+		s.mux.HandleFunc("POST /api/v1/modules/ai.cloud/test", s.requireAuth("modules.manage", s.cloudAIModuleTest))
+	}
 	s.mux.HandleFunc("POST /api/v1/modules/{moduleID}/control", s.requireAuth("modules.manage", s.moduleControl))
 	s.mux.HandleFunc("/api/v1/modules/", s.requireAuth("modules.read", s.moduleResource))
 	if nvrService != nil {
@@ -181,18 +186,20 @@ func newServer(
 		s.mux.HandleFunc("POST /api/v1/nvr/cameras/{cameraID}/test", s.requireAuth("security.self.read", s.nvrCameraExistingTest))
 		s.mux.HandleFunc("GET /api/v1/nvr/cameras/{cameraID}/live.mjpeg", s.requireAuth("security.self.read", s.nvrCameraLiveMJPEG))
 	}
+	if aiService != nil {
 	s.mux.HandleFunc("/api/v1/ai/status", s.requireAuth("", s.aiStatus))
-	s.mux.HandleFunc("/api/v1/ai/tools", s.requireAuth("", s.aiTools))
-	s.mux.HandleFunc("/api/v1/ai/tools/", s.requireAuth("", s.aiToolResource))
-	s.mux.HandleFunc("/api/v1/ai/conversations", s.requireAuth("", s.aiConversations))
-	s.mux.HandleFunc("DELETE /api/v1/ai/conversations/closed", s.requireAuth("", s.aiClosedConversationsDelete))
-	s.mux.HandleFunc("DELETE /api/v1/ai/conversations/{conversationID}", s.requireAuth("", s.aiConversationDelete))
-	s.mux.HandleFunc("POST /api/v1/ai/conversations/{conversationID}/close", s.requireAuth("", s.aiConversationResource))
-	s.mux.HandleFunc("POST /api/v1/ai/conversations/{conversationID}/messages/stream", s.requireAuth("", s.aiConversationMessageStream))
-	s.mux.HandleFunc("GET /api/v1/ai/conversations/{conversationID}/actions", s.requireAuth("", s.aiConversationActions))
-	s.mux.HandleFunc("POST /api/v1/ai/conversations/{conversationID}/actions/{actionID}/approve", s.requireAuth("", s.aiConversationActionApprove))
-	s.mux.HandleFunc("POST /api/v1/ai/conversations/{conversationID}/actions/{actionID}/reject", s.requireAuth("", s.aiConversationActionReject))
-	s.mux.HandleFunc("/api/v1/ai/conversations/", s.requireAuth("", s.aiConversationResource))
+		s.mux.HandleFunc("/api/v1/ai/tools", s.requireAuth("", s.aiTools))
+		s.mux.HandleFunc("/api/v1/ai/tools/", s.requireAuth("", s.aiToolResource))
+		s.mux.HandleFunc("/api/v1/ai/conversations", s.requireAuth("", s.aiConversations))
+		s.mux.HandleFunc("DELETE /api/v1/ai/conversations/closed", s.requireAuth("", s.aiClosedConversationsDelete))
+		s.mux.HandleFunc("DELETE /api/v1/ai/conversations/{conversationID}", s.requireAuth("", s.aiConversationDelete))
+		s.mux.HandleFunc("POST /api/v1/ai/conversations/{conversationID}/close", s.requireAuth("", s.aiConversationResource))
+		s.mux.HandleFunc("POST /api/v1/ai/conversations/{conversationID}/messages/stream", s.requireAuth("", s.aiConversationMessageStream))
+		s.mux.HandleFunc("GET /api/v1/ai/conversations/{conversationID}/actions", s.requireAuth("", s.aiConversationActions))
+		s.mux.HandleFunc("POST /api/v1/ai/conversations/{conversationID}/actions/{actionID}/approve", s.requireAuth("", s.aiConversationActionApprove))
+		s.mux.HandleFunc("POST /api/v1/ai/conversations/{conversationID}/actions/{actionID}/reject", s.requireAuth("", s.aiConversationActionReject))
+		s.mux.HandleFunc("/api/v1/ai/conversations/", s.requireAuth("", s.aiConversationResource))
+	}
 	s.mux.HandleFunc("/api/v1/update", s.requireAuth("updates.read", func(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
 		s.updateStatus(w, r)
 	}))
