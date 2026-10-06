@@ -15,16 +15,16 @@ const (
 )
 
 type Config struct {
-	ListenAddress   string
-	StateDir        string
-	WebDir          string
+	ListenAddress string
+	StateDir      string
+	WebDir        string
 }
 
 func Load(args []string) (Config, error) {
 	cfg := Config{
-		ListenAddress:   envOrDefault("HOME_AI_LISTEN", defaultListen),
-		StateDir:        envOrDefault("HOME_AI_STATE_DIR", defaultStateDir),
-		WebDir:          envOrDefault("HOME_AI_WEB_DIR", defaultWebDir),
+		ListenAddress: envOrDefault("HOME_AI_LISTEN", defaultListen),
+		StateDir:      envOrDefault("HOME_AI_STATE_DIR", defaultStateDir),
+		WebDir:        envOrDefault("HOME_AI_WEB_DIR", defaultWebDir),
 	}
 
 	fs := flag.NewFlagSet("home-ai-core", flag.ContinueOnError)
