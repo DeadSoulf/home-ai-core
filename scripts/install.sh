@@ -97,6 +97,18 @@ until curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1; do
 done
 
 echo
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Docker runtime is missing after package installation" >&2
+  exit 1
+fi
+if ! systemctl is-active --quiet docker.service; then
+  echo "Docker service is not running" >&2
+  systemctl --no-pager --full status docker.service || true
+  exit 1
+fi
+
+echo "Docker runtime is ready: $(docker --version)"
+
 echo "Home-AI-Core installed successfully."
 echo "Open the Web UI from another computer on the same local network:"
 found=0
