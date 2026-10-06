@@ -127,6 +127,22 @@ func ValidateManifest(m Manifest) error {
 		return err
 	}
 
+	if m.Runtime.Driver != "" || m.Runtime.Image != "" || m.Runtime.InternalPort != 0 || m.Runtime.HealthPath != "" {
+		if m.Runtime.Driver != "docker" {
+			return fmt.Errorf("unsupported module runtime driver %q", m.Runtime.Driver)
+		}
+		image := strings.TrimSpace(m.Runtime.Image)
+		if image == "" || len(image) > 512 || strings.ContainsAny(image, " \t\r\n") || strings.HasPrefix(image, "-") {
+			return fmt.Errorf("invalid docker image reference")
+		}
+		if m.Runtime.InternalPort < 1 || m.Runtime.InternalPort > 65535 {
+			return fmt.Errorf("docker internal port must be between 1 and 65535")
+		}
+		if m.Runtime.HealthPath == "" || !strings.HasPrefix(m.Runtime.HealthPath, "/") || strings.Contains(m.Runtime.HealthPath, "..") {
+			return fmt.Errorf("docker health path must be an absolute safe path")
+		}
+	}
+
 	if m.API.Namespace != "" {
 		if !moduleIDPattern.MatchString(m.API.Namespace) {
 			return fmt.Errorf("invalid api namespace")
