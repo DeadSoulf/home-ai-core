@@ -12,7 +12,7 @@ type Manifest struct {
 	Permissions   []string         `json:"permissions,omitempty"`
 	Capabilities  Capabilities     `json:"capabilities,omitempty"`
 	Host          HostRequirements `json:"host,omitempty"`
-	Runtime       RuntimeContract   `json:"runtime,omitempty"`
+	Runtime       RuntimeContract  `json:"runtime,omitempty"`
 	API           APIContribution  `json:"api,omitempty"`
 	Events        EventContract    `json:"events,omitempty"`
 	UI            UIContract       `json:"ui,omitempty"`
