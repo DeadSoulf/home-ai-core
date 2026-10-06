@@ -25,6 +25,9 @@ func DiscoverHostCapabilities() []string {
 	if fileExists("/dev/kvm") {
 		capabilities["host.kvm"] = struct{}{}
 	}
+	if fileExists("/usr/bin/docker") || fileExists("/usr/local/bin/docker") {
+		capabilities["runtime.docker"] = struct{}{}
+	}
 	if cards, _ := filepath.Glob("/sys/class/drm/card[0-9]*"); len(cards) > 0 {
 		capabilities["host.gpu"] = struct{}{}
 	}

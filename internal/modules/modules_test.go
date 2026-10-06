@@ -215,3 +215,52 @@ func TestRegistryCapabilitiesIncludeProvidedCapabilities(t *testing.T) {
 		t.Fatalf("provided capability missing: %#v", capabilities)
 	}
 }
+
+func TestValidateDockerRuntime(t *testing.T) {
+	m := validManifest("camera.nvr", "1.0.0")
+	m.Runtime = RuntimeContract{
+		Driver:       "docker",
+		Image:        "ghcr.io/deadsoulf/home-ai-module-nvr:1.0.0",
+		InternalPort: 8080,
+		HealthPath:   "/health",
+	}
+	if err := ValidateManifest(m); err != nil {
+		t.Fatalf("ValidateManifest() error = %v", err)
+	}
+
+	m.Runtime.Image = "bad image"
+	if err := ValidateManifest(m); err == nil {
+		t.Fatal("docker image with whitespace was accepted")
+	}
+}
+
+func TestRegistryRegistersExternalManifestWithoutRuntime(t *testing.T) {
+	ctx := context.Background()
+	store, err := state.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	registry := NewRegistry(store)
+	manifest := validManifest("camera.nvr", "1.0.0")
+	manifest.Runtime = RuntimeContract{
+		Driver:       "docker",
+		Image:        "ghcr.io/deadsoulf/home-ai-module-nvr:1.0.0",
+		InternalPort: 8080,
+		HealthPath:   "/health",
+	}
+	if err := registry.RegisterManifest(ctx, manifest); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := registry.Runtime(manifest.ID); ok {
+		t.Fatal("external manifest unexpectedly loaded an in-process runtime")
+	}
+	item, err := registry.Get(ctx, manifest.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.Manifest.Runtime.Driver != "docker" || item.Manifest.Runtime.Image != manifest.Runtime.Image {
+		t.Fatalf("runtime contract = %#v", item.Manifest.Runtime)
+	}
+}
