@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	defaultListen   = "127.0.0.1:8080"
+	defaultListen   = "0.0.0.0:8080"
 	defaultStateDir = "/var/lib/home-ai-core"
 	defaultWebDir   = "/usr/share/home-ai-core/web"
 )
