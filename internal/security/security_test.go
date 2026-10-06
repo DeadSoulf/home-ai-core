@@ -3,7 +3,6 @@ package security
 import (
 	"context"
 	"errors"
-	"os"
 	"testing"
 
 	"github.com/DeadSoulf/home-ai-core/internal/state"
@@ -30,7 +29,7 @@ func TestPasswordHashAndVerify(t *testing.T) {
 	}
 }
 
-func TestBootstrapLoginAuthenticateLogout(t *testing.T) {
+func TestFirstOwnerLoginAuthenticateLogout(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
 
@@ -45,14 +44,9 @@ func TestBootstrapLoginAuthenticateLogout(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	tokenBytes, err := os.ReadFile(service.BootstrapTokenPath())
-	if err != nil {
-		t.Fatalf("read bootstrap token: %v", err)
-	}
 
 	result, err := service.Bootstrap(
 		ctx,
-		string(tokenBytes),
 		"Owner",
 		"Home Owner",
 		"correct horse battery staple",
@@ -62,10 +56,7 @@ func TestBootstrapLoginAuthenticateLogout(t *testing.T) {
 		t.Fatalf("Bootstrap() error = %v", err)
 	}
 	if result.Actor.Username != "owner" || !result.Actor.Has("system.read") {
-		t.Fatalf("unexpected bootstrap actor: %#v", result.Actor)
-	}
-	if _, err := os.Stat(service.BootstrapTokenPath()); !os.IsNotExist(err) {
-		t.Fatal("bootstrap token still exists after initialization")
+		t.Fatalf("unexpected owner actor: %#v", result.Actor)
 	}
 
 	actor, err := service.Authenticate(ctx, result.Token)
@@ -149,13 +140,8 @@ func TestScopedPermissionLoadedFromSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	tokenBytes, err := os.ReadFile(service.BootstrapTokenPath())
-	if err != nil {
-		t.Fatalf("read bootstrap token: %v", err)
-	}
 	result, err := service.Bootstrap(
 		ctx,
-		string(tokenBytes),
 		"Owner",
 		"Home Owner",
 		"correct horse battery staple",
@@ -202,13 +188,8 @@ func TestCreateAndListFriendUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	tokenBytes, err := os.ReadFile(service.BootstrapTokenPath())
-	if err != nil {
-		t.Fatalf("read bootstrap token: %v", err)
-	}
 	owner, err := service.Bootstrap(
 		ctx,
-		string(tokenBytes),
 		"Owner",
 		"Home Owner",
 		"correct horse battery staple",
@@ -281,13 +262,8 @@ func TestUnifiedUserAccessCanBeCustomized(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	tokenBytes, err := os.ReadFile(service.BootstrapTokenPath())
-	if err != nil {
-		t.Fatalf("read bootstrap token: %v", err)
-	}
 	admin, err := service.Bootstrap(
 		ctx,
-		string(tokenBytes),
 		"Owner",
 		"Home Owner",
 		"correct horse battery staple",
