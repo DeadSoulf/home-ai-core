@@ -66,7 +66,7 @@ Open the Web UI from another computer on the same private local network:
 http://SERVER-IP:8080/
 ```
 
-Create the first owner account in the browser. No bootstrap token is generated or required. Once the first owner exists, first-run initialization is disabled.
+Create the first owner account in the browser. Once the first owner exists, first-run initialization is disabled.
 
 ## Normal updates
 
