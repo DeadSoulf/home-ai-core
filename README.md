@@ -66,7 +66,7 @@ Home Assistant не является обязательной зависимос
 Для чистого **Debian 13** на `amd64` или `arm64` Home-AI-Core устанавливается одной командой:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/DeadSoulf/home-ai-core/main/scripts/install.sh | sudo sh
+apt update && apt install -y curl ca-certificates && curl -fsSL https://raw.githubusercontent.com/DeadSoulf/home-ai-core/main/scripts/install.sh | sh
 ```
 
 Установщик сам определяет архитектуру, ставит необходимые инструменты сборки, собирает Debian-пакет, устанавливает зависимости, запускает сервисы и проверяет состояние Core.
