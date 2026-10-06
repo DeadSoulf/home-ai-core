@@ -381,7 +381,7 @@ The following are not primary product goals:
 - full Windows disk-image backup;
 - unrestricted autonomous root access for the AI.
 
-Containers and virtualization may exist later as optional implementation/runtime modules, but they are not the reason Home-AI exists.
+Docker is the standard isolated runtime for independently distributed Home-AI product modules. Core itself remains the trusted control plane and is not intended to become a generic Docker/virtualization management product.
 
 ## 16. Product completion criteria
 
