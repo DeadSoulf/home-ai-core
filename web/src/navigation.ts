@@ -18,7 +18,6 @@ export const navigationGroups: NavigationGroup[] = [
     { path: "/system", label: "system", permission: "system.read" },
   ] },
   { label: "serviceGroup", items: [
-    { path: "/ai", label: "aiAgent", permission: "security.self.read", moduleId: "ai.agent" },
     { path: "/files", label: "files", permission: "security.self.read" },
     { path: "/modules", label: "modules", permission: "modules.read" },
   ] },
@@ -44,9 +43,7 @@ function dynamicModuleItems(modules?: ModuleNavigationState[]): NavigationItem[]
     .filter((module) => module.status === "enabled")
     .flatMap((module) => (module.items || []).map((item) => ({
       path: item.route,
-      label: module.module_id === "ai.cloud"
-        ? ("cloudAI" as StringKey)
-        : undefined,
+      label: undefined,
       title: item.title,
       permission: "security.self.read",
       moduleId: module.module_id,
