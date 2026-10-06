@@ -12,6 +12,7 @@ type Manifest struct {
 	Permissions   []string         `json:"permissions,omitempty"`
 	Capabilities  Capabilities     `json:"capabilities,omitempty"`
 	Host          HostRequirements `json:"host,omitempty"`
+	Runtime       RuntimeContract   `json:"runtime,omitempty"`
 	API           APIContribution  `json:"api,omitempty"`
 	Events        EventContract    `json:"events,omitempty"`
 	UI            UIContract       `json:"ui,omitempty"`
@@ -31,6 +32,13 @@ type Capabilities struct {
 type HostRequirements struct {
 	Architectures []string `json:"architectures,omitempty"`
 	Packages      []string `json:"packages,omitempty"`
+}
+
+type RuntimeContract struct {
+	Driver       string `json:"driver,omitempty"`
+	Image        string `json:"image,omitempty"`
+	InternalPort int    `json:"internal_port,omitempty"`
+	HealthPath   string `json:"health_path,omitempty"`
 }
 
 type APIContribution struct {
