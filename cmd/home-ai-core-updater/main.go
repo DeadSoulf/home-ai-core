@@ -227,7 +227,6 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		return
 	}
 
-
 	if request.Operation == "smb.inspect" {
 		_ = conn.SetDeadline(time.Now().Add(45 * time.Second))
 		ctx, cancel := context.WithTimeout(parent, 40*time.Second)
