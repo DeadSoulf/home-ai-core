@@ -44,7 +44,6 @@ func TestFirstOwnerLoginAuthenticateLogout(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-
 	result, err := service.Bootstrap(
 		ctx,
 		"Owner",
