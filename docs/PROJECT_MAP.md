@@ -1,5 +1,7 @@
 # Home-AI — карта проекта
 
+> **Архитектурный переход 2026-10-06:** продуктовые модули выводятся из процесса Core и переводятся на независимые Docker-контейнеры. Core остаётся control plane: identity/RBAC/audit/jobs/events/update/system/storage foundation + реестр и lifecycle модулей. AI, NVR, Smart Home, NAS product services, Voice, Remote Access и Cluster должны выпускаться отдельно от Core. Старые module-specific данные пока сохраняются для безопасной миграции. Канонический контракт: [MODULE_RUNTIME.md](MODULE_RUNTIME.md).
+
 > Рабочая карта фактического состояния проекта.  
 > Каноническая конечная цель: [PRODUCT_VISION.md](PRODUCT_VISION.md)  
 > Аудит уже сделанного: [CURRENT_STATE_AUDIT.md](CURRENT_STATE_AUDIT.md)
