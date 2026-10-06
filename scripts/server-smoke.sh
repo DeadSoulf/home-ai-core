@@ -31,6 +31,3 @@ test -f /var/lib/home-ai-core/identity/node-id
 
 echo "Smoke test passed."
 echo "Web UI: $BASE_URL/"
-if [ -f /var/lib/home-ai-core/bootstrap-token ]; then
-  echo "First-run bootstrap token exists at /var/lib/home-ai-core/bootstrap-token"
-fi
