@@ -63,17 +63,25 @@ describe("navigation access", () => {
     }
   });
 
-  it("hides disabled module navigation and keeps Cloud AI out of the main menu", () => {
+  it("shows navigation only for enabled external modules", () => {
     const reader = actor(allReads);
     const modules = [
-      {module_id: "ai.agent", status: "disabled" as const},
-      {module_id: "ai.cloud", status: "enabled" as const, items: []},
+      {
+        module_id: "camera.nvr",
+        status: "enabled" as const,
+        items: [{id: "overview", title: "Cameras", route: "/modules/camera.nvr", order: 20}],
+      },
+      {
+        module_id: "ai.agent",
+        status: "disabled" as const,
+        items: [{id: "overview", title: "AI Agent", route: "/modules/ai.agent", order: 30}],
+      },
     ];
     const paths = visibleNavigation(reader, modules).flatMap((group) => group.items.map((item) => item.path));
-    expect(paths).not.toContain("/ai");
-    expect(paths).not.toContain("/modules/ai.cloud");
-    expect(accessiblePath(reader, "/ai", modules)).toBe("/");
-    expect(accessiblePath(reader, "/modules/ai.cloud", modules)).toBe("/");
+    expect(paths).toContain("/modules/camera.nvr");
+    expect(paths).not.toContain("/modules/ai.agent");
+    expect(accessiblePath(reader, "/modules/camera.nvr", modules)).toBe("/modules/camera.nvr");
+    expect(accessiblePath(reader, "/modules/ai.agent", modules)).toBe("/");
   });
 
 
