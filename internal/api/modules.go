@@ -122,7 +122,7 @@ func (s *server) moduleControl(
 		methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	if !validMutationCSRF(actor, source, r) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
 		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
 		return
 	}
