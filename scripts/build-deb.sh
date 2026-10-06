@@ -61,7 +61,7 @@ Section: admin
 Priority: optional
 Architecture: $ARCH
 Maintainer: Home-AI-Core
-Depends: systemd, pci.ids, apt, iproute2, wireguard-tools, ffmpeg, util-linux, fdisk, lvm2, smartmontools, e2fsprogs, xfsprogs, dosfstools
+Depends: systemd, pci.ids, apt, iproute2, wireguard-tools, docker.io, util-linux, fdisk, lvm2, smartmontools, e2fsprogs, xfsprogs, dosfstools
 Description: Home-AI-Core private home infrastructure control plane
  Home-AI-Core provides a modular Debian-based control plane for private
  home-server infrastructure, modules, jobs, events and the Web UI.
@@ -86,6 +86,7 @@ if command -v systemctl >/dev/null 2>&1; then
   systemctl daemon-reload || true
   systemctl enable home-ai-core.service >/dev/null 2>&1 || true
   systemctl enable home-ai-core-updater.service >/dev/null 2>&1 || true
+  systemctl enable --now docker.service >/dev/null 2>&1 || true
   if [ "$1" = "configure" ]; then
     systemctl restart home-ai-core-updater.service || true
     systemctl restart home-ai-core.service || true
