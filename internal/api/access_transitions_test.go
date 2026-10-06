@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -46,11 +45,7 @@ func actualAccessFixture(t *testing.T) accessFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bootstrap, err := os.ReadFile(sec.BootstrapTokenPath())
-	if err != nil {
-		t.Fatal(err)
-	}
-	owner, err := sec.Bootstrap(ctx, string(bootstrap), "owner", "Owner", "owner correct password", security.RequestContext{})
+	owner, err := sec.Bootstrap(ctx, "owner", "Owner", "owner correct password", security.RequestContext{})
 	if err != nil {
 		t.Fatal(err)
 	}

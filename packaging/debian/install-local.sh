@@ -43,10 +43,10 @@ systemctl --no-pager --full status home-ai-core.service || true
 echo
 echo "Home-AI-Core installed."
 echo "Local UI: http://127.0.0.1:8080/"
-if [ -f /var/lib/home-ai-core/bootstrap-token ]; then
-  echo "Bootstrap token:"
-  cat /var/lib/home-ai-core/bootstrap-token
-fi
-echo
-echo "Use an SSH tunnel for first-run access:"
-echo "  ssh -L 8080:127.0.0.1:8080 <user>@<server>"
+for address in $(hostname -I 2>/dev/null || true); do
+  case "$address" in
+    *:*) ;;
+    127.*) ;;
+    *) echo "LAN UI:   http://$address:8080/" ;;
+  esac
+done

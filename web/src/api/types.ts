@@ -59,7 +59,6 @@ export type AccessCatalog = {
 
 export type SetupStatus = {
   initialized: boolean;
-  bootstrap: string;
 };
 
 export type AuthResponse = {

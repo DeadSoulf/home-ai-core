@@ -441,18 +441,13 @@ export const api = {
 
 
   bootstrap: async (input: {
-    bootstrapToken: string;
     username: string;
     displayName: string;
     password: string;
   }) => {
-    const headers = new Headers({
-      "Content-Type": "application/json",
-      "X-Home-AI-Bootstrap-Token": input.bootstrapToken,
-    });
     const result = await request<AuthResponse>("/api/v1/security/bootstrap", {
       method: "POST",
-      headers,
+      headers: new Headers({"Content-Type": "application/json"}),
       body: JSON.stringify({
         username: input.username,
         display_name: input.displayName,

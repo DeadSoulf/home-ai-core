@@ -12,10 +12,9 @@ Unauthenticated. Reports only whether the Core has an initialized user database.
 
 ```text
 POST /api/v1/security/bootstrap
-X-Home-AI-Bootstrap-Token: <local one-time token>
 ```
 
-The peer must be loopback.
+The peer must be localhost or a private local-network address. The endpoint is usable only while the user database is uninitialized.
 
 Request:
 
@@ -27,8 +26,6 @@ Request:
   "session_mode": "cookie"
 }
 ```
-
-The bootstrap token is stored at `/var/lib/home-ai-core/bootstrap-token` with mode `0600` until initialization succeeds.
 
 ## Login
 
@@ -90,7 +87,7 @@ Requires `audit.read`.
 
 ## Transport warning
 
-Authentication does not make plaintext remote HTTP safe. The Core remains loopback-only by default until the secure networking/TLS gateway phase provides an approved remote-access path.
+Authentication does not make plaintext HTTP safe for untrusted networks. The Core listens on the local network by default for first-run convenience; do not expose port 8080 directly to the public Internet. Use the planned secure networking/TLS gateway for untrusted remote access.
 
 
 ## User management

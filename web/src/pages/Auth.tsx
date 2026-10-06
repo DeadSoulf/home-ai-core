@@ -7,7 +7,7 @@ import { LanguageSwitch, useI18n } from "../i18n";
 
 export function LoginPage({onAuthenticated}: {onAuthenticated: (actor: Actor) => void}) {
   const {t} = useI18n();
-  const messageFor = (error: unknown) => error instanceof APIError && error.code === "bootstrap_local_only" ? t("bootstrapLocalOnly") : error instanceof Error ? error.message : t("requestFailed");
+  const messageFor = (error: unknown) => error instanceof APIError && error.code === "setup_network_only" ? t("setupNetworkOnly") : error instanceof Error ? error.message : t("requestFailed");
   const [username, setUsername] = useState("owner");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -49,8 +49,7 @@ export function LoginPage({onAuthenticated}: {onAuthenticated: (actor: Actor) =>
 
 export function FirstRunPage({onAuthenticated}: {onAuthenticated: (actor: Actor) => void}) {
   const {t} = useI18n();
-  const messageFor = (error: unknown) => error instanceof APIError && error.code === "bootstrap_local_only" ? t("bootstrapLocalOnly") : error instanceof Error ? error.message : t("requestFailed");
-  const [bootstrapToken, setBootstrapToken] = useState("");
+  const messageFor = (error: unknown) => error instanceof APIError && error.code === "setup_network_only" ? t("setupNetworkOnly") : error instanceof Error ? error.message : t("requestFailed");
   const [username, setUsername] = useState("owner");
   const [displayName, setDisplayName] = useState("Home Owner");
   const [password, setPassword] = useState("");
@@ -63,7 +62,6 @@ export function FirstRunPage({onAuthenticated}: {onAuthenticated: (actor: Actor)
     setError("");
     try {
       const result = await api.bootstrap({
-        bootstrapToken,
         username,
         displayName,
         password,
@@ -78,14 +76,7 @@ export function FirstRunPage({onAuthenticated}: {onAuthenticated: (actor: Actor)
 
   return (
     <AuthLayout title={t("createOwner")} subtitle={t("createOwnerSubtitle")}>
-      <div className="notice">
-        {t("bootstrapNotice")}
-      </div>
       <form onSubmit={submit} className="auth-form">
-        <label>
-          {t("bootstrapToken")}
-          <input value={bootstrapToken} onChange={(e) => setBootstrapToken(e.target.value)} autoComplete="off" />
-        </label>
         <label>
           {t("username")}
           <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />

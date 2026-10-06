@@ -210,7 +210,6 @@ func (f fakeSecurity) Bootstrap(
 	string,
 	string,
 	string,
-	string,
 	security.RequestContext,
 ) (security.AuthResult, error) {
 	return security.AuthResult{}, errors.New("not implemented in fake")
@@ -1976,5 +1975,30 @@ func TestResumableFileUploadAPI(t *testing.T) {
 	}
 	if string(data) != string(payload) {
 		t.Fatalf("uploaded data = %q", data)
+	}
+}
+
+func TestRemoteIsSetupNetwork(t *testing.T) {
+	tests := []struct {
+		name       string
+		remoteAddr string
+		want       bool
+	}{
+		{name: "loopback IPv4", remoteAddr: "127.0.0.1:1234", want: true},
+		{name: "private 10", remoteAddr: "10.20.30.40:1234", want: true},
+		{name: "private 172", remoteAddr: "172.16.5.10:1234", want: true},
+		{name: "private 192", remoteAddr: "192.168.1.20:1234", want: true},
+		{name: "link local", remoteAddr: "169.254.10.20:1234", want: true},
+		{name: "shared CGNAT", remoteAddr: "100.64.10.20:1234", want: true},
+		{name: "public", remoteAddr: "8.8.8.8:1234", want: false},
+		{name: "invalid", remoteAddr: "not-an-ip", want: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := remoteIsSetupNetwork(tc.remoteAddr); got != tc.want {
+				t.Fatalf("remoteIsSetupNetwork(%q) = %v, want %v", tc.remoteAddr, got, tc.want)
+			}
+		})
 	}
 }

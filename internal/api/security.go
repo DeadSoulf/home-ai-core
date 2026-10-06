@@ -22,7 +22,7 @@ const (
 
 type SecurityService interface {
 	Initialized(context.Context) (bool, error)
-	Bootstrap(context.Context, string, string, string, string, security.RequestContext) (security.AuthResult, error)
+	Bootstrap(context.Context, string, string, string, security.RequestContext) (security.AuthResult, error)
 	Login(context.Context, string, string, security.RequestContext) (security.AuthResult, error)
 	Authenticate(context.Context, string) (security.Actor, error)
 	Logout(context.Context, security.Actor, security.RequestContext) error
@@ -45,13 +45,8 @@ func (s *server) setupStatus(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, http.StatusInternalServerError, "security_unavailable", "security state is unavailable", nil)
 		return
 	}
-	bootstrap := "local_token_required"
-	if initialized {
-		bootstrap = "disabled"
-	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"initialized": initialized,
-		"bootstrap":   bootstrap,
 	})
 }
 
@@ -60,8 +55,8 @@ func (s *server) bootstrap(w http.ResponseWriter, r *http.Request) {
 		methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	if !remoteIsLoopback(r.RemoteAddr) {
-		writeAPIError(w, r, http.StatusForbidden, "bootstrap_local_only", "bootstrap is available only from the local host", nil)
+	if !remoteIsSetupNetwork(r.RemoteAddr) {
+		writeAPIError(w, r, http.StatusForbidden, "setup_network_only", "first-owner setup is available only from localhost or a private local network", nil)
 		return
 	}
 
@@ -84,7 +79,6 @@ func (s *server) bootstrap(w http.ResponseWriter, r *http.Request) {
 
 	result, err := s.security.Bootstrap(
 		r.Context(),
-		r.Header.Get("X-Home-AI-Bootstrap-Token"),
 		request.Username,
 		request.DisplayName,
 		request.Password,
@@ -92,8 +86,6 @@ func (s *server) bootstrap(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		switch {
-		case errors.Is(err, security.ErrInvalidBootstrapToken):
-			writeAPIError(w, r, http.StatusUnauthorized, "invalid_bootstrap_token", "invalid bootstrap token", nil)
 		case errors.Is(err, security.ErrAlreadyInitialized):
 			writeAPIError(w, r, http.StatusConflict, "already_initialized", "security is already initialized", nil)
 		default:
@@ -479,13 +471,23 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, target any) error {
 	return nil
 }
 
-func remoteIsLoopback(remoteAddr string) bool {
+func remoteIsSetupNetwork(remoteAddr string) bool {
 	host, _, err := net.SplitHostPort(remoteAddr)
 	if err != nil {
 		host = remoteAddr
 	}
 	ip := net.ParseIP(strings.Trim(host, "[]"))
-	return ip != nil && ip.IsLoopback()
+	if ip == nil {
+		return false
+	}
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() {
+		return true
+	}
+	// RFC 6598 shared address space is commonly used by home/ISP networks.
+	if ip4 := ip.To4(); ip4 != nil {
+		return ip4[0] == 100 && ip4[1] >= 64 && ip4[1] <= 127
+	}
+	return false
 }
 
 func methodNotAllowed(w http.ResponseWriter, r *http.Request, allowed string) {
