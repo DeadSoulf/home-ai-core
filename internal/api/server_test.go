@@ -1978,7 +1978,6 @@ func TestResumableFileUploadAPI(t *testing.T) {
 	}
 }
 
-
 func TestRemoteIsSetupNetwork(t *testing.T) {
 	tests := []struct {
 		name       string
