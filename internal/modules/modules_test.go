@@ -216,7 +216,6 @@ func TestRegistryCapabilitiesIncludeProvidedCapabilities(t *testing.T) {
 	}
 }
 
-
 func TestValidateDockerRuntime(t *testing.T) {
 	m := validManifest("camera.nvr", "1.0.0")
 	m.Runtime = RuntimeContract{
