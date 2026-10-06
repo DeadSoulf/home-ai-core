@@ -114,4 +114,4 @@ if [ "$found" -eq 0 ]; then
   echo "  http://<SERVER-IP>:8080/"
 fi
 echo
-echo "Create the first owner account in the browser. No bootstrap token is required."
+echo "Create the first owner account in the browser."
