@@ -14,8 +14,8 @@ import (
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrAlreadyInitialized = errors.New("security already initialized")
-	ErrUnauthorized          = errors.New("authentication required")
-	ErrUserExists            = errors.New("user already exists")
+	ErrUnauthorized       = errors.New("authentication required")
+	ErrUserExists         = errors.New("user already exists")
 )
 
 const sessionLifetime = 24 * time.Hour
