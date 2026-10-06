@@ -47,4 +47,3 @@ func TestLoadOverrides(t *testing.T) {
 		t.Fatalf("WebDir = %q", cfg.WebDir)
 	}
 }
-
