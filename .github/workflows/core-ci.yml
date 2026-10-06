@@ -29,6 +29,10 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24.x'
+      - name: Check installer scripts
+        run: |
+          sh -n scripts/install.sh
+          sh -n packaging/debian/install-local.sh
       - name: Build Web once
         working-directory: web
         run: |
