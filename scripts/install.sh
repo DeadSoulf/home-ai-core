@@ -8,7 +8,7 @@ SOURCE_URL="${HOME_AI_SOURCE_URL:-https://github.com/DeadSoulf/home-ai-core.git}
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "run as root, for example:" >&2
-  echo "  curl -fsSL https://raw.githubusercontent.com/DeadSoulf/home-ai-core/main/scripts/install.sh | sudo sh" >&2
+  echo "  apt update && apt install -y curl ca-certificates && curl -fsSL https://raw.githubusercontent.com/DeadSoulf/home-ai-core/main/scripts/install.sh | sh" >&2
   exit 2
 fi
 
