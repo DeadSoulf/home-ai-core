@@ -11,37 +11,9 @@ import (
 const ManifestSchemaVersion = 2
 
 var (
-	moduleIDPattern   = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
-	permissionPattern  = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+package modules
-
-import (
-	"encoding/json"
-	"fmt"
-	"io"
-	"regexp"
-	"strings"
-)
-
-const ManifestSchemaVersion = 2
-
-var (
-	moduleIDPattern   = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
-)
-	imageDigestPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,447}@sha256:[a-f0-9]{64}package modules
-
-import (
-	"encoding/json"
-	"fmt"
-	"io"
-	"regexp"
-	"strings"
-)
-
-const ManifestSchemaVersion = 2
-
-var (
-	moduleIDPattern   = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
-)
+	moduleIDPattern    = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
+	permissionPattern  = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$`)
+	imageDigestPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,447}@sha256:[a-f0-9]{64}$`)
 )
 
 var lifecycleOps = map[string]struct{}{
@@ -98,6 +70,7 @@ func ValidateManifest(m Manifest) error {
 	if len(m.Lifecycle) == 0 {
 		return fmt.Errorf("at least one lifecycle operation is required")
 	}
+
 	if m.Runtime.Type != "docker" {
 		return fmt.Errorf("runtime type must be docker")
 	}
@@ -112,6 +85,9 @@ func ValidateManifest(m Manifest) error {
 	}
 	if m.Runtime.Health.Path != "" && !strings.HasPrefix(m.Runtime.Health.Path, "/") {
 		return fmt.Errorf("health path must start with /")
+	}
+	if (m.Runtime.Health.Port == 0) != (m.Runtime.Health.Path == "") {
+		return fmt.Errorf("health port and path must be declared together")
 	}
 
 	if err := uniqueStrings("conflict", m.Conflicts, moduleIDPattern); err != nil {
@@ -169,6 +145,7 @@ func ValidateManifest(m Manifest) error {
 	if err := uniqueAllowedArchitectures(m.Host.Architectures); err != nil {
 		return err
 	}
+
 	if m.API.Namespace != "" {
 		if !moduleIDPattern.MatchString(m.API.Namespace) {
 			return fmt.Errorf("invalid api namespace")
