@@ -205,5 +205,5 @@ func inspectModuleContainer(ctx context.Context, dockerPath, name string) (modul
 }
 
 func moduleContainerName(moduleID string) string {
-	return "home-ai-module-" + strings.ReplaceAll(moduleID, ".", "-")
+	return "home-ai-module-" + moduleID
 }
