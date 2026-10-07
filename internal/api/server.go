@@ -88,6 +88,8 @@ func New(
 	s.mux.HandleFunc("/api/v1/jobs", s.requireAuth("jobs.read", s.jobsCollection))
 	s.mux.HandleFunc("/api/v1/jobs/", s.requireAuth("jobs.read", s.jobResource))
 	s.mux.HandleFunc("/api/v1/modules", s.requireAuth("modules.read", s.modulesCollection))
+	s.mux.HandleFunc("GET /api/v1/modules/catalog", s.requireAuth("modules.read", s.moduleCatalog))
+	s.mux.HandleFunc("POST /api/v1/modules/catalog/{moduleID}/install", s.requireAuth("modules.manage", s.moduleCatalogInstall))
 	s.mux.HandleFunc("POST /api/v1/modules/install", s.requireAuth("modules.manage", s.moduleInstall))
 	s.mux.HandleFunc("GET /api/v1/modules/navigation", s.requireAuth("", s.moduleNavigation))
 	s.mux.HandleFunc("GET /api/v1/modules/capabilities", s.requireAuth("modules.read", s.moduleCapabilities))
