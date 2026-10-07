@@ -211,6 +211,25 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		})
 		return
 	}
+	if strings.HasPrefix(request.Operation, "docker.module.") {
+		_ = conn.SetDeadline(time.Now().Add(31 * time.Minute))
+		ctx, cancel := context.WithTimeout(parent, 30*time.Minute)
+		defer cancel()
+		status, message, err := performDockerModuleOperation(ctx, request, gid)
+		if err != nil {
+			logger.Error("Docker module operation failed", "operation", request.Operation, "module_id", request.ModuleID, "error", err)
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})
+			return
+		}
+		logger.Info("Docker module operation completed", "operation", request.Operation, "module_id", request.ModuleID, "state", status.State)
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+			OK:          true,
+			Message:     message,
+			ModuleState: status.State,
+			ContainerID: status.ContainerID,
+		})
+		return
+	}
 	if request.Operation == "storage.inspect" {
 		_ = conn.SetDeadline(time.Now().Add(45 * time.Second))
 		ctx, cancel := context.WithTimeout(parent, 40*time.Second)
