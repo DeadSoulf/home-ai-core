@@ -4,11 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
@@ -38,7 +42,17 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 		if !imageDigestPattern.MatchString(image) {
 			return moduleContainerStatus{}, "", errors.New("module image must be an immutable @sha256 reference")
 		}
-		return installDockerModule(ctx, moduleID, image, serviceUID, serviceGID)
+		return installDockerModule(
+			ctx,
+			moduleID,
+			image,
+			serviceUID,
+			serviceGID,
+			request.ModuleHealthPort,
+			request.ModuleHealthPath,
+			request.RegistryUsername,
+			request.RegistryToken,
+		)
 	case "docker.module.start":
 		return controlDockerModule(ctx, moduleID, "start")
 	case "docker.module.stop":
@@ -46,31 +60,42 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 	case "docker.module.restart":
 		return controlDockerModule(ctx, moduleID, "restart")
 	case "docker.module.remove":
-		return removeDockerModule(ctx, moduleID)
+		return removeDockerModule(ctx, moduleID, false)
+	case "docker.module.remove-data":
+		return removeDockerModule(ctx, moduleID, true)
 	default:
 		return moduleContainerStatus{}, "", errors.New("unsupported Docker module operation")
 	}
 }
 
-func installDockerModule(ctx context.Context, moduleID, image string, serviceUID, serviceGID int) (moduleContainerStatus, string, error) {
+func installDockerModule(
+	ctx context.Context,
+	moduleID, image string,
+	serviceUID, serviceGID, healthPort int,
+	healthPath, registryUser, registryToken string,
+) (moduleContainerStatus, string, error) {
 	dockerPath, err := exec.LookPath("docker")
 	if err != nil {
 		return moduleContainerStatus{}, "", errors.New("Docker CLI is unavailable")
 	}
 
-	if output, err := exec.CommandContext(ctx, dockerPath, "pull", image).CombinedOutput(); err != nil {
-		return moduleContainerStatus{}, "", fmt.Errorf("pull module image: %s", commandError(output, err))
+	if err := pullDockerImage(ctx, dockerPath, image, registryUser, registryToken); err != nil {
+		return moduleContainerStatus{}, "", err
 	}
 
 	name := moduleContainerName(moduleID)
-	if exists, managed, err := inspectManagedContainer(ctx, dockerPath, name, moduleID); err != nil {
+	exists, managed, err := inspectManagedContainer(ctx, dockerPath, name, moduleID)
+	if err != nil {
 		return moduleContainerStatus{}, "", err
-	} else if exists {
+	}
+	previousImage := ""
+	if exists {
 		if !managed {
 			return moduleContainerStatus{}, "", errors.New("container name is already used by an unmanaged container")
 		}
-		if output, err := exec.CommandContext(ctx, dockerPath, "rm", "-f", name).CombinedOutput(); err != nil {
-			return moduleContainerStatus{}, "", fmt.Errorf("replace module container: %s", commandError(output, err))
+		previousImage, err = inspectModuleContainerImage(ctx, dockerPath, name)
+		if err != nil {
+			return moduleContainerStatus{}, "", err
 		}
 	}
 
@@ -85,6 +110,91 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 		return moduleContainerStatus{}, "", fmt.Errorf("set module data permissions: %w", err)
 	}
 
+	if exists {
+		if output, err := exec.CommandContext(ctx, dockerPath, "rm", "-f", name).CombinedOutput(); err != nil {
+			return moduleContainerStatus{}, "", fmt.Errorf("replace module container: %s", commandError(output, err))
+		}
+	}
+
+	containerID, err := createDockerModuleContainer(ctx, dockerPath, name, moduleID, image, dataDir, serviceUID, serviceGID)
+	if err != nil {
+		if previousImage != "" {
+			if rollbackErr := rollbackDockerModule(ctx, dockerPath, name, moduleID, previousImage, dataDir, serviceUID, serviceGID); rollbackErr != nil {
+				return moduleContainerStatus{}, "", fmt.Errorf("%v; rollback failed: %w", err, rollbackErr)
+			}
+			return moduleContainerStatus{}, "", fmt.Errorf("%v; previous module image restored", err)
+		}
+		return moduleContainerStatus{}, "", err
+	}
+
+	if output, err := exec.CommandContext(ctx, dockerPath, "start", name).CombinedOutput(); err != nil {
+		_ = exec.CommandContext(context.Background(), dockerPath, "rm", "-f", name).Run()
+		startErr := fmt.Errorf("start module container: %s", commandError(output, err))
+		if previousImage != "" {
+			if rollbackErr := rollbackDockerModule(ctx, dockerPath, name, moduleID, previousImage, dataDir, serviceUID, serviceGID); rollbackErr != nil {
+				return moduleContainerStatus{}, "", fmt.Errorf("%v; rollback failed: %w", startErr, rollbackErr)
+			}
+			return moduleContainerStatus{}, "", fmt.Errorf("%v; previous module image restored", startErr)
+		}
+		return moduleContainerStatus{}, "", startErr
+	}
+
+	if err := waitForModuleHealth(ctx, dockerPath, name, healthPort, healthPath); err != nil {
+		_ = exec.CommandContext(context.Background(), dockerPath, "rm", "-f", name).Run()
+		if previousImage != "" {
+			if rollbackErr := rollbackDockerModule(ctx, dockerPath, name, moduleID, previousImage, dataDir, serviceUID, serviceGID); rollbackErr != nil {
+				return moduleContainerStatus{}, "", fmt.Errorf("%v; rollback failed: %w", err, rollbackErr)
+			}
+			return moduleContainerStatus{}, "", fmt.Errorf("%v; previous module image restored", err)
+		}
+		return moduleContainerStatus{}, "", err
+	}
+
+	message := "module installed and started"
+	if previousImage != "" && previousImage != image {
+		message = "module updated and started"
+	}
+	return moduleContainerStatus{State: "running", ContainerID: containerID}, message, nil
+}
+
+func pullDockerImage(ctx context.Context, dockerPath, image, registryUser, registryToken string) error {
+	env := os.Environ()
+	if strings.TrimSpace(registryToken) != "" && strings.HasPrefix(strings.ToLower(image), "ghcr.io/") {
+		configDir, err := os.MkdirTemp("", "home-ai-docker-auth-*")
+		if err != nil {
+			return fmt.Errorf("create temporary Docker auth directory: %w", err)
+		}
+		defer os.RemoveAll(configDir)
+		if err := os.Chmod(configDir, 0o700); err != nil {
+			return fmt.Errorf("protect temporary Docker auth directory: %w", err)
+		}
+		user := strings.TrimSpace(registryUser)
+		if user == "" {
+			user = "DeadSoulf"
+		}
+		authEnv := append(env, "DOCKER_CONFIG="+configDir)
+		login := exec.CommandContext(ctx, dockerPath, "login", "ghcr.io", "--username", user, "--password-stdin")
+		login.Env = authEnv
+		login.Stdin = strings.NewReader(strings.TrimSpace(registryToken) + "\n")
+		if output, err := login.CombinedOutput(); err != nil {
+			return fmt.Errorf("authenticate to GHCR: %s", commandError(output, err))
+		}
+		env = authEnv
+	}
+
+	cmd := exec.CommandContext(ctx, dockerPath, "pull", image)
+	cmd.Env = env
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("pull module image: %s", commandError(output, err))
+	}
+	return nil
+}
+
+func createDockerModuleContainer(
+	ctx context.Context,
+	dockerPath, name, moduleID, image, dataDir string,
+	serviceUID, serviceGID int,
+) (string, error) {
 	args := []string{
 		"create",
 		"--name", name,
@@ -103,16 +213,85 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 	}
 	output, err := exec.CommandContext(ctx, dockerPath, args...).CombinedOutput()
 	if err != nil {
-		return moduleContainerStatus{}, "", fmt.Errorf("create module container: %s", commandError(output, err))
+		return "", fmt.Errorf("create module container: %s", commandError(output, err))
 	}
-	containerID := strings.TrimSpace(string(output))
+	return strings.TrimSpace(string(output)), nil
+}
 
+func rollbackDockerModule(
+	ctx context.Context,
+	dockerPath, name, moduleID, image, dataDir string,
+	serviceUID, serviceGID int,
+) error {
+	_ = exec.CommandContext(context.Background(), dockerPath, "rm", "-f", name).Run()
+	if _, err := createDockerModuleContainer(ctx, dockerPath, name, moduleID, image, dataDir, serviceUID, serviceGID); err != nil {
+		return err
+	}
 	if output, err := exec.CommandContext(ctx, dockerPath, "start", name).CombinedOutput(); err != nil {
-		_ = exec.CommandContext(context.Background(), dockerPath, "rm", "-f", name).Run()
-		return moduleContainerStatus{}, "", fmt.Errorf("start module container: %s", commandError(output, err))
+		return fmt.Errorf("restart previous module container: %s", commandError(output, err))
+	}
+	return nil
+}
+
+func waitForModuleHealth(ctx context.Context, dockerPath, name string, port int, path string) error {
+	if port == 0 && strings.TrimSpace(path) == "" {
+		status, err := inspectModuleContainer(ctx, dockerPath, name)
+		if err != nil {
+			return err
+		}
+		if status.State != "running" {
+			return fmt.Errorf("module container is not running: %s", status.State)
+		}
+		return nil
+	}
+	if port < 1 || port > 65535 || !strings.HasPrefix(path, "/") {
+		return errors.New("invalid module health endpoint")
 	}
 
-	return moduleContainerStatus{State: "running", ContainerID: containerID}, "module installed and started", nil
+	ipOutput, err := exec.CommandContext(
+		ctx,
+		dockerPath,
+		"inspect",
+		"--format",
+		`{{with index .NetworkSettings.Networks "home-ai-modules"}}{{.IPAddress}}{{end}}`,
+		name,
+	).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("inspect module health address: %s", commandError(ipOutput, err))
+	}
+	ip := strings.TrimSpace(string(ipOutput))
+	if net.ParseIP(ip) == nil {
+		return errors.New("module health address is unavailable")
+	}
+	url := "http://" + net.JoinHostPort(ip, strconv.Itoa(port)) + path
+	client := &http.Client{Timeout: 2 * time.Second}
+	deadline := time.Now().Add(30 * time.Second)
+	var lastError error
+	for time.Now().Before(deadline) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return err
+		}
+		resp, err := client.Do(req)
+		if err == nil {
+			_ = resp.Body.Close()
+			if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+				return nil
+			}
+			lastError = fmt.Errorf("health endpoint returned HTTP %d", resp.StatusCode)
+		} else {
+			lastError = err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+	if lastError == nil {
+		lastError = errors.New("health endpoint did not become ready")
+	}
+	return fmt.Errorf("module health check failed: %w", lastError)
 }
 
 func controlDockerModule(ctx context.Context, moduleID, action string) (moduleContainerStatus, string, error) {
@@ -142,7 +321,7 @@ func controlDockerModule(ctx context.Context, moduleID, action string) (moduleCo
 	return status, "module " + action + " completed", nil
 }
 
-func removeDockerModule(ctx context.Context, moduleID string) (moduleContainerStatus, string, error) {
+func removeDockerModule(ctx context.Context, moduleID string, removeData bool) (moduleContainerStatus, string, error) {
 	dockerPath, err := exec.LookPath("docker")
 	if err != nil {
 		return moduleContainerStatus{}, "", errors.New("Docker CLI is unavailable")
@@ -152,15 +331,24 @@ func removeDockerModule(ctx context.Context, moduleID string) (moduleContainerSt
 	if err != nil {
 		return moduleContainerStatus{}, "", err
 	}
+	if exists {
+		if !managed {
+			return moduleContainerStatus{}, "", errors.New("refusing to remove unmanaged container")
+		}
+		output, err := exec.CommandContext(ctx, dockerPath, "rm", "-f", name).CombinedOutput()
+		if err != nil {
+			return moduleContainerStatus{}, "", fmt.Errorf("remove module container: %s", commandError(output, err))
+		}
+	}
+	if removeData {
+		dataDir := filepath.Join(moduleDataRoot, moduleID)
+		if err := os.RemoveAll(dataDir); err != nil {
+			return moduleContainerStatus{}, "", fmt.Errorf("remove module persistent data: %w", err)
+		}
+		return moduleContainerStatus{State: "removed"}, "module container and persistent data removed", nil
+	}
 	if !exists {
 		return moduleContainerStatus{State: "removed"}, "module container already absent; data preserved", nil
-	}
-	if !managed {
-		return moduleContainerStatus{}, "", errors.New("refusing to remove unmanaged container")
-	}
-	output, err := exec.CommandContext(ctx, dockerPath, "rm", "-f", name).CombinedOutput()
-	if err != nil {
-		return moduleContainerStatus{}, "", fmt.Errorf("remove module container: %s", commandError(output, err))
 	}
 	return moduleContainerStatus{State: "removed"}, "module container removed; data preserved", nil
 }
@@ -183,6 +371,18 @@ func inspectManagedContainer(ctx context.Context, dockerPath, name, moduleID str
 	}
 	parts := strings.SplitN(strings.TrimSpace(string(output)), "|", 2)
 	return true, len(parts) == 2 && parts[0] == "true" && parts[1] == moduleID, nil
+}
+
+func inspectModuleContainerImage(ctx context.Context, dockerPath, name string) (string, error) {
+	output, err := exec.CommandContext(ctx, dockerPath, "inspect", "--format", `{{ .Config.Image }}`, name).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("inspect module image: %s", commandError(output, err))
+	}
+	image := strings.TrimSpace(string(output))
+	if !imageDigestPattern.MatchString(image) {
+		return "", errors.New("installed module image is not pinned to an immutable digest")
+	}
+	return image, nil
 }
 
 func inspectModuleContainer(ctx context.Context, dockerPath, name string) (moduleContainerStatus, error) {
