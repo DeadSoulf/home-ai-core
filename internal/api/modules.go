@@ -215,7 +215,7 @@ func (s *server) moduleControl(
 		ActorID:       actor.ID,
 		RequestID:     meta.RequestID,
 		CorrelationID: meta.CorrelationID,
-		Input: map[string]any{"module_id": id, "operation": input.Operation},
+		Input:         map[string]any{"module_id": id, "operation": input.Operation},
 	})
 	if err != nil {
 		writeAPIError(w, r, http.StatusInternalServerError, "module_job_failed", "failed to queue module operation", nil)
