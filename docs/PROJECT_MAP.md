@@ -176,15 +176,17 @@ Reference implementation уже собран в отдельной staging-ве�
 - ✅ Manifest v2 генерируется автоматически с immutable image digest;
 - ✅ текущий reference image закреплён digest `sha256:60177fb078509ea63e74c9776f92a1dd987e88be2cd0b146cc553ec89f987336`.
 
-### Осталось проверить на реальном Home-AI node
+### Live-проверка на реальном Home-AI node
 
-- ⏭ установить модуль через Web UI Core;
-- ⏭ проверить start;
-- ⏭ проверить stop;
-- ⏭ проверить restart;
-- ⏭ проверить remove;
+- ✅ установка модуля через Web UI Core;
+- ✅ start;
+- ✅ stop;
+- ✅ restart;
+- ✅ remove;
+- ✅ lifecycle-кнопки в Web UI отрабатывают через Core;
 - ⏭ проверить сохранение `/data` после remove;
 - ⏭ проверить повторную установку через Core;
+- ⏭ подтвердить persistent state после reinstall;
 - ⏭ подтвердить работу на реальном amd64 node;
 - ⏭ подтвердить работу на реальном arm64 node;
 - ⏭ вынести готовый reference implementation в отдельный репозиторий;
