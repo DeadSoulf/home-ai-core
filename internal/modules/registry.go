@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/DeadSoulf/home-ai-core/internal/state"
 )
@@ -25,9 +24,6 @@ type Store interface {
 type Registry struct {
 	store       Store
 	coreVersion string
-
-	mu      sync.RWMutex
-	modules map[string]Module
 }
 
 func NewRegistry(store Store, coreVersion ...string) *Registry {
@@ -38,40 +34,7 @@ func NewRegistry(store Store, coreVersion ...string) *Registry {
 	return &Registry{
 		store:       store,
 		coreVersion: version,
-		modules:     make(map[string]Module),
 	}
-}
-
-func (r *Registry) Register(ctx context.Context, module Module) error {
-	if module == nil {
-		return errors.New("module is nil")
-	}
-	manifest := module.Manifest()
-	if err := ValidateManifest(manifest); err != nil {
-		return err
-	}
-
-	raw, err := json.Marshal(manifest)
-	if err != nil {
-		return fmt.Errorf("encode module manifest: %w", err)
-	}
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, exists := r.modules[manifest.ID]; exists {
-		return fmt.Errorf("module %q already registered", manifest.ID)
-	}
-
-	if err := r.store.UpsertModule(ctx, state.ModuleRecord{
-		ID:           manifest.ID,
-		Version:      manifest.Version,
-		Status:       "registered",
-		ManifestJSON: string(raw),
-	}); err != nil {
-		return err
-	}
-	r.modules[manifest.ID] = module
-	return nil
 }
 
 func (r *Registry) InstallManifest(ctx context.Context, manifest Manifest) (Registered, error) {
@@ -219,13 +182,6 @@ func (r *Registry) SetStatus(ctx context.Context, id, status, errorMessage strin
 		return err
 	}
 	return nil
-}
-
-func (r *Registry) Runtime(id string) (Module, bool) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	module, ok := r.modules[id]
-	return module, ok
 }
 
 func registeredFromRecord(record state.ModuleRecord) (Registered, error) {
