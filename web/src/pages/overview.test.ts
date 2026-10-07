@@ -16,7 +16,18 @@ const system: SystemResponse = {
   },
 };
 const modules: RegisteredModule[] = [{
-  manifest: {schema_version: 1, id: "demo", name: "Demo", version: "1.0.0", core: ">=0.1.0", lifecycle: []},
+  manifest: {
+    schema_version: 2,
+    id: "demo",
+    name: "Demo",
+    version: "1.0.0",
+    core: ">=0.1.0",
+    runtime: {
+      type: "docker",
+      docker: {image: "ghcr.io/home-ai/demo@sha256:" + "a".repeat(64)},
+    },
+    lifecycle: ["install"],
+  },
   status: "registered",
 }];
 const jobs: Job[] = [{
