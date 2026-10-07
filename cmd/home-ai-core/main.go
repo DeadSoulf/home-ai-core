@@ -15,6 +15,7 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/events"
 	"github.com/DeadSoulf/home-ai-core/internal/identity"
 	"github.com/DeadSoulf/home-ai-core/internal/jobs"
+	"github.com/DeadSoulf/home-ai-core/internal/modulecatalog"
 	"github.com/DeadSoulf/home-ai-core/internal/modules"
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
@@ -73,7 +74,9 @@ func main() {
 	realtimeHub := realtime.New(nodeID, logger)
 	eventService := events.New(nodeID, store, realtimeHub)
 	jobService := jobs.New(nodeID, store, eventService, 2)
+	moduleCatalogService := modulecatalog.New(cfg.StateDir, version.Version)
 	moduleRegistry := modules.NewRegistry(store, version.Version)
+	moduleRegistry.SetRegistryCredentialsProvider(moduleCatalogService.RegistryCredentials)
 	updaterService := updater.New(version.Version, cfg.StateDir)
 	if err := registerModuleJobs(jobService, moduleRegistry); err != nil {
 		logger.Error("failed to register module jobs", "error", err)
@@ -97,6 +100,7 @@ func main() {
 		moduleRegistry,
 		updaterService,
 		realtimeHub,
+		moduleCatalogService,
 	)
 	handler := webui.New(apiHandler, cfg.WebDir)
 
