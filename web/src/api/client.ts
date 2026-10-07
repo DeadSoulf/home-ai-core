@@ -582,6 +582,16 @@ export const api = {
     return result.modules;
   },
 
+  moduleCatalog: async () => {
+    const result = await request<{catalog: {id: string; generated_at?: string; modules: RegisteredModule["manifest"][]}}>("/api/v1/modules/catalog");
+    return result.catalog;
+  },
+
+  installCatalogModule: async (id: string) => {
+    const result = await postJSON<{job: Job}>(`/api/v1/modules/catalog/${encodeURIComponent(id)}/install`, undefined, true);
+    return result.job;
+  },
+
   moduleNavigation: async () => {
     const result = await request<{modules: ModuleNavigationState[]}>("/api/v1/modules/navigation");
     return result.modules;
