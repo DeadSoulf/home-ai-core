@@ -1,0 +1,42 @@
+{
+  "schema_version": 2,
+  "id": "reference.module",
+  "name": "Home-AI Reference Module",
+  "description": "Reference workload used to validate the Home-AI Docker Module Runtime v2 lifecycle.",
+  "version": "0.1.0",
+  "core": ">=0.1.166 <1.0.0",
+  "runtime": {
+    "type": "docker",
+    "docker": {
+      "image": "__IMAGE_WITH_DIGEST__"
+    },
+    "health": {
+      "port": 8080,
+      "path": "/health"
+    }
+  },
+  "capabilities": {
+    "requires": [
+      "host.docker"
+    ],
+    "provides": [
+      "reference.module"
+    ]
+  },
+  "host": {
+    "architectures": [
+      "amd64",
+      "arm64"
+    ]
+  },
+  "api": {
+    "namespace": "reference.module"
+  },
+  "lifecycle": [
+    "install",
+    "remove",
+    "start",
+    "stop",
+    "restart"
+  ]
+}
