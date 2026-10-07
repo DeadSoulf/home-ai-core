@@ -18,7 +18,7 @@ func parseVersion(value string) (version, error) {
 		value = strings.TrimPrefix(value, "v")
 	}
 	if strings.ContainsAny(value, "+-") {
-		return version{}, fmt.Errorf("pre-release/build metadata is not supported in manifest v1")
+		return version{}, fmt.Errorf("pre-release/build metadata is not supported in module versions")
 	}
 	parts := strings.Split(value, ".")
 	if len(parts) != 3 {
