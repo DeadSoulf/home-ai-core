@@ -97,6 +97,16 @@ func main() {
 		"version", updaterhelper.HelperVersion,
 		"protocol", updaterhelper.ProtocolVersion,
 	)
+	go func() {
+		dockerCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
+		defer cancel()
+		status, err := ensureDockerRuntime(dockerCtx, gid)
+		if err != nil {
+			logger.Error("Docker runtime reconciliation failed", "error", err, "status_error", status.Error)
+			return
+		}
+		logger.Info("Docker runtime ready", "version", status.Version, "network", dockerNetworkName)
+	}()
 	for {
 		conn, err := listener.AcceptUnix()
 		if err != nil {
@@ -150,6 +160,54 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 			),
 			HelperVersion:   updaterhelper.HelperVersion,
 			ProtocolVersion: updaterhelper.ProtocolVersion,
+		})
+		return
+	}
+	if request.Operation == "docker.inspect" {
+		ctx, cancel := context.WithTimeout(parent, 20*time.Second)
+		defer cancel()
+		status := inspectDockerRuntime(ctx)
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+			OK:                 true,
+			Message:            "Docker runtime inspected",
+			HelperVersion:      updaterhelper.HelperVersion,
+			ProtocolVersion:    updaterhelper.ProtocolVersion,
+			DockerAvailable:    status.Available,
+			DockerActive:       status.Active,
+			DockerVersion:      status.Version,
+			DockerNetworkReady: status.NetworkReady,
+			DockerError:        status.Error,
+		})
+		return
+	}
+	if request.Operation == "docker.ensure" {
+		_ = conn.SetDeadline(time.Now().Add(16 * time.Minute))
+		ctx, cancel := context.WithTimeout(parent, 15*time.Minute)
+		defer cancel()
+		status, err := ensureDockerRuntime(ctx, gid)
+		if err != nil {
+			logger.Error("Docker runtime setup failed", "error", err)
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+				Error:              err.Error(),
+				HelperVersion:      updaterhelper.HelperVersion,
+				ProtocolVersion:    updaterhelper.ProtocolVersion,
+				DockerAvailable:    status.Available,
+				DockerActive:       status.Active,
+				DockerVersion:      status.Version,
+				DockerNetworkReady: status.NetworkReady,
+				DockerError:        status.Error,
+			})
+			return
+		}
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+			OK:                 true,
+			Message:            "Docker runtime ready",
+			HelperVersion:      updaterhelper.HelperVersion,
+			ProtocolVersion:    updaterhelper.ProtocolVersion,
+			DockerAvailable:    status.Available,
+			DockerActive:       status.Active,
+			DockerVersion:      status.Version,
+			DockerNetworkReady: status.NetworkReady,
 		})
 		return
 	}
