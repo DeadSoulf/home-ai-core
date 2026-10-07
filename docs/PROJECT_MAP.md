@@ -159,24 +159,36 @@ internal/smarthome
 
 **Статус: 🔄 текущий этап**
 
-Нужен отдельный минимальный reference-модуль, который не входит в репозиторий Core.
+Reference implementation уже собран в отдельной staging-ветке и не входит в `main` Core. После live-проверки он будет вынесен в отдельный репозиторий.
 
-### Нужно сделать
+### Уже сделано
 
-- ⏭ создать отдельный репозиторий reference module;
-- ⏭ собрать Docker image;
-- ⏭ опубликовать image с immutable digest;
-- ⏭ подготовить Manifest v2;
-- ⏭ установить модуль через Web UI;
+- ✅ создан минимальный `reference.module`;
+- ✅ HTTP health endpoint `/health`;
+- ✅ persistent state в `/data/state.json`;
+- ✅ повторный запуск увеличивает `boot_count`;
+- ✅ Docker image собирается без root-зависимостей;
+- ✅ локальный lifecycle smoke-test проходит;
+- ✅ persistent `/data` переживает пересоздание контейнера;
+- ✅ multi-arch image собран для amd64/arm64;
+- ✅ image опубликован в GHCR;
+- ✅ anonymous pull из GHCR проверен без авторизации;
+- ✅ Manifest v2 генерируется автоматически с immutable image digest;
+- ✅ текущий reference image закреплён digest `sha256:60177fb078509ea63e74c9776f92a1dd987e88be2cd0b146cc553ec89f987336`.
+
+### Осталось проверить на реальном Home-AI node
+
+- ⏭ установить модуль через Web UI Core;
 - ⏭ проверить start;
 - ⏭ проверить stop;
 - ⏭ проверить restart;
 - ⏭ проверить remove;
-- ⏭ проверить сохранение `/data`;
-- ⏭ проверить повторную установку;
-- ⏭ проверить amd64;
-- ⏭ проверить arm64;
-- ⏭ зафиксировать reference implementation для будущих модулей.
+- ⏭ проверить сохранение `/data` после remove;
+- ⏭ проверить повторную установку через Core;
+- ⏭ подтвердить работу на реальном amd64 node;
+- ⏭ подтвердить работу на реальном arm64 node;
+- ⏭ вынести готовый reference implementation в отдельный репозиторий;
+- ⏭ зафиксировать его как шаблон для будущих модулей.
 
 ### Критерий завершения M4
 
@@ -369,6 +381,6 @@ Core владеет:
 
 Главная ближайшая задача:
 
-> доказать архитектуру на реальном независимом reference-модуле, после чего добавить health, logs, update/rollback и каталог модулей.
+> прогнать уже опубликованный `reference.module` через полный lifecycle на реальном Home-AI node, после чего добавить health, logs, update/rollback и каталог модулей.
 
 До завершения M4 новые продуктовые функции в Core не добавляем.
