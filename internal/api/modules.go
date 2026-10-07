@@ -96,8 +96,8 @@ func (s *server) moduleResource(
 		methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
-	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/v1/modules/"), "/")
-	if id == "" || strings.Contains(id, "/") {
+	id := strings.TrimSpace(r.PathValue("moduleID"))
+	if id == "" {
 		s.notFound(w, r)
 		return
 	}
