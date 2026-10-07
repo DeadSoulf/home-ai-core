@@ -1,0 +1,181 @@
+name: Reference module image
+
+on:
+  push:
+    branches:
+      - chatgpt/reference-module-staging
+    paths:
+      - reference-module/go.mod
+      - reference-module/main.go
+      - reference-module/Dockerfile
+      - reference-module/manifest.template.json
+      - .github/workflows/reference-module-image.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  smoke:
+    name: Reference module lifecycle smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build local image
+        run: docker build -t home-ai-reference-module:test ./reference-module
+
+      - name: Verify health and persistent data
+        shell: bash
+        run: |
+          set -euo pipefail
+          DATA_DIR="$RUNNER_TEMP/reference-module-data"
+          mkdir -p "$DATA_DIR"
+          chmod 0777 "$DATA_DIR"
+
+          cleanup() {
+            docker rm -f home-ai-reference-smoke >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          run_module() {
+            docker run -d \
+              --name home-ai-reference-smoke \
+              --user 65532:65532 \
+              --read-only \
+              --cap-drop ALL \
+              --security-opt no-new-privileges \
+              --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+              -v "$DATA_DIR:/data" \
+              -p 127.0.0.1:18081:8080 \
+              home-ai-reference-module:test >/dev/null
+          }
+
+          wait_health() {
+            for _ in $(seq 1 50); do
+              if curl --fail --silent http://127.0.0.1:18081/health >/tmp/reference-health.json; then
+                return 0
+              fi
+              sleep 0.2
+            done
+            docker logs home-ai-reference-smoke
+            return 1
+          }
+
+          run_module
+          wait_health
+
+          python3 - <<'PY'
+          import json
+          with open("/tmp/reference-health.json", "r", encoding="utf-8") as f:
+              health = json.load(f)
+          assert health["status"] == "ok"
+          assert health["module_id"] == "reference.module"
+          assert health["version"] == "0.1.0"
+          assert health["boot_count"] == 1
+          PY
+
+          docker rm -f home-ai-reference-smoke >/dev/null
+          run_module
+          wait_health
+
+          curl --fail --silent http://127.0.0.1:18081/state >/tmp/reference-state.json
+          python3 - <<'PY'
+          import json
+          with open("/tmp/reference-state.json", "r", encoding="utf-8") as f:
+              state = json.load(f)
+          assert state["boot_count"] == 2
+          assert state["created_at"]
+          assert state["updated_at"]
+          PY
+
+  publish:
+    name: Publish multi-arch reference image
+    needs: smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: chatgpt/reference-module-staging
+
+      - name: Resolve image name
+        shell: bash
+        run: |
+          set -euo pipefail
+          OWNER="$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+          echo "IMAGE_NAME=ghcr.io/$OWNER/home-ai-reference-module" >> "$GITHUB_ENV"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./reference-module
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:0.1.0
+            ${{ env.IMAGE_NAME }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/DeadSoulf/home-ai-core
+            org.opencontainers.image.version=0.1.0
+
+      - name: Generate immutable Manifest v2
+        env:
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$IMAGE_DIGEST"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          template = Path("reference-module/manifest.template.json")
+          manifest = json.loads(template.read_text(encoding="utf-8"))
+          manifest["runtime"]["docker"]["image"] = f"{os.environ['IMAGE_NAME']}@{os.environ['IMAGE_DIGEST']}"
+          Path("reference-module/manifest.json").write_text(
+              json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+              encoding="utf-8",
+          )
+          PY
+          python3 -m json.tool reference-module/manifest.json >/dev/null
+          cat reference-module/manifest.json
+          {
+            echo "### Reference module Manifest v2"
+            echo
+            echo '~~~json'
+            cat reference-module/manifest.json
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit generated manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reference-module/manifest.json
+          if git diff --cached --quiet; then
+            echo "Manifest already points at this digest"
+            exit 0
+          fi
+          git commit -m "Update reference module image digest"
+          git push origin HEAD:chatgpt/reference-module-staging
