@@ -8,8 +8,8 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"testing"
 	"strings"
+	"testing"
 
 	"github.com/DeadSoulf/home-ai-core/internal/modules"
 )
