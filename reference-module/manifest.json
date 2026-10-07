@@ -8,7 +8,7 @@
   "runtime": {
     "type": "docker",
     "docker": {
-      "image": "ghcr.io/deadsoulf/home-ai-reference-module@sha256:472131d031286d2696544377a896f03112caede53c8d34a2a50565662b8befcb"
+      "image": "ghcr.io/deadsoulf/home-ai-reference-module@sha256:60177fb078509ea63e74c9776f92a1dd987e88be2cd0b146cc553ec89f987336"
     },
     "health": {
       "port": 8080,
