@@ -88,11 +88,11 @@ export default function App() {
     }
     let stopped = false;
     let checking = false;
-    const check = async () => {
+    const check = async (fresh = false) => {
       if (checking) return;
       checking = true;
       try {
-        const result = await api.updateStatus();
+        const result = await api.updateStatus(fresh);
         if (!stopped) {
           setAvailableUpdate(result.available ? result.available_version : undefined);
         }
@@ -103,15 +103,15 @@ export default function App() {
       }
     };
     const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") void check();
+      if (document.visibilityState === "visible") void check(false);
     };
     const updateStatusEvent = (event: Event) => {
       const detail = (event as CustomEvent<string | undefined>).detail;
       setAvailableUpdate(detail || undefined);
     };
 
-    void check();
-    const timer = window.setInterval(check, 5 * 60 * 1000);
+    void check(true);
+    const timer = window.setInterval(() => { void check(true); }, 5 * 60 * 1000);
     window.addEventListener("focus", refreshWhenVisible);
     document.addEventListener("visibilitychange", refreshWhenVisible);
     window.addEventListener("home-ai-core:update-status", updateStatusEvent);
