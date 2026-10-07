@@ -5,6 +5,8 @@ import type {
   Job,
   RealtimeEvent,
   RegisteredModule, ModuleNavigationState,
+  ModuleCatalogAccess,
+  ModuleCatalogResponse,
   SetupStatus,
   SystemResponse,
   UpdateStatus,
@@ -582,6 +584,44 @@ export const api = {
     return result.modules;
   },
 
+  moduleCatalog: async (refresh = false) => {
+    const path = refresh ? "/api/v1/modules/catalog?refresh=1" : "/api/v1/modules/catalog";
+    const result = await request<{catalog: ModuleCatalogResponse}>(path);
+    return result.catalog;
+  },
+
+  moduleCatalogAccess: async () => {
+    const result = await request<{access: ModuleCatalogAccess}>("/api/v1/modules/catalog/access");
+    return result.access;
+  },
+
+  setModuleCatalogToken: async (token: string) => {
+    const result = await mutateJSON<{access: ModuleCatalogAccess}>(
+      "/api/v1/modules/catalog/access",
+      "PUT",
+      {token},
+    );
+    return result.access;
+  },
+
+  installCatalogModule: async (id: string) => {
+    const result = await postJSON<{job: Job}>(
+      `/api/v1/modules/catalog/${encodeURIComponent(id)}/install`,
+      undefined,
+      true,
+    );
+    return result.job;
+  },
+
+  updateCatalogModule: async (id: string) => {
+    const result = await postJSON<{job: Job}>(
+      `/api/v1/modules/catalog/${encodeURIComponent(id)}/update`,
+      undefined,
+      true,
+    );
+    return result.job;
+  },
+
   moduleNavigation: async () => {
     const result = await request<{modules: ModuleNavigationState[]}>("/api/v1/modules/navigation");
     return result.modules;
@@ -606,12 +646,13 @@ export const api = {
     return result.job;
   },
 
-  removeModule: async (id: string) => {
+  removeModule: async (id: string, removeData = false) => {
     const headers = new Headers();
     const token = getCSRFToken();
     if (token) headers.set("X-CSRF-Token", token);
+    const suffix = removeData ? "?data=1" : "";
     const result = await request<{job: Job}>(
-      `/api/v1/modules/${encodeURIComponent(id)}`,
+      `/api/v1/modules/${encodeURIComponent(id)}${suffix}`,
       {method: "DELETE", headers},
     );
     return result.job;
