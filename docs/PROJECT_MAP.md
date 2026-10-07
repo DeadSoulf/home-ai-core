@@ -44,35 +44,33 @@ Core больше не является местом для реализации
 - ✅ создана отдельная bridge-сеть `home-ai-modules`;
 - ✅ создан каталог данных `/var/lib/home-ai-core/modules`;
 - ✅ Core не получает Docker socket;
-- ⏭ следующий срез: безопасный container lifecycle и manifest v2.
+- ✅ container lifecycle проходит только через root-helper;
+- ✅ Docker socket не доступен Core и модулям.
 
 ### M2 — Container module manifest
 
-Расширить manifest данными контейнера:
-
-- image/repository;
-- version/tag/digest;
-- supported architectures;
-- health endpoint;
-- API namespace;
-- mounts/volumes;
-- required host capabilities;
-- declared ports;
-- dependencies;
-- upgrade/rollback metadata.
+- ✅ Manifest v2;
+- ✅ обязательный Docker runtime;
+- ✅ immutable image `@sha256`;
+- ✅ amd64/arm64 requirements;
+- ✅ health metadata;
+- ✅ API namespace;
+- ✅ dependencies/capabilities;
+- ✅ запрет произвольных host packages;
+- ⏭ отдельные декларации ports/devices/mounts будут добавляться только с политикой безопасности.
 
 ### M3 — Module lifecycle
 
-Поддержать из Web UI и API:
-
-- install;
-- start/enable;
-- stop/disable;
-- restart;
-- update;
-- remove;
-- health/status;
-- logs.
+- ✅ install через Job Engine;
+- ✅ start/enable;
+- ✅ stop/disable;
+- ✅ restart;
+- ✅ remove с сохранением persistent data;
+- ✅ Web UI для Manifest v2 и lifecycle;
+- ⏭ update с проверкой версии/digest;
+- ⏭ health reconciliation;
+- ⏭ logs;
+- ⏭ явный purge persistent data.
 
 ### M4 — первый внешний модуль
 

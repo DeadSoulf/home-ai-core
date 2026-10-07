@@ -1,14 +1,24 @@
 # Modules
 
-This directory is reserved for independently installable Home-AI-Core capability modules.
+Home-AI functional extensions are independently distributed Docker modules.
 
-The module contract itself is implemented in:
+The active module contract is implemented in:
 
-- `internal/modules/`
-- `schemas/module-manifest-v1.schema.json`
-- `schemas/module-repository-v1.schema.json`
-- `docs/sdk/module-sdk-v1.md`
+- `internal/modules/` — manifest validation, dependency planning, registry and Docker helper client;
+- `schemas/module-manifest-v2.schema.json` — canonical Manifest v2 schema;
+- `schemas/module-repository-v1.schema.json` — repository/catalog foundation;
+- `docs/sdk/module-sdk-v2.md` — module authoring and runtime contract.
 
-Current Core code contains the module registry, dependency/conflict planner, capability discovery and signed repository verification foundation.
+Core contains no product-specific module implementation.
 
-Higher-level capabilities such as NAS, storage pools, backup, containers, virtualization, NVR, AI and VPN should be implemented behind these module boundaries rather than embedded directly into unrelated Core code.
+A module owns its business logic and persistent state. Core owns validation, authorization, jobs, audit, registry metadata and orchestration through the privileged helper.
+
+Current runtime rules:
+
+- Docker only;
+- immutable image reference pinned with `@sha256`;
+- dedicated `home-ai-modules` network;
+- persistent data under `/var/lib/home-ai-core/modules/<module-id>`;
+- no Docker socket inside Core or module containers;
+- no host ports, devices or extra mounts in the initial v2 profile;
+- install/start/stop/restart/remove run through the Job Engine.

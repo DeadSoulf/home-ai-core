@@ -44,6 +44,18 @@ func (s *Store) UpsertModule(ctx context.Context, record ModuleRecord) error {
 	return nil
 }
 
+func (s *Store) DeleteModule(ctx context.Context, id string) error {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM modules WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("delete module: %w", err)
+	}
+	count, _ := result.RowsAffected()
+	if count == 0 {
+		return ErrModuleNotFound
+	}
+	return nil
+}
+
 func (s *Store) SetModuleStatus(ctx context.Context, id, status, errorMessage string) error {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	result, err := s.db.ExecContext(ctx, `

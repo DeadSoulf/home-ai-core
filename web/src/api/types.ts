@@ -161,6 +161,16 @@ export type RegisteredModule = {
     description?: string;
     version: string;
     core: string;
+    runtime: {
+      type: "docker";
+      docker: {
+        image: string;
+      };
+      health?: {
+        port?: number;
+        path?: string;
+      };
+    };
     permissions?: string[];
     capabilities?: {
       requires?: string[];

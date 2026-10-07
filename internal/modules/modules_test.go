@@ -2,6 +2,7 @@ package modules
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -15,8 +16,14 @@ func validManifest(id, ver string) Manifest {
 		Name:          "Test Module",
 		Version:       ver,
 		Core:          ">=0.1.0 <1.0.0",
+		Runtime: RuntimeSpec{
+			Type: "docker",
+			Docker: DockerSpec{
+				Image: "ghcr.io/home-ai/test@sha256:" + strings.Repeat("a", 64),
+			},
+		},
 		Capabilities: Capabilities{
-			Requires: []string{"host.linux"},
+			Requires: []string{"host.linux", "host.docker"},
 		},
 		UI: UIContract{
 			Navigation: []NavigationItem{
@@ -27,13 +34,36 @@ func validManifest(id, ver string) Manifest {
 	}
 }
 
+func persistManifest(t *testing.T, store *state.Store, manifest Manifest, status string) {
+	t.Helper()
+	raw, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpsertModule(context.Background(), state.ModuleRecord{
+		ID:           manifest.ID,
+		Version:      manifest.Version,
+		Status:       status,
+		ManifestJSON: string(raw),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if status != "registered" {
+		if err := store.SetModuleStatus(context.Background(), manifest.ID, status, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestDecodeManifestRejectsUnknownField(t *testing.T) {
 	raw := `{
-		"schema_version":1,
+		"schema_version":2,
 		"id":"test",
 		"name":"Test",
 		"version":"0.1.0",
 		"core":">=0.1.0 <1.0.0",
+		"runtime":{"type":"docker","docker":{"image":"ghcr.io/home-ai/test@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
+		"capabilities":{"requires":["host.docker"]},
 		"lifecycle":["install"],
 		"unknown":true
 	}`
@@ -53,17 +83,17 @@ func TestValidateManifestRejectsRouteEscape(t *testing.T) {
 func TestPlanInstallDependencyFirst(t *testing.T) {
 	base := validManifest("base", "1.2.0")
 	base.Capabilities.Provides = []string{"runtime.base"}
-	base.Capabilities.Requires = []string{"host.linux"}
+	base.Capabilities.Requires = []string{"host.linux", "host.docker"}
 
 	app := validManifest("feature", "2.0.0")
 	app.Dependencies = []Dependency{{ID: "base", Version: ">=1.0.0 <2.0.0"}}
-	app.Capabilities.Requires = []string{"runtime.base"}
+	app.Capabilities.Requires = []string{"host.docker", "runtime.base"}
 
 	plan, err := PlanInstall(PlanInput{
 		CoreVersion:  "0.1.0",
 		Target:       "feature",
 		Available:    map[string]Manifest{"base": base, "feature": app},
-		Capabilities: []string{"host.linux"},
+		Capabilities: []string{"host.linux", "host.docker"},
 		Architecture: "amd64",
 	})
 	if err != nil {
@@ -84,18 +114,13 @@ func TestPlanInstallRejectsCycle(t *testing.T) {
 		CoreVersion:  "0.1.0",
 		Target:       "a",
 		Available:    map[string]Manifest{"a": a, "b": b},
-		Capabilities: []string{"host.linux"},
+		Capabilities: []string{"host.linux", "host.docker"},
 		Architecture: "amd64",
 	})
 	if err == nil {
 		t.Fatal("dependency cycle was accepted")
 	}
 }
-
-type testModule struct{ manifest Manifest }
-
-func (m testModule) Manifest() Manifest   { return m.manifest }
-func (m testModule) Lifecycle() Lifecycle { return nil }
 
 func TestRegistryPersistsManifest(t *testing.T) {
 	ctx := context.Background()
@@ -107,9 +132,7 @@ func TestRegistryPersistsManifest(t *testing.T) {
 
 	registry := NewRegistry(store)
 	manifest := validManifest("storage", "1.0.0")
-	if err := registry.Register(ctx, testModule{manifest: manifest}); err != nil {
-		t.Fatalf("Register() error = %v", err)
-	}
+	persistManifest(t, store, manifest, "registered")
 
 	got, err := registry.Get(ctx, "storage")
 	if err != nil {
@@ -129,22 +152,20 @@ func TestRegistrySetStatusPersistsDisabledState(t *testing.T) {
 	defer store.Close()
 
 	registry := NewRegistry(store)
-	manifest := validManifest("ai.agent", "0.2.0")
-	manifest.Capabilities.Provides = []string{"ai.agent"}
-	if err := registry.Register(ctx, testModule{manifest: manifest}); err != nil {
+	manifest := validManifest("demo.agent", "0.2.0")
+	manifest.Capabilities.Provides = []string{"demo.agent"}
+	persistManifest(t, store, manifest, "registered")
+	if err := registry.SetStatus(ctx, "demo.agent", "disabled", ""); err != nil {
 		t.Fatal(err)
 	}
-	if err := registry.SetStatus(ctx, "ai.agent", "disabled", ""); err != nil {
-		t.Fatal(err)
-	}
-	item, err := registry.Get(ctx, "ai.agent")
+	item, err := registry.Get(ctx, "demo.agent")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if item.Status != "disabled" {
 		t.Fatalf("status = %q, want disabled", item.Status)
 	}
-	if err := registry.SetStatus(ctx, "ai.agent", "restarting", ""); err == nil {
+	if err := registry.SetStatus(ctx, "demo.agent", "restarting", ""); err == nil {
 		t.Fatal("transient restarting status was accepted for persistence")
 	}
 
@@ -152,7 +173,7 @@ func TestRegistrySetStatusPersistsDisabledState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if contains(capabilities, "ai.agent") {
+	if contains(capabilities, "demo.agent") {
 		t.Fatalf("disabled module capability leaked: %#v", capabilities)
 	}
 }
@@ -184,7 +205,7 @@ func TestPlanInstallRejectsBidirectionalConflict(t *testing.T) {
 		Target:       "feature",
 		Available:    map[string]Manifest{"base": base, "feature": feature},
 		Installed:    map[string]string{"base": "1.0.0"},
-		Capabilities: []string{"host.linux"},
+		Capabilities: []string{"host.linux", "host.docker"},
 		Architecture: "amd64",
 	})
 	if err == nil {
@@ -203,9 +224,7 @@ func TestRegistryCapabilitiesIncludeProvidedCapabilities(t *testing.T) {
 	registry := NewRegistry(store)
 	manifest := validManifest("storage", "1.0.0")
 	manifest.Capabilities.Provides = []string{"storage.block"}
-	if err := registry.Register(ctx, testModule{manifest: manifest}); err != nil {
-		t.Fatalf("Register() error = %v", err)
-	}
+	persistManifest(t, store, manifest, "registered")
 
 	capabilities, err := registry.Capabilities(ctx)
 	if err != nil {

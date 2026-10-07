@@ -8,12 +8,12 @@ import (
 	"strings"
 )
 
-const ManifestSchemaVersion = 1
+const ManifestSchemaVersion = 2
 
 var (
-	moduleIDPattern   = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
-	namePattern       = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]*$`)
-	permissionPattern = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$`)
+	moduleIDPattern    = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
+	permissionPattern  = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$`)
+	imageDigestPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,447}@sha256:[a-f0-9]{64}$`)
 )
 
 var lifecycleOps = map[string]struct{}{
@@ -22,6 +22,9 @@ var lifecycleOps = map[string]struct{}{
 	"remove":  {},
 	"backup":  {},
 	"restore": {},
+	"start":   {},
+	"stop":    {},
+	"restart": {},
 }
 
 func DecodeManifest(reader io.Reader) (Manifest, error) {
@@ -66,6 +69,25 @@ func ValidateManifest(m Manifest) error {
 	}
 	if len(m.Lifecycle) == 0 {
 		return fmt.Errorf("at least one lifecycle operation is required")
+	}
+
+	if m.Runtime.Type != "docker" {
+		return fmt.Errorf("runtime type must be docker")
+	}
+	if !imageDigestPattern.MatchString(strings.TrimSpace(m.Runtime.Docker.Image)) {
+		return fmt.Errorf("docker image must be an immutable @sha256 reference")
+	}
+	if !contains(m.Capabilities.Requires, "host.docker") {
+		return fmt.Errorf("docker module must require host.docker capability")
+	}
+	if m.Runtime.Health.Port < 0 || m.Runtime.Health.Port > 65535 {
+		return fmt.Errorf("health port must be between 1 and 65535")
+	}
+	if m.Runtime.Health.Path != "" && !strings.HasPrefix(m.Runtime.Health.Path, "/") {
+		return fmt.Errorf("health path must start with /")
+	}
+	if (m.Runtime.Health.Port == 0) != (m.Runtime.Health.Path == "") {
+		return fmt.Errorf("health port and path must be declared together")
 	}
 
 	if err := uniqueStrings("conflict", m.Conflicts, moduleIDPattern); err != nil {
@@ -121,9 +143,6 @@ func ValidateManifest(m Manifest) error {
 	}
 
 	if err := uniqueAllowedArchitectures(m.Host.Architectures); err != nil {
-		return err
-	}
-	if err := uniqueStrings("package", m.Host.Packages, namePattern); err != nil {
 		return err
 	}
 

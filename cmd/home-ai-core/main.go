@@ -73,8 +73,12 @@ func main() {
 	realtimeHub := realtime.New(nodeID, logger)
 	eventService := events.New(nodeID, store, realtimeHub)
 	jobService := jobs.New(nodeID, store, eventService, 2)
-	moduleRegistry := modules.NewRegistry(store)
+	moduleRegistry := modules.NewRegistry(store, version.Version)
 	updaterService := updater.New(version.Version, cfg.StateDir)
+	if err := registerModuleJobs(jobService, moduleRegistry); err != nil {
+		logger.Error("failed to register module jobs", "error", err)
+		os.Exit(1)
+	}
 	jobCtx, jobCancel := context.WithCancel(context.Background())
 	defer jobCancel()
 	go func() {
