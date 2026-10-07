@@ -32,8 +32,8 @@ func callModuleHelper(
 	defer conn.Close()
 
 	request := updaterhelper.Request{
-		Operation:       operation,
-		ProtocolVersion: updaterhelper.ProtocolVersion,
+		Operation:        operation,
+		ProtocolVersion:  updaterhelper.ProtocolVersion,
 		ModuleID:         moduleID,
 		Image:            image,
 		ModuleHealthPort: health.Port,
