@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import type { RegisteredModule } from "../api/types";
 import { api } from "../api/client";
 import { useResource } from "../hooks/useResource";
@@ -94,10 +94,7 @@ export function ModulesPage({revision, canManage}: {revision: number; canManage:
   const dockerReady = value.capabilities.includes("host.docker");
   const catalogModules = value.catalog?.modules || [];
   const availableModules = catalogModules.filter((module) => !module.installed || module.update_available);
-  const catalogByID = useMemo(
-    () => new Map(catalogModules.map((module) => [module.manifest.id, module])),
-    [catalogModules],
-  );
+  const catalogByID = new Map(catalogModules.map((module) => [module.manifest.id, module]));
 
   return (
     <div className="page">
@@ -121,7 +118,7 @@ export function ModulesPage({revision, canManage}: {revision: number; canManage:
         </div>
 
         {!value.access.token_configured && canManage && (
-          <div className="stack">
+          <div>
             <div className="notice">{t("moduleCatalogTokenRequired")}</div>
             <input
               className="text-input mono"
