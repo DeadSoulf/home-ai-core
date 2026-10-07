@@ -127,6 +127,12 @@ export function ServerConsole() {
     }
   };
 
+  const statusLabel =
+    status === "connected" ? t("consoleStatusConnected") :
+    status === "connecting" ? t("consoleStatusConnecting") :
+    status === "error" ? t("consoleStatusError") :
+    t("consoleStatusDisconnected");
+
   return (
     <Panel
       className="wide console-panel"
@@ -134,7 +140,7 @@ export function ServerConsole() {
       action={
         <div className="console-actions">
           <span className={`status-badge ${status === "connected" ? "status-success" : status === "error" ? "status-failed" : ""}`}>
-            {t(`consoleStatus_${status}` as "consoleStatus_connected")}
+            {statusLabel}
           </span>
           <button type="button" className="button secondary" onClick={() => setOutput("")}>{t("consoleClear")}</button>
           {status === "connected"
