@@ -257,6 +257,7 @@ func (s *server) moduleRemove(
 		return
 	}
 
+	removeData := r.URL.Query().Get("data") == "1"
 	meta := metadataFromContext(r.Context())
 	job, err := s.jobs.Submit(r.Context(), state.JobRecord{
 		Type:          "module.remove",
@@ -264,7 +265,10 @@ func (s *server) moduleRemove(
 		ActorID:       actor.ID,
 		RequestID:     meta.RequestID,
 		CorrelationID: meta.CorrelationID,
-		Input:         map[string]any{"module_id": id},
+		Input: map[string]any{
+			"module_id":   id,
+			"remove_data": removeData,
+		},
 	})
 	if err != nil {
 		writeAPIError(w, r, http.StatusInternalServerError, "module_job_failed", "failed to queue module removal", nil)
@@ -278,7 +282,7 @@ func (s *server) moduleRemove(
 		"module",
 		id,
 		"success",
-		map[string]any{"job_id": job.ID, "data_preserved": true},
+		map[string]any{"job_id": job.ID, "data_preserved": !removeData},
 	)
 	writeJSON(w, http.StatusAccepted, map[string]any{"job": job})
 }

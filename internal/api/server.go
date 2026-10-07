@@ -21,6 +21,7 @@ type server struct {
 	jobs                JobService
 	eventHistoryService EventHistoryService
 	modules             ModuleService
+	moduleCatalog       ModuleCatalogService
 	updater             UpdaterService
 	realtime            *realtime.Hub
 	console             *consoleState
@@ -37,7 +38,12 @@ func New(
 	moduleService ModuleService,
 	updaterService UpdaterService,
 	realtimeHub *realtime.Hub,
+	moduleCatalogServices ...ModuleCatalogService,
 ) http.Handler {
+	var moduleCatalogService ModuleCatalogService
+	if len(moduleCatalogServices) > 0 {
+		moduleCatalogService = moduleCatalogServices[0]
+	}
 	s := &server{
 		nodeID:              nodeID,
 		logger:              logger,
@@ -46,6 +52,7 @@ func New(
 		jobs:                jobService,
 		eventHistoryService: eventHistoryService,
 		modules:             moduleService,
+		moduleCatalog:       moduleCatalogService,
 		updater:             updaterService,
 		realtime:            realtimeHub,
 		console:             newConsoleState(),
@@ -88,6 +95,10 @@ func New(
 	s.mux.HandleFunc("/api/v1/jobs", s.requireAuth("jobs.read", s.jobsCollection))
 	s.mux.HandleFunc("/api/v1/jobs/", s.requireAuth("jobs.read", s.jobResource))
 	s.mux.HandleFunc("/api/v1/modules", s.requireAuth("modules.read", s.modulesCollection))
+	s.mux.HandleFunc("GET /api/v1/modules/catalog", s.requireAuth("modules.read", s.moduleCatalogCollection))
+	s.mux.HandleFunc("GET /api/v1/modules/catalog/access", s.requireAuth("modules.read", s.moduleCatalogAccessStatus))
+	s.mux.HandleFunc("PUT /api/v1/modules/catalog/access", s.requireAuth("modules.manage", s.moduleCatalogAccessUpdate))
+	s.mux.HandleFunc("POST /api/v1/modules/catalog/{moduleID}/{action}", s.requireAuth("modules.manage", s.moduleCatalogAction))
 	s.mux.HandleFunc("POST /api/v1/modules/install", s.requireAuth("modules.manage", s.moduleInstall))
 	s.mux.HandleFunc("GET /api/v1/modules/navigation", s.requireAuth("", s.moduleNavigation))
 	s.mux.HandleFunc("GET /api/v1/modules/capabilities", s.requireAuth("modules.read", s.moduleCapabilities))

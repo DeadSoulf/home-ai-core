@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -22,8 +23,9 @@ type Store interface {
 }
 
 type Registry struct {
-	store       Store
-	coreVersion string
+	store               Store
+	coreVersion         string
+	registryCredentials func() (string, string)
 }
 
 func NewRegistry(store Store, coreVersion ...string) *Registry {
@@ -37,44 +39,46 @@ func NewRegistry(store Store, coreVersion ...string) *Registry {
 	}
 }
 
+func (r *Registry) SetRegistryCredentialsProvider(provider func() (string, string)) {
+	r.registryCredentials = provider
+}
+
 func (r *Registry) InstallManifest(ctx context.Context, manifest Manifest) (Registered, error) {
-	if err := ValidateManifest(manifest); err != nil {
+	capabilities, err := r.Capabilities(ctx)
+	if err != nil {
 		return Registered{}, err
 	}
-	if r.coreVersion != "" {
-		current := strings.TrimPrefix(r.coreVersion, "v")
-		if idx := strings.IndexAny(current, "+-"); idx >= 0 {
-			current = current[:idx]
-		}
-		if _, err := parseVersion(current); err == nil {
-			ok, err := satisfies(current, manifest.Core)
-			if err != nil {
-				return Registered{}, err
-			}
-			if !ok {
-				return Registered{}, fmt.Errorf("module %q is incompatible with Core %s", manifest.ID, r.coreVersion)
-			}
-		}
+	if err := CheckCompatibility(manifest, r.coreVersion, runtime.GOARCH, capabilities); err != nil {
+		return Registered{}, err
 	}
 
 	raw, err := json.Marshal(manifest)
 	if err != nil {
 		return Registered{}, fmt.Errorf("encode module manifest: %w", err)
 	}
-	if err := r.store.UpsertModule(ctx, state.ModuleRecord{
-		ID:           manifest.ID,
-		Version:      manifest.Version,
-		Status:       "registered",
-		ManifestJSON: string(raw),
-	}); err != nil {
-		return Registered{}, err
+
+	registryUser, registryToken := "", ""
+	if r.registryCredentials != nil {
+		registryUser, registryToken = r.registryCredentials()
 	}
-	if err := r.store.SetModuleStatus(ctx, manifest.ID, "registered", ""); err != nil {
+	if _, err := callModuleHelper(
+		ctx,
+		"docker.module.install",
+		manifest.ID,
+		manifest.Runtime.Docker.Image,
+		manifest.Runtime.Health,
+		registryUser,
+		registryToken,
+	); err != nil {
 		return Registered{}, err
 	}
 
-	if _, err := callModuleHelper(ctx, "docker.module.install", manifest.ID, manifest.Runtime.Docker.Image); err != nil {
-		_ = r.store.SetModuleStatus(context.WithoutCancel(ctx), manifest.ID, "error", err.Error())
+	if err := r.store.UpsertModule(ctx, state.ModuleRecord{
+		ID:           manifest.ID,
+		Version:      manifest.Version,
+		Status:       "enabled",
+		ManifestJSON: string(raw),
+	}); err != nil {
 		return Registered{}, err
 	}
 	if err := r.store.SetModuleStatus(ctx, manifest.ID, "enabled", ""); err != nil {
@@ -107,7 +111,7 @@ func (r *Registry) Control(ctx context.Context, id, operation string) (Registere
 	default:
 		return Registered{}, fmt.Errorf("unsupported module control operation %q", operation)
 	}
-	if _, err := callModuleHelper(ctx, helperOperation, id, ""); err != nil {
+	if _, err := callModuleHelper(ctx, helperOperation, id, "", HealthSpec{}, "", ""); err != nil {
 		_ = r.store.SetModuleStatus(context.WithoutCancel(ctx), id, "error", err.Error())
 		return Registered{}, err
 	}
@@ -117,7 +121,7 @@ func (r *Registry) Control(ctx context.Context, id, operation string) (Registere
 	return r.Get(ctx, id)
 }
 
-func (r *Registry) Remove(ctx context.Context, id string) error {
+func (r *Registry) Remove(ctx context.Context, id string, removeData ...bool) error {
 	item, err := r.Get(ctx, id)
 	if err != nil {
 		return err
@@ -125,7 +129,11 @@ func (r *Registry) Remove(ctx context.Context, id string) error {
 	if item.Manifest.Runtime.Type != "docker" {
 		return errors.New("module runtime is not Docker")
 	}
-	if _, err := callModuleHelper(ctx, "docker.module.remove", id, ""); err != nil {
+	operation := "docker.module.remove"
+	if len(removeData) > 0 && removeData[0] {
+		operation = "docker.module.remove-data"
+	}
+	if _, err := callModuleHelper(ctx, operation, id, "", HealthSpec{}, "", ""); err != nil {
 		_ = r.store.SetModuleStatus(context.WithoutCancel(ctx), id, "error", err.Error())
 		return err
 	}

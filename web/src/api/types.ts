@@ -191,6 +191,31 @@ export type RegisteredModule = {
   error?: string;
 };
 
+export type ModuleCatalogEntry = {
+  manifest: RegisteredModule["manifest"];
+  installed: boolean;
+  installed_version?: string;
+  installed_status?: RegisteredModule["status"];
+  update_available: boolean;
+  compatible: boolean;
+  compatibility_error?: string;
+};
+
+export type ModuleCatalogResponse = {
+  id: string;
+  generated_at: string;
+  source_sha?: string;
+  refreshed_at: string;
+  from_cache: boolean;
+  warning?: string;
+  modules: ModuleCatalogEntry[];
+};
+
+export type ModuleCatalogAccess = {
+  repository: string;
+  token_configured: boolean;
+};
+
 export type Job = {
   id: string;
   node_id: string;
