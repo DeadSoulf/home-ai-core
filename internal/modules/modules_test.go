@@ -63,7 +63,7 @@ func TestPlanInstallDependencyFirst(t *testing.T) {
 
 	app := validManifest("feature", "2.0.0")
 	app.Dependencies = []Dependency{{ID: "base", Version: ">=1.0.0 <2.0.0"}}
-	app.Capabilities.Requires = []string{"runtime.base"}
+	app.Capabilities.Requires = []string{"host.docker", "runtime.base"}
 
 	plan, err := PlanInstall(PlanInput{
 		CoreVersion:  "0.1.0",
