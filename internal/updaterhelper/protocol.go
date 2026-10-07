@@ -41,8 +41,12 @@ type Request struct {
 	SMBPassword     string            `json:"smb_password,omitempty"`
 	SMBUsers        []string          `json:"smb_users,omitempty"`
 	SMBShares       []SMBShareRequest `json:"smb_shares,omitempty"`
-	ModuleID        string            `json:"module_id,omitempty"`
-	Image           string            `json:"image,omitempty"`
+	ModuleID         string            `json:"module_id,omitempty"`
+	Image            string            `json:"image,omitempty"`
+	ModuleHealthPort int               `json:"module_health_port,omitempty"`
+	ModuleHealthPath string            `json:"module_health_path,omitempty"`
+	RegistryUsername string            `json:"registry_username,omitempty"`
+	RegistryToken    string            `json:"registry_token,omitempty"`
 }
 
 type SMBShareRequest struct {
