@@ -2,6 +2,7 @@ package modules
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -33,13 +34,36 @@ func validManifest(id, ver string) Manifest {
 	}
 }
 
+func persistManifest(t *testing.T, store *state.Store, manifest Manifest, status string) {
+	t.Helper()
+	raw, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpsertModule(context.Background(), state.ModuleRecord{
+		ID:           manifest.ID,
+		Version:      manifest.Version,
+		Status:       status,
+		ManifestJSON: string(raw),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if status != "registered" {
+		if err := store.SetModuleStatus(context.Background(), manifest.ID, status, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestDecodeManifestRejectsUnknownField(t *testing.T) {
 	raw := `{
-		"schema_version":1,
+		"schema_version":2,
 		"id":"test",
 		"name":"Test",
 		"version":"0.1.0",
 		"core":">=0.1.0 <1.0.0",
+		"runtime":{"type":"docker","docker":{"image":"ghcr.io/home-ai/test@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
+		"capabilities":{"requires":["host.docker"]},
 		"lifecycle":["install"],
 		"unknown":true
 	}`
@@ -98,11 +122,6 @@ func TestPlanInstallRejectsCycle(t *testing.T) {
 	}
 }
 
-type testModule struct{ manifest Manifest }
-
-func (m testModule) Manifest() Manifest   { return m.manifest }
-func (m testModule) Lifecycle() Lifecycle { return nil }
-
 func TestRegistryPersistsManifest(t *testing.T) {
 	ctx := context.Background()
 	store, err := state.Open(ctx, t.TempDir())
@@ -113,9 +132,7 @@ func TestRegistryPersistsManifest(t *testing.T) {
 
 	registry := NewRegistry(store)
 	manifest := validManifest("storage", "1.0.0")
-	if err := registry.Register(ctx, testModule{manifest: manifest}); err != nil {
-		t.Fatalf("Register() error = %v", err)
-	}
+	persistManifest(t, store, manifest, "registered")
 
 	got, err := registry.Get(ctx, "storage")
 	if err != nil {
@@ -137,9 +154,7 @@ func TestRegistrySetStatusPersistsDisabledState(t *testing.T) {
 	registry := NewRegistry(store)
 	manifest := validManifest("demo.agent", "0.2.0")
 	manifest.Capabilities.Provides = []string{"demo.agent"}
-	if err := registry.Register(ctx, testModule{manifest: manifest}); err != nil {
-		t.Fatal(err)
-	}
+	persistManifest(t, store, manifest, "registered")
 	if err := registry.SetStatus(ctx, "demo.agent", "disabled", ""); err != nil {
 		t.Fatal(err)
 	}
