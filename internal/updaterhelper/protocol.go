@@ -1,6 +1,6 @@
 package updaterhelper
 
-const ProtocolVersion = 6
+const ProtocolVersion = 7
 
 // HelperVersion is injected at build time. "dev" is used for local builds.
 var HelperVersion = "dev"
@@ -41,6 +41,8 @@ type Request struct {
 	SMBPassword     string            `json:"smb_password,omitempty"`
 	SMBUsers        []string          `json:"smb_users,omitempty"`
 	SMBShares       []SMBShareRequest `json:"smb_shares,omitempty"`
+	ModuleID        string            `json:"module_id,omitempty"`
+	Image           string            `json:"image,omitempty"`
 }
 
 type SMBShareRequest struct {
@@ -150,6 +152,8 @@ type Response struct {
 	DockerVersion      string                `json:"docker_version,omitempty"`
 	DockerNetworkReady bool                  `json:"docker_network_ready"`
 	DockerError        string                `json:"docker_error,omitempty"`
+	ModuleState        string                `json:"module_state,omitempty"`
+	ContainerID        string                `json:"container_id,omitempty"`
 }
 
 type Result struct {
