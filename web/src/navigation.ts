@@ -68,7 +68,7 @@ export function visibleNavigation(actor: Actor, modules?: ModuleNavigationState[
   }).filter((group) => group.items.length > 0);
 }
 
-export const systemSections = ["equipment", "storage", "network", "updates"] as const;
+export const systemSections = ["equipment", "storage", "network", "updates", "console"] as const;
 export type SystemSection = typeof systemSections[number];
 
 export const fileSections = ["folders", "storage", "windows"] as const;
@@ -110,6 +110,7 @@ export function accessiblePath(actor: Actor, path: string, modules?: ModuleNavig
   if (route === "/system") {
     const section = systemSection(path);
     if (section === "updates" && !hasPermission(actor, "updates.read")) return route;
+    if (section === "console" && !hasPermission(actor, "system.console")) return route;
     return route + "#" + section;
   }
   return route;
