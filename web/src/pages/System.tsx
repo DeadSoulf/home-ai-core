@@ -114,6 +114,11 @@ export function SystemPage({
   }
 
   useEffect(() => {
+    if (activeSection !== "updates" || !canReadUpdates) return;
+    void checkUpdate();
+  }, [activeSection, canReadUpdates]);
+
+  useEffect(() => {
     if (!canReadUpdates || !downloadingUpdate) return;
     let stopped = false;
     const poll = async () => {
