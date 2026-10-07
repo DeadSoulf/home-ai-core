@@ -87,6 +87,8 @@ internal/smarthome
 
 ---
 
+> Подробная фиксация механизма установки/обновления модулей: [`docs/MODULE_CATALOG_WORK_RU.md`](MODULE_CATALOG_WORK_RU.md)
+
 # Engineering milestones
 
 ## M0 — Core foundation
