@@ -224,9 +224,7 @@ func TestRegistryCapabilitiesIncludeProvidedCapabilities(t *testing.T) {
 	registry := NewRegistry(store)
 	manifest := validManifest("storage", "1.0.0")
 	manifest.Capabilities.Provides = []string{"storage.block"}
-	if err := registry.Register(ctx, testModule{manifest: manifest}); err != nil {
-		t.Fatalf("Register() error = %v", err)
-	}
+	persistManifest(t, store, manifest, "registered")
 
 	capabilities, err := registry.Capabilities(ctx)
 	if err != nil {
