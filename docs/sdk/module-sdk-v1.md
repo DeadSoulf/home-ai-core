@@ -107,6 +107,7 @@ Core discovers a small stable baseline:
 - `host.linux`
 - `host.arch.amd64` or `host.arch.arm64`
 - `host.systemd` when visible
+- `host.docker` when the Docker Engine socket is active
 - `host.kvm` when `/dev/kvm` is visible
 - `host.gpu` when DRM cards are visible
 

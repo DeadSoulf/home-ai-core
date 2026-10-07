@@ -61,7 +61,7 @@ Section: admin
 Priority: optional
 Architecture: $ARCH
 Maintainer: Home-AI-Core
-Depends: systemd, pci.ids, apt, iproute2, wireguard-tools, util-linux, fdisk, lvm2, smartmontools, e2fsprogs, xfsprogs, dosfstools
+Depends: systemd, pci.ids, apt, iproute2, docker.io, wireguard-tools, util-linux, fdisk, lvm2, smartmontools, e2fsprogs, xfsprogs, dosfstools
 Description: Home-AI-Core private home infrastructure control plane
  Home-AI-Core provides a modular Debian-based control plane for private
  home-server infrastructure, modules, jobs, events and the Web UI.
@@ -81,6 +81,7 @@ elif ! getent passwd home-ai-core >/dev/null 2>&1; then
 fi
 install -d -o home-ai-core -g home-ai-core -m 0700 /var/lib/home-ai-core
 install -d -o home-ai-core -g home-ai-core -m 0700 /var/lib/home-ai-core/update
+install -d -o root -g home-ai-core -m 0750 /var/lib/home-ai-core/modules
 install -d -o root -g home-ai-core -m 0750 /etc/home-ai-core
 if [ -f /etc/home-ai-core/home-ai-core.env ]; then
   sed -i '/^HOME_AI_AI_/d;/^HOME_AI_CLOUD_AI_/d' /etc/home-ai-core/home-ai-core.env
@@ -89,6 +90,7 @@ if command -v systemctl >/dev/null 2>&1; then
   systemctl daemon-reload || true
   systemctl enable home-ai-core.service >/dev/null 2>&1 || true
   systemctl enable home-ai-core-updater.service >/dev/null 2>&1 || true
+  systemctl enable --now docker.service >/dev/null 2>&1 || true
   if [ "$1" = "configure" ]; then
     systemctl restart home-ai-core-updater.service || true
     systemctl restart home-ai-core.service || true

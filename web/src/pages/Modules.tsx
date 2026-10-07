@@ -16,11 +16,19 @@ export function ModulesPage({revision}: {revision: number; canManage: boolean}) 
   if (loading && !data) return <LoadingState />;
   if (error && !data) return <ErrorState message={error} />;
   const value = data!;
+  const dockerReady = value.capabilities.includes("host.docker");
 
   return (
     <div className="page">
       <PageHeading title={t("modules")} subtitle={t("modulesSubtitleSimple")} />
       {error && <ErrorState message={error} />}
+
+      <Panel title={t("dockerRuntime")}>
+        <div className="details">
+          <div>{dockerReady ? t("dockerRuntimeReady") : t("dockerRuntimePreparing")}</div>
+          <div className="mono">host.docker: {dockerReady ? "yes" : "no"}</div>
+        </div>
+      </Panel>
 
       <div className="card-grid">
         {value.modules.map((module) => (
