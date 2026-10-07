@@ -80,7 +80,7 @@ manifest = {
     "product": "home-ai-core",
     "version": version,
     "architecture": arch,
-    "helper_protocol": 5,
+    "helper_protocol": 6,
     "helper_version": version,
     "files": files,
 }
