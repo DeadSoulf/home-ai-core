@@ -226,6 +226,7 @@ export default function App() {
             canManageStorage={has("storage.manage")}
             canReadNetwork={has("network.read")}
             canManageNetwork={has("network.manage")}
+            canUseConsole={has("system.console")}
           />
         )
         : accountPage;
