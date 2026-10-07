@@ -12,6 +12,7 @@ import (
 )
 
 type JobService interface {
+	Submit(context.Context, state.JobRecord) (state.JobRecord, error)
 	Get(context.Context, string) (state.JobRecord, error)
 	List(context.Context, string, int) ([]state.JobRecord, error)
 	Cancel(context.Context, string) (state.JobRecord, error)
