@@ -58,8 +58,8 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 		return moduleContainerStatus{}, "", errors.New("Docker CLI is unavailable")
 	}
 
-	if output, err := exec.CommandContext(ctx, dockerPath, "pull", image).CombinedOutput(); err != nil {
-		return moduleContainerStatus{}, "", fmt.Errorf("pull module image: %s", commandError(output, err))
+	if err := pullDockerModuleImage(ctx, dockerPath, image); err != nil {
+		return moduleContainerStatus{}, "", err
 	}
 
 	name := moduleContainerName(moduleID)
@@ -113,6 +113,40 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 	}
 
 	return moduleContainerStatus{State: "running", ContainerID: containerID}, "module installed and started", nil
+}
+
+func pullDockerModuleImage(ctx context.Context, dockerPath, image string) error {
+	token := strings.TrimSpace(os.Getenv("HOME_AI_MODULE_CATALOG_TOKEN"))
+	if token == "" || !strings.HasPrefix(strings.ToLower(image), "ghcr.io/") {
+		if output, err := exec.CommandContext(ctx, dockerPath, "pull", image).CombinedOutput(); err != nil {
+			return fmt.Errorf("pull module image: %s", commandError(output, err))
+		}
+		return nil
+	}
+
+	user := strings.TrimSpace(os.Getenv("HOME_AI_MODULE_REGISTRY_USER"))
+	if user == "" {
+		user = "DeadSoulf"
+	}
+	configDir, err := os.MkdirTemp("", "home-ai-docker-auth-*")
+	if err != nil {
+		return fmt.Errorf("create temporary Docker auth directory: %w", err)
+	}
+	defer os.RemoveAll(configDir)
+
+	env := append(os.Environ(), "DOCKER_CONFIG="+configDir)
+	login := exec.CommandContext(ctx, dockerPath, "login", "ghcr.io", "--username", user, "--password-stdin")
+	login.Env = env
+	login.Stdin = strings.NewReader(token)
+	if output, err := login.CombinedOutput(); err != nil {
+		return fmt.Errorf("authenticate to private module registry: %s", commandError(output, err))
+	}
+	pull := exec.CommandContext(ctx, dockerPath, "pull", image)
+	pull.Env = env
+	if output, err := pull.CombinedOutput(); err != nil {
+		return fmt.Errorf("pull module image: %s", commandError(output, err))
+	}
+	return nil
 }
 
 func controlDockerModule(ctx context.Context, moduleID, action string) (moduleContainerStatus, string, error) {
