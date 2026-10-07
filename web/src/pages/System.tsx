@@ -7,6 +7,7 @@ import { useI18n } from "../i18n";
 import { PageHeading } from "./Dashboard";
 import { StorageBrowser } from "../components/StorageBrowser";
 import { NetworkManagement } from "../components/NetworkManagement";
+import { ServerConsole } from "../components/ServerConsole";
 import type { SystemSection } from "../navigation";
 
 function bytes(value = 0) {
@@ -29,6 +30,7 @@ export function SystemPage({
   canReadUpdates,
   canManageUpdates,
   canManageStorage,
+  canUseConsole,
 }: {
   revision: number;
   canReadNetwork: boolean;
@@ -38,9 +40,14 @@ export function SystemPage({
   canReadUpdates: boolean;
   canManageUpdates: boolean;
   canManageStorage: boolean;
+  canUseConsole: boolean;
 }) {
   const {t, date} = useI18n();
-  const activeSection = section === "updates" && !canReadUpdates ? "equipment" : section;
+  const activeSection =
+    (section === "updates" && !canReadUpdates) ||
+    (section === "console" && !canUseConsole)
+      ? "equipment"
+      : section;
   const mounted = useRef(true);
   const timers = useRef(new Set<number>());
   useEffect(() => {
@@ -229,8 +236,11 @@ export function SystemPage({
     <div className="page">
       <PageHeading title={t("system")} subtitle={t("serverOverview")} />
       <nav className="server-sections" aria-label={t("serverSections")}>
-        {(["equipment", "storage", "network", "updates"] as const)
-          .filter((item) => item !== "updates" || canReadUpdates)
+        {(["equipment", "storage", "network", "updates", "console"] as const)
+          .filter((item) =>
+            (item !== "updates" || canReadUpdates) &&
+            (item !== "console" || canUseConsole)
+          )
           .map((item) => <button type="button" key={item} className={`button secondary${activeSection === item ? " active" : ""}`}
             aria-current={activeSection === item ? "page" : undefined} onClick={() => onSectionChange(item)}>{t(item)}</button>)}
       </nav>
@@ -391,6 +401,8 @@ export function SystemPage({
         </Panel>
 
         }
+        {activeSection === "console" && canUseConsole && <ServerConsole />}
+
         {activeSection === "network" && <NetworkManagement
           interfaces={value.system.network_interfaces}
           canReadNetwork={canReadNetwork}
