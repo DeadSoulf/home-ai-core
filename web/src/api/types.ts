@@ -226,6 +226,18 @@ export type RealtimeEvent = {
   data?: unknown;
 };
 
+export type ModuleNavigationState = {
+  module_id: string;
+  status: "registered" | "enabled" | "disabled" | "error";
+  items?: Array<{
+    id: string;
+    title: string;
+    route: string;
+    icon?: string;
+    order?: number;
+  }>;
+};
+
 export type UpdateStatus = {
   current_version: string;
   available_version?: string;
@@ -242,65 +254,6 @@ export type UpdateStatus = {
   helper_error?: string;
   rollback_available: boolean;
   rollback_version?: string;
-};
-
-export type AIStatus = {
-  module_id: string;
-  state: string;
-  version: string;
-  tool_count: number;
-  provider_configured: boolean;
-  provider_id?: string;
-  provider_model?: string;
-  provider_modes?: Array<"local" | "cloud" | "auto">;
-  cloud_provider_configured: boolean;
-  cloud_provider_enabled: boolean;
-  cloud_provider_model?: string;
-  conversation_store_ready: boolean;
-};
-
-export type ModuleNavigationState = {
-  module_id: string;
-  status: "registered" | "enabled" | "disabled" | "error";
-  items?: Array<{
-    id: string;
-    title: string;
-    route: string;
-    icon?: string;
-    order?: number;
-  }>;
-};
-
-export type AIConversation = {
-  id: string;
-  user_id: string;
-  title: string;
-  created_at: string;
-  updated_at: string;
-  closed_at?: string;
-};
-
-export type AIAction = {
-  id: string;
-  conversation_id: string;
-  user_id: string;
-  tool_id: string;
-  tool_name: string;
-  sensitivity: "change" | "sensitive";
-  input: Record<string, unknown>;
-  status: "pending" | "executing" | "executed" | "rejected" | "failed";
-  result?: unknown;
-  error_code?: string;
-  created_at: string;
-  updated_at: string;
-};
-
-export type AIMessage = {
-  id: string;
-  conversation_id: string;
-  role: "user" | "assistant";
-  content: string;
-  created_at: string;
 };
 
 export type UpdaterState = {
@@ -360,10 +313,10 @@ export type NetworkProfileStatus = {
   profiles: NetworkProfile[];
 };
 
-export type StoragePurpose = "files" | "video";
+export type StoragePurpose = "files";
 
 export type StoragePurposeUsage = {
-  type: "file_pool" | "nvr_archive";
+  type: "file_pool";
   id: string;
   name: string;
   root_path?: string;
@@ -486,165 +439,4 @@ export type SMBStatus = {
   shares: SMBShare[];
   hard_quota_ready: boolean;
   hard_quota_error?: string;
-};
-
-
-
-export type NVRStorageTarget = {
-  id?: string;
-  device: string;
-  filesystem_uuid?: string;
-  mountpoint?: string;
-  filesystem?: string;
-  label?: string;
-  size_bytes?: number;
-  free_bytes?: number;
-  free_known: boolean;
-  reserve_percent: number;
-  active: boolean;
-  ready: boolean;
-  mountpoints: string[];
-  archive_bytes?: number;
-};
-
-export type NVRStatus = {
-  module_id: string;
-  state: "registered" | "enabled" | "disabled" | "error";
-  version: string;
-  camera_count: number;
-  online_count: number;
-  offline_count: number;
-  supervisor_running: boolean;
-  media_runtime_ready: boolean;
-  live_runtime_ready: boolean;
-  active_live_streams: number;
-  recording_ready: boolean;
-  active_recordings: number;
-  secret_store_ready: boolean;
-  onvif_ready: boolean;
-  foundation_stage: string;
-};
-
-export type NVRCamera = {
-  id: string;
-  name: string;
-  enabled: boolean;
-  source_type: "rtsp" | "onvif";
-  transport: "tcp" | "udp";
-  recording_mode: "off" | "continuous" | "motion";
-  audio_enabled: boolean;
-  has_credentials: boolean;
-  runtime: {
-    state: "disabled" | "connecting" | "online" | "offline";
-    last_seen_at?: string;
-    last_checked_at?: string;
-    last_error?: string;
-    reconnect_count: number;
-  };
-  recording: {
-    active: boolean;
-    last_segment_at?: string;
-    last_segment_path?: string;
-    last_error?: string;
-  };
-  created_at: string;
-  updated_at: string;
-};
-
-export type NVRStreamProfile = {
-  id: string;
-  camera_id: string;
-  role: "main" | "sub";
-  codec?: string;
-  width?: number;
-  height?: number;
-  fps?: number;
-  bitrate_bps?: number;
-  created_at: string;
-  updated_at: string;
-};
-
-export type NVRCameraConfig = NVRCamera & {
-  address: string;
-  substream_address?: string;
-  profiles?: NVRStreamProfile[];
-};
-
-export type NVRProbe = {
-  codec: string;
-  width: number;
-  height: number;
-  fps: number;
-  bitrate_bps: number;
-  has_audio: boolean;
-  substream?: NVRProbe;
-};
-
-export type NVRCameraInput = {
-  name: string;
-  address: string;
-  substream_address?: string;
-  username?: string;
-  password?: string;
-  transport?: "tcp" | "udp";
-  recording_mode?: "off" | "continuous" | "motion";
-  audio_enabled: boolean;
-  enabled?: boolean;
-  clear_credentials?: boolean;
-  clear_substream?: boolean;
-};
-
-
-export type NVRCameraDiscoveryService = {
-  protocol: string;
-  port: number;
-  address?: string;
-};
-
-export type NVRCameraDiscoveryDevice = {
-  id: string;
-  name: string;
-  ip: string;
-  mac?: string;
-  vendor?: string;
-  model?: string;
-  device_type: "camera" | "recorder" | "possible_camera";
-  confidence: "high" | "medium" | "possible";
-  sources: string[];
-  services: NVRCameraDiscoveryService[];
-  onvif_address?: string;
-  rtsp_address_hint?: string;
-  substream_address_hint?: string;
-};
-
-export type NVRONVIFDevice = {
-  id: string;
-  name: string;
-  address: string;
-  ip: string;
-  scopes?: string[];
-};
-
-export type NVRONVIFProfile = {
-  token: string;
-  name: string;
-  stream_uri: string;
-  codec?: string;
-  width?: number;
-  height?: number;
-  fps?: number;
-  bitrate_bps?: number;
-  has_audio: boolean;
-};
-
-export type NVRONVIFImportInput = {
-  name: string;
-  address: string;
-  username?: string;
-  password?: string;
-  main_profile_token: string;
-  sub_profile_token?: string;
-  transport?: "tcp" | "udp";
-  recording_mode?: "off" | "continuous" | "motion";
-  audio_enabled: boolean;
 };

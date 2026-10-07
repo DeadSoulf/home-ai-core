@@ -44,6 +44,13 @@ func Open(ctx context.Context, stateDir string) (*Store, error) {
 		_ = db.Close()
 		return nil, err
 	}
+	// Remove filesystem state left by the retired embedded media module.
+	// The SQL cleanup migration removes its database state; this removes its
+	// encrypted credential directory from upgraded installations.
+	if err := os.RemoveAll(filepath.Join(stateDir, "nvr-secrets")); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("remove retired module state: %w", err)
+	}
 
 	return store, nil
 }

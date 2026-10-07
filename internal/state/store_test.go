@@ -20,8 +20,8 @@ func TestOpenAppliesMigrationsAndPersistsNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SchemaVersion() error = %v", err)
 	}
-	if version != 24 {
-		t.Fatalf("schema version = %d, want 24", version)
+	if version != 25 {
+		t.Fatalf("schema version = %d, want 25", version)
 	}
 
 	const nodeID = "00000000-0000-4000-8000-000000000001"
@@ -95,8 +95,8 @@ func TestMigrationsAreIdempotent(t *testing.T) {
 	if err := store.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM schema_migrations").Scan(&count); err != nil {
 		t.Fatalf("count migrations: %v", err)
 	}
-	if count != 24 {
-		t.Fatalf("migration rows = %d, want 24", count)
+	if count != 19 {
+		t.Fatalf("migration rows = %d, want 19", count)
 	}
 }
 
@@ -146,25 +146,25 @@ func TestModuleStatusPersistsAcrossRegistration(t *testing.T) {
 	defer store.Close()
 
 	if err := store.UpsertModule(ctx, ModuleRecord{
-		ID:           "ai.agent",
+		ID:           "demo.module",
 		Version:      "0.2.0",
 		Status:       "registered",
-		ManifestJSON: `{"id":"ai.agent","version":"0.2.0"}`,
+		ManifestJSON: `{"id":"demo.module","version":"0.2.0"}`,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.SetModuleStatus(ctx, "ai.agent", "disabled", ""); err != nil {
+	if err := store.SetModuleStatus(ctx, "demo.module", "disabled", ""); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.UpsertModule(ctx, ModuleRecord{
-		ID:           "ai.agent",
+		ID:           "demo.module",
 		Version:      "0.3.0",
 		Status:       "registered",
-		ManifestJSON: `{"id":"ai.agent","version":"0.3.0"}`,
+		ManifestJSON: `{"id":"demo.module","version":"0.3.0"}`,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	record, err := store.Module(ctx, "ai.agent")
+	record, err := store.Module(ctx, "demo.module")
 	if err != nil {
 		t.Fatal(err)
 	}

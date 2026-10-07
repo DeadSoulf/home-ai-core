@@ -19,7 +19,6 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 
-	"github.com/DeadSoulf/home-ai-core/internal/aiagent"
 	"github.com/DeadSoulf/home-ai-core/internal/filedata"
 	"github.com/DeadSoulf/home-ai-core/internal/modules"
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
@@ -732,240 +731,6 @@ func TestModulesAPI(t *testing.T) {
 	}
 }
 
-func TestCloudAIModuleRuntimeControl(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	const nodeID = "00000000-0000-4000-8000-000000000000"
-	moduleService := fakeModules{
-		items: []modules.Registered{
-			{
-				Manifest: modules.Manifest{
-					SchemaVersion: 1, ID: "ai.agent", Name: "AI Agent",
-					Version: "0.8.0", Core: ">=0.1.0 <1.0.0", Lifecycle: []string{"backup"},
-				},
-				Status: "enabled",
-			},
-			{
-				Manifest: modules.Manifest{
-					SchemaVersion: 1, ID: "ai.cloud", Name: "Cloud AI",
-					Version: "0.1.0", Core: ">=0.1.0 <1.0.0", Lifecycle: []string{"backup"},
-				},
-				Status: "disabled",
-			},
-		},
-	}
-	local := aiagent.DeterministicProvider{
-		ProviderID: "local",
-		Response:   aiagent.ModelResponse{Message: aiagent.Message{Role: aiagent.RoleAssistant, Content: "local"}},
-	}
-	cloud := aiagent.DeterministicProvider{
-		ProviderID: "cloud",
-		Response:   aiagent.ModelResponse{Message: aiagent.Message{Role: aiagent.RoleAssistant, Content: "cloud"}},
-	}
-	router := aiagent.NewRoutingProvider(local, cloud)
-	handler := New(
-		nodeID,
-		logger,
-		fakeState{schemaVersion: 19},
-		defaultFakeSecurity(),
-		nil,
-		nil,
-		moduleService,
-		nil,
-		realtime.New(nodeID, logger),
-		router,
-	)
-
-	post := func(operation string) *httptest.ResponseRecorder {
-		req := httptest.NewRequest(
-			http.MethodPost,
-			"/api/v1/modules/ai.cloud/control",
-			strings.NewReader(`{"operation":"`+operation+`"}`),
-		)
-		req.Header.Set("Authorization", "Bearer test")
-		req.Header.Set("Content-Type", "application/json")
-		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, req)
-		return rec
-	}
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/modules/ai.cloud/test", strings.NewReader(`{}`))
-	req.Header.Set("Authorization", "Bearer test")
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"ok":true`) {
-		t.Fatalf("cloud test status = %d: %s", rec.Code, rec.Body.String())
-	}
-
-	rec = post("enable")
-	if rec.Code != http.StatusOK {
-		t.Fatalf("cloud enable status = %d: %s", rec.Code, rec.Body.String())
-	}
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/ai/status", nil)
-	req.Header.Set("Authorization", "Bearer test")
-	rec = httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"cloud_provider_enabled":true`) {
-		t.Fatalf("AI status after cloud enable = %d: %s", rec.Code, rec.Body.String())
-	}
-
-	rec = post("disable")
-	if rec.Code != http.StatusOK {
-		t.Fatalf("cloud disable status = %d: %s", rec.Code, rec.Body.String())
-	}
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/ai/status", nil)
-	req.Header.Set("Authorization", "Bearer test")
-	rec = httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"cloud_provider_enabled":false`) {
-		t.Fatalf("AI status after cloud disable = %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestAIModuleRuntimeControl(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	const nodeID = "00000000-0000-4000-8000-000000000000"
-	moduleService := fakeModules{
-		items: []modules.Registered{{
-			Manifest: modules.Manifest{
-				SchemaVersion: 1,
-				ID:            "ai.agent",
-				Name:          "AI Agent",
-				Version:       "0.2.0",
-				Core:          ">=0.1.0 <1.0.0",
-				Lifecycle:     []string{"backup", "restore"},
-			},
-			Status: "enabled",
-		}},
-	}
-	handler := New(
-		nodeID,
-		logger,
-		fakeState{schemaVersion: 19},
-		defaultFakeSecurity(),
-		nil,
-		nil,
-		moduleService,
-		nil,
-		realtime.New(nodeID, logger),
-	)
-
-	post := func(operation string) *httptest.ResponseRecorder {
-		req := httptest.NewRequest(
-			http.MethodPost,
-			"/api/v1/modules/ai.agent/control",
-			strings.NewReader(`{"operation":"`+operation+`"}`),
-		)
-		req.Header.Set("Authorization", "Bearer test")
-		req.Header.Set("Content-Type", "application/json")
-		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, req)
-		return rec
-	}
-
-	rec := post("disable")
-	if rec.Code != http.StatusOK {
-		t.Fatalf("disable status = %d: %s", rec.Code, rec.Body.String())
-	}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/ai/status", nil)
-	req.Header.Set("Authorization", "Bearer test")
-	rec = httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"state":"disabled"`) {
-		t.Fatalf("AI status after disable = %d: %s", rec.Code, rec.Body.String())
-	}
-
-	rec = post("restart")
-	if rec.Code != http.StatusOK {
-		t.Fatalf("restart status = %d: %s", rec.Code, rec.Body.String())
-	}
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/ai/status", nil)
-	req.Header.Set("Authorization", "Bearer test")
-	rec = httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"state":"ready"`) {
-		t.Fatalf("AI status after restart = %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestAIModuleRestartUsesSQLiteSupportedStatus(t *testing.T) {
-	ctx := context.Background()
-	store, err := state.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer store.Close()
-
-	registry := modules.NewRegistry(store)
-	if err := registry.Register(ctx, aiagent.NewModule()); err != nil {
-		t.Fatal(err)
-	}
-
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	const nodeID = "00000000-0000-4000-8000-000000000000"
-	handler := New(
-		nodeID,
-		logger,
-		fakeState{schemaVersion: 19},
-		defaultFakeSecurity(),
-		nil,
-		nil,
-		registry,
-		nil,
-		realtime.New(nodeID, logger),
-	)
-
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/api/v1/modules/ai.agent/control",
-		strings.NewReader(`{"operation":"restart"}`),
-	)
-	req.Header.Set("Authorization", "Bearer test")
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("restart status = %d: %s", rec.Code, rec.Body.String())
-	}
-
-	record, err := store.Module(ctx, "ai.agent")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if record.Status != "enabled" {
-		t.Fatalf("persisted status = %q, want enabled", record.Status)
-	}
-}
-
-func TestAIModuleRuntimeControlRequiresManagePermission(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	const nodeID = "00000000-0000-4000-8000-000000000000"
-	sec := defaultFakeSecurity()
-	filtered := make([]string, 0, len(sec.actor.Permissions))
-	for _, permission := range sec.actor.Permissions {
-		if permission != "modules.manage" {
-			filtered = append(filtered, permission)
-		}
-	}
-	sec.actor.Permissions = filtered
-	moduleService := fakeModules{
-		items: []modules.Registered{{
-			Manifest: modules.Manifest{SchemaVersion: 1, ID: "ai.agent", Name: "AI Agent", Version: "0.2.0", Core: ">=0.1.0 <1.0.0"},
-			Status:   "enabled",
-		}},
-	}
-	handler := New(nodeID, logger, fakeState{schemaVersion: 19}, sec, nil, nil, moduleService, nil, realtime.New(nodeID, logger))
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/modules/ai.agent/control", strings.NewReader(`{"operation":"disable"}`))
-	req.Header.Set("Authorization", "Bearer test")
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("status = %d, want 403: %s", rec.Code, rec.Body.String())
-	}
-}
-
 func TestUsersListRequiresPermission(t *testing.T) {
 	sec := defaultFakeSecurity()
 	sec.actor.Permissions = []string{"security.self.read"}
@@ -1118,13 +883,13 @@ func TestStoragePurposeResponseKeepsMissingAssignment(t *testing.T) {
 	record := state.StoragePurposeRecord{
 		DevicePath:     "/dev/sdc1",
 		FilesystemUUID: "uuid-missing",
-		Purpose:        state.StoragePurposeVideo,
+		Purpose:        state.StoragePurposeFiles,
 	}
 	response := storagePurposeResponseFor(record, nil)
 	if response.Present {
 		t.Fatal("missing storage was reported as present")
 	}
-	if response.DevicePath != "/dev/sdc1" || response.Purpose != state.StoragePurposeVideo {
+	if response.DevicePath != "/dev/sdc1" || response.Purpose != state.StoragePurposeFiles {
 		t.Fatalf("unexpected missing response: %#v", response)
 	}
 }
@@ -1262,10 +1027,10 @@ func TestFilePoolStorageNodeRequiresFilesAssignment(t *testing.T) {
 		t.Fatalf("unexpected backing storage: %#v", node)
 	}
 
-	videoAssignment := append([]state.StoragePurposeRecord(nil), filesAssignment...)
-	videoAssignment[0].Purpose = state.StoragePurposeVideo
-	if _, err := filePoolStorageNode("/mnt/home-ai-core/files", videoAssignment, nodes); err == nil {
-		t.Fatal("video storage was accepted for a file pool")
+	invalidAssignment := append([]state.StoragePurposeRecord(nil), filesAssignment...)
+	invalidAssignment[0].Purpose = "other"
+	if _, err := filePoolStorageNode("/mnt/home-ai-core/files", invalidAssignment, nodes); err == nil {
+		t.Fatal("non-file storage was accepted for a file pool")
 	}
 }
 
