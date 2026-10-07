@@ -18,7 +18,12 @@ type helperModuleResult struct {
 	Message     string
 }
 
-func callModuleHelper(ctx context.Context, operation, moduleID, image string) (helperModuleResult, error) {
+func callModuleHelper(
+	ctx context.Context,
+	operation, moduleID, image string,
+	health HealthSpec,
+	registryUser, registryToken string,
+) (helperModuleResult, error) {
 	dialer := net.Dialer{}
 	conn, err := dialer.DialContext(ctx, "unix", moduleHelperSocketPath)
 	if err != nil {
@@ -29,8 +34,12 @@ func callModuleHelper(ctx context.Context, operation, moduleID, image string) (h
 	request := updaterhelper.Request{
 		Operation:       operation,
 		ProtocolVersion: updaterhelper.ProtocolVersion,
-		ModuleID:        moduleID,
-		Image:           image,
+		ModuleID:         moduleID,
+		Image:            image,
+		ModuleHealthPort: health.Port,
+		ModuleHealthPath: health.Path,
+		RegistryUsername: registryUser,
+		RegistryToken:    registryToken,
 	}
 	if err := json.NewEncoder(conn).Encode(request); err != nil {
 		return helperModuleResult{}, err
