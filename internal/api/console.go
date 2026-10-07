@@ -21,10 +21,10 @@ import (
 )
 
 const (
-	consoleTicketLifetime = 30 * time.Second
+	consoleTicketLifetime  = 30 * time.Second
 	consoleSessionLifetime = 2 * time.Hour
-	consoleReadLimit = 32 << 10
-	consoleChunkSize = 4096
+	consoleReadLimit       = 32 << 10
+	consoleChunkSize       = 4096
 )
 
 type consoleTicket struct {
