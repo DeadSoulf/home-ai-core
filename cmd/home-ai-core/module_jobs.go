@@ -66,14 +66,19 @@ func registerModuleJobs(service *jobs.Service, registry *modules.Registry) error
 		if moduleID == "" {
 			return nil, errors.New("module id is missing")
 		}
+		removeData, _ := job.Input["remove_data"].(bool)
 		_ = reporter.Progress(ctx, 2000, "removing module container")
-		if err := registry.Remove(ctx, moduleID); err != nil {
+		if err := registry.Remove(ctx, moduleID, removeData); err != nil {
 			return nil, err
 		}
-		_ = reporter.Progress(ctx, 9500, "module removed; persistent data preserved")
+		message := "module removed; persistent data preserved"
+		if removeData {
+			message = "module and persistent data removed"
+		}
+		_ = reporter.Progress(ctx, 9500, message)
 		return map[string]any{
 			"module_id":      moduleID,
-			"data_preserved": true,
+			"data_preserved": !removeData,
 		}, nil
 	}); err != nil {
 		return err
