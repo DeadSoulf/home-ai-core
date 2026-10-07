@@ -84,9 +84,11 @@ func New(
 	s.mux.HandleFunc("/api/v1/jobs", s.requireAuth("jobs.read", s.jobsCollection))
 	s.mux.HandleFunc("/api/v1/jobs/", s.requireAuth("jobs.read", s.jobResource))
 	s.mux.HandleFunc("/api/v1/modules", s.requireAuth("modules.read", s.modulesCollection))
+	s.mux.HandleFunc("POST /api/v1/modules/install", s.requireAuth("modules.manage", s.moduleInstall))
 	s.mux.HandleFunc("GET /api/v1/modules/navigation", s.requireAuth("", s.moduleNavigation))
 	s.mux.HandleFunc("/api/v1/modules/capabilities", s.requireAuth("modules.read", s.moduleCapabilities))
 	s.mux.HandleFunc("POST /api/v1/modules/{moduleID}/control", s.requireAuth("modules.manage", s.moduleControl))
+	s.mux.HandleFunc("DELETE /api/v1/modules/{moduleID}", s.requireAuth("modules.manage", s.moduleRemove))
 	s.mux.HandleFunc("/api/v1/modules/", s.requireAuth("modules.read", s.moduleResource))
 	s.mux.HandleFunc("/api/v1/update", s.requireAuth("updates.read", func(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
 		s.updateStatus(w, r)
