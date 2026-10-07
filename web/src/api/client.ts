@@ -585,13 +585,29 @@ export const api = {
     return result.capabilities;
   },
 
+  installModule: async (manifest: RegisteredModule["manifest"]) => {
+    const result = await postJSON<{job: Job}>("/api/v1/modules/install", manifest, true);
+    return result.job;
+  },
+
   controlModule: async (id: string, operation: "enable" | "disable" | "restart") => {
-    const result = await postJSON<{module: RegisteredModule}>(
+    const result = await postJSON<{job: Job}>(
       `/api/v1/modules/${encodeURIComponent(id)}/control`,
       {operation},
       true,
     );
-    return result.module;
+    return result.job;
+  },
+
+  removeModule: async (id: string) => {
+    const headers = new Headers();
+    const token = getCSRFToken();
+    if (token) headers.set("X-CSRF-Token", token);
+    const result = await request<{job: Job}>(
+      `/api/v1/modules/${encodeURIComponent(id)}`,
+      {method: "DELETE", headers},
+    );
+    return result.job;
   },
 
 
