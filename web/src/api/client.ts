@@ -168,6 +168,13 @@ export const api = {
     return result.actor;
   },
 
+  consoleTicket: () => postJSON<{ticket: string; expires_at: string}>(
+    "/api/v1/system/console/session",
+    undefined,
+    true,
+  ),
+
+
   logout: async () => {
     await postJSON<void>("/api/v1/auth/logout", undefined, true);
     setCSRFToken();
