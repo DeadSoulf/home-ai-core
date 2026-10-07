@@ -15,7 +15,7 @@ const maxOutputChars = 256 * 1024;
 
 export function ServerConsole() {
   const {t} = useI18n();
-  const socketRef = useRef<WebSocket>();
+  const socketRef = useRef<WebSocket | undefined>(undefined);
   const outputRef = useRef<HTMLPreElement>(null);
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef(0);
