@@ -23,6 +23,7 @@ type server struct {
 	modules             ModuleService
 	updater             UpdaterService
 	realtime            *realtime.Hub
+	console             *consoleState
 	mux                 *http.ServeMux
 }
 
@@ -47,6 +48,7 @@ func New(
 		modules:             moduleService,
 		updater:             updaterService,
 		realtime:            realtimeHub,
+		console:             newConsoleState(),
 		mux:                 http.NewServeMux(),
 	}
 
@@ -68,6 +70,8 @@ func New(
 	s.mux.HandleFunc("PUT /api/v1/security/users/{userID}/access", s.requireAuth("security.users.manage", s.userAccess))
 	s.mux.HandleFunc("PUT /api/v1/security/users/{userID}/identity", s.requireAuth("security.users.manage", s.userIdentity))
 	s.mux.HandleFunc("PUT /api/v1/security/users/{userID}/password", s.requireAuth("security.users.manage", s.userPassword))
+	s.mux.HandleFunc("POST /api/v1/system/console/session", s.requireAuth("system.console", s.consoleSession))
+	s.mux.HandleFunc("GET /api/v1/system/console", s.requireAuth("system.console", s.consoleSocket))
 	s.mux.HandleFunc("/api/v1/system", s.requireAuth(
 		"system.read",
 		func(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
