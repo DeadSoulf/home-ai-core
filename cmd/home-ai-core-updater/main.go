@@ -215,7 +215,7 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		_ = conn.SetDeadline(time.Now().Add(31 * time.Minute))
 		ctx, cancel := context.WithTimeout(parent, 30*time.Minute)
 		defer cancel()
-		status, message, err := performDockerModuleOperation(ctx, request, gid)
+		status, message, err := performDockerModuleOperation(ctx, request, uid, gid)
 		if err != nil {
 			logger.Error("Docker module operation failed", "operation", request.Operation, "module_id", request.ModuleID, "error", err)
 			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})
