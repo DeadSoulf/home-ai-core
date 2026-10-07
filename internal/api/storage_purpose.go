@@ -107,7 +107,6 @@ func (s *server) storagePurposes(
 			}
 		}
 
-
 		pools, err := s.state.ListNASPools(r.Context())
 		if err != nil {
 			writeAPIError(w, r, http.StatusInternalServerError, "storage_usage_unavailable", "storage usage is unavailable", nil)
