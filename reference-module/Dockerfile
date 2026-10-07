@@ -1,8 +1,10 @@
-FROM golang:1.27-bookworm AS build
+FROM --platform=$BUILDPLATFORM golang:1.27-bookworm AS build
+ARG TARGETOS
+ARG TARGETARCH
 WORKDIR /src
 COPY go.mod ./
 COPY main.go ./
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/home-ai-reference-module .
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/home-ai-reference-module .
 
 FROM scratch
 LABEL org.opencontainers.image.source="https://github.com/DeadSoulf/home-ai-core"
