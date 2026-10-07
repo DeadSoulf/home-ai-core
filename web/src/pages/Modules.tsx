@@ -60,32 +60,6 @@ export function ModulesPage({revision, canManage}: {revision: number; canManage:
         </div>
       </Panel>
 
-      {canManage && (
-        <Panel title={t("moduleInstallManifest")}>
-          <p>{t("moduleInstallManifestHint")}</p>
-          <textarea
-            className="text-input mono"
-            rows={12}
-            value={manifestText}
-            onChange={(event) => setManifestText(event.target.value)}
-            placeholder={'{"schema_version":2,...}'}
-            disabled={busy}
-          />
-          <div className="button-row">
-            <button
-              type="button"
-              className="button primary"
-              disabled={busy || !manifestText.trim() || !dockerReady}
-              onClick={() => void installManifest()}
-            >
-              {busy ? t("working") : t("moduleInstall")}
-            </button>
-          </div>
-          {queuedJob && <div className="notice">{t("moduleJobQueued")}: <span className="mono">{queuedJob}</span></div>}
-          {actionError && <div className="form-error">{actionError}</div>}
-        </Panel>
-      )}
-
       <div className="card-grid">
         {value.modules.map((module) => (
           <article className="module-card" key={module.manifest.id}>
@@ -146,6 +120,32 @@ export function ModulesPage({revision, canManage}: {revision: number; canManage:
           </div>
         </Panel>
       </details>
+
+      {canManage && (
+        <Panel title={t("moduleInstallManifest")}>
+          <p>{t("moduleInstallManifestHint")}</p>
+          <textarea
+            className="text-input mono"
+            rows={12}
+            value={manifestText}
+            onChange={(event) => setManifestText(event.target.value)}
+            placeholder={'{"schema_version":2,...}'}
+            disabled={busy}
+          />
+          <div className="button-row">
+            <button
+              type="button"
+              className="button primary"
+              disabled={busy || !manifestText.trim() || !dockerReady}
+              onClick={() => void installManifest()}
+            >
+              {busy ? t("working") : t("moduleInstall")}
+            </button>
+          </div>
+          {queuedJob && <div className="notice">{t("moduleJobQueued")}: <span className="mono">{queuedJob}</span></div>}
+          {actionError && <div className="form-error">{actionError}</div>}
+        </Panel>
+      )}
     </div>
   );
 }
