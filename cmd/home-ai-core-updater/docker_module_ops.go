@@ -23,7 +23,7 @@ type moduleContainerStatus struct {
 	ContainerID string
 }
 
-func performDockerModuleOperation(ctx context.Context, request updaterhelper.Request, serviceGID int) (moduleContainerStatus, string, error) {
+func performDockerModuleOperation(ctx context.Context, request updaterhelper.Request, serviceUID, serviceGID int) (moduleContainerStatus, string, error) {
 	moduleID := strings.TrimSpace(request.ModuleID)
 	if !moduleIDPattern.MatchString(moduleID) || len(moduleID) > 96 {
 		return moduleContainerStatus{}, "", errors.New("invalid module id")
@@ -38,7 +38,7 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 		if !imageDigestPattern.MatchString(image) {
 			return moduleContainerStatus{}, "", errors.New("module image must be an immutable @sha256 reference")
 		}
-		return installDockerModule(ctx, moduleID, image, serviceGID)
+		return installDockerModule(ctx, moduleID, image, serviceUID, serviceGID)
 	case "docker.module.start":
 		return controlDockerModule(ctx, moduleID, "start")
 	case "docker.module.stop":
@@ -52,7 +52,7 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 	}
 }
 
-func installDockerModule(ctx context.Context, moduleID, image string, serviceGID int) (moduleContainerStatus, string, error) {
+func installDockerModule(ctx context.Context, moduleID, image string, serviceUID, serviceGID int) (moduleContainerStatus, string, error) {
 	dockerPath, err := exec.LookPath("docker")
 	if err != nil {
 		return moduleContainerStatus{}, "", errors.New("Docker CLI is unavailable")
@@ -78,10 +78,10 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceGID
 	if err := os.MkdirAll(dataDir, 0o750); err != nil {
 		return moduleContainerStatus{}, "", fmt.Errorf("create module data directory: %w", err)
 	}
-	if err := os.Chown(dataDir, 0, serviceGID); err != nil {
+	if err := os.Chown(dataDir, serviceUID, serviceGID); err != nil {
 		return moduleContainerStatus{}, "", fmt.Errorf("set module data ownership: %w", err)
 	}
-	if err := os.Chmod(dataDir, 0o750); err != nil {
+	if err := os.Chmod(dataDir, 0o700); err != nil {
 		return moduleContainerStatus{}, "", fmt.Errorf("set module data permissions: %w", err)
 	}
 
@@ -91,6 +91,7 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceGID
 		"--label", "home-ai.managed=true",
 		"--label", "home-ai.module.id=" + moduleID,
 		"--network", dockerNetworkName,
+		"--user", fmt.Sprintf("%d:%d", serviceUID, serviceGID),
 		"--restart", "unless-stopped",
 		"--cap-drop", "ALL",
 		"--security-opt", "no-new-privileges",
