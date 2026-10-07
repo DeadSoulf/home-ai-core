@@ -40,13 +40,15 @@ esac
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y ca-certificates curl git xz-utils python3
+apt-get install -y ca-certificates curl git xz-utils python3 docker.io
 
 WORKDIR=$(mktemp -d)
 cleanup() {
   rm -rf "$WORKDIR"
 }
 trap cleanup EXIT HUP INT TERM
+
+systemctl enable --now docker.service
 
 echo "Installing Go $GO_VERSION..."
 curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${GOARCH}.tar.gz" -o "$WORKDIR/go.tar.gz"
