@@ -86,7 +86,7 @@ Core не должен получать прямой root-доступ или п
 - `docs/PRODUCT_VISION.md` — границы продукта и архитектурная модель;
 - `docs/PROJECT_MAP.md` — текущее состояние и следующие этапы;
 - `docs/CURRENT_STATE_AUDIT.md` — что остаётся внутри Core;
-- `docs/sdk/module-sdk-v1.md` — контракт модулей.
+- `docs/sdk/module-sdk-v2.md` — контракт Docker-модулей.
 
 ## Авторство
 
