@@ -38,13 +38,13 @@ Core больше не является местом для реализации
 
 ### M1 — Docker runtime foundation
 
-- установка Docker на поддерживаемом Debian;
-- capability `host.docker`;
-- безопасный privileged bridge для container lifecycle;
-- отдельная сеть модулей;
-- стандартные каталоги данных модулей;
-- health/status;
-- логирование без выдачи Docker socket процессу Core.
+- ✅ Docker устанавливается на поддерживаемом Debian;
+- ✅ capability `host.docker` отражает активный Docker Engine;
+- ✅ root-helper восстанавливает Docker runtime на обновлённых установках;
+- ✅ создана отдельная bridge-сеть `home-ai-modules`;
+- ✅ создан каталог данных `/var/lib/home-ai-core/modules`;
+- ✅ Core не получает Docker socket;
+- ⏭ следующий срез: безопасный container lifecycle и manifest v2.
 
 ### M2 — Container module manifest
 
