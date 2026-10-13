@@ -6,11 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
 
-const updaterSocketPath = "/run/home-ai-core-updater.sock"
+const (
+	updaterSocketPath      = "/run/home-ai-core-updater.sock"
+	updaterHelperIOTimeout = 30 * time.Second
+)
 
 var ErrHelperUpgradeRequired = errors.New("system updater helper is outdated; install the latest initial installer once")
 
@@ -25,12 +29,11 @@ type HelperInfo struct {
 }
 
 func queryUpdaterHelperInfo(ctx context.Context) (HelperInfo, error) {
-	dialer := net.Dialer{}
-	conn, err := dialer.DialContext(ctx, "unix", updaterSocketPath)
+	conn, closeConn, err := dialUpdaterHelper(ctx)
 	if err != nil {
 		return HelperInfo{Error: err.Error()}, err
 	}
-	defer conn.Close()
+	defer closeConn()
 
 	if err := json.NewEncoder(conn).Encode(updaterhelper.Request{Operation: "info"}); err != nil {
 		return HelperInfo{Error: err.Error()}, err
@@ -70,12 +73,11 @@ func callUpdaterHelper(ctx context.Context, currentVersion, version string) erro
 		return err
 	}
 
-	dialer := net.Dialer{}
-	conn, err := dialer.DialContext(ctx, "unix", updaterSocketPath)
+	conn, closeConn, err := dialUpdaterHelper(ctx)
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer closeConn()
 
 	if err := json.NewEncoder(conn).Encode(updaterhelper.Request{
 		Operation:       "install",
@@ -108,12 +110,11 @@ func callUpdaterRollback(ctx context.Context) (string, error) {
 		return "", errors.New("no rollback backup is available")
 	}
 
-	dialer := net.Dialer{}
-	conn, err := dialer.DialContext(ctx, "unix", updaterSocketPath)
+	conn, closeConn, err := dialUpdaterHelper(ctx)
 	if err != nil {
 		return "", err
 	}
-	defer conn.Close()
+	defer closeConn()
 
 	if err := json.NewEncoder(conn).Encode(updaterhelper.Request{
 		Operation:       "rollback",
@@ -135,4 +136,40 @@ func callUpdaterRollback(ctx context.Context) (string, error) {
 		return response.RollbackVersion, nil
 	}
 	return info.RollbackVersion, nil
+}
+
+// dialUpdaterHelper bounds every IPC exchange, not only the initial socket dial.
+// DialContext alone does not interrupt JSON reads after the connection succeeds.
+func dialUpdaterHelper(ctx context.Context) (net.Conn, func(), error) {
+	conn, err := (&net.Dialer{}).DialContext(ctx, "unix", updaterSocketPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	closeConn, err := protectUpdaterHelperConn(ctx, conn, updaterHelperIOTimeout)
+	if err != nil {
+		return nil, nil, err
+	}
+	return conn, closeConn, nil
+}
+
+func protectUpdaterHelperConn(ctx context.Context, conn net.Conn, timeout time.Duration) (func(), error) {
+	if err := ctx.Err(); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	deadline := time.Now().Add(timeout)
+	if ctxDeadline, ok := ctx.Deadline(); ok && ctxDeadline.Before(deadline) {
+		deadline = ctxDeadline
+	}
+	if err := conn.SetDeadline(deadline); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	stopCancel := context.AfterFunc(ctx, func() {
+		_ = conn.SetDeadline(time.Now())
+	})
+	return func() {
+		stopCancel()
+		_ = conn.Close()
+	}, nil
 }
