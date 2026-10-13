@@ -157,6 +157,7 @@ type Response struct {
 	DockerError        string                `json:"docker_error,omitempty"`
 	ModuleState        string                `json:"module_state,omitempty"`
 	ContainerID        string                `json:"container_id,omitempty"`
+	ModuleIP           string                `json:"module_ip,omitempty"`
 }
 
 type Result struct {
