@@ -13,8 +13,10 @@ import (
 const (
 	dockerServiceName = "docker.service"
 	dockerNetworkName = "home-ai-modules"
-	moduleDataRoot    = "/var/lib/home-ai-core/modules"
 )
+
+// Kept configurable for filesystem-isolated runtime tests.
+var moduleDataRoot = "/var/lib/home-ai-core/modules"
 
 type dockerRuntimeStatus struct {
 	Available    bool
