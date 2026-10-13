@@ -69,9 +69,7 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 		if !managed {
 			return moduleContainerStatus{}, "", errors.New("container name is already used by an unmanaged container")
 		}
-		if output, err := exec.CommandContext(ctx, dockerPath, "rm", "-f", name).CombinedOutput(); err != nil {
-			return moduleContainerStatus{}, "", fmt.Errorf("replace module container: %s", commandError(output, err))
-		}
+		return moduleContainerStatus{}, "", errors.New("module already installed; use a verified upgrade")
 	}
 
 	dataDir := filepath.Join(moduleDataRoot, moduleID)
