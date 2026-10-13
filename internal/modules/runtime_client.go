@@ -16,6 +16,7 @@ type helperModuleResult struct {
 	State       string
 	ContainerID string
 	Message     string
+	IP          string
 }
 
 func callModuleHelper(ctx context.Context, operation, moduleID, image string) (helperModuleResult, error) {
@@ -62,5 +63,6 @@ func callModuleHelperRequest(ctx context.Context, request updaterhelper.Request)
 		State:       response.ModuleState,
 		ContainerID: response.ContainerID,
 		Message:     response.Message,
+		IP:          response.ModuleIP,
 	}, nil
 }
