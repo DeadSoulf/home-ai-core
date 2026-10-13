@@ -58,8 +58,8 @@ func registerModuleJobs(service *jobs.Service, registry *modules.Registry) error
 		_ = reporter.Progress(ctx, 9500, "module upgrade verified; registry committed")
 		return map[string]any{
 			"module_id": item.Manifest.ID,
-			"version": item.Manifest.Version,
-			"status": item.Status,
+			"version":   item.Manifest.Version,
+			"status":    item.Status,
 		}, nil
 	}); err != nil {
 		return err
