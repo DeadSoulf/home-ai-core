@@ -100,7 +100,10 @@ exit 1
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("HOME_AI_TEST_DOCKER_LOG", logPath)
-	_, _, err := installDockerModule(context.Background(), "demo", "example.com/demo@sha256:"+strings.Repeat("a", 64), 1000, 1000)
+	originalRoot := moduleDataRoot
+	moduleDataRoot = filepath.Join(dir, "module-data")
+	t.Cleanup(func() { moduleDataRoot = originalRoot })
+	_, _, err := installDockerModule(context.Background(), "demo", "example.com/demo@sha256:"+strings.Repeat("a", 64), os.Getuid(), os.Getgid())
 	if err == nil || !strings.Contains(err.Error(), "stopped during startup") {
 		t.Fatalf("unexpected install result: %v", err)
 	}
