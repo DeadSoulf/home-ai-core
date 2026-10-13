@@ -252,3 +252,40 @@
     grid-column: 1;
   }
 }
+
+/* Guided first-time disk connection. Advanced partition tools remain below. */
+.quick-disk-setup {
+  border: 1px solid #355b72;
+  background: #142530;
+  border-radius: 12px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+.quick-disk-setup-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.quick-disk-setup-heading strong { font-size: 15px; color: #edf5fa; }
+.quick-disk-setup-heading p { margin: 6px 0 0; font-size: 13px; color: #b4c5d2; }
+.quick-disk-setup-form { display: grid; gap: 12px; }
+.quick-disk-setup-form > label:not(.quick-disk-setup-ack) {
+  display: grid; gap: 6px; font-size: 13px; color: #d6e0e8;
+}
+.quick-disk-setup-form input[type="text"],
+.quick-disk-setup-form label:not(.quick-disk-setup-ack) > input {
+  min-width: 0; width: 100%; background: #101c26; color: #f5faff;
+  border: 1px solid #526779; border-radius: 8px; padding: 9px;
+}
+.quick-disk-setup-target { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.quick-disk-setup-target .mono { color: #b4c5d2; font-size: 12px; }
+.quick-disk-setup-plan { color: #c3e4f4; font-size: 13px; }
+.quick-disk-setup-ack { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; }
+.quick-disk-setup-ack input { margin-top: 3px; }
+.quick-disk-setup .form-error { white-space: pre-line; }
+@media (max-width: 650px) {
+  .quick-disk-setup-heading { align-items: stretch; }
+}
