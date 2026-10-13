@@ -7,11 +7,16 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/state"
 )
 
-var ErrModuleNotFound = errors.New("module not found")
+var (
+	ErrModuleNotFound = errors.New("module not found")
+	ErrModuleAlreadyInstalled = errors.New("module already installed; automatic replacement is disabled until rollback-safe upgrades are implemented")
+)
 
 type Store interface {
 	UpsertModule(context.Context, state.ModuleRecord) error
@@ -24,6 +29,8 @@ type Store interface {
 type Registry struct {
 	store       Store
 	coreVersion string
+	mu          sync.Mutex
+	helper      func(context.Context, string, string, string) (helperModuleResult, error)
 }
 
 func NewRegistry(store Store, coreVersion ...string) *Registry {
@@ -34,10 +41,14 @@ func NewRegistry(store Store, coreVersion ...string) *Registry {
 	return &Registry{
 		store:       store,
 		coreVersion: version,
+		helper:      callModuleHelper,
 	}
 }
 
 func (r *Registry) InstallManifest(ctx context.Context, manifest Manifest) (Registered, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if err := ValidateManifest(manifest); err != nil {
 		return Registered{}, err
 	}
@@ -57,9 +68,20 @@ func (r *Registry) InstallManifest(ctx context.Context, manifest Manifest) (Regi
 		}
 	}
 
+	// Never overwrite the last known-good manifest before validating the
+	// replacement container. Upgrades require a separate staged transaction.
+	if _, err := r.store.Module(ctx, manifest.ID); err == nil {
+		return Registered{}, ErrModuleAlreadyInstalled
+	} else if !errors.Is(err, state.ErrModuleNotFound) {
+		return Registered{}, err
+	}
+
 	raw, err := json.Marshal(manifest)
 	if err != nil {
 		return Registered{}, fmt.Errorf("encode module manifest: %w", err)
+	}
+	if _, err := r.helper(ctx, "docker.module.install", manifest.ID, manifest.Runtime.Docker.Image); err != nil {
+		return Registered{}, err
 	}
 	if err := r.store.UpsertModule(ctx, state.ModuleRecord{
 		ID:           manifest.ID,
@@ -67,23 +89,32 @@ func (r *Registry) InstallManifest(ctx context.Context, manifest Manifest) (Regi
 		Status:       "registered",
 		ManifestJSON: string(raw),
 	}); err != nil {
-		return Registered{}, err
-	}
-	if err := r.store.SetModuleStatus(ctx, manifest.ID, "registered", ""); err != nil {
-		return Registered{}, err
-	}
-
-	if _, err := callModuleHelper(ctx, "docker.module.install", manifest.ID, manifest.Runtime.Docker.Image); err != nil {
-		_ = r.store.SetModuleStatus(context.WithoutCancel(ctx), manifest.ID, "error", err.Error())
-		return Registered{}, err
+		return Registered{}, r.rollbackNewInstall(ctx, manifest.ID, err)
 	}
 	if err := r.store.SetModuleStatus(ctx, manifest.ID, "enabled", ""); err != nil {
-		return Registered{}, err
+		return Registered{}, r.rollbackNewInstall(ctx, manifest.ID, err)
 	}
 	return r.Get(ctx, manifest.ID)
 }
 
+// rollbackNewInstall compensates for a failure to persist a newly created
+// container. The old registry state is never overwritten by the install path.
+func (r *Registry) rollbackNewInstall(ctx context.Context, id string, cause error) error {
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	defer cancel()
+	if _, err := r.helper(cleanupCtx, "docker.module.remove", id, ""); err != nil {
+		return errors.Join(cause, fmt.Errorf("remove unregistered module container %q: %w", id, err))
+	}
+	if err := r.store.DeleteModule(cleanupCtx, id); err != nil && !errors.Is(err, state.ErrModuleNotFound) {
+		return errors.Join(cause, fmt.Errorf("remove incomplete module registration %q: %w", id, err))
+	}
+	return cause
+}
+
 func (r *Registry) Control(ctx context.Context, id, operation string) (Registered, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	item, err := r.Get(ctx, id)
 	if err != nil {
 		return Registered{}, err
@@ -107,7 +138,7 @@ func (r *Registry) Control(ctx context.Context, id, operation string) (Registere
 	default:
 		return Registered{}, fmt.Errorf("unsupported module control operation %q", operation)
 	}
-	if _, err := callModuleHelper(ctx, helperOperation, id, ""); err != nil {
+	if _, err := r.helper(ctx, helperOperation, id, ""); err != nil {
 		_ = r.store.SetModuleStatus(context.WithoutCancel(ctx), id, "error", err.Error())
 		return Registered{}, err
 	}
@@ -118,6 +149,9 @@ func (r *Registry) Control(ctx context.Context, id, operation string) (Registere
 }
 
 func (r *Registry) Remove(ctx context.Context, id string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	item, err := r.Get(ctx, id)
 	if err != nil {
 		return err
@@ -125,7 +159,7 @@ func (r *Registry) Remove(ctx context.Context, id string) error {
 	if item.Manifest.Runtime.Type != "docker" {
 		return errors.New("module runtime is not Docker")
 	}
-	if _, err := callModuleHelper(ctx, "docker.module.remove", id, ""); err != nil {
+	if _, err := r.helper(ctx, "docker.module.remove", id, ""); err != nil {
 		_ = r.store.SetModuleStatus(context.WithoutCancel(ctx), id, "error", err.Error())
 		return err
 	}
@@ -167,6 +201,9 @@ func (r *Registry) List(ctx context.Context) ([]Registered, error) {
 }
 
 func (r *Registry) SetStatus(ctx context.Context, id, status, errorMessage string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	switch status {
 	case "registered", "enabled", "disabled", "error":
 	default:
