@@ -9,11 +9,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
 
 var (
+	moduleOperationMu sync.Mutex
 	moduleIDPattern    = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
 	imageDigestPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,447}@sha256:[a-f0-9]{64}$`)
 )
@@ -24,6 +26,10 @@ type moduleContainerStatus struct {
 }
 
 func performDockerModuleOperation(ctx context.Context, request updaterhelper.Request, serviceUID, serviceGID int) (moduleContainerStatus, string, error) {
+	if !moduleOperationMu.TryLock() {
+		return moduleContainerStatus{}, "", errors.New("another Docker module operation is already in progress")
+	}
+	defer moduleOperationMu.Unlock()
 	moduleID := strings.TrimSpace(request.ModuleID)
 	if !moduleIDPattern.MatchString(moduleID) || len(moduleID) > 96 {
 		return moduleContainerStatus{}, "", errors.New("invalid module id")
