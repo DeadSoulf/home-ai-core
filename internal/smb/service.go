@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"strings"
 	"time"
 
+	"github.com/DeadSoulf/home-ai-core/internal/helperipc"
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
 
@@ -102,20 +102,15 @@ func execute(ctx context.Context, request updaterhelper.Request) (string, error)
 }
 
 func callHelper(ctx context.Context, request updaterhelper.Request) (updaterhelper.Response, error) {
-	dialer := net.Dialer{}
-	conn, err := dialer.DialContext(ctx, "unix", helperSocketPath)
+	timeout := 11 * time.Minute // helper permits up to 10 minutes for SMB changes
+	if request.Operation == "smb.inspect" {
+		timeout = 45 * time.Second
+	}
+	conn, cleanup, err := helperipc.Dial(ctx, helperSocketPath, timeout)
 	if err != nil {
 		return updaterhelper.Response{}, fmt.Errorf("connect SMB helper: %w", err)
 	}
-	defer conn.Close()
-	deadline := time.Now().Add(45 * time.Second)
-	if request.Operation == "smb.install" {
-		deadline = time.Now().Add(12 * time.Minute)
-	}
-	if value, ok := ctx.Deadline(); ok && value.Before(deadline) {
-		deadline = value
-	}
-	_ = conn.SetDeadline(deadline)
+	defer cleanup()
 
 	if err := json.NewEncoder(conn).Encode(request); err != nil {
 		return updaterhelper.Response{}, err

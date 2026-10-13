@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
-	"net"
 	"time"
+
+	"github.com/DeadSoulf/home-ai-core/internal/helperipc"
+	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
 
 type QuotaStatus struct{ LimitBytes, UsedBytes uint64 }
@@ -18,16 +19,11 @@ type NASUsage struct {
 
 func quotaHelper(ctx context.Context, request updaterhelper.Request) (updaterhelper.Response, error) {
 	request.ProtocolVersion = updaterhelper.ProtocolVersion
-	conn, err := (&net.Dialer{}).DialContext(ctx, "unix", helperSocketPath)
+	conn, cleanup, err := helperipc.Dial(ctx, helperSocketPath, 45*time.Second)
 	if err != nil {
 		return updaterhelper.Response{}, err
 	}
-	defer conn.Close()
-	deadline := time.Now().Add(45 * time.Second)
-	if value, ok := ctx.Deadline(); ok && value.Before(deadline) {
-		deadline = value
-	}
-	_ = conn.SetDeadline(deadline)
+	defer cleanup()
 	if err := json.NewEncoder(conn).Encode(request); err != nil {
 		return updaterhelper.Response{}, err
 	}
