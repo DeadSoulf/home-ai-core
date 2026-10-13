@@ -134,6 +134,24 @@ func (s *server) moduleCatalogInstall(
 		writeAPIError(w, r, http.StatusNotFound, "module_not_in_catalog", "module is not present in the official catalog", nil)
 		return
 	}
+	jobType := "module.install"
+	auditAction := "modules.catalog.install.queued"
+	if installed, lookupErr := s.modules.Get(r.Context(), manifest.ID); lookupErr == nil {
+		newer, versionErr := modules.NewerVersion(manifest.Version, installed.Manifest.Version)
+		if versionErr != nil || !newer {
+			writeAPIError(w, r, http.StatusConflict, "module_update_not_newer", "catalog version must be newer than installed version", nil)
+			return
+		}
+		if manifest.Runtime.Health.Port == 0 || manifest.Runtime.Health.Path == "" {
+			writeAPIError(w, r, http.StatusConflict, "module_update_requires_health", "module update requires a declared health endpoint", nil)
+			return
+		}
+		jobType = "module.update"
+		auditAction = "modules.catalog.update.queued"
+	} else if !errors.Is(lookupErr, modules.ErrModuleNotFound) {
+		writeAPIError(w, r, http.StatusInternalServerError, "modules_unavailable", "module registry is unavailable", nil)
+		return
+	}
 	raw, err := json.Marshal(manifest)
 	if err != nil {
 		writeAPIError(w, r, http.StatusInternalServerError, "module_job_failed", "failed to prepare module job", nil)
@@ -141,7 +159,7 @@ func (s *server) moduleCatalogInstall(
 	}
 	meta := metadataFromContext(r.Context())
 	job, err := s.jobs.Submit(r.Context(), state.JobRecord{
-		Type:          "module.install",
+		Type:          jobType,
 		ActorType:     actor.Type,
 		ActorID:       actor.ID,
 		RequestID:     meta.RequestID,
@@ -159,7 +177,7 @@ func (s *server) moduleCatalogInstall(
 		r.Context(),
 		s.securityRequestContext(r),
 		actor,
-		"modules.catalog.install.queued",
+		auditAction,
 		"module",
 		manifest.ID,
 		"success",
