@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { BlockNode } from "../api/types";
 import { useI18n } from "../i18n";
 import { StorageDevices } from "./StorageDevices";
+import { QuickDiskSetup, quickDiskSetup } from "./QuickDiskSetup";
 import "./StorageBrowser.css";
 
 function bytes(value = 0) {
@@ -92,6 +93,7 @@ export function StorageBrowser({
                     <span className="storage-disk-title">
                       <strong>{disk.display_name || disk.name}</strong>
                       {disk.system && <span className="status-badge storage-system">{t("systemDisk")}</span>}
+                      {!disk.system && quickDiskSetup(disk).kind !== "unavailable" && <span className="status-badge status-success">{t("quickDiskReady")}</span>}
                       <span className={healthClass(disk.health)}>{healthText(disk, t)}</span>
                     </span>
                     <span className="storage-disk-meta">
@@ -186,6 +188,8 @@ export function StorageBrowser({
           />
         </div>
       </div>
+
+      {canManage && <QuickDiskSetup key={selectedDisk.path || selectedDisk.name} disk={selectedDisk} onChanged={onChanged} />}
 
       <div className="storage-disk-manager">
         <StorageDevices
