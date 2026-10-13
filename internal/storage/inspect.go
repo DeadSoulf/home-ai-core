@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"sync"
 	"time"
 
+	"github.com/DeadSoulf/home-ai-core/internal/helperipc"
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
 
@@ -39,12 +39,11 @@ func Inspect(ctx context.Context) (Inspection, error) {
 		return Inspection{}, err
 	}
 
-	dialer := net.Dialer{}
-	conn, err := dialer.DialContext(ctx, "unix", helperSocketPath)
+	conn, cleanup, err := helperipc.Dial(ctx, helperSocketPath, 45*time.Second)
 	if err != nil {
 		return Inspection{}, fmt.Errorf("connect storage helper: %w", err)
 	}
-	defer conn.Close()
+	defer cleanup()
 
 	if err := json.NewEncoder(conn).Encode(updaterhelper.Request{
 		Operation:       "storage.inspect",
