@@ -27,14 +27,15 @@ jobs:
           parent = os.environ['EXPECTED_HEAD']
           assert len(parent) == 40 and all(c in '0123456789abcdef' for c in parent)
           assert subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip() == parent
-          encoded = pathlib.Path('_security_import/bundle.b64').read_bytes()
+          names = ['part-00.b64','part-01.b64','part-02.b64','part-03.b64','bundle.b64']
+          encoded = b''.join(pathlib.Path('_security_import',n).read_bytes().strip() for n in names)
           assert len(encoded) < 100000
-          patch = gzip.decompress(base64.b64decode(encoded))
+          patch = gzip.decompress(base64.b64decode(encoded,validate=True))
           assert len(patch) < 1000000
           assert hashlib.sha256(patch).hexdigest() == '70e603a4face29a5bc3270b85047e2654af28ed4de5b2e80067c4cfb51f411d3'
           subprocess.run(['git','apply','--check','--index','-'], input=patch, check=True)
           subprocess.run(['git','apply','--index','-'], input=patch, check=True)
-          subprocess.run(['git','rm','-f','--ignore-unmatch','_security_import/bundle.b64','.github/workflows/security-import.yml','.github/workflows/security-review.yml','.github/workflows/security-toolchain.yml'], check=True)
+          subprocess.run(['git','rm','-r','-f','--ignore-unmatch','_security_import','.github/workflows/security-import.yml','.github/workflows/security-review.yml','.github/workflows/security-toolchain.yml'], check=True)
           subprocess.run(['git','diff','--cached','--check'], check=True)
           def api(path, data=None):
               raw = None if data is None else json.dumps(data).encode()
