@@ -41,8 +41,8 @@ func waitForModuleHTTPHealth(ctx context.Context, ip string, health HealthSpec) 
 	transport := &http.Transport{Proxy: nil}
 	defer transport.CloseIdleConnections()
 	client := &http.Client{
-		Transport: transport,
-		Timeout: 2 * time.Second,
+		Transport:     transport,
+		Timeout:       2 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
 	url := "http://" + net.JoinHostPort(ip, strconv.Itoa(health.Port)) + health.Path
