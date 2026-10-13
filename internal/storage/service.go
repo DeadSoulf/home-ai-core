@@ -22,7 +22,7 @@ type Request struct {
 	Confirm        string
 	DryRun         bool
 	SizeMiB        uint64
-	RequireBlank    bool
+	RequireBlank   bool
 	RootPath       string
 	RelativePath   string
 	ReservePercent int
