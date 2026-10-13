@@ -35,17 +35,23 @@ func upgradeDockerModule(ctx context.Context, moduleID, image, previousImage str
 	name := moduleContainerName(moduleID)
 	backup := moduleRollbackContainerName(moduleID)
 	exists, managed, err := inspectManagedContainer(ctx, dockerPath, name, moduleID)
-	if err != nil { return moduleContainerStatus{}, "", err }
+	if err != nil {
+		return moduleContainerStatus{}, "", err
+	}
 	if !exists || !managed {
 		return moduleContainerStatus{}, "", errors.New("upgrade requires an existing managed module container")
 	}
 	backupExists, _, err := inspectManagedContainer(ctx, dockerPath, backup, moduleID)
-	if err != nil { return moduleContainerStatus{}, "", err }
+	if err != nil {
+		return moduleContainerStatus{}, "", err
+	}
 	if backupExists {
 		return moduleContainerStatus{}, "", errors.New("a previous upgrade backup is pending; resolve it before another upgrade")
 	}
 	output, err := exec.CommandContext(ctx, dockerPath, "inspect", "--format", "{{.Config.Image}}", name).CombinedOutput()
-	if err != nil { return moduleContainerStatus{}, "", fmt.Errorf("inspect previous image: %s", commandError(output, err)) }
+	if err != nil {
+		return moduleContainerStatus{}, "", fmt.Errorf("inspect previous image: %s", commandError(output, err))
+	}
 	if strings.TrimSpace(string(output)) != previousImage {
 		return moduleContainerStatus{}, "", errors.New("running module image does not match the installed immutable digest; refusing upgrade")
 	}
@@ -86,18 +92,26 @@ func moduleRollbackContainerName(moduleID string) string {
 
 func rollbackDockerModule(ctx context.Context, moduleID string) (moduleContainerStatus, string, error) {
 	dockerPath, err := exec.LookPath("docker")
-	if err != nil { return moduleContainerStatus{}, "", errors.New("Docker CLI is unavailable") }
+	if err != nil {
+		return moduleContainerStatus{}, "", errors.New("Docker CLI is unavailable")
+	}
 	name := moduleContainerName(moduleID)
 	backup := moduleRollbackContainerName(moduleID)
 	backupExists, backupManaged, err := inspectManagedContainer(ctx, dockerPath, backup, moduleID)
-	if err != nil { return moduleContainerStatus{}, "", err }
+	if err != nil {
+		return moduleContainerStatus{}, "", err
+	}
 	if !backupExists || !backupManaged {
 		return moduleContainerStatus{}, "", errors.New("no managed previous container is available for rollback")
 	}
 	exists, managed, err := inspectManagedContainer(ctx, dockerPath, name, moduleID)
-	if err != nil { return moduleContainerStatus{}, "", err }
+	if err != nil {
+		return moduleContainerStatus{}, "", err
+	}
 	if exists {
-		if !managed { return moduleContainerStatus{}, "", errors.New("refusing to replace an unmanaged container during rollback") }
+		if !managed {
+			return moduleContainerStatus{}, "", errors.New("refusing to replace an unmanaged container during rollback")
+		}
 		if output, err := exec.CommandContext(ctx, dockerPath, "rm", "-f", name).CombinedOutput(); err != nil {
 			return moduleContainerStatus{}, "", fmt.Errorf("remove failed replacement: %s", commandError(output, err))
 		}
@@ -109,22 +123,30 @@ func rollbackDockerModule(ctx context.Context, moduleID string) (moduleContainer
 		return moduleContainerStatus{}, "", fmt.Errorf("start restored container: %s", commandError(output, err))
 	}
 	status, err := inspectModuleContainer(ctx, dockerPath, name)
-	if err != nil { return moduleContainerStatus{}, "", err }
+	if err != nil {
+		return moduleContainerStatus{}, "", err
+	}
 	return status, "previous container restored; module data retained", nil
 }
 
 func finalizeDockerModule(ctx context.Context, moduleID string) (moduleContainerStatus, string, error) {
 	dockerPath, err := exec.LookPath("docker")
-	if err != nil { return moduleContainerStatus{}, "", errors.New("Docker CLI is unavailable") }
+	if err != nil {
+		return moduleContainerStatus{}, "", errors.New("Docker CLI is unavailable")
+	}
 	name := moduleContainerName(moduleID)
 	backup := moduleRollbackContainerName(moduleID)
 	exists, managed, err := inspectManagedContainer(ctx, dockerPath, name, moduleID)
-	if err != nil { return moduleContainerStatus{}, "", err }
+	if err != nil {
+		return moduleContainerStatus{}, "", err
+	}
 	if !exists || !managed {
 		return moduleContainerStatus{}, "", errors.New("cannot finalize upgrade without current managed module")
 	}
 	backupExists, backupManaged, err := inspectManagedContainer(ctx, dockerPath, backup, moduleID)
-	if err != nil { return moduleContainerStatus{}, "", err }
+	if err != nil {
+		return moduleContainerStatus{}, "", err
+	}
 	if !backupExists || !backupManaged {
 		return moduleContainerStatus{}, "", errors.New("cannot finalize upgrade without previous managed container")
 	}
@@ -132,16 +154,20 @@ func finalizeDockerModule(ctx context.Context, moduleID string) (moduleContainer
 		return moduleContainerStatus{}, "", fmt.Errorf("clean previous container: %s", commandError(output, err))
 	}
 	status, err := inspectModuleContainer(ctx, dockerPath, name)
-	if err != nil { return moduleContainerStatus{}, "", err }
+	if err != nil {
+		return moduleContainerStatus{}, "", err
+	}
 	return status, "verified module upgrade committed", nil
 }
 
 func waitForModuleHealth(ctx context.Context, dockerPath, name string, port int, healthPath string) error {
-	if err := validateModuleHealthCheck(port, healthPath); err != nil { return err }
+	if err := validateModuleHealthCheck(port, healthPath); err != nil {
+		return err
+	}
 	deadlineCtx, cancel := context.WithTimeout(ctx, moduleHealthTimeout)
 	defer cancel()
 	client := &http.Client{
-		Timeout: 2*time.Second,
+		Timeout:       2 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
 	var lastError error
@@ -150,7 +176,9 @@ func waitForModuleHealth(ctx context.Context, dockerPath, name string, port int,
 			return fmt.Errorf("module health did not pass: %v: %w", lastError, deadlineCtx.Err())
 		}
 		running, err := exec.CommandContext(deadlineCtx, dockerPath, "inspect", "--format", "{{.State.Running}}", name).CombinedOutput()
-		if err != nil { return fmt.Errorf("replacement disappeared before health verification: %s", commandError(running, err)) }
+		if err != nil {
+			return fmt.Errorf("replacement disappeared before health verification: %s", commandError(running, err))
+		}
 		if strings.TrimSpace(string(running)) != "true" {
 			return errors.New("replacement container exited before passing health verification")
 		}
@@ -166,16 +194,26 @@ func waitForModuleHealth(ctx context.Context, dockerPath, name string, port int,
 					if httpErr == nil {
 						_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
 						_ = response.Body.Close()
-						if response.StatusCode >= 200 && response.StatusCode < 300 { return nil }
+						if response.StatusCode >= 200 && response.StatusCode < 300 {
+							return nil
+						}
 						lastError = fmt.Errorf("HTTP status %d", response.StatusCode)
-					} else { lastError = httpErr }
-				} else { lastError = reqErr }
-			} else { lastError = errors.New("Docker module network address unavailable") }
-		} else { lastError = fmt.Errorf("inspect module network: %s", commandError(ipOutput, err)) }
+					} else {
+						lastError = httpErr
+					}
+				} else {
+					lastError = reqErr
+				}
+			} else {
+				lastError = errors.New("Docker module network address unavailable")
+			}
+		} else {
+			lastError = fmt.Errorf("inspect module network: %s", commandError(ipOutput, err))
+		}
 		select {
 		case <-deadlineCtx.Done():
 			return fmt.Errorf("module health did not pass: %v: %w", lastError, deadlineCtx.Err())
-		case <-time.After(750*time.Millisecond):
+		case <-time.After(750 * time.Millisecond):
 		}
 	}
 }
