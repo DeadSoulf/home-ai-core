@@ -22,6 +22,7 @@ type Request struct {
 	Confirm        string
 	DryRun         bool
 	SizeMiB        uint64
+	RequireBlank    bool
 	RootPath       string
 	RelativePath   string
 	ReservePercent int
@@ -77,6 +78,7 @@ func Execute(ctx context.Context, input Request) (string, error) {
 		Confirm:         strings.TrimSpace(input.Confirm),
 		DryRun:          input.DryRun,
 		SizeMiB:         input.SizeMiB,
+		RequireBlank:    input.RequireBlank,
 		RootPath:        strings.TrimSpace(input.RootPath),
 		RelativePath:    strings.TrimSpace(input.RelativePath),
 		ReservePercent:  input.ReservePercent,
