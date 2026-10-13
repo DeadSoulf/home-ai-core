@@ -39,6 +39,18 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 			return moduleContainerStatus{}, "", errors.New("module image must be an immutable @sha256 reference")
 		}
 		return installDockerModule(ctx, moduleID, image, serviceUID, serviceGID)
+	case "docker.module.upgrade":
+		if !imageDigestPattern.MatchString(request.Image) || !imageDigestPattern.MatchString(request.PreviousImage) {
+			return moduleContainerStatus{}, "", errors.New("module upgrade requires current and new immutable image digests")
+		}
+		if err := validateModuleHealthCheck(request.ModuleHealthPort, request.ModuleHealthPath); err != nil {
+			return moduleContainerStatus{}, "", err
+		}
+		return upgradeDockerModule(ctx, moduleID, request.Image, request.PreviousImage, request.ModuleHealthPort, request.ModuleHealthPath, serviceUID, serviceGID)
+	case "docker.module.rollback":
+		return rollbackDockerModule(ctx, moduleID)
+	case "docker.module.finalize":
+		return finalizeDockerModule(ctx, moduleID)
 	case "docker.module.start":
 		return controlDockerModule(ctx, moduleID, "start")
 	case "docker.module.stop":
