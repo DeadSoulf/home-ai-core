@@ -234,3 +234,48 @@ func TestRegistryCapabilitiesIncludeProvidedCapabilities(t *testing.T) {
 		t.Fatalf("provided capability missing: %#v", capabilities)
 	}
 }
+
+func TestNewerVersionRejectsDowngradeAndSameVersion(t *testing.T) {
+	cases := []struct {
+		candidate, installed string
+		want                 bool
+	}{
+		{"1.2.0", "1.1.9", true},
+		{"1.1.10", "1.1.9", true},
+		{"1.0.0", "1.0.0", false},
+		{"1.0.0", "1.0.1", false},
+		{"1.0.0", "2.0.0", false},
+	}
+	for _, tc := range cases {
+		got, err := NewerVersion(tc.candidate, tc.installed)
+		if err != nil || got != tc.want {
+			t.Errorf("NewerVersion(%q,%q) = %v, %v; want %v", tc.candidate, tc.installed, got, err, tc.want)
+		}
+	}
+	if _, err := NewerVersion("1.2.0-dev", "1.0.0"); err == nil {
+		t.Fatal("pre-release module version was accepted")
+	}
+}
+
+func TestRegistryUpgradeRejectsUnhealthyManifestWithoutMutatingRecord(t *testing.T) {
+	ctx := context.Background()
+	store, err := state.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	current := validManifest("example", "1.0.0")
+	persistManifest(t, store, current, "enabled")
+	r := NewRegistry(store, "0.1.170-dev")
+	upgrade := validManifest("example", "1.1.0")
+	if _, err := r.UpgradeManifest(ctx, upgrade); err == nil {
+		t.Fatal("upgrade without a health endpoint was accepted")
+	}
+	got, err := r.Get(ctx, "example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Manifest.Version != current.Version || got.Status != "enabled" {
+		t.Fatalf("failed validation modified the installed module: %+v", got)
+	}
+}

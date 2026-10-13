@@ -85,7 +85,7 @@ export function ModulesPage({revision, canManage}: {revision: number; canManage:
             <div className="card-grid">
               {value.catalog.modules.map((manifest) => {
                 const installed = installedByID.get(manifest.id);
-                const updateAvailable = Boolean(installed && installed.manifest.version !== manifest.version);
+                const updateAvailable = Boolean(installed && manifest.version.localeCompare(installed.manifest.version, undefined, { numeric: true }) > 0);
                 return (
                   <article className="module-card" key={manifest.id}>
                     <div className="module-title">

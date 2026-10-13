@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/state"
 )
@@ -39,6 +40,11 @@ func NewRegistry(store Store, coreVersion ...string) *Registry {
 
 func (r *Registry) InstallManifest(ctx context.Context, manifest Manifest) (Registered, error) {
 	if err := ValidateManifest(manifest); err != nil {
+		return Registered{}, err
+	}
+	if _, err := r.store.Module(ctx, manifest.ID); err == nil {
+		return Registered{}, fmt.Errorf("module %q is already registered; use the verified upgrade operation", manifest.ID)
+	} else if !errors.Is(err, state.ErrModuleNotFound) {
 		return Registered{}, err
 	}
 	if r.coreVersion != "" {
@@ -79,6 +85,98 @@ func (r *Registry) InstallManifest(ctx context.Context, manifest Manifest) (Regi
 	}
 	if err := r.store.SetModuleStatus(ctx, manifest.ID, "enabled", ""); err != nil {
 		return Registered{}, err
+	}
+	return r.Get(ctx, manifest.ID)
+}
+
+// UpgradeManifest keeps the old registry record until the helper has started and
+// health-checked the replacement. The helper keeps the old container as a
+// rollback candidate until the registry commit succeeds.
+func (r *Registry) UpgradeManifest(ctx context.Context, manifest Manifest) (Registered, error) {
+	if err := ValidateManifest(manifest); err != nil {
+		return Registered{}, err
+	}
+	previous, err := r.Get(ctx, manifest.ID)
+	if err != nil {
+		return Registered{}, err
+	}
+	if previous.Status != "enabled" {
+		return Registered{}, errors.New("stop or failed module cannot be upgraded; module must be enabled")
+	}
+	newer, err := NewerVersion(manifest.Version, previous.Manifest.Version)
+	if err != nil {
+		return Registered{}, err
+	}
+	if !newer {
+		return Registered{}, fmt.Errorf("module %q version %s is not newer than installed version %s", manifest.ID, manifest.Version, previous.Manifest.Version)
+	}
+	if manifest.Runtime.Health.Port == 0 || manifest.Runtime.Health.Path == "" {
+		return Registered{}, errors.New("module update requires an explicit HTTP health endpoint")
+	}
+
+	coreVersion := strings.TrimPrefix(r.coreVersion, "v")
+	if idx := strings.IndexAny(coreVersion, "+-"); idx >= 0 {
+		coreVersion = coreVersion[:idx]
+	}
+	if _, err := parseVersion(coreVersion); err != nil {
+		return Registered{}, fmt.Errorf("cannot validate module upgrade against Core version %q: %w", r.coreVersion, err)
+	}
+	all, err := r.List(ctx)
+	if err != nil {
+		return Registered{}, err
+	}
+	installed := map[string]string{}
+	available := map[string]Manifest{manifest.ID: manifest}
+	for _, item := range all {
+		installed[item.Manifest.ID] = item.Manifest.Version
+		if item.Manifest.ID != manifest.ID {
+			available[item.Manifest.ID] = item.Manifest
+		}
+	}
+	capabilities, err := r.Capabilities(ctx)
+	if err != nil {
+		return Registered{}, err
+	}
+	if _, err := PlanInstall(PlanInput{
+		CoreVersion: coreVersion, Target: manifest.ID,
+		Available: available, Installed: installed,
+		Capabilities: capabilities,
+	}); err != nil {
+		return Registered{}, fmt.Errorf("module update compatibility: %w", err)
+	}
+
+	oldImage := previous.Manifest.Runtime.Docker.Image
+	result, err := callModuleUpgradeHelper(ctx, manifest.ID, manifest.Runtime.Docker.Image, oldImage, manifest.Runtime.Health)
+	if err != nil {
+		return Registered{}, err
+	}
+	if err := waitForModuleHTTPHealth(ctx, result.IP, manifest.Runtime.Health); err != nil {
+		rollbackCtx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+		defer cancel()
+		if _, rollbackErr := callModuleHelper(rollbackCtx, "docker.module.rollback", manifest.ID, ""); rollbackErr != nil {
+			return Registered{}, errors.Join(err, fmt.Errorf("Docker rollback failed: %w", rollbackErr))
+		}
+		return Registered{}, fmt.Errorf("module failed HTTP health; prior container restored: %w", err)
+	}
+	raw, err := json.Marshal(manifest)
+	if err == nil {
+		err = r.store.UpsertModule(ctx, state.ModuleRecord{
+			ID: manifest.ID, Version: manifest.Version,
+			Status: "enabled", ManifestJSON: string(raw),
+		})
+	}
+	if err != nil {
+		// The registry must never claim a new version after a failed commit.
+		rollbackCtx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+		defer cancel()
+		if _, rollbackErr := callModuleHelper(rollbackCtx, "docker.module.rollback", manifest.ID, ""); rollbackErr != nil {
+			return Registered{}, errors.Join(err, fmt.Errorf("Docker rollback failed: %w", rollbackErr))
+		}
+		return Registered{}, fmt.Errorf("module registry commit failed; prior container restored: %w", err)
+	}
+	if _, err := callModuleHelper(ctx, "docker.module.finalize", manifest.ID, ""); err != nil {
+		// The stopped previous container is intentionally preserved for recovery.
+		_ = r.store.SetModuleStatus(context.WithoutCancel(ctx), manifest.ID, "enabled", "previous container cleanup pending: "+err.Error())
 	}
 	return r.Get(ctx, manifest.ID)
 }

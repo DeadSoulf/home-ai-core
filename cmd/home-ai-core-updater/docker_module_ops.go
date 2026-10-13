@@ -21,6 +21,7 @@ var (
 type moduleContainerStatus struct {
 	State       string
 	ContainerID string
+	IP          string
 }
 
 func performDockerModuleOperation(ctx context.Context, request updaterhelper.Request, serviceUID, serviceGID int) (moduleContainerStatus, string, error) {
@@ -39,6 +40,18 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 			return moduleContainerStatus{}, "", errors.New("module image must be an immutable @sha256 reference")
 		}
 		return installDockerModule(ctx, moduleID, image, serviceUID, serviceGID)
+	case "docker.module.upgrade":
+		if !imageDigestPattern.MatchString(request.Image) || !imageDigestPattern.MatchString(request.PreviousImage) {
+			return moduleContainerStatus{}, "", errors.New("module upgrade requires current and new immutable image digests")
+		}
+		if err := validateModuleHealthCheck(request.ModuleHealthPort, request.ModuleHealthPath); err != nil {
+			return moduleContainerStatus{}, "", err
+		}
+		return upgradeDockerModule(ctx, moduleID, request.Image, request.PreviousImage, request.ModuleHealthPort, request.ModuleHealthPath, serviceUID, serviceGID)
+	case "docker.module.rollback":
+		return rollbackDockerModule(ctx, moduleID)
+	case "docker.module.finalize":
+		return finalizeDockerModule(ctx, moduleID)
 	case "docker.module.start":
 		return controlDockerModule(ctx, moduleID, "start")
 	case "docker.module.stop":
@@ -69,9 +82,7 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 		if !managed {
 			return moduleContainerStatus{}, "", errors.New("container name is already used by an unmanaged container")
 		}
-		if output, err := exec.CommandContext(ctx, dockerPath, "rm", "-f", name).CombinedOutput(); err != nil {
-			return moduleContainerStatus{}, "", fmt.Errorf("replace module container: %s", commandError(output, err))
-		}
+		return moduleContainerStatus{}, "", errors.New("module already installed; use a verified upgrade")
 	}
 
 	dataDir := filepath.Join(moduleDataRoot, moduleID)

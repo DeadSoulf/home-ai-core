@@ -212,6 +212,11 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		return
 	}
 	if strings.HasPrefix(request.Operation, "docker.module.") {
+		if !installMu.TryLock() {
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: "a Core update or Docker module operation is already running"})
+			return
+		}
+		defer installMu.Unlock()
 		_ = conn.SetDeadline(time.Now().Add(31 * time.Minute))
 		ctx, cancel := context.WithTimeout(parent, 30*time.Minute)
 		defer cancel()
@@ -227,6 +232,7 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 			Message:     message,
 			ModuleState: status.State,
 			ContainerID: status.ContainerID,
+			ModuleIP:    status.IP,
 		})
 		return
 	}
