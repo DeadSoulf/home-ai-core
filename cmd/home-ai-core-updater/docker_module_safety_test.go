@@ -61,3 +61,16 @@ func TestInstallDockerModuleDoesNotRemoveExistingContainer(t *testing.T) {
 		t.Fatalf("existing module was modified: %s", log)
 	}
 }
+
+func TestModuleControlDoesNotInstallMissingDocker(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the privileged helper targets Linux")
+	}
+	t.Setenv("PATH", t.TempDir()) // no Docker binary available
+	_, _, err := performDockerModuleOperation(context.Background(), updaterhelper.Request{
+		Operation: "docker.module.stop", ModuleID: "demo",
+	}, 1000, 1000)
+	if err == nil || !strings.Contains(err.Error(), "Docker runtime is not ready") {
+		t.Fatalf("missing Docker must cause a read-only failure, got %v", err)
+	}
+}
