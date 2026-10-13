@@ -104,7 +104,7 @@ func satisfies(value, constraint string) (bool, error) {
 	return true, nil
 }
 
- // NewerVersion compares strict major.minor.patch module versions.
+// NewerVersion compares strict major.minor.patch module versions.
 func NewerVersion(candidate, installed string) (bool, error) {
 	next, err := parseVersion(candidate)
 	if err != nil {
