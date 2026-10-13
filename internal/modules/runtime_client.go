@@ -6,11 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
 
-const moduleHelperSocketPath = "/run/home-ai-core-updater.sock"
+const (
+	moduleHelperSocketPath = "/run/home-ai-core-updater.sock"
+	moduleHelperIOTimeout  = 31 * time.Minute // helper has a 30-minute operation budget
+)
 
 type helperModuleResult struct {
 	State       string
@@ -24,7 +28,11 @@ func callModuleHelper(ctx context.Context, operation, moduleID, image string) (h
 	if err != nil {
 		return helperModuleResult{}, fmt.Errorf("connect privileged module helper: %w", err)
 	}
-	defer conn.Close()
+	cleanup, err := protectModuleHelperConn(ctx, conn, moduleHelperIOTimeout)
+	if err != nil {
+		return helperModuleResult{}, fmt.Errorf("set privileged module helper timeout: %w", err)
+	}
+	defer cleanup()
 
 	request := updaterhelper.Request{
 		Operation:       operation,
@@ -50,5 +58,30 @@ func callModuleHelper(ctx context.Context, operation, moduleID, image string) (h
 		State:       response.ModuleState,
 		ContainerID: response.ContainerID,
 		Message:     response.Message,
+	}, nil
+}
+
+// protectModuleHelperConn enforces a deadline for the full JSON exchange.
+// DialContext only constrains connection establishment; it does not bound reads
+// once the privileged helper has accepted the connection.
+func protectModuleHelperConn(ctx context.Context, conn net.Conn, timeout time.Duration) (func(), error) {
+	if err := ctx.Err(); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	deadline := time.Now().Add(timeout)
+	if ctxDeadline, ok := ctx.Deadline(); ok && ctxDeadline.Before(deadline) {
+		deadline = ctxDeadline
+	}
+	if err := conn.SetDeadline(deadline); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	stopCancellation := context.AfterFunc(ctx, func() {
+		_ = conn.SetDeadline(time.Now())
+	})
+	return func() {
+		stopCancellation()
+		_ = conn.Close()
 	}, nil
 }
