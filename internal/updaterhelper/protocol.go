@@ -1,6 +1,6 @@
 package updaterhelper
 
-const ProtocolVersion = 7
+const ProtocolVersion = 8
 
 // HelperVersion is injected at build time. "dev" is used for local builds.
 var HelperVersion = "dev"
@@ -17,6 +17,7 @@ type Request struct {
 	Confirm         string            `json:"confirm,omitempty"`
 	DryRun          bool              `json:"dry_run,omitempty"`
 	SizeMiB         uint64            `json:"size_mib,omitempty"`
+	RequireBlank    bool              `json:"require_blank,omitempty"`
 	Interface       string            `json:"interface,omitempty"`
 	Address         string            `json:"address,omitempty"`
 	Gateway         string            `json:"gateway,omitempty"`
