@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
+	"time"
 	"strings"
 
+	"github.com/DeadSoulf/home-ai-core/internal/helperipc"
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
 
@@ -28,12 +29,11 @@ type Request struct {
 }
 
 func ensureCompatibleHelper(ctx context.Context) error {
-	dialer := net.Dialer{}
-	conn, err := dialer.DialContext(ctx, "unix", helperSocketPath)
+	conn, cleanup, err := helperipc.Dial(ctx, helperSocketPath, 30*time.Second)
 	if err != nil {
 		return fmt.Errorf("connect storage helper: %w", err)
 	}
-	defer conn.Close()
+	defer cleanup()
 
 	if err := json.NewEncoder(conn).Encode(updaterhelper.Request{Operation: "info"}); err != nil {
 		return fmt.Errorf("query storage helper: %w", err)
@@ -60,12 +60,15 @@ func Execute(ctx context.Context, input Request) (string, error) {
 		return "", err
 	}
 
-	dialer := net.Dialer{}
-	conn, err := dialer.DialContext(ctx, "unix", helperSocketPath)
+	timeout := 2*time.Minute + 15*time.Second
+	if strings.HasPrefix(operation, "nas.") {
+		timeout = 45 * time.Second
+	}
+	conn, cleanup, err := helperipc.Dial(ctx, helperSocketPath, timeout)
 	if err != nil {
 		return "", err
 	}
-	defer conn.Close()
+	defer cleanup()
 
 	request := updaterhelper.Request{
 		Operation:       "storage." + operation,
