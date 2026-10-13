@@ -4,8 +4,8 @@ import "testing"
 
 func TestValidateModuleHTTPHealth(t *testing.T) {
 	for _, test := range []struct {
-		port int
-		path string
+		port  int
+		path  string
 		valid bool
 	}{
 		{8080, "/health", true},
