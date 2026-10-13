@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
+	"time"
 	"strings"
 
+	"github.com/DeadSoulf/home-ai-core/internal/helperipc"
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
 
@@ -132,12 +133,18 @@ func ensureCompatibleHelper(ctx context.Context) error {
 }
 
 func callHelper(ctx context.Context, request updaterhelper.Request) (updaterhelper.Response, error) {
-	dialer := net.Dialer{}
-	conn, err := dialer.DialContext(ctx, "unix", helperSocketPath)
+	timeout := 12*time.Minute + 15*time.Second
+	switch request.Operation {
+	case "info", "wireguard.inspect":
+		timeout = 30 * time.Second
+	case "network.profile.inspect":
+		timeout = 45 * time.Second
+	}
+	conn, cleanup, err := helperipc.Dial(ctx, helperSocketPath, timeout)
 	if err != nil {
 		return updaterhelper.Response{}, fmt.Errorf("connect network helper: %w", err)
 	}
-	defer conn.Close()
+	defer cleanup()
 
 	if err := json.NewEncoder(conn).Encode(request); err != nil {
 		return updaterhelper.Response{}, err
