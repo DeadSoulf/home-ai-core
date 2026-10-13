@@ -25,6 +25,7 @@ import (
 var (
 	prepareFilePool        = storage.PrepareNASPool
 	prepareFileFolder      = storage.PrepareNASFolder
+	resolveFileFolderRoot  = filedata.FolderRoot
 	resolveFilePoolStorage = func(nodeID, rootPath string, assignments []state.StoragePurposeRecord) (systeminfo.BlockNode, error) {
 		return filePoolStorageNode(rootPath, assignments, systeminfo.Collect(nodeID).BlockTree)
 	}
@@ -928,12 +929,28 @@ func (s *server) authorizedFileFolder(
 		return state.NASFolderRecord{}, "", false
 	}
 
-	root, err := filedata.FolderRoot(folder.PoolRoot, folder.RelativePath)
+	root, err := fileFolderRootWithRepair(r.Context(), folder)
 	if err != nil {
 		writeAPIError(w, r, http.StatusBadGateway, "file_folder_storage_unavailable", err.Error(), nil)
 		return state.NASFolderRecord{}, "", false
 	}
 	return folder, root, true
+}
+
+// The NAS helper owns the structural folder directories. If their Unix owner
+// no longer matches the Core service account (for example, after reinstallation),
+// a previously created folder can become inaccessible even to an authorized user.
+// Reconcile just this authorized folder once, using the existing path-validated
+// privileged helper; never retry arbitrary filesystem errors or user-supplied paths.
+func fileFolderRootWithRepair(ctx context.Context, folder state.NASFolderRecord) (string, error) {
+	root, err := resolveFileFolderRoot(folder.PoolRoot, folder.RelativePath)
+	if !errors.Is(err, os.ErrPermission) {
+		return root, err
+	}
+	if repairErr := prepareFileFolder(ctx, folder.PoolRoot, folder.RelativePath); repairErr != nil {
+		return "", fmt.Errorf("repair NAS folder directory access: %w", repairErr)
+	}
+	return resolveFileFolderRoot(folder.PoolRoot, folder.RelativePath)
 }
 
 func (s *server) filePoolResponse(ctx context.Context, record state.NASPoolRecord) filePoolResponse {
