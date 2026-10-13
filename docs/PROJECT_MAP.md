@@ -1,513 +1,318 @@
 # Home-AI — карта проекта
 
-**Текущая версия исходников Core:** `0.1.173-dev` (проверки CI и приёмка отдельно от номера версии)
-**Состояние:** Core Foundation, Docker Module Runtime v2 и официальный каталог модулей реализованы; Core ещё находится в разработке.  
-**Текущий этап:** повышение отказоустойчивости операций с модулями, восстановление после прерываний и проверки безопасности.  
-**Следующий крупный этап:** транзакционное обновление Docker-модулей с health-check, безопасным переключением и автоматическим rollback (issue #177). До завершения этого этапа прямое обновление установленного контейнера блокируется для предотвращения потери рабочего модуля.
+**Дата сверки:** 14 октября 2026 года (Europe/Kyiv).  
+**Версия исходников Core:** `0.1.173-dev`.  
+**База сверки:** `main`, коммит реализации [`0204d7ce`](https://github.com/DeadSoulf/home-ai-core/commit/0204d7ce1b91e4509f282d5ada8ead25f4a06270), PR №179. Документационные коммиты после него не означают новый релиз Core.  
+**Адрес по умолчанию после установки:** `https://SERVER-IP:82/`.  
+**Текущий этап:** безопасный выпуск и однократная миграция на 173, затем приёмка отказоустойчивости ядра и Docker Module Runtime.  
+**Следующая крупная функция:** транзакционное обновление модулей на другой образ с проверкой здоровья приложения и откатом, задача №177.
 
----
+> Реализовано в исходниках ≠ прошло CI ≠ опубликован подписанный релиз ≠ установлено и проверено на реальном сервере. Эти состояния учитываются отдельно. Карта не является заявлением об отсутствии всех ошибок или готовности Core 1.0 Stable.
 
-## 1. Что уже работает в Core
+## 1. Точная текущая точка
 
-### Базовая платформа
+| Уровень | Зафиксированное состояние |
+|---|---|
+| Исходники | `0.1.173-dev`; исправления PR №174, №175, №176 и №179 находятся в `main`. |
+| Проверки реализации | Полный `core-ci` на коммите реализации прошёл; подробности и ссылки в разделе 5. |
+| Сборки | Debian amd64/arm64, update bundles amd64/arm64 и Windows-клиент успешно собраны в release workflow. |
+| Публикация | Запуск `38473908673` остановлен на подписании: `HOME_AI_UPDATE_SIGNING_KEY` не был предоставлен. Публикация пропущена; при сверке релиз `v0.1.173-dev` не найден. Артефакты сборки не считаются опубликованным подписанным релизом. |
+| Работающий сервер | В рамках этих работ не обновлялся; удалённое переключение порта не выполнялось. Фактически установленную версию и порт нужно проверить на узле, а не выводить из `VERSION`. |
+| Обновление существующей установки | Требуется однократная установка проверенного Debian-пакета через доверенную консоль/SSH. Старый Web-updater не должен создавать новую границу доверия. |
+| Модули | Повтор той же установки восстанавливается; замена на другой манифест/образ намеренно отклоняется до завершения №177. |
+| Стабильный выпуск | Не объявлен: остаются ключ подписи, доверие TLS, миграция, приёмка на целевом сервере и незакрытые сценарии восстановления. |
 
-- ✅ первичная установка на чистый Debian 13;
-- ✅ amd64 и arm64;
-- ✅ доступ к Web UI по LAN сразу после установки;
-- ✅ создание первого владельца с одноразовым локальным кодом настройки;
-- ✅ users, sessions, RBAC и resource permissions;
-- ✅ CSRF и audit;
-- ✅ persistent jobs;
-- ✅ durable events;
-- ✅ WebSocket transport;
-- ✅ SQLite state;
-- ✅ system and hardware inventory;
-- ✅ network management;
-- ✅ storage foundation;
-- ✅ Core updater;
-- ✅ privileged helper;
-- ✅ обновление Core через Web UI;
-- ✅ Windows file client;
-- ✅ Web-консоль сервера в `Система → Консоль` для администратора;
-- ✅ отдельное permission `system.console`;
-- ✅ одноразовый CSRF-защищённый ticket перед WebSocket-сессией;
-- ✅ shell работает от непривилегированного пользователя `home-ai-core` внутри systemd sandbox.
+При расхождении локальной копии, карты и GitHub ориентироваться на `VERSION` вместе с точным commit SHA. Ранее исследованная копия 163 на Asus не является базой текущей разработки. Незавершённая ветка Hikvision не переносилась обратно в Core.
 
-### Архитектура модулей
-
-- ✅ Module Registry;
-- ✅ dependency/conflict planner;
-- ✅ capability discovery;
-- ✅ Docker Engine runtime;
-- ✅ bridge-сеть `home-ai-modules`;
-- ✅ отдельный каталог данных модулей;
-- ✅ Manifest v2;
-- ✅ Docker image только через immutable `@sha256`;
-- ✅ install/start/stop/restart/remove через Job Engine;
-- ✅ lifecycle проходит через privileged helper;
-- ✅ Web UI для установки Manifest v2 и управления модулем;
-- ✅ persistent data сохраняются после удаления контейнера;
-- ✅ Core не получает `docker.sock`;
-- ✅ модуль не получает `docker.sock`;
-- ✅ модуль запускается от непривилегированного UID/GID;
-- ✅ read-only root filesystem;
-- ✅ dropped Linux capabilities;
-- ✅ `no-new-privileges`.
-
----
-
-## 2. Что Core принципиально не содержит
-
-Home-AI-Core — это control plane, а не место для продуктовой бизнес-логики.
-
-Новые функции не должны добавляться как:
+## 2. Границы архитектуры
 
 ```text
-internal/nvr
-internal/nas
-internal/ai
-internal/smarthome
-...
+Home-AI-Core = общий управляющий уровень платформы
+  ├─ Identity / Users / Sessions / RBAC
+  ├─ Resource permissions / CSRF / Audit
+  ├─ Jobs / Events / WebSocket
+  ├─ System / Hardware / Storage / Network foundations
+  ├─ HTTPS Web UI / API / административная консоль
+  ├─ Core Updater
+  └─ Module Registry / Catalog / Docker Runtime
+       └─ независимые продуктовые Docker-модули
+
+Privileged Helper = ограниченная граница системных полномочий
+Module            = изолированная продуктовая нагрузка
+Jobs              = модель выполнения модульных изменений
 ```
 
-Функциональные возможности должны поставляться как отдельные Docker-модули.
+Core содержит Go backend, React/TypeScript Web UI, SQLite, общую файловую/сетевую инфраструктуру, установщик Debian и Windows-клиент файловых операций. Он не должен получать прямой доступ к `docker.sock` или работать сетевым сервисом от root.
 
-Каждый модуль:
+Новая бизнес-логика NVR, AI, Smart Home и расширенных NAS-функций не добавляется в бинарник Core как `internal/nvr`, `internal/ai`, `internal/smarthome` или `internal/nas`. Базовые файловые операции, Storage, SMB и разрешения, уже входящие в общую инфраструктуру, не означают возврат продуктовых модулей внутрь Core.
 
-1. имеет собственный репозиторий;
-2. имеет собственный Docker image;
-3. имеет отдельную версию;
-4. объявляет совместимость с Core;
-5. объявляет capabilities и permissions;
-6. имеет собственный persistent state;
-7. устанавливается независимо от Core;
-8. обновляется независимо от Core;
-9. запускается только через Module Runtime;
-10. взаимодействует с Core только через документированные контракты.
+Каждый модуль имеет собственный репозиторий, образ, версию, persistent state, совместимость с Core, permissions/capabilities, API namespace и health-контракт. Независимое безопасное обновление модулей — целевая возможность; автоматический rollback на другой digest пока не реализован.
 
----
+## 3. Реестр изменений и решений
 
-> Подробная фиксация механизма установки/обновления модулей: [`docs/MODULE_CATALOG_WORK_RU.md`](MODULE_CATALOG_WORK_RU.md)
+| PR / задача | Состояние | Что зафиксировано |
+|---|---|---|
+| [№174 — Updater IPC](https://github.com/DeadSoulf/home-ai-core/pull/174) | В `main` | Ограничение времени обмена с updater helper и прерывание заблокированного ожидания при отмене контекста. |
+| [№175 — Module IPC](https://github.com/DeadSoulf/home-ai-core/pull/175) | В `main` | Аналогичная защита Docker module IPC с учётом длительных операций. |
+| [№176 — Storage / Network / SMB IPC](https://github.com/DeadSoulf/home-ai-core/pull/176) | В `main` | Общий `internal/helperipc`; ограничения для Storage, inspect, NAS quota/usage, Network/WireGuard и SMB; регрессионные тесты. |
+| [№178 — безопасная первая установка](https://github.com/DeadSoulf/home-ai-core/pull/178) | Закрыт как заменённый | Первоначальные ограничения опасной замены контейнера. Codex обнаружил ошибки восстановления и stop/remove при неисправной сети; старый вариант отдельно не сливать. |
+| [№179 — безопасность и порт 82](https://github.com/DeadSoulf/home-ai-core/pull/179) | Объединён | HTTPS, локальный код первого владельца, подпись внутри root-helper, защищённое staging/backup, протокол 8, восстановление модулей и заданий, клиент и миграция установщика. Заменяет №178. |
+| [№177 — транзакционные обновления](https://github.com/DeadSoulf/home-ai-core/issues/177) | Открыта | Новая версия приложения, health-check, безопасное переключение, совместимость данных и rollback. Защитный запрет опасной замены не закрывает эту задачу. |
 
-# Engineering milestones
+В процессе предыдущего аудита были реально выполнены `codex review` и отдельный анализ исходников в режиме только чтения. Замечания о HTTP, доверии к подготовленному обновлению, первоначальном владельце, прерванной установке и неисправной Docker-сети послужили входом для №179. Прохождение CI не отменяет необходимость проверки новой реализации на реальном узле.
 
-## M0 — Core foundation
+## 4. Что изменено в 0.1.173-dev
 
-**Статус: ✅ готово**
+### 4.1. HTTPS и перенос 8080 → 82
 
-- ✅ security / users / sessions / RBAC;
-- ✅ jobs / events / audit;
-- ✅ Web UI;
-- ✅ hardware/system inventory;
-- ✅ network foundation;
-- ✅ storage foundation;
-- ✅ privileged helper;
-- ✅ Core updater;
-- ✅ Debian installer;
-- ✅ Windows file client;
-- ✅ Web-консоль сервера (`Система → Консоль`);
-- ✅ permission `system.console` только для администратора;
-- ✅ audit открытия/закрытия консоли без журналирования введённых команд.
+- Default listener изменён с `0.0.0.0:8080` на `0.0.0.0:82`; обычный адрес — **HTTPS**, а не HTTP.
+- Включён TLS 1.2+; первоначальный постоянный сертификат и ключ создаются с закрытыми правами в `/var/lib/home-ai-core/tls/`.
+- Для собственного сертификата предусмотрены `HOME_AI_TLS_CERT` и `HOME_AI_TLS_KEY`; оба пути задаются вместе.
+- Неполная, несовместимая или просроченная пара сертификат/ключ не вызывает незаметного перехода на HTTP.
+- Для HTTPS-сессии используются `Secure` и `HttpOnly` cookie.
+- Обычный HTTP оставлен только для явно включённого `--allow-insecure-loopback` на literal loopback-адресе в изолированной разработке/тестах.
+- Core по-прежнему работает как `home-ai-core`. Systemd выдаёт только `CAP_NET_BIND_SERVICE` для низкого порта; `NoNewPrivileges=yes` и ограничения файловой системы/устройств сохранены.
 
----
+Самоподписанный сертификат нельзя считать доверенным автоматически. Его SHA-256 fingerprint сверяется через доверенную консоль; клиентам передаётся только публичный сертификат/CA, не `server.key`. Предусмотреть продление сертификата до истечения срока и переиздание при смене адреса сервера.
 
-## M1 — Docker runtime foundation
+### 4.2. Первый владелец
 
-**Статус: ✅ готово**
+- Для новой базы требуется случайный одноразовый код из `/var/lib/home-ai-core/bootstrap-token`, доступный локально с соответствующими правами.
+- Web-форма передаёт этот код по проверенному HTTPS; API не раскрывает его клиенту.
+- Отсутствующий или неверный код отклоняется. После создания владельца файл удаляется; повторное создание владельца отвергается.
+- Существующие пользователи, владелец и база не сбрасываются.
 
-- ✅ Docker устанавливается на поддерживаемом Debian;
-- ✅ capability `host.docker`;
-- ✅ helper восстанавливает Docker runtime;
-- ✅ bridge-сеть `home-ai-modules`;
-- ✅ каталог `/var/lib/home-ai-core/modules`;
-- ✅ Core не имеет доступа к Docker socket;
-- ✅ модуль не имеет доступа к Docker socket;
-- ✅ lifecycle разрешён только через helper.
+Ограничение по локальной сети больше не считается достаточным доказательством права создать владельца. Код настройки не публикуется в GitHub, отчётах или общедоступных логах.
 
----
+### 4.3. Подпись и привилегированные обновления
 
-## M2 — Module Manifest v2
+- Ed25519-подпись обязательна для **всех** Core updates, включая development-версии.
+- Привилегированный helper самостоятельно проверяет доверенную подпись над checksum и точным именем архива; проверки только в непривилегированном Core недостаточно.
+- Входной архив копируется без следования символьным ссылкам в root-controlled storage, проверяется по SHA-256 и распаковывается из этой частной копии с ограничениями архива.
+- Изменяемый службой Core каталог `prepared-*` и самостоятельно составленные manifest hashes не являются доказательством происхождения пакета.
+- Verified staging и новые rollback backups находятся в `/var/lib/home-ai-core-updater`, вне Core-owned state directory.
+- Старые backups в `/var/lib/home-ai-core/update/backup` не импортируются как доверенные.
+- Результат установки передаётся Core атомарно, с защитой от следования ссылкам.
+- Helper protocol повышен с **7 до 8**.
+- Публичный trust root: `/etc/home-ai-core/update-trusted.pub`. Приватный release key не устанавливается на домашний сервер и не хранится в репозитории.
 
-**Статус: ✅ готово**
+Публикация останавливается при отсутствии `HOME_AI_UPDATE_SIGNING_KEY`. Работающий production signing key этими изменениями не создавался; его предоставление и доверенная установка соответствующего публичного ключа — отдельная административная операция.
 
-- ✅ Docker runtime обязателен;
-- ✅ immutable image `@sha256`;
-- ✅ Core version constraint;
-- ✅ amd64/arm64 requirements;
-- ✅ dependencies;
-- ✅ conflicts;
-- ✅ capabilities;
-- ✅ permissions;
-- ✅ health metadata;
-- ✅ API namespace;
-- ✅ declarative UI navigation;
-- ✅ lifecycle declaration;
-- ✅ запрет произвольных shell-команд;
-- ✅ запрет module-specific host packages.
+### 4.4. Модули и восстановление после прерывания
 
----
+- До Docker side effects сохраняется durable intent: запись `registered` с неизменным манифестом.
+- Повтор с тем же манифестом и image digest может восстановить managed-контейнер после прерывания Core без удаления рабочих данных.
+- Уже завершённая идентичная установка идемпотентна. Незавершённая запись остаётся доступной для повторной попытки или явного удаления.
+- Неоднозначный результат IPC и ошибка финальной записи сохраняют восстанавливаемое состояние, а не выдают установку за завершённую.
+- Pending/registered-модули не рекламируют готовые capabilities.
+- Lifecycle-операции сериализованы; вместо неотменяемого ожидания общего mutex возвращается занятость. Это не обещание параллельной установки нескольких модулей.
+- Проверяются недопустимые операции и образы до привилегированных изменений. Stop/remove не запускают установку Docker как побочный эффект.
+- Stop/remove требуют доступный Docker engine, но не исправную bridge-сеть `home-ai-modules`. Install/start/restart сохраняют свои необходимые prerequisites.
+- Обрыв модульного запроса отменяет контекст helper; неизвестный результат уже начатой операции не трактуется как доказанное отсутствие side effects.
+- Новые контейнеры, немедленно завершившиеся после старта, не должны считаться успешно запущенным модулем; очистка ограничена по времени и возвращает ошибки.
+- Установка поверх другого манифеста/образа остаётся запрещённой до №177; прежний рабочий контейнер не удаляется ради непроверенной замены.
 
-## M3 — Module lifecycle v1
+Короткая проверка `running` — не health-check приложения и не проверка совместимости его данных.
 
-**Статус: ✅ готово**
+### 4.5. Persistent data модулей
 
-- ✅ install;
-- ✅ start / enable;
-- ✅ stop / disable;
-- ✅ restart;
-- ✅ remove;
-- ✅ persistent Job Engine;
-- ✅ audit постановки lifecycle jobs;
-- ✅ Web UI controls;
-- ✅ persistent data сохраняются при remove;
-- ✅ unmanaged Docker containers не затрагиваются helper-ом.
+| Назначение | Путь / политика |
+|---|---|
+| Новые каталоги данных | `/var/lib/home-ai-modules/ID`, родитель контролируется root. |
+| Legacy data | `/var/lib/home-ai-core/modules/ID`; автоматически не удаляются, не перемещаются и не подменяются пустым каталогом. |
+| Уже установленные контейнеры | Сохраняют имеющиеся mounts. |
+| Новая установка с legacy data | Блокируется с требованием явной миграции данных. |
+| Обычный remove | Удаляет контейнер и регистрацию, сохраняя данные. |
+| Purge / backup / restore | Отдельные подтверждаемые контракты ещё предстоит закончить. |
 
----
+Автоматического инструмента миграции legacy data нет. Перенос требует остановки модуля, резервной копии, проверки ownership/содержимого и явного плана смены mount.
 
-## M4 — Первый независимый Docker-модуль
+### 4.6. Задания и IPC
 
-**Статус: 🔄 текущий этап**
+Ранее добавленные ограничения полного JSON-обмена применяются к Updater, Modules, Storage, Network, SMB и quota/usage; `DialContext` сам по себе не ограничивает чтение уже подключённого сокета. Учитываются более короткий deadline вызывающего кода, отмена и корректное закрытие соединения.
 
-Reference implementation уже собран в отдельной staging-ветке и не входит в `main` Core. После live-проверки он будет вынесен в отдельный репозиторий.
+После рестарта отменённые задания не воскресают. Автоматически возвращается в очередь только теперь идемпотентная установка модуля; прочие прерванные операции помечаются ошибкой для проверки фактического результата перед повтором. Это предотвращает слепое повторение необратимых действий, но не заменяет их предметную приёмку.
 
-### Уже сделано
+### 4.7. Windows-клиент и сопутствующие изменения
 
-- ✅ создан минимальный `reference.module`;
-- ✅ HTTP health endpoint `/health`;
-- ✅ persistent state в `/data/state.json`;
-- ✅ повторный запуск увеличивает `boot_count`;
-- ✅ Docker image собирается без root-зависимостей;
-- ✅ локальный lifecycle smoke-test проходит;
-- ✅ persistent `/data` переживает пересоздание контейнера;
-- ✅ multi-arch image собран для amd64/arm64;
-- ✅ image опубликован в GHCR;
-- ✅ anonymous pull из GHCR проверен без авторизации;
-- ✅ Manifest v2 генерируется автоматически с immutable image digest;
-- ✅ текущий reference image закреплён digest `sha256:60177fb078509ea63e74c9776f92a1dd987e88be2cd0b146cc553ec89f987336`.
+- Удалённые подключения требуют проверенный HTTPS; plaintext remote URLs отклоняются.
+- Перенаправления не используются для передачи учётных данных другому адресу.
+- Используется системное хранилище доверия; `HOME_AI_CA_FILE` позволяет указать заранее проверенный публичный сертификат/CA.
+- Сохранённые URL подключения и синхронизации необходимо перевести на `https://SERVER-IP:82` и заново авторизоваться.
+- Обновлены default URLs, Web-форма первого владельца, переводы, smoke-проверка, установщик, упаковка Debian и release workflow.
+- В итоговом дереве реализации нет временных source-transfer файлов и служебных workflows, применявшихся при подготовке изменений.
 
-### Live-проверка на реальном Home-AI node
+Основные точки кода: `internal/securetransport`, `internal/security/bootstrap_token.go`, `internal/api/security.go`, `cmd/home-ai-core-updater/update_trust.go`, `internal/updater/signed_archive.go`, `internal/modules/registry.go`, `cmd/home-ai-core-updater/docker_module_ops.go`, `internal/state/jobs.go`, `internal/windowsclient`, `packaging/debian`, `scripts`.
 
-- ✅ установка модуля через Web UI Core;
-- ✅ start;
-- ✅ stop;
-- ✅ restart;
-- ✅ remove;
-- ✅ lifecycle-кнопки в Web UI отрабатывают через Core;
-- ⏭ проверить сохранение `/data` после remove;
-- ⏭ проверить повторную установку через Core;
-- ⏭ подтвердить persistent state после reinstall;
-- ⏭ подтвердить работу на реальном amd64 node;
-- ⏭ подтвердить работу на реальном arm64 node;
-- ⏭ вынести готовый reference implementation в отдельный репозиторий;
-- ⏭ зафиксировать его как шаблон для будущих модулей.
+## 5. Проверки и доказательства
 
-### Критерий завершения M4
+| Проверка | Результат и источник |
+|---|---|
+| Проверка полного PR | [core-ci 38473101536](https://github.com/DeadSoulf/home-ai-core/actions/runs/38473101536) — успешно. |
+| Финальная версия PR №179 | [core-ci 38473364916](https://github.com/DeadSoulf/home-ai-core/actions/runs/38473364916) — успешно; head `65fb21ba3a6d179e6ecd9192df8ff739c0bd6f73`. |
+| Проверка после merge | [core-ci 38473908648](https://github.com/DeadSoulf/home-ai-core/actions/runs/38473908648) — успешно на `0204d7ce`: Go format/dependency lock/tests/vet, schema/shell checks, Web typecheck/tests/build, HTTPS integration smoke, Linux cross-build, Windows tests/build, Debian installers. |
+| Release build | [38473908673](https://github.com/DeadSoulf/home-ai-core/actions/runs/38473908673) — пять сборочных jobs успешны; публикация завершилась ошибкой на подписании. |
+| Причина блокировки | [Publish job 115560372054](https://github.com/DeadSoulf/home-ai-core/actions/runs/38473908673/job/115560372054): отсутствовал `HOME_AI_UPDATE_SIGNING_KEY`; шаг Publish release пропущен. |
+| Локальные регрессии | В [протоколе PR №179](https://github.com/DeadSoulf/home-ai-core/pull/179) зафиксированы `go test ./...`, `go vet ./...` с Go 1.27.2 и targeted race tests для modules/security/state/helper IPC/TLS/updater. Это результат предыдущей проверки, не новый запуск при редактировании карты. |
+| Изолированный запуск | В том же протоколе: Core как UID 65534 на HTTPS:82; health 200, без авторизации 401, без setup code 403, создание владельца 201, удаление token file, Secure/HttpOnly cookie, авторизованный запрос 200, replay 409, logout 204, отозванная сессия 401. |
+| Реальный сервер | Миграция на 173, доверие сертификату, сохранность данных и новый подписанный update/rollback цикл пока не приняты. |
 
-Полный цикл должен работать без ручного использования Docker CLI:
+Повторная фиксация статуса после merge: [комментарий к №179](https://github.com/DeadSoulf/home-ai-core/pull/179#issuecomment-6156039093).
+
+Регрессионное покрытие включает недействительные/отсутствующие подписи, tampering архива, symlink escapes, неизменяемое verified staging, неверный/replayed setup code, TLS и cookie, durable install intent, same-image adoption, degraded-network cleanup и restart/cancellation. Тесты на подменённом Docker CLI не равны полноценному испытанию Docker и файловой системы на целевом устройстве.
+
+## 6. Выпуск и миграция: обязательные незакрытые действия
+
+Подробная инструкция и команды: [SECURITY_PORT82_MIGRATION.md](SECURITY_PORT82_MIGRATION.md). Этот раздел фиксирует порядок, а не факт выполнения.
+
+1. **Подпись релиза.** Администратор предоставляет настоящий Ed25519 signing key через секрет `HOME_AI_UPDATE_SIGNING_KEY` и проверяет соответствующий публичный ключ. Не обходить проверку и не публиковать неподписанный dev update.
+2. **Доверенный пакет.** Повторить подписанный выпуск; до установки проверить происхождение нужного Debian-пакета. Для amd64 имя — `home-ai-core_0.1.173.dev_amd64.deb`; `.dev` в имени пакета отличается от `-dev` в версии Core. Для arm64 нужен соответствующий пакет.
+3. **Резервирование и доступ.** Сохранить SQLite, конфигурацию и данные модулей; обеспечить консоль или доверенный SSH, проверить доступность порта 82. Не выполнять миграцию по единственному каналу, потеря которого исключает восстановление.
+4. **Однократная установка.** Применить проверенный пакет, а не старый Web bundle updater: требуются новые systemd capabilities, protocol 8, ownership и trust storage. Старый updater не обновляет весь этот контракт.
+5. **Настройки порта.** Установщик переводит старое значение `HOME_AI_LISTEN` на порту 8080 на тот же host с портом 82; предыдущий env сохраняется в `/etc/home-ai-core/home-ai-core.env.before-port82`. Другие custom ports сохраняются. Переход меняет и порт, и схему на HTTPS.
+6. **Доверие на сервере и клиентах.** Установить проверенный публичный update key в `/etc/home-ai-core/update-trusted.pub`; проверить TLS fingerprint и настроить доверие клиентов. Private signing key не копировать на сервер. При собственном TLS-сертификате проверить имена/IP, срок и доступ из systemd sandbox.
+7. **Приёмка.** Подтвердить HTTPS:82, вход существующих пользователей, первый setup для новой установки, права файлов/SMB, сохранность данных, module recovery, подписанный update/rollback/re-update и перезагрузку.
+
+Запись о выполнении каждого пункта должна содержать дату, версию/commit, архитектуру, идентификатор тестового узла без секретов и результат. Успешный CI или скачанный артефакт сами по себе пункт не закрывают.
+
+## 7. Engineering milestones
+
+Обозначения: **реализовано** — есть код; **проверено** — указан тест/протокол; **план** — архитектурное решение, не обещание работающей функции. Историческая приёмка старой версии сохраняется, но не переносится автоматически на 173.
+
+### M0 — Core foundation
+
+**Статус: базовая инфраструктура реализована; выпуск 173 требует раздела 6.**
+
+Сохраняются security/users/sessions/RBAC, resource permissions, CSRF, audit, jobs, events, WebSocket, SQLite, Web UI, инвентаризация, network/storage foundation, privileged helper, Core updater, Debian installer и Windows file client. Административная Web-консоль использует `system.console`, одноразовый CSRF-защищённый ticket, непривилегированную shell и audit открытия/закрытия без журналирования введённых команд.
+
+Историческое завершение foundation и проверки от 1 октября 2026 года описаны в [CORE_1_0_READINESS.md](CORE_1_0_READINESS.md) и [CORE_ACCEPTANCE.md](CORE_ACCEPTANCE.md). Они не подтверждают новую TLS/trust/port миграцию и не заменяют длительные испытания прерванных обновлений.
+
+### M1 — Docker runtime foundation
+
+**Статус: реализовано; политика данных обновлена в 173.**
+
+Есть установка Docker на поддерживаемом Debian, capability `host.docker`, bridge `home-ai-modules` и lifecycle через helper без передачи Docker socket Core/модулям. Новое место данных — `/var/lib/home-ai-modules`; старое `/var/lib/home-ai-core/modules` теперь только legacy, с правилами раздела 4.5.
+
+Runtime setup относится к установке; команда остановки/удаления не должна устанавливать Docker. Новый helper сохраняет возможность stop/remove при неисправной bridge-сети.
+
+### M2 — Module Manifest v2
+
+**Статус: контракт и его валидация реализованы.**
+
+Manifest v2 объявляет Docker runtime, immutable `@sha256`, Core version constraint, amd64/arm64 requirements, dependencies/conflicts, permissions/capabilities, health metadata, API namespace, UI navigation и lifecycle. Произвольные shell-команды и module-specific host packages не являются расширением этого контракта.
+
+Наличие поля в манифесте или отдельного dependency/conflict planner не доказывает выполнение полного плана совместимости непосредственно перед каждым изменением. Полная связка preflight → mutation остаётся в M6; health metadata не означает реализованный application health loop.
+
+Контракт: [Module SDK v2](sdk/module-sdk-v2.md).
+
+### M3 — Module lifecycle v1
+
+**Статус: реализовано; восстановление того же install усилено в 173.**
+
+Есть install/start/stop/restart/remove через persistent Jobs, audit постановки, Web controls, сохранение данных при remove и проверки managed-контейнера. Добавлены durable intent, идемпотентный повтор, same-image recovery, доступность незавершённой записи для удаления, корректная отмена и ограничения IPC.
+
+Полный live-цикл `install → stop → start → restart → remove → reinstall` с проверкой данных после новой миграции ещё нужно подтвердить. Само наличие кнопки не является приёмкой результата.
+
+### M4 — Первый независимый Docker-модуль
+
+**Статус: исторический reference implementation; окончательная приёмка не закрыта.**
+
+Из предыдущей карты сохранена запись: `reference.module` в отдельной staging-ветке, `/health`, `/data/state.json`, `boot_count`, локальный lifecycle smoke, сохранение `/data`, multi-arch build amd64/arm64, публикация и anonymous pull GHCR, автоматический Manifest v2 с digest. Исторический digest:
 
 ```text
-install
-  ↓
-running
-  ↓
-stop
-  ↓
-start
-  ↓
-restart
-  ↓
-remove
-  ↓
-reinstall
+sha256:60177fb078509ea63e74c9776f92a1dd987e88be2cd0b146cc553ec89f987336
 ```
 
----
+Это не утверждение о текущей доступности образа, ветки или GHCR. Прежняя карта также отмечала успешные Web install/start/stop/restart/remove; точный commit и узел тех проверок здесь не восстановлены.
 
-## M5 — Module Runtime v2 hardening
+Остаётся проверить на 173: `/data` после remove/reinstall, persistent state, реальные amd64 и arm64 узлы; завершить выделение reference implementation в отдельный репозиторий и закрепить воспроизводимый шаблон для будущих модулей.
 
-**Статус: 🔄 активный этап**
+### M5 — Module Runtime v2 hardening
 
-### Health
+**Статус: активный этап, частично реализован.**
 
-- ⏭ health reconciliation;
-- ⏭ состояние starting / healthy / unhealthy;
-- ⏭ автоматическое обнаружение падения контейнера;
-- ⏭ отображение health в Web UI.
+Завершённые изменения — разделы 4.4–4.6. Не считать их завершением следующих работ:
 
-### Logs
+- **Health:** периодическая сверка реального состояния, starting/healthy/unhealthy, обнаружение падений и понятное отображение в UI.
+- **Logs:** ограниченные по объёму и времени stdout/stderr, API и Web-просмотр.
+- **Update, №177:** отдельный update job, candidate staging без разрушения старого контейнера, preflight, application health, предыдущий manifest/digest, безопасное переключение, rollback приложения и совместимости данных, crash recovery и audit результата. Очистка старых images — только после подтверждённого успеха.
+- **Data lifecycle:** обычный remove с сохранением данных уже есть; `purge data`, «Удалить модуль и данные» с отдельным подтверждением, backup/restore и автоматический legacy-data migration tool не завершены.
+- **Расширения runtime:** ports/devices/additional mounts/GPU/USB; host networking — только для явно доверенных сценариев через декларативную policy. Не открывать эти полномочия произвольно.
 
-- ⏭ безопасный просмотр stdout/stderr;
-- ⏭ API логов;
-- ⏭ Web UI логов;
-- ⏭ ограничение размера и времени чтения.
+Целевая модель модульных обновлений: обычный SemVer, обнаружение новых версий автоматически и вручную, установка новой версии только по действию пользователя, обязательный rollback при неуспешном health-check. Это модель **модулей**; текущий Core продолжает обозначаться `0.1.173-dev`. Готового механизма release channels для модулей не заявлено.
 
-### Update
+### M6 — Official Module Catalog / Store
 
-Принята модель обновлений:
+**Статус: базовые API и Web-каталог уже реализованы; расширенный Store не завершён.**
 
-- ✅ обновление запускается пользователем вручную;
-- ✅ Core должен автоматически проверять наличие новых версий;
-- ✅ используется обычная SemVer-нумерация `major.minor.patch`;
-- ✅ release channels (`stable/beta/dev`) не используются;
-- ⏭ обнаружение новой версии по официальному каталогу;
-- ⏭ сравнение установленной версии с последней доступной;
-- ⏭ проверка нового immutable image digest;
-- ⏭ отдельный update job;
-- ⏭ health-check новой версии после запуска;
-- ⏭ сохранение предыдущего manifest/image digest;
-- ⏭ автоматический rollback при неуспешном health-check;
-- ⏭ audit update/rollback;
-- ⏭ очистка устаревших Docker images после успешного обновления.
+Реально присутствуют:
 
-### Data lifecycle
+- загрузка `catalog.json` из `DeadSoulf/home-ai-core_modules` через GitHub API;
+- документ каталога schema 1 с Manifest v2, ограничение ответа/timeout и проверка манифестов;
+- передача `HOME_AI_MODULE_CATALOG_TOKEN` при запросе каталога и поддержка GHCR authentication; `HOME_AI_MODULE_REGISTRY_USER` задаёт registry user;
+- catalog API, выбор модуля по ID и постановка `module.install`, CSRF для cookie-запроса и audit;
+- Web-блоки доступных и установленных модулей, версии, ошибки каталога, установка и lifecycle controls.
 
-Принято разделение удаления:
+Источники: [`internal/api/module_catalog.go`](../internal/api/module_catalog.go), [`Modules.tsx`](../web/src/pages/Modules.tsx). Настройку прав внешних репозиториев, наличие токена на сервере и актуальную приватность каждого образа необходимо проверять отдельно; поддержка authentication не доказывает, что credentials уже настроены.
 
-- ⏭ «Удалить модуль» — контейнер и регистрация удаляются, данные сохраняются;
-- ⏭ «Удалить модуль и данные» — отдельное подтверждаемое действие;
-- ⏭ отдельная операция `purge data`;
-- ⏭ backup/restore contract.
+**Ограничения интерфейса и политики:** ручная установка Manifest всё ещё доступна администратору в обычной странице. Поэтому целевая политика «только официальный каталог» ещё не является исключительным каналом установки. UI определяет отличие версии сравнением строк на неравенство и может показывать «Обновить», хотя backend отклоняет другой манифест/образ до №177. Эту рассинхронизацию нужно устранить, не ослабляя защиту backend.
 
-### Дополнительные runtime permissions
+Остаётся:
 
-Пока v2 специально не разрешает дополнительные host-возможности.
+- полноценный refresh job, периодическая проверка и отдельное ручное обновление каталога;
+- last-known-good snapshot при недоступности GitHub;
+- корректное SemVer-сравнение, отсутствие ложного предложения downgrade;
+- compatibility/architecture/capabilities и dependency/conflict validation непосредственно перед mutation;
+- update-plan preview, отдельный update job, health/rollback и audit;
+- согласование кнопок с запретом different-image upgrade и понятный UI восстановления pending install;
+- убрать/изолировать ручной Manifest из обычного сценария согласно принятой политике;
+- воспроизводимая публикация metadata/digest после CI внешнего модуля, без ручного копирования.
 
-В будущем только декларативно и через policy:
-
-- ⏭ ports;
-- ⏭ devices;
-- ⏭ additional mounts;
-- ⏭ GPU access;
-- ⏭ USB access;
-- ⏭ host networking только для отдельных доверенных сценариев.
-
----
-
-## M6 — Official Module Catalog / Store
-
-**Статус: 🔄 архитектура согласована, реализация следующая**
-
-Цель — полностью убрать ручную вставку Manifest из обычного пользовательского сценария.
-
-### Принятая архитектура
-
-- ✅ официальный каталог размещается в отдельном GitHub-репозитории `DeadSoulf/home-ai-core_modules`;
-- ✅ каждый продуктовый модуль остаётся в собственном GitHub-репозитории;
-- ✅ Docker images публикуются отдельно от Core и закрепляются immutable `@sha256`;
-- ✅ каталог и образы приватные;
-- ✅ Core доверяет только нашим официальным модулям;
-- ✅ сторонние module repositories пока не поддерживаются;
-- ✅ release channels не используются;
-- ✅ версии модулей используют обычный SemVer;
-- ✅ новая версия модуля появляется в каталоге только после CI build/test/publish;
-- ✅ digest должен попадать в каталог автоматически, без ручного копирования;
-- ✅ установка — только из каталога одной кнопкой;
-- ✅ обновление — только вручную пользователем;
-- ✅ проверка наличия обновлений — автоматически + кнопка ручной проверки;
-- ✅ неуспешное обновление должно автоматически откатываться на предыдущий digest;
-- ✅ ручное поле «Вставьте manifest доверенного модуля» убрать из обычного UI.
-
-### Каталог
-
-Целевая цепочка публикации:
+Целевой pipeline, не весь уже выполненный:
 
 ```text
-module repository
-  ↓
-Git tag / release
-  ↓
-GitHub Actions
-  ↓
-build + tests
-  ↓
-private container image
-  ↓
-immutable sha256 digest
-  ↓
-official home-ai-core_modules catalog
-  ↓
-HOME AI Core refresh
+репозиторий модуля → tag/release → CI build/test/publish
+  → registry image@sha256 → официальный каталог
+  → Core refresh/preflight → пользовательский install/update
+  → Jobs → Docker → application health → commit или rollback
 ```
 
-### UI «Модули»
+Подробная спецификация решений: [MODULE_CATALOG_WORK_RU.md](MODULE_CATALOG_WORK_RU.md). При расхождении описанного плана и кода использовать пометки состояния в этой карте; не выдавать требования за готовые функции.
 
-Раздел должен иметь два логических блока:
+### M7 — Продуктовые модули
 
-```text
-Доступные
-  ├─ карточка модуля
-  ├─ версия
-  ├─ описание
-  └─ Установить
+**Статус: развитие отдельно от ядра, после стабилизации общих контрактов.**
 
-Установленные
-  ├─ текущая версия
-  ├─ состояние
-  ├─ доступное обновление
-  ├─ Запустить / Остановить / Перезапустить
-  ├─ Обновить
-  ├─ Удалить
-  └─ Удалить модуль и данные
-```
+Первый продуктовый модуль — NVR/камеры в `DeadSoulf/home-ai-core_dvr`. Принята цель показывать его как раздел HOME AI Core через контролируемый API/UI routing, а не как отдельный незащищённый пользовательский Web-сервис. Факт полного безопасного routing/deployment этой записью не подтверждается.
 
-Если в каталоге опубликована версия новее установленной:
+Далее планируются расширенное NAS/Storage, backup, Smart Home, Local AI, voice, VPN/remote access, containers/services; virtualization — при подтверждённой необходимости. Порядок определяется отдельно. Продуктовая логика не возвращается в Core.
 
-```text
-NVR
-Установлено: 1.1.0
-Доступно: 1.2.0
-[ Обновить ]
-```
+### M8 — Multi-node Home-AI
 
-### Нужно реализовать
+**Статус: долгосрочный план.**
 
-- ⏭ новый Docker-image-oriented формат официального каталога;
-- ⏭ private repository authentication для Core;
-- ⏭ private container registry authentication;
-- ⏭ repository/catalog refresh job;
-- ⏭ периодическую автоматическую проверку обновлений;
-- ⏭ кнопку «Проверить обновления»;
-- ⏭ last-known-good snapshot каталога;
-- ⏭ catalog API;
-- ⏭ список доступных модулей;
-- ⏭ проверку совместимости Core/архитектуры/capabilities;
-- ⏭ dependency/conflict validation непосредственно перед mutation;
-- ⏭ update-plan preview;
-- ⏭ update job;
-- ⏭ post-update health-check;
-- ⏭ automatic rollback;
-- ⏭ audit update/rollback;
-- ⏭ Web UI каталога;
-- ⏭ убрать ручной Manifest install из обычного UI.
+Node discovery, доверенное pairing, cluster identity, размещение модулей по узлам, hardware-aware scheduling, единый Web UI/event/control plane и безопасные удалённые jobs. Не реализовывать это ценой ослабления модели безопасности Core и модулей.
 
-### Пользовательский сценарий
+## 8. Приоритет следующего этапа
 
-```text
-Модули
-  ↓
-Core обновляет официальный private catalog
-  ↓
-Доступные
-  ↓
-Установить
-  ↓
-Core проверяет compatibility + digest
-  ↓
-Job Engine
-  ↓
-Docker Runtime
-  ↓
-health-check
-  ↓
-Установлено
-```
+| Порядок | Задача | Условие завершения |
+|---|---|---|
+| 1 | Подписанный выпуск 173 | Реальный signing key предоставлен; публикация успешно подписана; проверены версия, артефакты и соответствующий trust root. |
+| 2 | Миграция сервера на HTTPS:82 | Проверенный Debian-пакет, console recovery, доверие TLS, существующие пользователи/данные сохранены; фактический endpoint проверен. |
+| 3 | Приёмка ядра после миграции | Подписанный update/rollback/re-update, restart/cancel, файлы/SMB, сеть и данные подтверждены на целевом host. |
+| 4 | Согласовать UI и backend модулей | Нет ложной доступности upgrade; понятны pending/retry/remove и неисправности runtime. |
+| 5 | №177: безопасное обновление другого образа | Пройдены failure-injection сценарии pull/create/start/health/commit/cancel/restart; проверены rollback и совместимость данных. |
+| 6 | M4/M5/M6 и стабильный выпуск | Живой lifecycle/data acceptance, health/logs/catalog hardening, длительные аварийные испытания и закрытие release gates. |
 
-Обновление:
+Наличие новой версии в `VERSION` не разрешает автоматически обновлять рабочий сервер или удалять данные. Результат развёртывания фиксируется только после фактической проверки.
 
-```text
-Core обнаружил новую версию
-  ↓
-«Доступно обновление»
-  ↓
-пользователь нажал «Обновить»
-  ↓
-Core сохраняет предыдущий digest
-  ↓
-pull нового immutable image
-  ↓
-замена контейнера
-  ↓
-health-check
-  ├─ OK → новая версия активна
-  └─ ERROR → автоматический rollback
-```
+## 9. Связанные документы и правила ведения карты
 
----
+- [README](../README.md) — обзор и обычная установка.
+- [SECURITY_PORT82_MIGRATION.md](SECURITY_PORT82_MIGRATION.md) — обязательный переход 172 → 173, TLS, подпись, legacy data.
+- [CORE_1_0_READINESS.md](CORE_1_0_READINESS.md), [CORE_ACCEPTANCE.md](CORE_ACCEPTANCE.md) — критерии и исторические протоколы приёмки.
+- [Module SDK v2](sdk/module-sdk-v2.md), [MODULE_CATALOG_WORK_RU.md](MODULE_CATALOG_WORK_RU.md) — контракты и целевой Store.
+- [Debian runtime](architecture/15-debian-runtime.md), [Windows file client](windows-file-client.md) — эксплуатационные инструкции.
+- [№177](https://github.com/DeadSoulf/home-ai-core/issues/177), [№179](https://github.com/DeadSoulf/home-ai-core/pull/179) — незакрытое обновление модулей и внедрённый security/port этап.
 
-## M7 — Первые продуктовые модули
-
-**Статус: ⏭ после стабилизации runtime**
-
-Планируемые семейства модулей:
-
-- 🔄 NVR / камеры — первый реальный продуктовый модуль;
-- ⏭ NAS / расширенное хранилище;
-- ⏭ backup;
-- ⏭ Smart Home;
-- ⏭ Local AI;
-- ⏭ voice;
-- ⏭ VPN / remote access;
-- ⏭ containers / services;
-- ⏭ virtualization — если будет подтверждена необходимость.
-
-Порядок реализации определяется отдельно. Ни один из этих модулей не должен возвращать продуктовую логику обратно в Core.
-
----
-
-## M8 — Multi-node Home-AI
-
-**Статус: 🔭 долгосрочный этап**
-
-Архитектура Core должна позволять в будущем объединять несколько Home-AI nodes.
-
-Направления:
-
-- ⏭ node discovery;
-- ⏭ trusted node pairing;
-- ⏭ cluster identity;
-- ⏭ распределение модулей по nodes;
-- ⏭ hardware-aware scheduling;
-- ⏭ единый Web UI;
-- ⏭ общий event/control plane;
-- ⏭ безопасное удалённое выполнение jobs.
-
-Multi-node не должен требовать изменения базовой модели безопасности модулей.
-
----
-
-# Архитектурное правило проекта
-
-```text
-Core   = trusted control plane
-Module = isolated product workload
-Docker = module runtime
-Helper = privileged execution boundary
-Jobs   = mutation execution model
-```
-
-Core владеет:
-
-- identity;
-- security;
-- permissions;
-- audit;
-- jobs;
-- events;
-- orchestration;
-- registry;
-- system foundations.
-
-Модуль владеет:
-
-- своей бизнес-логикой;
-- своим Docker image;
-- своей версией;
-- своим persistent state;
-- своим API namespace;
-- своим health contract.
-
----
-
-# Текущая точка проекта
-
-На версии `0.1.167-dev` базовый Docker Module Runtime уже существует. Следующая задача — превратить техническую установку по Manifest в полноценный официальный каталог модулей.
-
-Первый продуктовый модуль — NVR — развивается отдельно в `DeadSoulf/home-ai-core_dvr`.
-
-Принято, что NVR после установки не будет открываться как отдельный пользовательский Web-сервис. Он должен появляться в HOME AI Core как новый раздел интерфейса, а Core будет выступать control plane и точкой доступа к модулю.
-
-Главная ближайшая задача:
-
-> реализовать private official catalog `home-ai-core_modules`, автоматическое обнаружение доступных версий, установку одной кнопкой и ручное обновление с обязательным health-check и автоматическим rollback.
-
-Продуктовая логика NVR при этом остаётся внутри отдельного Docker-модуля и не переносится обратно в Core.
+При каждом завершённом этапе обновлять версию исходников и commit реализации, ссылки на PR и CI, отдельно статус публикации и фактической установки, изменения путей/портов/протоколов, миграционные ограничения и следующий проверяемый шаг. Секреты, одноразовые коды, приватные ключи и credentials в карту не включать.
