@@ -17,13 +17,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/DeadSoulf/home-ai-core/internal/updater"
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
 
 const (
 	socketPath        = "/run/home-ai-core-updater.sock"
 	updateRoot        = "/var/lib/home-ai-core/update"
+	trustedUpdateRoot = "/var/lib/home-ai-core-updater"
 	liveBinary        = "/usr/bin/home-ai-core"
 	liveWeb           = "/usr/share/home-ai-core/web"
 	liveHelper        = "/usr/libexec/home-ai-core/home-ai-core-updater"
@@ -51,6 +51,21 @@ func main() {
 	uid, gid, err := serviceIdentity()
 	if err != nil {
 		logger.Error("resolve service identity", "error", err)
+		os.Exit(1)
+	}
+	if len(os.Args) > 1 {
+		if len(os.Args) != 2 || os.Args[1] != "--prepare-state" {
+			logger.Error("unsupported helper command")
+			os.Exit(2)
+		}
+		if err := preparePrivateState(uid, gid); err != nil {
+			logger.Error("prepare secure state", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
+	if err := ensureTrustedUpdateRoot(); err != nil {
+		logger.Error("unsafe updater state directory", "error", err)
 		os.Exit(1)
 	}
 	if err := prepareSocket(socketPath); err != nil {
@@ -215,6 +230,7 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		_ = conn.SetDeadline(time.Now().Add(31 * time.Minute))
 		ctx, cancel := context.WithTimeout(parent, 30*time.Minute)
 		defer cancel()
+		go func() { var extra [1]byte; _, _ = conn.Read(extra[:]); cancel() }()
 		status, message, err := performDockerModuleOperation(ctx, request, uid, gid)
 		if err != nil {
 			logger.Error("Docker module operation failed", "operation", request.Operation, "module_id", request.ModuleID, "error", err)
@@ -410,7 +426,7 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 			time.Sleep(500 * time.Millisecond)
 			ctx, cancel := context.WithTimeout(parent, 3*time.Minute)
 			defer cancel()
-			helperUpdated, err := performManualRollback(ctx, filepath.Join(updateRoot, "backup"))
+			helperUpdated, err := performManualRollback(ctx, filepath.Join(trustedUpdateRoot, "backup"))
 			if err != nil {
 				logger.Error("update rollback failed", "version", metadata.Version, "error", err)
 				_ = writeResult(uid, gid, updaterhelper.Result{
@@ -444,20 +460,24 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		return
 	}
 
-	prepared := filepath.Join(updateRoot, "prepared-"+request.Version)
-	if _, err := updater.VerifyPreparedBundle(prepared, request.Version); err != nil {
+	_ = conn.SetDeadline(time.Now().Add(5 * time.Minute))
+	verifyCtx, verifyCancel := context.WithTimeout(parent, 4*time.Minute)
+	prepared, cleanup, err := stageSignedUpdate(verifyCtx, request.Version)
+	verifyCancel()
+	if err != nil {
 		installMu.Unlock()
 		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})
 		return
 	}
-
-	if err := json.NewEncoder(conn).Encode(updaterhelper.Response{OK: true, Message: "installation accepted"}); err != nil {
+	if err := json.NewEncoder(conn).Encode(updaterhelper.Response{OK: true, Message: "verified installation accepted"}); err != nil {
+		cleanup()
 		installMu.Unlock()
 		return
 	}
 
 	go func() {
 		defer installMu.Unlock()
+		defer cleanup()
 		time.Sleep(750 * time.Millisecond)
 		ctx, cancel := context.WithTimeout(parent, 3*time.Minute)
 		defer cancel()

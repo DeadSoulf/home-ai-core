@@ -45,3 +45,24 @@ func TestLoadOverrides(t *testing.T) {
 		t.Fatalf("WebDir = %q", cfg.WebDir)
 	}
 }
+
+func TestSecureDefaultPortAndPlaintextRestriction(t *testing.T) {
+	t.Setenv("HOME_AI_LISTEN", "")
+	t.Setenv("HOME_AI_TLS_CERT", "")
+	t.Setenv("HOME_AI_TLS_KEY", "")
+	cfg, err := Load(nil)
+	if err != nil || cfg.ListenAddress != "0.0.0.0:82" || cfg.InsecureLoopback {
+		t.Fatalf("insecure defaults: %#v %v", cfg, err)
+	}
+	for _, address := range []string{"0.0.0.0:82", "[::]:82", "192.168.1.1:82", "localhost:82"} {
+		if _, err := Load([]string{"--listen", address, "--allow-insecure-loopback"}); err == nil {
+			t.Fatalf("plaintext allowed for %s", address)
+		}
+	}
+	if _, err := Load([]string{"--listen", "127.0.0.1:18082", "--allow-insecure-loopback"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load([]string{"--tls-cert", "only-one.pem"}); err == nil {
+		t.Fatal("accepted an incomplete explicit TLS configuration")
+	}
+}

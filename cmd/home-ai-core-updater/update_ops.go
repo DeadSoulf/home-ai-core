@@ -37,7 +37,7 @@ func readBackupMetadata(backup string) (backupMetadata, error) {
 }
 
 func availableRollback() (backupMetadata, bool) {
-	backup := filepath.Join(updateRoot, "backup")
+	backup := filepath.Join(trustedUpdateRoot, "backup")
 	metadata, err := readBackupMetadata(backup)
 	if err != nil || !validVersion(metadata.Version) {
 		return backupMetadata{}, false
@@ -54,7 +54,7 @@ func availableRollback() (backupMetadata, bool) {
 }
 
 func performInstall(ctx context.Context, currentVersion, version, prepared string, uid, gid int) (bool, error) {
-	backup := filepath.Join(updateRoot, "backup")
+	backup := filepath.Join(trustedUpdateRoot, "backup")
 	if err := os.RemoveAll(backup); err != nil {
 		return false, err
 	}
@@ -147,7 +147,6 @@ func performInstall(ctx context.Context, currentVersion, version, prepared strin
 
 	rollbackNeeded = false
 	_ = os.RemoveAll(rollbackWeb)
-	_ = os.Chown(filepath.Join(updateRoot, "backup"), uid, gid)
 	return helperUpdated, nil
 }
 
@@ -156,7 +155,7 @@ func performManualRollback(ctx context.Context, backup string) (bool, error) {
 		return false, errors.New("rollback backup is incomplete")
 	}
 
-	current := filepath.Join(updateRoot, "rollback-current")
+	current := filepath.Join(trustedUpdateRoot, "rollback-current")
 	if err := os.RemoveAll(current); err != nil {
 		return false, err
 	}
@@ -375,13 +374,5 @@ func writeResult(uid, gid int, result updaterhelper.Result) error {
 		return err
 	}
 	data = append(data, '\n')
-	path := filepath.Join(updateRoot, "install-result.json")
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return err
-	}
-	if err := os.Chown(tmp, uid, gid); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	return writeUntrustedResult(updateRoot, uid, gid, data)
 }

@@ -20,7 +20,7 @@ npm install
 npm run dev
 ```
 
-Vite proxies `/api` and `/health` to a Core daemon listening on `127.0.0.1:8080`.
+Vite proxies `/api` and `/health` to a Core daemon listening on `127.0.0.1:82`.
 
 ## Validation
 
@@ -35,3 +35,5 @@ The production bundle is written to `web/dist`.
 On Debian the bundle is installed under `/usr/share/home-ai-core/web` and is served by the Go Core. Node.js is not required on the production server.
 
 First-owner bootstrap is intentionally localhost-only. Remote onboarding belongs to the later secure-networking work rather than the current Web UI foundation.
+
+The Core proxy now uses HTTPS on port 82. For a local self-signed Core, first verify its certificate fingerprint through the server console and set `NODE_EXTRA_CA_CERTS` to that certificate when starting Vite. Certificate verification remains enabled. Bind Vite only to loopback; it is not the production server.

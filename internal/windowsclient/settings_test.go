@@ -9,7 +9,7 @@ func TestClientSettingsRoundTrip(t *testing.T) {
 	filename := filepath.Join(t.TempDir(), "settings.json")
 	want := ClientSettings{
 		Version:   1,
-		ServerURL: "http://home-ai.local:8080",
+		ServerURL: "https://home-ai.local:82",
 		Username:  "alice",
 		Language:  "ru",
 	}

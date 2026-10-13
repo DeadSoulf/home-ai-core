@@ -58,12 +58,12 @@ The GitHub Actions workflow `Build initial installer` builds downloadable amd64 
 
 ## First-run access
 
-The default listener is `0.0.0.0:8080`.
+The default listener is `0.0.0.0:82`.
 
 Open the Web UI from another computer on the same private local network:
 
 ```text
-http://SERVER-IP:8080/
+https://SERVER-IP:82/
 ```
 
 Create the first owner account in the browser. Once the first owner exists, first-run initialization is disabled.

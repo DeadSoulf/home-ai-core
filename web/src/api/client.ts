@@ -135,6 +135,7 @@ export const api = {
   setupStatus: () => request<SetupStatus>("/api/v1/security/setup-status"),
 
   bootstrap: async (input: {
+    bootstrapToken: string;
     username: string;
     displayName: string;
     password: string;
@@ -145,6 +146,7 @@ export const api = {
       body: JSON.stringify({
         username: input.username,
         display_name: input.displayName,
+        bootstrap_token: input.bootstrapToken,
         password: input.password,
         session_mode: "cookie",
       }),

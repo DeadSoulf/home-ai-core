@@ -42,11 +42,11 @@ systemctl --no-pager --full status home-ai-core.service || true
 
 echo
 echo "Home-AI-Core installed."
-echo "Local UI: http://127.0.0.1:8080/"
+echo "Local UI: https://127.0.0.1:82/"
 for address in $(hostname -I 2>/dev/null || true); do
   case "$address" in
     *:*) ;;
     127.*) ;;
-    *) echo "LAN UI:   http://$address:8080/" ;;
+    *) echo "LAN UI:   https://$address:82/" ;;
   esac
 done

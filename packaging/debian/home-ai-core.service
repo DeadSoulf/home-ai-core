@@ -9,7 +9,7 @@ Type=simple
 User=home-ai-core
 Group=home-ai-core
 
-Environment=HOME_AI_LISTEN=0.0.0.0:8080
+Environment=HOME_AI_LISTEN=0.0.0.0:82
 Environment=HOME_AI_STATE_DIR=/var/lib/home-ai-core
 Environment=HOME_AI_WEB_DIR=/usr/share/home-ai-core/web
 EnvironmentFile=-/etc/home-ai-core/home-ai-core.env
@@ -23,8 +23,6 @@ StateDirectory=home-ai-core
 StateDirectoryMode=0700
 RuntimeDirectory=home-ai-core
 RuntimeDirectoryMode=0700
-ConfigurationDirectory=home-ai-core
-ConfigurationDirectoryMode=0750
 WorkingDirectory=/var/lib/home-ai-core
 UMask=0077
 
@@ -45,8 +43,8 @@ RestrictRealtime=yes
 LockPersonality=yes
 MemoryDenyWriteExecute=yes
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-CapabilityBoundingSet=
-AmbientCapabilities=
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 SystemCallArchitectures=native
 
 [Install]

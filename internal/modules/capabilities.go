@@ -51,7 +51,7 @@ func (r *Registry) Capabilities(ctx context.Context) ([]string, error) {
 		capabilities[capability] = struct{}{}
 	}
 	for _, item := range items {
-		if item.Status == "error" || item.Status == "disabled" {
+		if item.Status != "enabled" {
 			continue
 		}
 		for _, capability := range item.Manifest.Capabilities.Provides {

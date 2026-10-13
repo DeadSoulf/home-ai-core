@@ -79,21 +79,35 @@ if command -v systemd-sysusers >/dev/null 2>&1; then
 elif ! getent passwd home-ai-core >/dev/null 2>&1; then
   useradd --system --home-dir /var/lib/home-ai-core --shell /usr/sbin/nologin --user-group home-ai-core
 fi
-install -d -o home-ai-core -g home-ai-core -m 0700 /var/lib/home-ai-core
-install -d -o home-ai-core -g home-ai-core -m 0700 /var/lib/home-ai-core/update
-install -d -o root -g home-ai-core -m 0750 /var/lib/home-ai-core/modules
+/usr/libexec/home-ai-core/home-ai-core-updater --prepare-state
 install -d -o root -g home-ai-core -m 0750 /etc/home-ai-core
+if [ -L /etc/home-ai-core/home-ai-core.env ]; then
+  echo "Refusing symlinked service environment; repair it from the server console" >&2
+  exit 1
+fi
+if [ -L /etc/home-ai-core/home-ai-core.env.before-port82 ]; then
+  echo "Refusing symlinked environment backup" >&2
+  exit 1
+fi
 if [ -f /etc/home-ai-core/home-ai-core.env ]; then
+  # Migrate only the old default port; preserve unrelated/custom settings.
+  if grep -q '^HOME_AI_LISTEN=.*:8080$' /etc/home-ai-core/home-ai-core.env; then
+    cp -n /etc/home-ai-core/home-ai-core.env /etc/home-ai-core/home-ai-core.env.before-port82
+    chmod 0600 /etc/home-ai-core/home-ai-core.env.before-port82
+    sed -i 's/^\(HOME_AI_LISTEN=.*:\)8080$/\182/' /etc/home-ai-core/home-ai-core.env
+  fi
+  chown root:root /etc/home-ai-core/home-ai-core.env
+  chmod 0600 /etc/home-ai-core/home-ai-core.env
   sed -i '/^HOME_AI_AI_/d;/^HOME_AI_CLOUD_AI_/d' /etc/home-ai-core/home-ai-core.env
 fi
-if command -v systemctl >/dev/null 2>&1; then
-  systemctl daemon-reload || true
+if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+  systemctl daemon-reload
   systemctl enable home-ai-core.service >/dev/null 2>&1 || true
   systemctl enable home-ai-core-updater.service >/dev/null 2>&1 || true
   systemctl enable --now docker.service >/dev/null 2>&1 || true
   if [ "$1" = "configure" ]; then
-    systemctl restart home-ai-core-updater.service || true
-    systemctl restart home-ai-core.service || true
+    systemctl restart home-ai-core-updater.service
+    systemctl restart home-ai-core.service
   fi
 fi
 EOF

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/updater"
@@ -85,7 +86,12 @@ func (s *server) updateDownload(
 		return
 	}
 
-	state, err := s.updater.Download(r.Context(), strings.TrimSpace(input.Version))
+	// Download and root verification have a bounded budget longer than the
+	// general API write timeout. Other endpoints keep their tighter limit.
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(6 * time.Minute))
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	defer cancel()
+	state, err := s.updater.Download(ctx, strings.TrimSpace(input.Version))
 	switch {
 	case errors.Is(err, updater.ErrBusy):
 		writeAPIError(w, r, http.StatusConflict, "update_busy", err.Error(), nil)
@@ -128,7 +134,10 @@ func (s *server) updateInstall(
 		return
 	}
 
-	state, err := s.updater.Install(r.Context(), strings.TrimSpace(input.Version))
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(6 * time.Minute))
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	defer cancel()
+	state, err := s.updater.Install(ctx, strings.TrimSpace(input.Version))
 	switch {
 	case errors.Is(err, updater.ErrBusy):
 		writeAPIError(w, r, http.StatusConflict, "update_busy", err.Error(), nil)

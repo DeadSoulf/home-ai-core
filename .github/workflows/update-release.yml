@@ -175,12 +175,8 @@ jobs:
           KEY_FILE="$RUNNER_TEMP/home-ai-update-signing-key.pem"
 
           if [[ -z "${HOME_AI_UPDATE_SIGNING_KEY:-}" ]]; then
-            if [[ "$VERSION" != *-dev* ]]; then
-              echo "HOME_AI_UPDATE_SIGNING_KEY is required for non-development releases" >&2
-              exit 1
-            fi
-            echo "No update signing key configured; development bundles remain unsigned"
-            exit 0
+            echo "HOME_AI_UPDATE_SIGNING_KEY is required for ALL Core releases, including development builds" >&2
+            exit 1
           fi
 
           printf '%s\n' "$HOME_AI_UPDATE_SIGNING_KEY" > "$KEY_FILE"

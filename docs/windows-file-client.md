@@ -58,28 +58,28 @@ On Windows, the client can instead store the password in Windows Credential Mana
 
 ```powershell
 $env:HOME_AI_PASSWORD = 'your Home-AI password'
-.\home-ai-windows-client_<version>_amd64.exe credentials save --server http://HOME_AI_SERVER:8080 --username alice
+.\home-ai-windows-client_<version>_amd64.exe credentials save --server https://HOME_AI_SERVER:82 --username alice
 Remove-Item Env:HOME_AI_PASSWORD
 
-.\home-ai-windows-client_<version>_amd64.exe credentials status --server http://HOME_AI_SERVER:8080 --username alice
+.\home-ai-windows-client_<version>_amd64.exe credentials status --server https://HOME_AI_SERVER:82 --username alice
 ```
 
 After that, `folders`, `copy`, `queue run`, `sync run` and `sync watch` can authenticate without an environment password. Remove the saved password with `credentials delete --server ... --username ...`. The secret is not copied into queue or sync-profile JSON.
 
 ## List folders
 
-.\home-ai-windows-client_<version>_amd64.exe folders --server http://HOME_AI_SERVER:8080 --username alice
+.\home-ai-windows-client_<version>_amd64.exe folders --server https://HOME_AI_SERVER:82 --username alice
 
 ## Upload a file
 
-.\home-ai-windows-client_<version>_amd64.exe upload --server http://HOME_AI_SERVER:8080 --username alice --folder nsf_xxxxxxxxxxxxxxxx --source C:\Users\Alice\Documents\archive.zip --dest Backups/archive.zip
+.\home-ai-windows-client_<version>_amd64.exe upload --server https://HOME_AI_SERVER:82 --username alice --folder nsf_xxxxxxxxxxxxxxxx --source C:\Users\Alice\Documents\archive.zip --dest Backups/archive.zip
 
 Running the same command again after interruption resumes a matching unfinished upload. Use --restart-stale only when you explicitly want to cancel a different unfinished upload for the same destination.
 
 ## Copy a directory
 
 ```powershell
-.\home-ai-windows-client_<version>_amd64.exe copy --server http://HOME_AI_SERVER:8080 --username alice --folder nsf_xxxxxxxxxxxxxxxx --source C:\Users\Alice\Documents --dest Backups/Documents
+.\home-ai-windows-client_<version>_amd64.exe copy --server https://HOME_AI_SERVER:82 --username alice --folder nsf_xxxxxxxxxxxxxxxx --source C:\Users\Alice\Documents --dest Backups/Documents
 ```
 
 `copy` plans the whole source tree before transfer. It creates missing destination directories and preserves empty directories. Without `--dest`, the source file/directory name is used. Relative paths stay inside the selected Home-AI folder. Symlinks and special files are rejected; an existing different file is a conflict, not an overwrite.
@@ -91,7 +91,7 @@ This immediate command uses server resumable uploads. Use the queue below to ret
 Add work without logging in or transferring files:
 
 ```powershell
-.\home-ai-windows-client_<version>_amd64.exe queue add --server http://HOME_AI_SERVER:8080 --username alice --folder nsf_xxxxxxxxxxxxxxxx --source C:\Users\Alice\Documents --dest Backups/Documents
+.\home-ai-windows-client_<version>_amd64.exe queue add --server https://HOME_AI_SERVER:82 --username alice --folder nsf_xxxxxxxxxxxxxxxx --source C:\Users\Alice\Documents --dest Backups/Documents
 .\home-ai-windows-client_<version>_amd64.exe queue list
 ```
 
@@ -126,7 +126,7 @@ Content verification permits a long transfer while bytes keep arriving. The conn
 Create a profile without logging in:
 
 ```powershell
-.\home-ai-windows-client_<version>_amd64.exe sync add --server http://HOME_AI_SERVER:8080 --username alice --folder nsf_xxxxxxxxxxxxxxxx --source C:\Users\Alice\Documents --dest Backups\Documents --every 15m --conflict stop
+.\home-ai-windows-client_<version>_amd64.exe sync add --server https://HOME_AI_SERVER:82 --username alice --folder nsf_xxxxxxxxxxxxxxxx --source C:\Users\Alice\Documents --dest Backups\Documents --every 15m --conflict stop
 .\home-ai-windows-client_<version>_amd64.exe sync list
 ```
 

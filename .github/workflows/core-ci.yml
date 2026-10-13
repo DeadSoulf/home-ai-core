@@ -144,9 +144,10 @@ jobs:
         run: |
           set -eu
           STATE_DIR="$(mktemp -d)"
+          curl() { command curl --cacert "$STATE_DIR/tls/server.crt" "$@"; }
           LOG_FILE="$(mktemp)"
           COOKIE_JAR="$(mktemp)"
-          ./build/home-ai-core             --state-dir "$STATE_DIR"             --web-dir "$GITHUB_WORKSPACE/web/dist"             --listen 127.0.0.1:18080             >"$LOG_FILE" 2>&1 &
+          ./build/home-ai-core             --state-dir "$STATE_DIR"             --web-dir "$GITHUB_WORKSPACE/web/dist"             --listen 127.0.0.1:18082             >"$LOG_FILE" 2>&1 &
           PID=$!
           cleanup() {
             kill "$PID" 2>/dev/null || true
@@ -157,7 +158,7 @@ jobs:
 
           ready=0
           for _ in $(seq 1 75); do
-            if curl --fail --silent http://127.0.0.1:18080/health >/tmp/home-ai-health.json; then
+            if curl --fail --silent https://127.0.0.1:18082/health >/tmp/home-ai-health.json; then
               ready=1
               break
             fi
@@ -169,27 +170,28 @@ jobs:
             exit 1
           fi
 
-          curl --fail --silent http://127.0.0.1:18080/ >/tmp/home-ai-index.html
-          curl --fail --silent http://127.0.0.1:18080/system >/tmp/home-ai-system-page.html
-          curl --fail --silent http://127.0.0.1:18080/files/storage >/tmp/home-ai-files-storage-page.html
+          curl --fail --silent https://127.0.0.1:18082/ >/tmp/home-ai-index.html
+          curl --fail --silent https://127.0.0.1:18082/system >/tmp/home-ai-system-page.html
+          curl --fail --silent https://127.0.0.1:18082/files/storage >/tmp/home-ai-files-storage-page.html
           grep -q "Home-AI-Core" /tmp/home-ai-index.html
           grep -q "Home-AI-Core" /tmp/home-ai-system-page.html
           grep -q "Home-AI-Core" /tmp/home-ai-files-storage-page.html
 
-          curl --fail --silent             http://127.0.0.1:18080/api/v1/security/setup-status             >/tmp/home-ai-setup.json
+          curl --fail --silent             https://127.0.0.1:18082/api/v1/security/setup-status             >/tmp/home-ai-setup.json
 
-          UNAUTH_STATUS="$(curl --silent --output /tmp/home-ai-unauth.json --write-out '%{http_code}'             http://127.0.0.1:18080/api/v1/system)"
+          UNAUTH_STATUS="$(curl --silent --output /tmp/home-ai-unauth.json --write-out '%{http_code}'             https://127.0.0.1:18082/api/v1/system)"
           test "$UNAUTH_STATUS" = "401"
 
-          curl --fail --silent             --cookie-jar "$COOKIE_JAR"             -H "Content-Type: application/json"             --data '{"username":"owner","display_name":"CI Owner","password":"integration-test-owner-passphrase","session_mode":"cookie"}'             http://127.0.0.1:18080/api/v1/security/bootstrap             >/tmp/home-ai-bootstrap.json
+          BOOTSTRAP_TOKEN="$(tr -d '\r\n' < "$STATE_DIR/bootstrap-token")"
+          curl --fail --silent             --cookie-jar "$COOKIE_JAR"             -H "Content-Type: application/json"             --data "{\"username\":\"owner\",\"display_name\":\"CI Owner\",\"password\":\"integration-test-owner-passphrase\",\"session_mode\":\"cookie\",\"bootstrap_token\":\"$BOOTSTRAP_TOKEN\"}"             https://127.0.0.1:18082/api/v1/security/bootstrap             >/tmp/home-ai-bootstrap.json
 
-          curl --fail --silent             --cookie "$COOKIE_JAR"             http://127.0.0.1:18080/api/v1/system             >/tmp/home-ai-system.json
+          curl --fail --silent             --cookie "$COOKIE_JAR"             https://127.0.0.1:18082/api/v1/system             >/tmp/home-ai-system.json
 
-          curl --fail --silent             --cookie "$COOKIE_JAR"             http://127.0.0.1:18080/api/v1/auth/me             >/tmp/home-ai-me.json
+          curl --fail --silent             --cookie "$COOKIE_JAR"             https://127.0.0.1:18082/api/v1/auth/me             >/tmp/home-ai-me.json
 
-          curl --fail --silent             --cookie "$COOKIE_JAR"             http://127.0.0.1:18080/api/v1/modules             >/tmp/home-ai-modules.json
+          curl --fail --silent             --cookie "$COOKIE_JAR"             https://127.0.0.1:18082/api/v1/modules             >/tmp/home-ai-modules.json
 
-          curl --fail --silent             --cookie "$COOKIE_JAR"             http://127.0.0.1:18080/api/v1/audit             >/tmp/home-ai-audit.json
+          curl --fail --silent             --cookie "$COOKIE_JAR"             https://127.0.0.1:18082/api/v1/audit             >/tmp/home-ai-audit.json
 
           CSRF_TOKEN="$(python3 - <<'PY'
           import json
@@ -198,9 +200,9 @@ jobs:
           PY
           )"
 
-          curl --fail --silent             --cookie "$COOKIE_JAR"             -H "X-CSRF-Token: $CSRF_TOKEN"             -X POST             http://127.0.0.1:18080/api/v1/auth/logout             >/dev/null
+          curl --fail --silent             --cookie "$COOKIE_JAR"             -H "X-CSRF-Token: $CSRF_TOKEN"             -X POST             https://127.0.0.1:18082/api/v1/auth/logout             >/dev/null
 
-          REVOKED_STATUS="$(curl --silent --output /tmp/home-ai-revoked.json --write-out '%{http_code}'             --cookie "$COOKIE_JAR"             http://127.0.0.1:18080/api/v1/system)"
+          REVOKED_STATUS="$(curl --silent --output /tmp/home-ai-revoked.json --write-out '%{http_code}'             --cookie "$COOKIE_JAR"             https://127.0.0.1:18082/api/v1/system)"
           test "$REVOKED_STATUS" = "401"
 
           python3 - <<'PY'

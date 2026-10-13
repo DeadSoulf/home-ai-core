@@ -204,6 +204,13 @@ func (f fakeSecurity) Initialized(context.Context) (bool, error) {
 	return f.initialized, nil
 }
 
+func (f fakeSecurity) CheckBootstrapToken(_ context.Context, token string) error {
+	if token != "test-bootstrap-token" {
+		return security.ErrInvalidBootstrapToken
+	}
+	return nil
+}
+
 func (f fakeSecurity) Bootstrap(
 	context.Context,
 	string,

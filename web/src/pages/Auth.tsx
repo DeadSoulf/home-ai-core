@@ -52,6 +52,7 @@ export function FirstRunPage({onAuthenticated}: {onAuthenticated: (actor: Actor)
   const messageFor = (error: unknown) => error instanceof APIError && error.code === "setup_network_only" ? t("setupNetworkOnly") : error instanceof Error ? error.message : t("requestFailed");
   const [username, setUsername] = useState("owner");
   const [displayName, setDisplayName] = useState("Home Owner");
+  const [bootstrapToken, setBootstrapToken] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -62,6 +63,7 @@ export function FirstRunPage({onAuthenticated}: {onAuthenticated: (actor: Actor)
     setError("");
     try {
       const result = await api.bootstrap({
+        bootstrapToken,
         username,
         displayName,
         password,
@@ -77,6 +79,11 @@ export function FirstRunPage({onAuthenticated}: {onAuthenticated: (actor: Actor)
   return (
     <AuthLayout title={t("createOwner")} subtitle={t("createOwnerSubtitle")}>
       <form onSubmit={submit} className="auth-form">
+        <label>
+          {t("setupCode")}
+          <input type="password" value={bootstrapToken} onChange={(e) => setBootstrapToken(e.target.value)} required autoComplete="off" />
+          <small>{t("setupCodeHint")}</small>
+        </label>
         <label>
           {t("username")}
           <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />

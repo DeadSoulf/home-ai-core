@@ -7,11 +7,17 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/state"
 )
 
-var ErrModuleNotFound = errors.New("module not found")
+var (
+	ErrModuleBusy             = errors.New("a module lifecycle operation is in progress; retry later")
+	ErrModuleNotFound         = errors.New("module not found")
+	ErrModuleAlreadyInstalled = errors.New("module already installed; automatic replacement is disabled until rollback-safe upgrades are implemented")
+)
 
 type Store interface {
 	UpsertModule(context.Context, state.ModuleRecord) error
@@ -24,6 +30,8 @@ type Store interface {
 type Registry struct {
 	store       Store
 	coreVersion string
+	mu          sync.Mutex
+	helper      func(context.Context, string, string, string) (helperModuleResult, error)
 }
 
 func NewRegistry(store Store, coreVersion ...string) *Registry {
@@ -34,10 +42,19 @@ func NewRegistry(store Store, coreVersion ...string) *Registry {
 	return &Registry{
 		store:       store,
 		coreVersion: version,
+		helper:      callModuleHelper,
 	}
 }
 
 func (r *Registry) InstallManifest(ctx context.Context, manifest Manifest) (Registered, error) {
+	if err := ctx.Err(); err != nil {
+		return Registered{}, err
+	}
+	if !r.mu.TryLock() {
+		return Registered{}, ErrModuleBusy
+	}
+	defer r.mu.Unlock()
+
 	if err := ValidateManifest(manifest); err != nil {
 		return Registered{}, err
 	}
@@ -61,29 +78,57 @@ func (r *Registry) InstallManifest(ctx context.Context, manifest Manifest) (Regi
 	if err != nil {
 		return Registered{}, fmt.Errorf("encode module manifest: %w", err)
 	}
-	if err := r.store.UpsertModule(ctx, state.ModuleRecord{
-		ID:           manifest.ID,
-		Version:      manifest.Version,
-		Status:       "registered",
-		ManifestJSON: string(raw),
-	}); err != nil {
+	record, err := r.store.Module(ctx, manifest.ID)
+	switch {
+	case err == nil:
+		var previous Manifest
+		if err := json.Unmarshal([]byte(record.ManifestJSON), &previous); err != nil {
+			return Registered{}, err
+		}
+		previousRaw, _ := json.Marshal(previous)
+		if string(previousRaw) != string(raw) {
+			return Registered{}, ErrModuleAlreadyInstalled
+		}
+		if record.Status == "enabled" {
+			return r.Get(ctx, manifest.ID)
+		} // replay after a committed install
+		if record.Status != "registered" {
+			return Registered{}, ErrModuleAlreadyInstalled
+		}
+	case errors.Is(err, state.ErrModuleNotFound):
+		// Persist the immutable intent before an external side effect. If Core dies,
+		// the same manifest can resume; removal also has an addressable registry row.
+		if err := r.store.UpsertModule(ctx, state.ModuleRecord{ID: manifest.ID, Version: manifest.Version, Status: "registered", ManifestJSON: string(raw)}); err != nil {
+			return Registered{}, err
+		}
+	default:
 		return Registered{}, err
 	}
-	if err := r.store.SetModuleStatus(ctx, manifest.ID, "registered", ""); err != nil {
-		return Registered{}, err
+	if _, err := r.helper(ctx, "docker.module.install", manifest.ID, manifest.Runtime.Docker.Image); err != nil {
+		recordCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		recordErr := r.store.SetModuleStatus(recordCtx, manifest.ID, "registered", "install incomplete; retry the same manifest or remove: "+err.Error())
+		return Registered{}, errors.Join(err, recordErr)
 	}
-
-	if _, err := callModuleHelper(ctx, "docker.module.install", manifest.ID, manifest.Runtime.Docker.Image); err != nil {
-		_ = r.store.SetModuleStatus(context.WithoutCancel(ctx), manifest.ID, "error", err.Error())
-		return Registered{}, err
+	// A failed final write deliberately retains both the intent and container.
+	// Retrying reconciles the exact image rather than deleting working data.
+	finishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if err := r.store.SetModuleStatus(finishCtx, manifest.ID, "enabled", ""); err != nil {
+		return Registered{}, fmt.Errorf("module started; final registration incomplete, retry the same manifest: %w", err)
 	}
-	if err := r.store.SetModuleStatus(ctx, manifest.ID, "enabled", ""); err != nil {
-		return Registered{}, err
-	}
-	return r.Get(ctx, manifest.ID)
+	return r.Get(finishCtx, manifest.ID)
 }
 
 func (r *Registry) Control(ctx context.Context, id, operation string) (Registered, error) {
+	if err := ctx.Err(); err != nil {
+		return Registered{}, err
+	}
+	if !r.mu.TryLock() {
+		return Registered{}, ErrModuleBusy
+	}
+	defer r.mu.Unlock()
+
 	item, err := r.Get(ctx, id)
 	if err != nil {
 		return Registered{}, err
@@ -107,8 +152,10 @@ func (r *Registry) Control(ctx context.Context, id, operation string) (Registere
 	default:
 		return Registered{}, fmt.Errorf("unsupported module control operation %q", operation)
 	}
-	if _, err := callModuleHelper(ctx, helperOperation, id, ""); err != nil {
-		_ = r.store.SetModuleStatus(context.WithoutCancel(ctx), id, "error", err.Error())
+	if _, err := r.helper(ctx, helperOperation, id, ""); err != nil {
+		recordCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		_ = r.store.SetModuleStatus(recordCtx, id, item.Status, err.Error())
 		return Registered{}, err
 	}
 	if err := r.store.SetModuleStatus(ctx, id, nextStatus, ""); err != nil {
@@ -118,6 +165,14 @@ func (r *Registry) Control(ctx context.Context, id, operation string) (Registere
 }
 
 func (r *Registry) Remove(ctx context.Context, id string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !r.mu.TryLock() {
+		return ErrModuleBusy
+	}
+	defer r.mu.Unlock()
+
 	item, err := r.Get(ctx, id)
 	if err != nil {
 		return err
@@ -125,8 +180,10 @@ func (r *Registry) Remove(ctx context.Context, id string) error {
 	if item.Manifest.Runtime.Type != "docker" {
 		return errors.New("module runtime is not Docker")
 	}
-	if _, err := callModuleHelper(ctx, "docker.module.remove", id, ""); err != nil {
-		_ = r.store.SetModuleStatus(context.WithoutCancel(ctx), id, "error", err.Error())
+	if _, err := r.helper(ctx, "docker.module.remove", id, ""); err != nil {
+		recordCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		_ = r.store.SetModuleStatus(recordCtx, id, item.Status, err.Error())
 		return err
 	}
 	if err := r.store.DeleteModule(ctx, id); err != nil {
@@ -167,6 +224,14 @@ func (r *Registry) List(ctx context.Context) ([]Registered, error) {
 }
 
 func (r *Registry) SetStatus(ctx context.Context, id, status, errorMessage string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !r.mu.TryLock() {
+		return ErrModuleBusy
+	}
+	defer r.mu.Unlock()
+
 	switch status {
 	case "registered", "enabled", "disabled", "error":
 	default:

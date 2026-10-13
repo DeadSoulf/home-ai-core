@@ -17,6 +17,7 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/jobs"
 	"github.com/DeadSoulf/home-ai-core/internal/modules"
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
+	"github.com/DeadSoulf/home-ai-core/internal/securetransport"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
 	"github.com/DeadSoulf/home-ai-core/internal/updater"
@@ -109,6 +110,16 @@ func main() {
 		IdleTimeout:       120 * time.Second,
 	}
 
+	if !cfg.InsecureLoopback {
+		tlsConfig, fingerprint, err := securetransport.Config(cfg.StateDir, cfg.TLSCertFile, cfg.TLSKeyFile)
+		if err != nil {
+			logger.Error("TLS initialization failed", "error", err)
+			os.Exit(1)
+		}
+		server.TLSConfig = tlsConfig
+		logger.Info("TLS enabled; verify certificate through the server console before trusting it", "certificate_sha256", fingerprint)
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go api.ReconcileFileAccess(ctx, logger, store, securityService)
@@ -122,7 +133,13 @@ func main() {
 			"node_id", nodeID,
 		)
 
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		var serveErr error
+		if cfg.InsecureLoopback {
+			serveErr = server.ListenAndServe()
+		} else {
+			serveErr = server.ListenAndServeTLS("", "")
+		}
+		if err := serveErr; err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 			return
 		}

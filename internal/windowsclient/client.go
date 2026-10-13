@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -115,10 +118,41 @@ func New(rawBaseURL string) (*Client, error) {
 	if parsed.Host == "" {
 		return nil, errors.New("server URL must include a host")
 	}
+	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return nil, errors.New("server URL must not include credentials, query or fragment")
+	}
+	if parsed.Scheme == "http" {
+		ip := net.ParseIP(parsed.Hostname())
+		if ip == nil || !ip.IsLoopback() {
+			return nil, errors.New("HTTPS is required for non-loopback servers")
+		}
+	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	// Import a public certificate/CA only after verifying its fingerprint through
+	// a trusted channel. Never disable TLS hostname or chain validation.
+	if caFile := strings.TrimSpace(os.Getenv("HOME_AI_CA_FILE")); caFile != "" {
+		pem, err := os.ReadFile(caFile)
+		if err != nil {
+			return nil, fmt.Errorf("read server CA: %w", err)
+		}
+		pool, err := x509.SystemCertPool()
+		if err != nil {
+			pool = x509.NewCertPool()
+		}
+		if !pool.AppendCertsFromPEM(pem) {
+			return nil, errors.New("server CA file contains no valid certificate")
+		}
+		transport.TLSClientConfig.RootCAs = pool
+	}
 	parsed.Path = strings.TrimRight(parsed.Path, "/")
 	return &Client{
-		BaseURL:    parsed,
-		HTTPClient: &http.Client{Timeout: 90 * time.Second},
+		BaseURL: parsed,
+		HTTPClient: &http.Client{Timeout: 90 * time.Second, Transport: transport,
+			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+				// API servers must not redirect login bodies or bearer credentials.
+				return http.ErrUseLastResponse
+			}},
 	}, nil
 }
 
