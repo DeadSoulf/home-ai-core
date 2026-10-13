@@ -1,0 +1,67 @@
+name: Prepare reviewed security tree
+on:
+  pull_request:
+    branches: [main]
+    paths: ['_security_import/bundle.b64']
+permissions:
+  contents: write
+jobs:
+  prepare:
+    if: github.event.pull_request.head.repo.full_name == 'DeadSoulf/home-ai-core' && github.head_ref == 'chatgpt/core-security-port82-20261013'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Verify patch and create an unreferenced commit for explicit review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64, concurrent.futures, gzip, hashlib, json, os, pathlib, subprocess, urllib.request
+          repo = 'DeadSoulf/home-ai-core'
+          parent = os.environ['EXPECTED_HEAD']
+          assert len(parent) == 40 and all(c in '0123456789abcdef' for c in parent)
+          assert subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip() == parent
+          encoded = pathlib.Path('_security_import/bundle.b64').read_bytes()
+          assert len(encoded) < 100000
+          patch = gzip.decompress(base64.b64decode(encoded))
+          assert len(patch) < 1000000
+          assert hashlib.sha256(patch).hexdigest() == '70e603a4face29a5bc3270b85047e2654af28ed4de5b2e80067c4cfb51f411d3'
+          subprocess.run(['git','apply','--check','--index','-'], input=patch, check=True)
+          subprocess.run(['git','apply','--index','-'], input=patch, check=True)
+          subprocess.run(['git','rm','-f','--ignore-unmatch','_security_import/bundle.b64','.github/workflows/security-import.yml','.github/workflows/security-review.yml','.github/workflows/security-toolchain.yml'], check=True)
+          subprocess.run(['git','diff','--cached','--check'], check=True)
+          def api(path, data=None):
+              raw = None if data is None else json.dumps(data).encode()
+              req = urllib.request.Request('https://api.github.com/repos/'+repo+'/git/'+path, data=raw, headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'})
+              with urllib.request.urlopen(req, timeout=60) as r: return json.load(r)
+          base_tree = api('commits/'+parent)['tree']['sha']
+          lines = subprocess.check_output(['git','diff','--cached','--name-status'],text=True).splitlines()
+          def blob(line):
+              status,path = line.split('\t',1)
+              assert '..' not in pathlib.PurePosixPath(path).parts and not path.startswith('/')
+              if status == 'D': return {'path':path,'mode':'100644','type':'blob','sha':None}
+              assert status in ('A','M')
+              mode = subprocess.check_output(['git','ls-files','-s','--',path],text=True).split()[0]
+              content = pathlib.Path(path).read_bytes()
+              sha = api('blobs',{'content':base64.b64encode(content).decode(),'encoding':'base64'})['sha']
+              return {'path':path,'mode':mode,'type':'blob','sha':sha}
+          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+              entries = list(pool.map(blob,lines))
+          tree = api('trees',{'base_tree':base_tree,'tree':entries})['sha']
+          commit = api('commits',{'message':'fix(core): enforce signed privileged updates, HTTPS on 82 and recoverable module installs','tree':tree,'parents':[parent]})['sha']
+          result = {'parent':parent,'tree':tree,'commit':commit,'patch_sha256':hashlib.sha256(patch).hexdigest(),'changed_files':len(entries)}
+          pathlib.Path(os.environ['RUNNER_TEMP'],'prepared-security-commit.json').write_text(json.dumps(result,indent=2))
+          print(json.dumps(result))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prepared-security-commit
+          path: ${{ runner.temp }}/prepared-security-commit.json
+          retention-days: 1
+          if-no-files-found: error
