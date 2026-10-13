@@ -146,8 +146,17 @@ func (r *Registry) UpgradeManifest(ctx context.Context, manifest Manifest) (Regi
 	}
 
 	oldImage := previous.Manifest.Runtime.Docker.Image
-	if _, err := callModuleUpgradeHelper(ctx, manifest.ID, manifest.Runtime.Docker.Image, oldImage, manifest.Runtime.Health); err != nil {
+	result, err := callModuleUpgradeHelper(ctx, manifest.ID, manifest.Runtime.Docker.Image, oldImage, manifest.Runtime.Health)
+	if err != nil {
 		return Registered{}, err
+	}
+	if err := waitForModuleHTTPHealth(ctx, result.IP, manifest.Runtime.Health); err != nil {
+		rollbackCtx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+		defer cancel()
+		if _, rollbackErr := callModuleHelper(rollbackCtx, "docker.module.rollback", manifest.ID, ""); rollbackErr != nil {
+			return Registered{}, errors.Join(err, fmt.Errorf("Docker rollback failed: %w", rollbackErr))
+		}
+		return Registered{}, fmt.Errorf("module failed HTTP health; prior container restored: %w", err)
 	}
 	raw, err := json.Marshal(manifest)
 	if err == nil {
