@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 	"strings"
+	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/helperipc"
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
