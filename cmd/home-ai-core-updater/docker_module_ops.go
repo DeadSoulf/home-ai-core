@@ -28,17 +28,24 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 	if !moduleIDPattern.MatchString(moduleID) || len(moduleID) > 96 {
 		return moduleContainerStatus{}, "", errors.New("invalid module id")
 	}
+	// Reject malformed or unsupported operations before starting or installing Docker.
+	// Validation must not trigger privileged system changes.
+	switch request.Operation {
+	case "docker.module.install":
+		if !imageDigestPattern.MatchString(strings.TrimSpace(request.Image)) {
+			return moduleContainerStatus{}, "", errors.New("module image must be an immutable @sha256 reference")
+		}
+	case "docker.module.start", "docker.module.stop", "docker.module.restart", "docker.module.remove":
+	default:
+		return moduleContainerStatus{}, "", errors.New("unsupported Docker module operation")
+	}
 	if _, err := ensureDockerRuntime(ctx, serviceGID); err != nil {
 		return moduleContainerStatus{}, "", err
 	}
 
 	switch request.Operation {
 	case "docker.module.install":
-		image := strings.TrimSpace(request.Image)
-		if !imageDigestPattern.MatchString(image) {
-			return moduleContainerStatus{}, "", errors.New("module image must be an immutable @sha256 reference")
-		}
-		return installDockerModule(ctx, moduleID, image, serviceUID, serviceGID)
+		return installDockerModule(ctx, moduleID, strings.TrimSpace(request.Image), serviceUID, serviceGID)
 	case "docker.module.start":
 		return controlDockerModule(ctx, moduleID, "start")
 	case "docker.module.stop":
@@ -58,10 +65,6 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 		return moduleContainerStatus{}, "", errors.New("Docker CLI is unavailable")
 	}
 
-	if err := pullDockerModuleImage(ctx, dockerPath, image); err != nil {
-		return moduleContainerStatus{}, "", err
-	}
-
 	name := moduleContainerName(moduleID)
 	if exists, managed, err := inspectManagedContainer(ctx, dockerPath, name, moduleID); err != nil {
 		return moduleContainerStatus{}, "", err
@@ -69,9 +72,13 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 		if !managed {
 			return moduleContainerStatus{}, "", errors.New("container name is already used by an unmanaged container")
 		}
-		if output, err := exec.CommandContext(ctx, dockerPath, "rm", "-f", name).CombinedOutput(); err != nil {
-			return moduleContainerStatus{}, "", fmt.Errorf("replace module container: %s", commandError(output, err))
-		}
+		// Never destroy a running module before a candidate has passed start,
+		// health and recovery checks. Transactional upgrades are a separate path.
+		return moduleContainerStatus{}, "", errors.New("module container already exists; in-place upgrade is disabled until rollback-safe replacement is implemented")
+	}
+
+	if err := pullDockerModuleImage(ctx, dockerPath, image); err != nil {
+		return moduleContainerStatus{}, "", err
 	}
 
 	dataDir := filepath.Join(moduleDataRoot, moduleID)
