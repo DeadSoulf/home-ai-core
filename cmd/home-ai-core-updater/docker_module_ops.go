@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	moduleOperationMu sync.Mutex
+	moduleOperationMu  sync.Mutex
 	moduleIDPattern    = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
 	imageDigestPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,447}@sha256:[a-f0-9]{64}$`)
 )
