@@ -4,9 +4,9 @@ import "testing"
 
 func TestValidateBlankDiskLayout(t *testing.T) {
 	cases := []struct {
-		name string
+		name   string
 		output string
-		valid bool
+		valid  bool
 	}{
 		{"blank SATA", "/dev/sdb disk\n", true},
 		{"blank NVMe", "/dev/nvme1n1 disk\n", true},
@@ -19,7 +19,9 @@ func TestValidateBlankDiskLayout(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := validateBlankDiskLayout(tc.output, "/dev/sdb")
-			if tc.name == "blank NVMe" { err = validateBlankDiskLayout(tc.output, "/dev/nvme1n1") }
+			if tc.name == "blank NVMe" {
+				err = validateBlankDiskLayout(tc.output, "/dev/nvme1n1")
+			}
 			if (err == nil) != tc.valid {
 				t.Fatalf("validation error = %v, want valid=%v", err, tc.valid)
 			}
