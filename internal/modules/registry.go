@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	ErrModuleNotFound = errors.New("module not found")
+	ErrModuleNotFound         = errors.New("module not found")
 	ErrModuleAlreadyInstalled = errors.New("module already installed; automatic replacement is disabled until rollback-safe upgrades are implemented")
 )
 
