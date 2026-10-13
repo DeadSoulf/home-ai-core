@@ -25,7 +25,8 @@ ProtectKernelLogs=yes
 RestrictSUIDSGID=yes
 RestrictRealtime=yes
 LockPersonality=yes
-RestrictAddressFamilies=AF_UNIX
+# HTTP health checks connect only to managed Docker module IPs on the private bridge.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 SystemCallArchitectures=native
 
 [Install]
