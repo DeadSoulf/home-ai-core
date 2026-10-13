@@ -35,7 +35,8 @@ function sameDisk(before: BlockNode, after: BlockNode): boolean {
 
 export function QuickDiskSetup({disk, onChanged}: {disk: BlockNode; onChanged: () => void}) {
   const {t} = useI18n();
-  const setup = quickDiskSetup(disk);
+  const [lockedSetup, setLockedSetup] = useState<DiskSetup | null>(null);
+  const setup = lockedSetup ?? quickDiskSetup(disk);
   const [expanded, setExpanded] = useState(false);
   const [displayName, setDisplayName] = useState(disk.display_name || "");
   const [confirmation, setConfirmation] = useState("");
@@ -140,7 +141,7 @@ export function QuickDiskSetup({disk, onChanged}: {disk: BlockNode; onChanged: (
           <p>{t(setup.kind === "blank" ? "quickDiskBlankDescription" : "quickDiskExistingDescription")}</p>
         </div>
         {!expanded && !result && (
-          <button type="button" className="button primary" onClick={() => setExpanded(true)}>
+          <button type="button" className="button primary" onClick={() => { setLockedSetup(setup); setExpanded(true); }}>
             {t("quickDiskStart")}
           </button>
         )}
