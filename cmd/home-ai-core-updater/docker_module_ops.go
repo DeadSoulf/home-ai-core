@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
@@ -129,11 +130,23 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 	containerID := strings.TrimSpace(string(output))
 
 	if output, err := exec.CommandContext(ctx, dockerPath, "start", name).CombinedOutput(); err != nil {
-		_ = exec.CommandContext(context.Background(), dockerPath, "rm", "-f", name).Run()
-		return moduleContainerStatus{}, "", fmt.Errorf("start module container: %s", commandError(output, err))
+		return moduleContainerStatus{}, "", cleanupFailedModuleStart(dockerPath, name, fmt.Errorf("start module container: %s", commandError(output, err)))
 	}
-
-	return moduleContainerStatus{State: "running", ContainerID: containerID}, "module installed and started", nil
+	// Docker 'start' can return success when the container process exits
+	// immediately. Never publish such an instance as an enabled module.
+	select {
+	case <-ctx.Done():
+		return moduleContainerStatus{}, "", cleanupFailedModuleStart(dockerPath, name, ctx.Err())
+	case <-time.After(300 * time.Millisecond):
+	}
+	status, err := inspectModuleContainer(ctx, dockerPath, name)
+	if err != nil {
+		return moduleContainerStatus{}, "", cleanupFailedModuleStart(dockerPath, name, fmt.Errorf("inspect started module: %w", err))
+	}
+	if status.State != "running" {
+		return moduleContainerStatus{}, "", cleanupFailedModuleStart(dockerPath, name, fmt.Errorf("module stopped during startup (state: %s)", status.State))
+	}
+	return moduleContainerStatus{State: status.State, ContainerID: containerID}, "module installed and started", nil
 }
 
 func pullDockerModuleImage(ctx context.Context, dockerPath, image string) error {
@@ -265,4 +278,16 @@ func inspectModuleContainer(ctx context.Context, dockerPath, name string) (modul
 
 func moduleContainerName(moduleID string) string {
 	return "home-ai-module-" + moduleID
+}
+
+// cleanupFailedModuleStart bounds cleanup even if the parent job was canceled.
+// Preserve cleanup failures in the returned error for operator recovery.
+func cleanupFailedModuleStart(dockerPath, name string, cause error) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	output, err := exec.CommandContext(ctx, dockerPath, "rm", "-f", name).CombinedOutput()
+	if err != nil {
+		return errors.Join(cause, fmt.Errorf("remove failed module container: %s", commandError(output, err)))
+	}
+	return cause
 }
