@@ -45,8 +45,16 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 	default:
 		return moduleContainerStatus{}, "", errors.New("unsupported Docker module operation")
 	}
-	if _, err := ensureDockerRuntime(ctx, serviceGID); err != nil {
-		return moduleContainerStatus{}, "", err
+	if request.Operation == "docker.module.install" {
+		if _, err := ensureDockerRuntime(ctx, serviceGID); err != nil {
+			return moduleContainerStatus{}, "", err
+		}
+	} else {
+		// Control/remove must never install Docker or change host services.
+		status := inspectDockerRuntime(ctx)
+		if !status.Available || !status.Active || !status.NetworkReady {
+			return moduleContainerStatus{}, "", fmt.Errorf("Docker runtime is not ready: %s", status.Error)
+		}
 	}
 
 	switch request.Operation {
