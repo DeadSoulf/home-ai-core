@@ -40,6 +40,31 @@ func registerModuleJobs(service *jobs.Service, registry *modules.Registry) error
 		return err
 	}
 
+	if err := service.Register("module.update", func(ctx context.Context, job state.JobRecord, reporter jobs.Reporter) (map[string]any, error) {
+		raw, _ := job.Input["manifest_json"].(string)
+		if strings.TrimSpace(raw) == "" {
+			return nil, errors.New("updated module manifest is missing")
+		}
+		manifest, err := modules.DecodeManifest(strings.NewReader(raw))
+		if err != nil {
+			return nil, err
+		}
+		_ = reporter.Progress(ctx, 500, "validating module upgrade")
+		_ = reporter.Progress(ctx, 2000, "preserving existing Docker container and checking replacement")
+		item, err := registry.UpgradeManifest(ctx, manifest)
+		if err != nil {
+			return nil, err
+		}
+		_ = reporter.Progress(ctx, 9500, "module upgrade verified; registry committed")
+		return map[string]any{
+			"module_id": item.Manifest.ID,
+			"version": item.Manifest.Version,
+			"status": item.Status,
+		}, nil
+	}); err != nil {
+		return err
+	}
+
 	if err := service.Register("module.control", func(ctx context.Context, job state.JobRecord, reporter jobs.Reporter) (map[string]any, error) {
 		moduleID, _ := job.Input["module_id"].(string)
 		operation, _ := job.Input["operation"].(string)
