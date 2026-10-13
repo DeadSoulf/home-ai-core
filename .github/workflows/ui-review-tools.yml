@@ -1,0 +1,44 @@
+name: Isolated UI review tools
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/ui-review-tools.yml']
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    if: github.head_ref == 'chatgpt/web-ui-audit-fixes-20261014'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.x'
+      - name: Prepare only source and public locked dependencies
+        shell: bash
+        run: |
+          git archive --format=tar.gz --output="$RUNNER_TEMP/ui-source.tar.gz" HEAD
+          npm ci --ignore-scripts --no-audit --no-fund --prefix web
+          tar -czf "$RUNNER_TEMP/ui-dependencies.tar.gz" -C web node_modules
+          tar -czf "$RUNNER_TEMP/ui-node.tar.gz" -C "$(dirname "$(command -v node)")/.." bin lib
+          go mod download
+          tar -czf "$RUNNER_TEMP/ui-go.tar.gz" -C "$(go env GOROOT)" .
+          tar -czf "$RUNNER_TEMP/ui-go-modules.tar.gz" -C "$(go env GOMODCACHE)" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-offline-review-tools
+          path: |
+            ${{ runner.temp }}/ui-source.tar.gz
+            ${{ runner.temp }}/ui-dependencies.tar.gz
+            ${{ runner.temp }}/ui-node.tar.gz
+            ${{ runner.temp }}/ui-go.tar.gz
+            ${{ runner.temp }}/ui-go-modules.tar.gz
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
