@@ -30,16 +30,16 @@ func (s *server) storageOperation(
 	}
 
 	var input struct {
-		Operation  string `json:"operation"`
-		Device     string `json:"device"`
-		Mountpoint string `json:"mountpoint,omitempty"`
-		Filesystem string `json:"filesystem,omitempty"`
-		Label      string `json:"label,omitempty"`
-		Confirm    string `json:"confirm,omitempty"`
-		DryRun     bool   `json:"dry_run,omitempty"`
-		SizeMiB    uint64 `json:"size_mib,omitempty"`
-		Purpose    string `json:"purpose,omitempty"`
-		RequireBlank bool `json:"require_blank,omitempty"`
+		Operation    string `json:"operation"`
+		Device       string `json:"device"`
+		Mountpoint   string `json:"mountpoint,omitempty"`
+		Filesystem   string `json:"filesystem,omitempty"`
+		Label        string `json:"label,omitempty"`
+		Confirm      string `json:"confirm,omitempty"`
+		DryRun       bool   `json:"dry_run,omitempty"`
+		SizeMiB      uint64 `json:"size_mib,omitempty"`
+		Purpose      string `json:"purpose,omitempty"`
+		RequireBlank bool   `json:"require_blank,omitempty"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
@@ -107,14 +107,14 @@ func (s *server) storageOperation(
 
 	executeOperation, executeDryRun := storageExecutionMode(input.Operation, input.DryRun)
 	message, err := storage.Execute(r.Context(), storage.Request{
-		Operation:  executeOperation,
-		Device:     input.Device,
-		Mountpoint: input.Mountpoint,
-		Filesystem: input.Filesystem,
-		Label:      input.Label,
-		Confirm:    input.Confirm,
-		DryRun:     executeDryRun,
-		SizeMiB:    input.SizeMiB,
+		Operation:    executeOperation,
+		Device:       input.Device,
+		Mountpoint:   input.Mountpoint,
+		Filesystem:   input.Filesystem,
+		Label:        input.Label,
+		Confirm:      input.Confirm,
+		DryRun:       executeDryRun,
+		SizeMiB:      input.SizeMiB,
 		RequireBlank: input.RequireBlank,
 	})
 	if err != nil {
