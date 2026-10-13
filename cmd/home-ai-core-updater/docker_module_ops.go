@@ -21,6 +21,7 @@ var (
 type moduleContainerStatus struct {
 	State       string
 	ContainerID string
+	IP          string
 }
 
 func performDockerModuleOperation(ctx context.Context, request updaterhelper.Request, serviceUID, serviceGID int) (moduleContainerStatus, string, error) {
