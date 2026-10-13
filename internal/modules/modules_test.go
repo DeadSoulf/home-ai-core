@@ -236,7 +236,10 @@ func TestRegistryCapabilitiesIncludeProvidedCapabilities(t *testing.T) {
 }
 
 func TestNewerVersionRejectsDowngradeAndSameVersion(t *testing.T) {
-	cases := []struct { candidate, installed string; want bool }{
+	cases := []struct {
+		candidate, installed string
+		want                 bool
+	}{
 		{"1.2.0", "1.1.9", true},
 		{"1.1.10", "1.1.9", true},
 		{"1.0.0", "1.0.0", false},
@@ -257,7 +260,9 @@ func TestNewerVersionRejectsDowngradeAndSameVersion(t *testing.T) {
 func TestRegistryUpgradeRejectsUnhealthyManifestWithoutMutatingRecord(t *testing.T) {
 	ctx := context.Background()
 	store, err := state.Open(ctx, t.TempDir())
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer store.Close()
 	current := validManifest("example", "1.0.0")
 	persistManifest(t, store, current, "enabled")
@@ -267,7 +272,9 @@ func TestRegistryUpgradeRejectsUnhealthyManifestWithoutMutatingRecord(t *testing
 		t.Fatal("upgrade without a health endpoint was accepted")
 	}
 	got, err := r.Get(ctx, "example")
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got.Manifest.Version != current.Version || got.Status != "enabled" {
 		t.Fatalf("failed validation modified the installed module: %+v", got)
 	}
