@@ -3,7 +3,11 @@ package main
 import "testing"
 
 func TestValidateModuleHealthCheck(t *testing.T) {
-	for _, tc := range []struct { port int; path string; ok bool }{
+	for _, tc := range []struct {
+		port int
+		path string
+		ok   bool
+	}{
 		{8080, "/health", true},
 		{8090, "/api/health", true},
 		{0, "/health", false},
