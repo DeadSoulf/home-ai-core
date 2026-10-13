@@ -2,7 +2,7 @@ name: Prepare reviewed security tree
 on:
   pull_request:
     branches: [main]
-    paths: ['_security_import/bundle.b64']
+    paths: ['_security_import/bundle.b64', '_security_import/repairs.json']
 permissions:
   contents: write
 jobs:
@@ -27,10 +27,24 @@ jobs:
           parent = os.environ['EXPECTED_HEAD']
           assert len(parent) == 40 and all(c in '0123456789abcdef' for c in parent)
           assert subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip() == parent
-          names = ['part-00.b64','part-01.b64','part-02.b64','part-03.b64','bundle.b64']
-          encoded = b''.join(pathlib.Path('_security_import',n).read_bytes().strip() for n in names)
+          hashes = ['823a8075bad3c4e2b8b69709fcd75a78569858f75dcf7392eee28fd0417803af','ad77bb374eeab4e866efc97776db0bd22b354301cebc91db20da9664f4cc2762','f8db1407d326474c09687a2756b69f1643485289fbb699ecfaea32ceed68f79b','ba8d0ff243b15e7a922cac2acbc4bfa15b01922a2b3fc00a750fdb38b242217e','c4974104c0d64e7c7c03b06ca08ea7b970ea074c99c46e307ee2a688f7ef8f0b','14050b24938e59238fdc2b28598cfef5b666d6ce7ea1f1b6d8448da52be234af','974c5744d3c713106c45187c458c82da0d52e9ebd50886b5fbcd49f42684a3a5','d6acf7d345844d0a320b9b3e4481d9e8a135def328cfe8b0a5aa89f9ddeee0a2','59cef4a074a67f2555c210de0e74393c033c40f92fa58a60106b88f5997dfda5','16aa697c5942e7143bacd3e902b2efaf01788b10ccfe5e3a7b29e9d3b46e6fb2','28b0a1df836f8cba84b1930bfe6872885fbd7aae53ecbed69a168e17436496ad','8ce60340d5c2f2576178cc95e9b4d8f45418c7e5391582a45d5858c91752362c','965d38d87c4b5528c4819042a948fb751901d4ed3d18b1f9d695eb7af0afaff3']
+          repairs_path = pathlib.Path('_security_import/repairs.json')
+          repairs = json.loads(repairs_path.read_text()) if repairs_path.exists() else {}
+          chunks, valid = [], True
+          for i, expected in enumerate(hashes):
+              name = f'ch{i:02d}'
+              value = pathlib.Path('_security_import', name).read_bytes().strip()
+              for start, end, replacement in sorted(repairs.get(name, []), reverse=True):
+                  assert 0 <= start <= end <= len(value)
+                  value = value[:start] + replacement.encode('ascii') + value[end:]
+              actual = hashlib.sha256(value).hexdigest()
+              print(name, len(value), actual, 'OK' if actual == expected else 'MISMATCH', flush=True)
+              valid = valid and actual == expected
+              chunks.append(value)
+          assert valid, 'transport checksum mismatch; no code applied'
+          encoded = b''.join(chunks)
           assert len(encoded) < 100000
-          patch = gzip.decompress(base64.b64decode(encoded,validate=True))
+          patch = gzip.decompress(base64.b64decode(encoded, validate=True))
           assert len(patch) < 1000000
           assert hashlib.sha256(patch).hexdigest() == '70e603a4face29a5bc3270b85047e2654af28ed4de5b2e80067c4cfb51f411d3'
           subprocess.run(['git','apply','--check','--index','-'], input=patch, check=True)
@@ -66,3 +80,9 @@ jobs:
           path: ${{ runner.temp }}/prepared-security-commit.json
           retention-days: 1
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: transport-diagnostics
+          path: _security_import/ch*
+          retention-days: 1
