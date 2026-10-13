@@ -4,16 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net"
-	"net/http"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 )
-
-const moduleHealthTimeout = 60 * time.Second
 
 func validateModuleHealthCheck(port int, path string) error {
 	if port < 1 || port > 65535 {
@@ -71,7 +66,7 @@ func upgradeDockerModule(ctx context.Context, moduleID, image, previousImage str
 
 	status, _, installErr := installDockerModule(ctx, moduleID, image, serviceUID, serviceGID)
 	if installErr == nil {
-		installErr = waitForModuleHealth(ctx, dockerPath, name, healthPort, healthPath)
+		status.IP, installErr = inspectModuleNetworkIP(ctx, dockerPath, name)
 	}
 	if installErr != nil {
 		restoreCtx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
@@ -83,7 +78,7 @@ func upgradeDockerModule(ctx context.Context, moduleID, image, previousImage str
 	}
 	// Do not delete the previous container here. The registry must commit the
 	// new manifest first, then explicitly finalize this operation.
-	return status, "module upgrade healthy; previous container retained until registry commit", nil
+	return status, "module replacement running; awaiting health verification and registry commit", nil
 }
 
 func moduleRollbackContainerName(moduleID string) string {
@@ -160,60 +155,18 @@ func finalizeDockerModule(ctx context.Context, moduleID string) (moduleContainer
 	return status, "verified module upgrade committed", nil
 }
 
-func waitForModuleHealth(ctx context.Context, dockerPath, name string, port int, healthPath string) error {
-	if err := validateModuleHealthCheck(port, healthPath); err != nil {
-		return err
+// The helper only resolves a container IP on the managed Docker bridge; it
+// cannot make HTTP requests because its systemd sandbox allows AF_UNIX only.
+func inspectModuleNetworkIP(ctx context.Context, dockerPath, name string) (string, error) {
+	output, err := exec.CommandContext(ctx, dockerPath, "inspect", "--format",
+		`{{ with index .NetworkSettings.Networks "home-ai-modules" }}{{ .IPAddress }}{{ end }}`, name).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("inspect managed Docker network: %s", commandError(output, err))
 	}
-	deadlineCtx, cancel := context.WithTimeout(ctx, moduleHealthTimeout)
-	defer cancel()
-	client := &http.Client{
-		Timeout:       2 * time.Second,
-		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	ip := strings.TrimSpace(string(output))
+	parsed := net.ParseIP(ip)
+	if parsed == nil || !parsed.IsPrivate() {
+		return "", errors.New("managed Docker module does not have a private network IP")
 	}
-	var lastError error
-	for {
-		if deadlineCtx.Err() != nil {
-			return fmt.Errorf("module health did not pass: %v: %w", lastError, deadlineCtx.Err())
-		}
-		running, err := exec.CommandContext(deadlineCtx, dockerPath, "inspect", "--format", "{{.State.Running}}", name).CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("replacement disappeared before health verification: %s", commandError(running, err))
-		}
-		if strings.TrimSpace(string(running)) != "true" {
-			return errors.New("replacement container exited before passing health verification")
-		}
-		ipOutput, err := exec.CommandContext(deadlineCtx, dockerPath, "inspect", "--format",
-			`{{ with index .NetworkSettings.Networks "home-ai-modules" }}{{ .IPAddress }}{{ end }}`, name).CombinedOutput()
-		if err == nil {
-			ip := strings.TrimSpace(string(ipOutput))
-			if parsed := net.ParseIP(ip); parsed != nil {
-				url := "http://" + net.JoinHostPort(ip, strconv.Itoa(port)) + healthPath
-				request, reqErr := http.NewRequestWithContext(deadlineCtx, http.MethodGet, url, nil)
-				if reqErr == nil {
-					response, httpErr := client.Do(request)
-					if httpErr == nil {
-						_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
-						_ = response.Body.Close()
-						if response.StatusCode >= 200 && response.StatusCode < 300 {
-							return nil
-						}
-						lastError = fmt.Errorf("HTTP status %d", response.StatusCode)
-					} else {
-						lastError = httpErr
-					}
-				} else {
-					lastError = reqErr
-				}
-			} else {
-				lastError = errors.New("Docker module network address unavailable")
-			}
-		} else {
-			lastError = fmt.Errorf("inspect module network: %s", commandError(ipOutput, err))
-		}
-		select {
-		case <-deadlineCtx.Done():
-			return fmt.Errorf("module health did not pass: %v: %w", lastError, deadlineCtx.Err())
-		case <-time.After(750 * time.Millisecond):
-		}
-	}
+	return ip, nil
 }
