@@ -39,6 +39,7 @@ func (s *server) storageOperation(
 		DryRun     bool   `json:"dry_run,omitempty"`
 		SizeMiB    uint64 `json:"size_mib,omitempty"`
 		Purpose    string `json:"purpose,omitempty"`
+		RequireBlank bool `json:"require_blank,omitempty"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
@@ -55,6 +56,10 @@ func (s *server) storageOperation(
 		return
 	}
 
+	if input.RequireBlank && input.Operation != "partition.create" {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_storage_request", "require_blank is valid only when creating a partition", nil)
+		return
+	}
 	if input.Purpose != "" && input.Purpose != "none" {
 		if input.Operation != "partition.create" {
 			writeAPIError(w, r, http.StatusBadRequest, "invalid_storage_request", "storage purpose can only be supplied while creating a partition", nil)
@@ -110,6 +115,7 @@ func (s *server) storageOperation(
 		Confirm:    input.Confirm,
 		DryRun:     executeDryRun,
 		SizeMiB:    input.SizeMiB,
+		RequireBlank: input.RequireBlank,
 	})
 	if err != nil {
 		s.logger.Error("storage operation failed", "operation", input.Operation, "device", input.Device, "error", err)
