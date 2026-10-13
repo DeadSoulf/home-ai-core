@@ -53,4 +53,4 @@ The following are **post-foundation release/operations gates**, not reasons to r
 - [x] complete live storage dry-run/preflight acceptance on the target server; `0.1.114-dev` standalone read-only Web preflight was confirmed working by the user on 2026-10-01;
 - finish product-specific Windows/NAS acceptance.
 
-Items such as NAS/SMB acceptance, Windows client UX, Smart Home, NVR, AI and cluster functionality remain product/domain work and do not reopen the Core foundation unless they expose a shared-contract defect.
+External module functionality remains product/domain work and does not reopen the Core foundation unless it exposes a shared-contract defect.

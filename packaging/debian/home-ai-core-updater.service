@@ -12,6 +12,7 @@ Group=root
 Restart=always
 RestartSec=1s
 TimeoutStopSec=10s
+EnvironmentFile=-/etc/home-ai-core/home-ai-core.env
 UMask=0077
 
 NoNewPrivileges=yes

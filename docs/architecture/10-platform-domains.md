@@ -2,61 +2,27 @@
 
 Home-AI-Core separates platform control from workload implementation.
 
-## Control Plane
+## Control plane
 
-The Control Plane is provided by the Core and is responsible for:
+Core owns:
 
-- identity
-- authentication
-- authorization
-- node registry
-- module registry
-- configuration
-- event bus
-- jobs
-- audit
-- updates
-- health and capability discovery
+- identity;
+- authentication;
+- authorization;
+- module registry;
+- jobs;
+- durable events;
+- audit;
+- updates;
+- host health/capability discovery;
+- storage/network foundations.
 
-## Data Plane
+## Workload plane
 
-The Data Plane is implemented by modules and services.
+The workload plane is implemented exclusively by external Docker modules.
 
-Examples:
-
-- file storage
-- object/media storage
-- SMB/NFS
-- camera ingest and recording
-- Docker workloads
-- virtual machines
-- AI inference
-- smart-home integrations
-- backup engines
-
-## User-facing domains
-
-### Files
-Personal documents and general file storage.
-
-### Photos and Video
-Photo/video ingest, organization, metadata, thumbnails and future mobile synchronization.
-
-### Surveillance
-Cameras, streams, recordings, retention and AI events.
-
-### Home Automation
-Devices, states, automations and external smart-home systems.
-
-### Applications
-Self-hosted services such as media servers, collaboration tools and automation platforms.
-
-### AI
-Models, runtimes, inference endpoints, agents and approved platform tools.
-
-### Infrastructure
-Storage, networking, compute, containers, virtualization, backups and hardware.
+Each workload owns its domain logic and persistent state and communicates with Core through documented interfaces.
 
 ## Architectural rule
 
-User-facing domains may span multiple modules, but no domain is allowed to bypass Core identity, permissions, jobs, events or audit controls when performing privileged platform operations.
+A workload may request Core capabilities, permissions and privileged operations, but it cannot bypass Core security boundaries. Product-specific data and dependencies stay outside the Core binary and Core SQLite.

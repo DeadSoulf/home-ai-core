@@ -662,9 +662,7 @@ export function StorageDevices({
                   value={partitionPurpose}
                   onChange={(event) => setPartitionPurpose(event.target.value as StoragePurpose)}
                 >
-                  <option value="files">{t("storagePurposeFiles")}</option>
-                  <option value="video">{t("storagePurposeVideo")}</option>
-                </select>
+                  <option value="files">{t("storagePurposeFiles")}</option>                </select>
               </label>
             </div>
             <div className="storage-capacity-summary">
@@ -866,7 +864,7 @@ export function StorageDevices({
                         {node.label && <span className="storage-inline-label">{node.label}</span>}
                         {purposeAssignment && (
                           <span className="status-badge">
-                            {purposeAssignment.purpose === "files" ? t("storagePurposeFiles") : t("storagePurposeVideo")}
+                            {t("storagePurposeFiles")}
                           </span>
                         )}
                         {storageInUse && (
@@ -987,9 +985,7 @@ export function StorageDevices({
                               onChange={(event) => void changePurpose(node, event.target.value as "" | StoragePurpose)}
                             >
                               <option value="">{t("storagePurposeNone")}</option>
-                              <option value="files">{t("storagePurposeFiles")}</option>
-                              <option value="video">{t("storagePurposeVideo")}</option>
-                            </select>
+                              <option value="files">{t("storagePurposeFiles")}</option>                            </select>
                           </label>
                         )}
                         {node.type === "part" && (
@@ -1070,9 +1066,7 @@ export function StorageDevices({
                                   onChange={(event) => void changePurpose(node, event.target.value as "" | StoragePurpose)}
                                 >
                                   <option value="">{t("storagePurposeNone")}</option>
-                                  <option value="files">{t("storagePurposeFiles")}</option>
-                                  <option value="video">{t("storagePurposeVideo")}</option>
-                                </select>
+                                  <option value="files">{t("storagePurposeFiles")}</option>                                </select>
                               </label>
                             )}
                           </div>
@@ -1136,9 +1130,7 @@ export function StorageDevices({
                                 value={partitionPurpose}
                                 onChange={(event) => setPartitionPurpose(event.target.value as StoragePurpose)}
                               >
-                                <option value="files">{t("storagePurposeFiles")}</option>
-                                <option value="video">{t("storagePurposeVideo")}</option>
-                              </select>
+                                <option value="files">{t("storagePurposeFiles")}</option>                              </select>
                             </label>
                           </div>
                           <div className="storage-capacity-summary">

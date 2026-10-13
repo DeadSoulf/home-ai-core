@@ -2,66 +2,53 @@
 
 ## Core
 
-The Core is the smallest trusted Home-AI-Core layer. Its responsibilities are limited to:
+The Core is the smallest trusted layer. It owns:
 
-- API routing and version negotiation
-- authentication and sessions
-- authorization and permission checks
-- configuration registry
-- module registry and lifecycle orchestration
-- event bus
-- job engine
-- update orchestration
-- audit logging
-- basic host discovery required by the platform
+- API routing/version negotiation;
+- authentication/sessions;
+- authorization;
+- audit;
+- jobs/events/realtime;
+- module registry;
+- update orchestration;
+- basic host capability discovery;
+- storage/network foundations;
+- privileged-helper protocol;
+- Web shell.
 
-The Core must not contain Docker-, KVM-, NAS-, AI- or NVR-specific business logic.
+Core contains no product-specific runtime.
 
 ## Module
 
-A Module adds host-level capability.
-
-Examples:
-
-- Containers
-- Virtualization
-- Storage
-- NAS
-- Backup
-- Network/VPN
-- AI runtime
-- NVR runtime
+A Module is an independently distributed workload packaged as a Docker image.
 
 A module declares:
 
-- identity and version
-- Core API compatibility
-- dependencies and conflicts
-- required OS packages
-- required permissions and resources
-- API routes
-- events produced and consumed
-- UI contributions
-- lifecycle operations
+- stable ID;
+- version;
+- Core compatibility;
+- image/digest;
+- supported architectures;
+- capabilities and permissions;
+- dependencies/conflicts;
+- API namespace;
+- UI/navigation contribution;
+- events;
+- volumes;
+- network requirements;
+- host/device requirements;
+- health check;
+- lifecycle operations.
 
-## App
+## Runtime boundary
 
-An App is a user-facing service running on top of one or more Modules.
+Core stores module metadata and desired/observed lifecycle state. Domain data belongs to the module.
 
-Apps should normally run in an isolated runtime such as containers and must not receive unrestricted host access.
-
-Examples include Jellyfin, Immich, Home Assistant, Nextcloud and n8n.
-
-## Integration
-
-An Integration connects Home-AI-Core or an installed App to another service without becoming a general host capability.
-
-Examples include MQTT, notification providers, cloud DNS and monitoring exporters.
+The Core service does not mount `docker.sock`. The privileged helper performs tightly validated lifecycle operations.
 
 ## Dependency rules
 
-- Core does not depend on optional Modules.
-- Apps may depend on Modules.
-- Integrations may depend on Core capabilities, Modules or Apps.
-- Optional components must not create circular dependencies.
-- Removal must be blocked while dependants still require the component.
+- Core does not depend on optional modules.
+- Modules may depend on explicit Core capabilities or other modules.
+- Circular dependencies are invalid.
+- Removal is blocked while another installed module has a declared dependency.

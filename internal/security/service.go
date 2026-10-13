@@ -12,11 +12,10 @@ import (
 )
 
 var (
-	ErrInvalidCredentials    = errors.New("invalid credentials")
-	ErrInvalidBootstrapToken = errors.New("invalid bootstrap token")
-	ErrAlreadyInitialized    = errors.New("security already initialized")
-	ErrUnauthorized          = errors.New("authentication required")
-	ErrUserExists            = errors.New("user already exists")
+	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrAlreadyInitialized = errors.New("security already initialized")
+	ErrUnauthorized       = errors.New("authentication required")
+	ErrUserExists         = errors.New("user already exists")
 )
 
 const sessionLifetime = 24 * time.Hour
@@ -119,7 +118,6 @@ type AuditEntry struct {
 
 type Service struct {
 	store     *state.Store
-	stateDir  string
 	dummyHash string
 	now       func() time.Time
 }
@@ -132,18 +130,10 @@ func New(ctx context.Context, store *state.Store, stateDir string) (*Service, er
 
 	service := &Service{
 		store:     store,
-		stateDir:  stateDir,
 		dummyHash: dummyHash,
 		now:       time.Now,
 	}
 
-	initialized, err := service.Initialized(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if err := service.prepareBootstrap(initialized); err != nil {
-		return nil, err
-	}
 	if err := store.CleanupExpiredSessions(ctx, service.now()); err != nil {
 		return nil, err
 	}
@@ -160,7 +150,7 @@ func (s *Service) Initialized(ctx context.Context) (bool, error) {
 
 func (s *Service) Bootstrap(
 	ctx context.Context,
-	bootstrapToken, username, displayName, password string,
+	username, displayName, password string,
 	meta RequestContext,
 ) (AuthResult, error) {
 	initialized, err := s.Initialized(ctx)
@@ -170,10 +160,6 @@ func (s *Service) Bootstrap(
 	if initialized {
 		return AuthResult{}, ErrAlreadyInitialized
 	}
-	if !s.verifyBootstrapToken(bootstrapToken) {
-		return AuthResult{}, ErrInvalidBootstrapToken
-	}
-
 	username, err = NormalizeUsername(username)
 	if err != nil {
 		return AuthResult{}, err
@@ -199,10 +185,6 @@ func (s *Service) Bootstrap(
 	if err != nil {
 		return AuthResult{}, err
 	}
-	if err := s.removeBootstrapToken(); err != nil {
-		return AuthResult{}, fmt.Errorf("remove bootstrap token: %w", err)
-	}
-
 	result, err := s.createSession(ctx, user, now)
 	if err != nil {
 		return AuthResult{}, err

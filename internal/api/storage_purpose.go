@@ -56,11 +56,6 @@ func (s *server) storagePurposes(
 		for _, record := range records {
 			response := storagePurposeResponseFor(record, nodes)
 			response.UsedBy = storageUsageForPurposeRecord(record, nodes, pools)
-			if node, ok := blockNodeForStoragePurpose(nodes, record); ok {
-				if nvrUsage, active := s.activeNVRStorageUsage(r.Context(), node); active {
-					response.UsedBy = append(response.UsedBy, nvrUsage)
-				}
-			}
 			response.InUse = len(response.UsedBy) > 0
 			assignments = append(assignments, response)
 		}
@@ -110,18 +105,6 @@ func (s *server) storagePurposes(
 				writeAPIError(w, r, http.StatusBadRequest, "invalid_storage_purpose", err.Error(), nil)
 				return
 			}
-		}
-
-		if nvrUsage, active := s.activeNVRStorageUsage(r.Context(), node); active && purpose != state.StoragePurposeVideo {
-			writeAPIError(
-				w,
-				r,
-				http.StatusConflict,
-				"storage_in_use",
-				"storage is used by the active NVR archive and cannot be reassigned or cleared",
-				map[string]any{"used_by": []storagePurposeUsageResponse{nvrUsage}},
-			)
-			return
 		}
 
 		pools, err := s.state.ListNASPools(r.Context())

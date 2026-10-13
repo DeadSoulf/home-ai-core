@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/DeadSoulf/home-ai-core/internal/modules"
@@ -39,12 +40,19 @@ func TestSignedRepositoryAndPackageVerification(t *testing.T) {
 		GeneratedAt:   "2026-09-28T14:00:00Z",
 		Releases: []Release{{
 			Manifest: modules.Manifest{
-				SchemaVersion: 1,
+				SchemaVersion: modules.ManifestSchemaVersion,
 				ID:            "storage",
 				Name:          "Storage",
 				Version:       "1.0.0",
 				Core:          ">=0.1.0 <1.0.0",
-				Lifecycle:     []string{"install", "upgrade", "remove"},
+				Runtime: modules.RuntimeSpec{
+					Type: "docker",
+					Docker: modules.DockerSpec{
+						Image: "ghcr.io/home-ai/storage@sha256:" + strings.Repeat("a", 64),
+					},
+				},
+				Capabilities: modules.Capabilities{Requires: []string{"host.docker"}},
+				Lifecycle:    []string{"install", "upgrade", "remove"},
 			},
 			Package: pkg,
 		}},

@@ -489,8 +489,6 @@ function categoryLabel(category: string, t: (key: StringKey) => string) {
     case "storage": return t("userCategoryStorage");
     case "network": return t("userCategoryNetwork");
     case "files": return t("userCategoryFiles");
-    case "camera": return t("userCategoryCamera");
-    case "nvr": return t("userCategoryNVR");
     default: return category;
   }
 }
@@ -499,11 +497,6 @@ function resourcePermissionLabel(permission: string, t: (key: StringKey) => stri
   switch (permission) {
     case "files.read": return t("userResourceRead");
     case "files.write": return t("userResourceWrite");
-    case "camera.live": return t("userResourceLive");
-    case "camera.archive": return t("userResourceArchive");
-    case "camera.export": return t("userResourceExport");
-    case "camera.ptz": return t("userResourcePTZ");
-    case "camera.manage": return t("userResourceManage");
     default: return permission;
   }
 }

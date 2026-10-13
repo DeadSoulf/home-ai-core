@@ -24,11 +24,11 @@ func TestStoragePurposeRoundTripAndUUIDRebind(t *testing.T) {
 		t.Fatalf("unexpected record: %#v", record)
 	}
 
-	updated, err := store.SetStoragePurpose(ctx, "/dev/nvme1n1p1", "uuid-1", StoragePurposeVideo, now.Add(time.Minute))
+	updated, err := store.SetStoragePurpose(ctx, "/dev/nvme1n1p1", "uuid-1", StoragePurposeFiles, now.Add(time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.DevicePath != "/dev/nvme1n1p1" || updated.Purpose != StoragePurposeVideo {
+	if updated.DevicePath != "/dev/nvme1n1p1" || updated.Purpose != StoragePurposeFiles {
 		t.Fatalf("unexpected rebound record: %#v", updated)
 	}
 

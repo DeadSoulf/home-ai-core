@@ -2,12 +2,14 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/DeadSoulf/home-ai-core/internal/modules"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
+	"github.com/DeadSoulf/home-ai-core/internal/state"
 )
 
 type ModuleService interface {
@@ -94,8 +96,8 @@ func (s *server) moduleResource(
 		methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
-	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/v1/modules/"), "/")
-	if id == "" || strings.Contains(id, "/") {
+	id := strings.TrimSpace(r.PathValue("moduleID"))
+	if id == "" {
 		s.notFound(w, r)
 		return
 	}
@@ -112,29 +114,53 @@ func (s *server) moduleResource(
 	writeJSON(w, http.StatusOK, map[string]any{"module": item})
 }
 
-func (s *server) cloudAIModuleTest(
+func (s *server) moduleInstall(
 	w http.ResponseWriter,
 	r *http.Request,
 	actor security.Actor,
 	source authSource,
 ) {
-	if r.Method != http.MethodPost {
-		methodNotAllowed(w, r, http.MethodPost)
-		return
-	}
-	if !validMutationCSRF(actor, source, r) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
 		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
 		return
 	}
-	if !s.ai.CloudProviderConfigured() {
-		writeAPIError(w, r, http.StatusConflict, "cloud_ai_not_configured", "Cloud AI provider is not configured", nil)
+	manifest, err := modules.DecodeManifest(r.Body)
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_module_manifest", err.Error(), nil)
 		return
 	}
-	if err := s.ai.TestCloudProvider(r.Context()); err != nil {
-		s.writeAIChatError(w, r, err)
+	raw, err := json.Marshal(manifest)
+	if err != nil {
+		writeAPIError(w, r, http.StatusInternalServerError, "module_job_failed", "failed to prepare module job", nil)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	meta := metadataFromContext(r.Context())
+	job, err := s.jobs.Submit(r.Context(), state.JobRecord{
+		Type:          "module.install",
+		ActorType:     actor.Type,
+		ActorID:       actor.ID,
+		RequestID:     meta.RequestID,
+		CorrelationID: meta.CorrelationID,
+		Input: map[string]any{
+			"module_id":     manifest.ID,
+			"manifest_json": string(raw),
+		},
+	})
+	if err != nil {
+		writeAPIError(w, r, http.StatusInternalServerError, "module_job_failed", "failed to queue module installation", nil)
+		return
+	}
+	s.security.RecordAudit(
+		r.Context(),
+		s.securityRequestContext(r),
+		actor,
+		"modules.install.queued",
+		"module",
+		manifest.ID,
+		"success",
+		map[string]any{"version": manifest.Version, "job_id": job.ID},
+	)
+	writeJSON(w, http.StatusAccepted, map[string]any{"job": job})
 }
 
 func (s *server) moduleControl(
@@ -147,7 +173,7 @@ func (s *server) moduleControl(
 		methodNotAllowed(w, r, http.MethodPost)
 		return
 	}
-	if !validMutationCSRF(actor, source, r) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
 		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
 		return
 	}
@@ -157,183 +183,102 @@ func (s *server) moduleControl(
 		s.notFound(w, r)
 		return
 	}
-	item, err := s.modules.Get(r.Context(), id)
-	if errors.Is(err, modules.ErrModuleNotFound) {
+	if _, err := s.modules.Get(r.Context(), id); errors.Is(err, modules.ErrModuleNotFound) {
 		writeAPIError(w, r, http.StatusNotFound, "module_not_found", "module not found", nil)
 		return
-	}
-	if err != nil {
+	} else if err != nil {
 		writeAPIError(w, r, http.StatusInternalServerError, "modules_unavailable", "module registry is unavailable", nil)
 		return
 	}
-	if id != "ai.agent" && id != "ai.cloud" {
-		writeAPIError(w, r, http.StatusConflict, "module_control_unsupported", "runtime control is not supported for this module", nil)
-		return
-	}
 
-	var request struct {
+	var input struct {
 		Operation string `json:"operation"`
 	}
-	if err := decodeJSON(w, r, &request); err != nil {
-		writeAPIError(w, r, http.StatusBadRequest, "invalid_request", err.Error(), nil)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_module_operation", "invalid module operation", nil)
 		return
 	}
-	request.Operation = strings.ToLower(strings.TrimSpace(request.Operation))
-
-	previous := item.Status
-	switch id {
-	case "ai.agent":
-		switch request.Operation {
-		case "enable":
-			if err := s.modules.SetStatus(r.Context(), id, "enabled", ""); err != nil {
-				writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
-				return
-			}
-			s.ai.SetEnabled(true)
-		case "disable":
-			if err := s.modules.SetStatus(r.Context(), id, "disabled", ""); err != nil {
-				writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
-				return
-			}
-			s.ai.SetEnabled(false)
-			if cloud, cloudErr := s.modules.Get(r.Context(), "ai.cloud"); cloudErr == nil && cloud.Status == "enabled" {
-				_ = s.ai.SetCloudProviderEnabled(false)
-				_ = s.modules.SetStatus(r.Context(), "ai.cloud", "disabled", "")
-				if s.realtime != nil {
-					s.realtime.Publish(
-						"module.runtime.changed",
-						map[string]any{"module_id": "ai.cloud", "operation": "disable", "status": "disabled", "reason": "dependency_disabled"},
-						requestIDFromContext(r.Context()),
-					)
-				}
-			}
-		case "restart":
-			if err := s.modules.SetStatus(r.Context(), id, "enabled", ""); err != nil {
-				writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
-				return
-			}
-			s.ai.Restart()
-		default:
-			writeAPIError(w, r, http.StatusBadRequest, "invalid_module_operation", "operation must be enable, disable or restart", nil)
-			return
-		}
-	case "ai.cloud":
-		switch request.Operation {
-		case "enable":
-			if !s.ai.CloudProviderConfigured() {
-				writeAPIError(w, r, http.StatusConflict, "cloud_ai_not_configured", "Cloud AI provider is not configured", nil)
-				return
-			}
-
-			agent, agentErr := s.modules.Get(r.Context(), "ai.agent")
-			if agentErr != nil {
-				writeAPIError(w, r, http.StatusInternalServerError, "modules_unavailable", "AI Agent module state is unavailable", nil)
-				return
-			}
-			if agent.Status == "error" {
-				writeAPIError(w, r, http.StatusConflict, "ai_agent_error", "AI Agent is in an error state", nil)
-				return
-			}
-			agentAutoEnabled := agent.Status != "enabled"
-			if agentAutoEnabled {
-				if err := s.modules.SetStatus(r.Context(), "ai.agent", "enabled", ""); err != nil {
-					writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to enable AI Agent dependency", nil)
-					return
-				}
-				s.ai.SetEnabled(true)
-				if s.realtime != nil {
-					s.realtime.Publish(
-						"module.runtime.changed",
-						map[string]any{
-							"module_id": "ai.agent",
-							"operation": "enable",
-							"status":    "enabled",
-							"reason":    "dependency_enabled",
-						},
-						requestIDFromContext(r.Context()),
-					)
-				}
-				s.security.RecordAudit(
-					context.WithoutCancel(r.Context()),
-					s.securityRequestContext(r),
-					actor,
-					"module.runtime.control",
-					"module",
-					"ai.agent",
-					"success",
-					map[string]any{
-						"operation":       "enable",
-						"previous_status": agent.Status,
-						"status":          "enabled",
-						"reason":          "cloud_ai_dependency",
-					},
-				)
-			}
-
-			if err := s.ai.SetCloudProviderEnabled(true); err != nil {
-				if agentAutoEnabled {
-					_ = s.modules.SetStatus(r.Context(), "ai.agent", agent.Status, "")
-					s.ai.SetEnabled(false)
-				}
-				writeAPIError(w, r, http.StatusServiceUnavailable, "cloud_ai_unavailable", "Cloud AI provider is unavailable", nil)
-				return
-			}
-			if err := s.modules.SetStatus(r.Context(), id, "enabled", ""); err != nil {
-				_ = s.ai.SetCloudProviderEnabled(false)
-				if agentAutoEnabled {
-					_ = s.modules.SetStatus(r.Context(), "ai.agent", agent.Status, "")
-					s.ai.SetEnabled(false)
-				}
-				writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
-				return
-			}
-		case "disable":
-			_ = s.ai.SetCloudProviderEnabled(false)
-			if err := s.modules.SetStatus(r.Context(), id, "disabled", ""); err != nil {
-				writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
-				return
-			}
-		case "restart":
-			if err := s.ai.RestartCloudProvider(); err != nil {
-				writeAPIError(w, r, http.StatusServiceUnavailable, "cloud_ai_unavailable", "Cloud AI provider is unavailable", nil)
-				return
-			}
-			if err := s.modules.SetStatus(r.Context(), id, "enabled", ""); err != nil {
-				writeAPIError(w, r, http.StatusInternalServerError, "module_control_failed", "failed to persist module state", nil)
-				return
-			}
-		default:
-			writeAPIError(w, r, http.StatusBadRequest, "invalid_module_operation", "operation must be enable, disable or restart", nil)
-			return
-		}
-
+	input.Operation = strings.TrimSpace(input.Operation)
+	switch input.Operation {
+	case "enable", "disable", "restart":
+	default:
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_module_operation", "operation must be enable, disable or restart", nil)
+		return
 	}
 
-	updated, err := s.modules.Get(r.Context(), id)
+	meta := metadataFromContext(r.Context())
+	job, err := s.jobs.Submit(r.Context(), state.JobRecord{
+		Type:          "module.control",
+		ActorType:     actor.Type,
+		ActorID:       actor.ID,
+		RequestID:     meta.RequestID,
+		CorrelationID: meta.CorrelationID,
+		Input:         map[string]any{"module_id": id, "operation": input.Operation},
+	})
 	if err != nil {
-		writeAPIError(w, r, http.StatusInternalServerError, "modules_unavailable", "module registry is unavailable", nil)
+		writeAPIError(w, r, http.StatusInternalServerError, "module_job_failed", "failed to queue module operation", nil)
 		return
 	}
 	s.security.RecordAudit(
-		context.WithoutCancel(r.Context()),
+		r.Context(),
 		s.securityRequestContext(r),
 		actor,
-		"module.runtime.control",
+		"modules."+input.Operation+".queued",
 		"module",
 		id,
 		"success",
-		map[string]any{
-			"operation":       request.Operation,
-			"previous_status": previous,
-			"status":          updated.Status,
-		},
+		map[string]any{"job_id": job.ID},
 	)
-	if s.realtime != nil {
-		s.realtime.Publish(
-			"module.runtime.changed",
-			map[string]any{"module_id": id, "operation": request.Operation, "status": updated.Status},
-			requestIDFromContext(r.Context()),
-		)
+	writeJSON(w, http.StatusAccepted, map[string]any{"job": job})
+}
+
+func (s *server) moduleRemove(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"module": updated})
+	id := strings.TrimSpace(r.PathValue("moduleID"))
+	if id == "" {
+		s.notFound(w, r)
+		return
+	}
+	if _, err := s.modules.Get(r.Context(), id); errors.Is(err, modules.ErrModuleNotFound) {
+		writeAPIError(w, r, http.StatusNotFound, "module_not_found", "module not found", nil)
+		return
+	} else if err != nil {
+		writeAPIError(w, r, http.StatusInternalServerError, "modules_unavailable", "module registry is unavailable", nil)
+		return
+	}
+
+	meta := metadataFromContext(r.Context())
+	job, err := s.jobs.Submit(r.Context(), state.JobRecord{
+		Type:          "module.remove",
+		ActorType:     actor.Type,
+		ActorID:       actor.ID,
+		RequestID:     meta.RequestID,
+		CorrelationID: meta.CorrelationID,
+		Input:         map[string]any{"module_id": id},
+	})
+	if err != nil {
+		writeAPIError(w, r, http.StatusInternalServerError, "module_job_failed", "failed to queue module removal", nil)
+		return
+	}
+	s.security.RecordAudit(
+		r.Context(),
+		s.securityRequestContext(r),
+		actor,
+		"modules.remove.queued",
+		"module",
+		id,
+		"success",
+		map[string]any{"job_id": job.ID, "data_preserved": true},
+	)
+	writeJSON(w, http.StatusAccepted, map[string]any{"job": job})
 }

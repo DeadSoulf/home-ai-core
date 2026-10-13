@@ -86,9 +86,6 @@ func (s *server) storageOperation(
 				return
 			}
 			usage := storageUsageForNode(node, pools)
-			if nvrUsage, active := s.activeNVRStorageUsage(r.Context(), node); active {
-				usage = append(usage, nvrUsage)
-			}
 			if len(usage) > 0 {
 				writeAPIError(
 					w,

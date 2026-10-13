@@ -97,6 +97,16 @@ func main() {
 		"version", updaterhelper.HelperVersion,
 		"protocol", updaterhelper.ProtocolVersion,
 	)
+	go func() {
+		dockerCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
+		defer cancel()
+		status, err := ensureDockerRuntime(dockerCtx, gid)
+		if err != nil {
+			logger.Error("Docker runtime reconciliation failed", "error", err, "status_error", status.Error)
+			return
+		}
+		logger.Info("Docker runtime ready", "version", status.Version, "network", dockerNetworkName)
+	}()
 	for {
 		conn, err := listener.AcceptUnix()
 		if err != nil {
@@ -150,6 +160,73 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 			),
 			HelperVersion:   updaterhelper.HelperVersion,
 			ProtocolVersion: updaterhelper.ProtocolVersion,
+		})
+		return
+	}
+	if request.Operation == "docker.inspect" {
+		ctx, cancel := context.WithTimeout(parent, 20*time.Second)
+		defer cancel()
+		status := inspectDockerRuntime(ctx)
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+			OK:                 true,
+			Message:            "Docker runtime inspected",
+			HelperVersion:      updaterhelper.HelperVersion,
+			ProtocolVersion:    updaterhelper.ProtocolVersion,
+			DockerAvailable:    status.Available,
+			DockerActive:       status.Active,
+			DockerVersion:      status.Version,
+			DockerNetworkReady: status.NetworkReady,
+			DockerError:        status.Error,
+		})
+		return
+	}
+	if request.Operation == "docker.ensure" {
+		_ = conn.SetDeadline(time.Now().Add(16 * time.Minute))
+		ctx, cancel := context.WithTimeout(parent, 15*time.Minute)
+		defer cancel()
+		status, err := ensureDockerRuntime(ctx, gid)
+		if err != nil {
+			logger.Error("Docker runtime setup failed", "error", err)
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+				Error:              err.Error(),
+				HelperVersion:      updaterhelper.HelperVersion,
+				ProtocolVersion:    updaterhelper.ProtocolVersion,
+				DockerAvailable:    status.Available,
+				DockerActive:       status.Active,
+				DockerVersion:      status.Version,
+				DockerNetworkReady: status.NetworkReady,
+				DockerError:        status.Error,
+			})
+			return
+		}
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+			OK:                 true,
+			Message:            "Docker runtime ready",
+			HelperVersion:      updaterhelper.HelperVersion,
+			ProtocolVersion:    updaterhelper.ProtocolVersion,
+			DockerAvailable:    status.Available,
+			DockerActive:       status.Active,
+			DockerVersion:      status.Version,
+			DockerNetworkReady: status.NetworkReady,
+		})
+		return
+	}
+	if strings.HasPrefix(request.Operation, "docker.module.") {
+		_ = conn.SetDeadline(time.Now().Add(31 * time.Minute))
+		ctx, cancel := context.WithTimeout(parent, 30*time.Minute)
+		defer cancel()
+		status, message, err := performDockerModuleOperation(ctx, request, uid, gid)
+		if err != nil {
+			logger.Error("Docker module operation failed", "operation", request.Operation, "module_id", request.ModuleID, "error", err)
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})
+			return
+		}
+		logger.Info("Docker module operation completed", "operation", request.Operation, "module_id", request.ModuleID, "state", status.State)
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+			OK:          true,
+			Message:     message,
+			ModuleState: status.State,
+			ContainerID: status.ContainerID,
 		})
 		return
 	}
@@ -223,21 +300,6 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 			return
 		}
 		logger.Info("storage operation completed", "operation", request.Operation, "device", request.Device)
-		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{OK: true, Message: message})
-		return
-	}
-
-	if strings.HasPrefix(request.Operation, "nvr.") {
-		_ = conn.SetDeadline(time.Now().Add(12 * time.Minute))
-		ctx, cancel := context.WithTimeout(parent, 10*time.Minute)
-		defer cancel()
-		message, err := performNVROperation(ctx, request)
-		if err != nil {
-			logger.Error("NVR operation failed", "operation", request.Operation, "error", err)
-			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})
-			return
-		}
-		logger.Info("NVR operation completed", "operation", request.Operation)
 		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{OK: true, Message: message})
 		return
 	}

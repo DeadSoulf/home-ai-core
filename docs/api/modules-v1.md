@@ -1,6 +1,6 @@
 # Module Registry API v1
 
-Phase 7 exposes read-only module metadata. Installation and update mutations are intentionally deferred to Phase 9.
+The API version remains v1 while the active external module manifest is **Manifest v2**.
 
 ## List modules
 
@@ -9,8 +9,6 @@ GET /api/v1/modules
 ```
 
 Requires `modules.read`.
-
-Returns persisted module manifests and registry status.
 
 ## Read one module
 
@@ -28,30 +26,59 @@ GET /api/v1/modules/capabilities
 
 Requires `modules.read`.
 
-The response contains currently visible platform capabilities.
+The capability set may include `host.docker` when the Docker Engine socket is present, along with generic host architecture/system capabilities.
 
-Initial host capabilities may include:
+## Install a module
 
-- `host.linux`
-- `host.arch.amd64`
-- `host.arch.arm64`
-- `host.systemd`
-- `host.kvm`
-- `host.gpu`
+```text
+POST /api/v1/modules/install
+Content-Type: application/json
+```
 
-Registered modules may add capabilities declared in their manifests.
+Requires `modules.manage` and CSRF protection for cookie-authenticated requests.
 
-Disabled/error modules do not contribute provided capabilities.
+The body is a complete Manifest v2 object. Core validates it and returns `202 Accepted` with a Job record. The Job Engine performs the Docker pull/create/start operation through the privileged helper.
 
-Capability names are discovery metadata, not permission grants.
+Images must be immutable digest references.
+
+## Control a module
+
+```text
+POST /api/v1/modules/{module_id}/control
+Content-Type: application/json
+```
+
+Body:
+
+```json
+{"operation":"enable"}
+```
+
+Allowed operations:
+
+- `enable`
+- `disable`
+- `restart`
+
+The endpoint returns a queued Job.
+
+## Remove a module
+
+```text
+DELETE /api/v1/modules/{module_id}
+```
+
+Requires `modules.manage` and CSRF protection.
+
+Removal deletes the managed container and registry entry. Persistent module data under `/var/lib/home-ai-core/modules/<module-id>` is intentionally preserved.
 
 ## Registry status
 
-Phase 7 understands these descriptive statuses:
+Persisted statuses are:
 
 - `registered`
 - `enabled`
 - `disabled`
 - `error`
 
-A registry entry does not prove that a remote package has been downloaded, verified or installed. Package provenance and lifecycle mutations are Phase 9 responsibilities.
+All lifecycle mutations are auditable and run through the Job Engine.

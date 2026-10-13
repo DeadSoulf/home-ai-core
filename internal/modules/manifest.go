@@ -7,6 +7,7 @@ type Manifest struct {
 	Description   string           `json:"description,omitempty"`
 	Version       string           `json:"version"`
 	Core          string           `json:"core"`
+	Runtime       RuntimeSpec      `json:"runtime"`
 	Dependencies  []Dependency     `json:"dependencies,omitempty"`
 	Conflicts     []string         `json:"conflicts,omitempty"`
 	Permissions   []string         `json:"permissions,omitempty"`
@@ -16,6 +17,21 @@ type Manifest struct {
 	Events        EventContract    `json:"events,omitempty"`
 	UI            UIContract       `json:"ui,omitempty"`
 	Lifecycle     []string         `json:"lifecycle"`
+}
+
+type RuntimeSpec struct {
+	Type   string     `json:"type"`
+	Docker DockerSpec `json:"docker"`
+	Health HealthSpec `json:"health,omitempty"`
+}
+
+type DockerSpec struct {
+	Image string `json:"image"`
+}
+
+type HealthSpec struct {
+	Port int    `json:"port,omitempty"`
+	Path string `json:"path,omitempty"`
 }
 
 type Dependency struct {
@@ -30,7 +46,6 @@ type Capabilities struct {
 
 type HostRequirements struct {
 	Architectures []string `json:"architectures,omitempty"`
-	Packages      []string `json:"packages,omitempty"`
 }
 
 type APIContribution struct {

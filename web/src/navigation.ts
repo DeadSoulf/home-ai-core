@@ -18,7 +18,6 @@ export const navigationGroups: NavigationGroup[] = [
     { path: "/system", label: "system", permission: "system.read" },
   ] },
   { label: "serviceGroup", items: [
-    { path: "/ai", label: "aiAgent", permission: "security.self.read", moduleId: "ai.agent" },
     { path: "/files", label: "files", permission: "security.self.read" },
     { path: "/modules", label: "modules", permission: "modules.read" },
   ] },
@@ -44,9 +43,6 @@ function dynamicModuleItems(modules?: ModuleNavigationState[]): NavigationItem[]
     .filter((module) => module.status === "enabled")
     .flatMap((module) => (module.items || []).map((item) => ({
       path: item.route,
-      label: module.module_id === "ai.cloud"
-        ? ("cloudAI" as StringKey)
-        : undefined,
       title: item.title,
       permission: "security.self.read",
       moduleId: module.module_id,
@@ -72,7 +68,7 @@ export function visibleNavigation(actor: Actor, modules?: ModuleNavigationState[
   }).filter((group) => group.items.length > 0);
 }
 
-export const systemSections = ["equipment", "storage", "network", "updates"] as const;
+export const systemSections = ["equipment", "storage", "network", "updates", "console"] as const;
 export type SystemSection = typeof systemSections[number];
 
 export const fileSections = ["folders", "storage", "windows"] as const;
@@ -114,6 +110,7 @@ export function accessiblePath(actor: Actor, path: string, modules?: ModuleNavig
   if (route === "/system") {
     const section = systemSection(path);
     if (section === "updates" && !hasPermission(actor, "updates.read")) return route;
+    if (section === "console" && !hasPermission(actor, "system.console")) return route;
     return route + "#" + section;
   }
   return route;

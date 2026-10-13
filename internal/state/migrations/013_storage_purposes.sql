@@ -1,7 +1,7 @@
 CREATE TABLE storage_purposes (
     device_path TEXT PRIMARY KEY,
     filesystem_uuid TEXT NOT NULL DEFAULT '',
-    purpose TEXT NOT NULL CHECK (purpose IN ('files', 'video')),
+    purpose TEXT NOT NULL CHECK (purpose = 'files'),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );

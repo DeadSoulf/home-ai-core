@@ -63,21 +63,6 @@ describe("navigation access", () => {
     }
   });
 
-  it("hides disabled module navigation and keeps Cloud AI out of the main menu", () => {
-    const reader = actor(allReads);
-    const modules = [
-      {module_id: "ai.agent", status: "disabled" as const},
-      {module_id: "ai.cloud", status: "enabled" as const, items: []},
-    ];
-    const paths = visibleNavigation(reader, modules).flatMap((group) => group.items.map((item) => item.path));
-    expect(paths).not.toContain("/ai");
-    expect(paths).not.toContain("/modules/ai.cloud");
-    expect(accessiblePath(reader, "/ai", modules)).toBe("/");
-    expect(accessiblePath(reader, "/modules/ai.cloud", modules)).toBe("/");
-  });
-
-
-
   it("does not infer access from owner role or a similar permission name", () => {
     const restrictedOwner = actor(["system.read.extra", "updates.manage"]);
     expect(hasPermission(restrictedOwner, "system.read")).toBe(false);

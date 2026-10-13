@@ -25,6 +25,9 @@ func DiscoverHostCapabilities() []string {
 	if fileExists("/dev/kvm") {
 		capabilities["host.kvm"] = struct{}{}
 	}
+	if socketExists("/run/docker.sock") {
+		capabilities["host.docker"] = struct{}{}
+	}
 	if cards, _ := filepath.Glob("/sys/class/drm/card[0-9]*"); len(cards) > 0 {
 		capabilities["host.gpu"] = struct{}{}
 	}
@@ -72,4 +75,9 @@ func directoryExists(path string) bool {
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
+}
+
+func socketExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.Mode()&os.ModeSocket != 0
 }

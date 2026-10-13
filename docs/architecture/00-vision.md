@@ -1,6 +1,6 @@
 # Home-AI-Core — Architecture Vision
 
-Home-AI-Core is the trusted control-plane foundation of the Home-AI product.
+Home-AI-Core is the trusted control-plane foundation of Home-AI.
 
 The canonical product requirements are defined in `../PRODUCT_VISION.md`.
 
@@ -10,46 +10,29 @@ The canonical product requirements are defined in `../PRODUCT_VISION.md`.
 Debian
   |
 Home-AI-Core
-  |
   +-- Identity / Security / Policy / Audit
   +-- State / Jobs / Events / Realtime
-  +-- Module Registry / Update Manager
+  +-- Module Registry / Core Update Manager
   +-- Hardware / Node Capability Inventory
-  +-- Web UI
+  +-- Storage / Network foundation
+  +-- Web UI shell
   |
-  +-- Home-AI Modules
-       +-- File Storage / NAS
-       +-- Smart Home
-       +-- Cameras / NVR
-       +-- AI Runtime / AI Agent
-       +-- Voice
-       +-- Remote Access / WireGuard
-       +-- Client Sync
-       +-- Cluster
+  +-- Docker Module Runtime
+       +-- external module
+       +-- external module
+       +-- external module
 ```
-
-## Architectural goal
-
-A single Home-AI installation starts on one Debian server but can later grow into several trusted nodes while remaining one logical home system.
-
-The product must remain locally operable without mandatory cloud services.
 
 ## Core boundary
 
-Core contains shared trusted contracts and orchestration.
+Core contains shared trusted contracts and orchestration only.
 
-Core should not permanently absorb product-specific NVR, NAS, Smart Home or model-inference business logic.
+Functional workloads are separate modules. They have independent repositories, images, versions, state and lifecycle. Core must not absorb module-specific business logic or runtime dependencies.
 
-Those domains use Core identity, permissions, jobs, events, audit and module/update contracts.
+## Privilege boundary
 
-## AI boundary
+The network-facing Core remains unprivileged. It does not receive the Docker socket. Privileged host/container operations are delegated to the restricted helper through explicit validated operations.
 
-The AI Agent is powerful but is not a security bypass.
+## Growth
 
-AI actions execute through the same permission and approval system used by other clients and are auditable.
-
-## Cluster boundary
-
-Single-node operation is the first implementation target.
-
-APIs and resource identity should avoid assumptions that prevent later node enrollment, resource advertisement, workload scheduling and failover.
+Single-node operation is the first target. Stable resource identity and module contracts should allow future multi-node orchestration without replacing the security model.

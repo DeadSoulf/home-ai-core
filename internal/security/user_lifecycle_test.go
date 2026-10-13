@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
-	"os"
 	"strings"
 	"testing"
 )
@@ -23,11 +22,7 @@ func lifecycleFixture(t *testing.T) (context.Context, *Service, AuthResult) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	token, err := os.ReadFile(service.BootstrapTokenPath())
-	if err != nil {
-		t.Fatal(err)
-	}
-	login, err := service.Bootstrap(ctx, string(token), "owner", "Owner", "initial correct password", RequestContext{})
+	login, err := service.Bootstrap(ctx, "owner", "Owner", "initial correct password", RequestContext{})
 	if err != nil {
 		t.Fatal(err)
 	}

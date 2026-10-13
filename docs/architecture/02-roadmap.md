@@ -1,186 +1,83 @@
 # Home-AI Development Roadmap
 
-This roadmap follows the canonical product direction in `../PRODUCT_VISION.md`.
+## F0 — Core Foundation — complete
 
-Earlier foundation phases produced useful Core capabilities. Generic container/virtualization management is no longer on the critical path.
-
-## F0 — Core Foundation — mostly complete
-
-Implemented foundation:
+Foundation includes:
 
 - Core daemon/API;
 - node identity;
-- SQLite state + migrations;
-- authentication/sessions;
-- RBAC/CSRF/audit;
-- jobs;
-- durable events;
-- WebSocket realtime;
-- Module SDK/registry/dependency planning;
-- signed module repository foundation;
-- Web UI shell;
-- hardware/system discovery;
-- low-level storage;
+- SQLite state/migrations;
+- authentication, sessions and RBAC;
+- CSRF and audit;
+- jobs and durable events;
+- realtime transport;
+- Module Registry / SDK;
+- system and hardware discovery;
+- storage/network foundation;
 - privileged helper;
-- Web update system + rollback capability;
+- Web UI shell;
+- Core update/rollback;
+- Debian installer;
+- Windows file client;
 - CI/release pipelines.
 
-### Remaining F0 hardening
+## F1 — Core cleanup — active
 
-- split oversized privileged updater/storage helper implementation;
-- live rollback acceptance test;
-- extend permission model toward resource scopes;
-- stable signed release-channel design;
-- failure testing.
+- remove embedded product implementations;
+- remove product-specific API/Web/config/state;
+- remove product-only host dependencies;
+- preserve only generic Module Registry/SDK contracts;
+- clean existing installations during upgrade.
 
-## F1 — File Storage / NAS
+## F2 — Docker Module Runtime
 
-Build the first major user-facing product domain on the existing storage foundation.
+- install Docker on supported Debian hosts;
+- detect `host.docker`;
+- privileged helper operations for image/container lifecycle;
+- no Docker socket access from Core;
+- dedicated network and persistent data layout;
+- health/status/log collection;
+- resource/mount/device policy.
 
-- pools/volumes;
-- private per-user folders;
-- shared folders;
-- Web file manager;
-- SMB;
-- NFS where required;
-- quotas/policies;
-- snapshots/backup capabilities where supported;
-- storage health/capacity UX.
+## F3 — Module Manifest v2
 
-## F2 — Native Smart Home
+- container image and immutable digest;
+- supported architectures;
+- Core compatibility;
+- declared capabilities;
+- API/UI contribution metadata;
+- volumes/mounts;
+- network/ports;
+- device requirements;
+- health checks;
+- upgrade/rollback metadata.
 
-Home-AI owns its smart-home data model and automation engine.
+## F4 — Module lifecycle
 
-- device/entity/state model;
-- rooms/zones;
-- discovery and pairing;
-- Zigbee module;
-- Matter/Thread module;
-- MQTT module;
-- Wi-Fi/LAN integrations;
-- Bluetooth integrations;
-- Modbus;
-- scenes;
-- schedules;
-- automation/rule engine;
-- notification/event integration;
-- resource-scoped permissions and audit.
+- discover;
+- install;
+- start/enable;
+- stop/disable;
+- restart;
+- update;
+- rollback where supported;
+- remove;
+- logs/status.
 
-A future compatibility bridge to other systems is optional; Home Assistant is not the platform foundation.
+## F5 — First external module
 
-## F3 — Cameras / NVR
+Create the first real functional module in its own repository and Docker image. Its code and domain database must not be copied back into Core.
 
-- camera entities;
-- RTSP ingest;
-- ONVIF where useful;
-- live view;
-- recording;
-- timeline/archive;
-- configurable recording storage allocation;
-- oldest-first overwrite/retention;
-- protected recordings;
-- motion/object events;
-- AI vision integration points;
-- known-person database and face recognition when hardware permits.
+## F6 — Distribution hardening
 
-## F4 — Local AI Runtime and Agent
+- signed module metadata;
+- image provenance and digest pinning;
+- compatibility checks;
+- permission/capability review;
+- backup/restore contracts;
+- failure recovery;
+- release channels.
 
-### Runtime
+## Rule
 
-- local LLM adapters;
-- multimodal/vision adapters;
-- GPU/accelerator placement hints;
-- model lifecycle/storage;
-- resource limits.
-
-### Agent
-
-- tool registry;
-- permission-derived tool access;
-- approval workflow;
-- user/home context;
-- memory;
-- file search;
-- NVR search;
-- Smart Home control;
-- server diagnostics;
-- automation proposals;
-- self-improvement proposals;
-- versioned/audited/reversible AI-driven changes;
-- optional external AI providers.
-
-## F5 — Voice
-
-- microphone terminal identity;
-- wake word;
-- STT;
-- user/context resolution;
-- AI Agent request;
-- permission/approval;
-- TTS.
-
-## F6 — Remote Access and Client File Transfer
-
-### WireGuard
-
-- owner-controlled secure tunnel;
-- device enrollment and revocation;
-- service exposure policy.
-
-### Windows client
-
-- copy selected files to allowed Home-AI folders;
-- resumable upload;
-- integrity verification;
-- LAN/remote operation;
-- scheduling/automatic copy when enabled.
-
-Android follows after the server API is stable.
-
-## F7 — Multi-node Foundation
-
-- secure node enrollment;
-- authenticated/encrypted trust;
-- heartbeats;
-- node/resource inventory;
-- CPU/RAM/GPU/storage capability advertisement;
-- workload requirement model;
-- storage/locality metadata;
-- degraded operation.
-
-## F8 — Distributed Scheduling and Failover
-
-- scheduler;
-- placement of movable workloads;
-- AI/video processing distribution;
-- capacity accounting;
-- affinity/locality;
-- node-bound resource handling;
-- reassignment after failure where possible;
-- cluster-wide Web view.
-
-Cluster leader/control-state architecture is intentionally deferred until requirements are validated; current APIs must not force a permanent single-master model.
-
-## F9 — Production / Commercial Hardening
-
-- stable/dev channels;
-- signed release manifests/artifacts;
-- permission/security review;
-- backup/recovery validation;
-- multi-node failure tests;
-- NVR/storage long-duration tests;
-- AI approval/audit tests;
-- licensing/provenance audit;
-- documentation;
-- installer/recovery UX.
-
-## Parked optional capabilities
-
-These may be implemented later if there is a real Home-AI use case:
-
-- generic container management;
-- generic third-party app marketplace;
-- KVM/VM management;
-- iOS client.
-
-They must not block NAS, Smart Home, NVR, AI, Voice or Cluster development.
+New product functionality is implemented as a module only after the generic Docker runtime is stable.

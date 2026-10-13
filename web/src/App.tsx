@@ -6,7 +6,6 @@ import { useI18n } from "./i18n";
 import { accessiblePath, fileSection, fileSectionPath, systemSection } from "./navigation";
 import { FirstRunPage, LoginPage } from "./pages/Auth";
 import { AccountPage } from "./pages/Account";
-import { AIPage } from "./pages/AI";
 import { AuditPage } from "./pages/Audit";
 import { Dashboard } from "./pages/Dashboard";
 import { FilesPage } from "./pages/Files";
@@ -19,15 +18,12 @@ type Phase = "loading" | "setup" | "login" | "app";
 
 function currentPath(): string {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
-  const known = ["/", "/ai", "/files", "/files/storage", "/files/windows", "/system", "/modules", "/jobs", "/audit", "/users", "/account"];
+  const known = ["/", "/files", "/files/storage", "/files/windows", "/system", "/modules", "/jobs", "/audit", "/users", "/account"];
   const moduleRoute = /^\/modules\/[a-z][a-z0-9.-]*$/.test(path);
   if (!known.includes(path) && !moduleRoute) return "/";
   return path + (path === "/system" || path === "/files" ? window.location.hash : "");
 }
 
-export function keepAIPageMounted(wasMounted: boolean, path: string): boolean {
-  return wasMounted || path.split("#")[0] === "/ai";
-}
 
 export default function App() {
   const {t} = useI18n();
@@ -38,7 +34,6 @@ export default function App() {
   const [revision, setRevision] = useState(0);
   const [availableUpdate, setAvailableUpdate] = useState<string>();
   const [moduleNavigation, setModuleNavigation] = useState<ModuleNavigationState[]>();
-  const [aiMounted, setAIMounted] = useState(() => currentPath().split("#")[0] === "/ai");
 
   useEffect(() => {
     api.setupStatus()
@@ -93,11 +88,11 @@ export default function App() {
     }
     let stopped = false;
     let checking = false;
-    const check = async () => {
+    const check = async (fresh = false) => {
       if (checking) return;
       checking = true;
       try {
-        const result = await api.updateStatus();
+        const result = await api.updateStatus(fresh);
         if (!stopped) {
           setAvailableUpdate(result.available ? result.available_version : undefined);
         }
@@ -108,15 +103,15 @@ export default function App() {
       }
     };
     const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") void check();
+      if (document.visibilityState === "visible") void check(false);
     };
     const updateStatusEvent = (event: Event) => {
       const detail = (event as CustomEvent<string | undefined>).detail;
       setAvailableUpdate(detail || undefined);
     };
 
-    void check();
-    const timer = window.setInterval(check, 5 * 60 * 1000);
+    void check(true);
+    const timer = window.setInterval(() => { void check(true); }, 5 * 60 * 1000);
     window.addEventListener("focus", refreshWhenVisible);
     document.addEventListener("visibilitychange", refreshWhenVisible);
     window.addEventListener("home-ai-core:update-status", updateStatusEvent);
@@ -161,13 +156,6 @@ export default function App() {
     }
   }, [phase, actor, path, moduleNavigation]);
 
-  useEffect(() => {
-    if (phase !== "app" || !actor || !moduleNavigation) return;
-    const allowedPath = accessiblePath(actor, path, moduleNavigation);
-    if (allowedPath.split("#")[0] === "/ai") {
-      setAIMounted(true);
-    }
-  }, [phase, actor, path, moduleNavigation]);
 
   const authenticated = (nextActor: Actor) => {
     setActor(nextActor);
@@ -209,11 +197,6 @@ export default function App() {
   const allowedPath = accessiblePath(actor, path, moduleNavigation);
   let page;
   switch (allowedPath.split("#")[0]) {
-    case "/ai":
-      // AIPage is mounted separately and kept alive after the first visit so
-      // in-flight model requests and the visible chat state survive navigation.
-      page = null;
-      break;
     case "/account":
       page = accountPage;
       break;
@@ -243,6 +226,7 @@ export default function App() {
             canManageStorage={has("storage.manage")}
             canReadNetwork={has("network.read")}
             canManageNetwork={has("network.manage")}
+            canUseConsole={has("system.console")}
           />
         )
         : accountPage;
@@ -267,13 +251,10 @@ export default function App() {
       page = dashboardAllowed ? <Dashboard actor={actor} revision={revision} onNavigate={navigate} /> : accountPage;
   }
 
-  const aiVisible = allowedPath.split("#")[0] === "/ai";
-  const mountAI = keepAIPageMounted(aiMounted, allowedPath);
 
   return (
     <Shell actor={actor} path={allowedPath} realtime={realtime} availableUpdate={availableUpdate} modules={moduleNavigation} onNavigate={navigate} onLogout={logout}>
-      {mountAI && <div hidden={!aiVisible}><AIPage /></div>}
-      {!aiVisible && page}
+      {page}
     </Shell>
   );
 }
