@@ -232,6 +232,7 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 			Message:     message,
 			ModuleState: status.State,
 			ContainerID: status.ContainerID,
+			ModuleIP:    status.IP,
 		})
 		return
 	}
