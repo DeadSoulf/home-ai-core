@@ -3,7 +3,6 @@ package modules
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 
 	"github.com/DeadSoulf/home-ai-core/internal/state"
@@ -62,61 +61,90 @@ func TestInstallManifestRejectsReplacementWithoutMutatingRegistration(t *testing
 	}
 }
 
-func TestInstallManifestHelperFailureCreatesNoGhostRegistration(t *testing.T) {
+func TestInstallManifestFailureRetainsRecoverableIntent(t *testing.T) {
 	ctx := context.Background()
 	store, err := state.Open(ctx, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer store.Close()
-
 	registry := NewRegistry(store, "0.1.172-dev")
-	failure := errors.New("Docker start failed")
+	manifest := validManifest("demo", "1.0.0")
+	failure := errors.New("lost helper reply")
 	registry.helper = func(context.Context, string, string, string) (helperModuleResult, error) {
 		return helperModuleResult{}, failure
 	}
-	_, err = registry.InstallManifest(ctx, validManifest("demo", "1.0.0"))
-	if !errors.Is(err, failure) {
-		t.Fatalf("install error = %v, want runtime error", err)
+	if _, err := registry.InstallManifest(ctx, manifest); !errors.Is(err, failure) {
+		t.Fatal(err)
 	}
-	if _, err := store.Module(ctx, "demo"); !errors.Is(err, state.ErrModuleNotFound) {
-		t.Fatalf("failed install persisted a ghost module: %v", err)
+	pending, err := registry.Get(ctx, "demo")
+	if err != nil || pending.Status != "registered" || pending.Manifest.Version != "1.0.0" {
+		t.Fatalf("missing durable intent %#v %v", pending, err)
+	}
+	// A new Core instance resumes exactly that manifest after a process crash.
+	recovered := NewRegistry(store, "0.1.172-dev")
+	recovered.helper = func(context.Context, string, string, string) (helperModuleResult, error) {
+		return helperModuleResult{State: "running"}, nil
+	}
+	ready, err := recovered.InstallManifest(ctx, manifest)
+	if err != nil || ready.Status != "enabled" {
+		t.Fatalf("resume failed %#v %v", ready, err)
+	}
+	if _, err := recovered.InstallManifest(ctx, manifest); err != nil {
+		t.Fatalf("completed install replay is not idempotent: %v", err)
 	}
 }
 
-func TestInstallManifestStateFailureCompensatesRuntime(t *testing.T) {
-	for _, failurePoint := range []string{"upsert", "enabled"} {
-		t.Run(failurePoint, func(t *testing.T) {
-			ctx := context.Background()
-			underlying, err := state.Open(ctx, t.TempDir())
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer underlying.Close()
-			store := &brokenModuleStore{Store: underlying}
-			failure := errors.New("simulated SQLite failure")
-			if failurePoint == "upsert" {
-				store.upsertErr = failure
-			} else {
-				store.statusErr = failure
-			}
-			registry := NewRegistry(store, "0.1.172-dev")
-			operations := []string{}
-			registry.helper = func(_ context.Context, operation, _, _ string) (helperModuleResult, error) {
-				operations = append(operations, operation)
-				return helperModuleResult{State: "running"}, nil
-			}
-			_, err = registry.InstallManifest(ctx, validManifest("demo", "1.0.0"))
-			if !errors.Is(err, failure) {
-				t.Fatalf("install error = %v, want SQLite failure", err)
-			}
-			if strings.Join(operations, ",") != "docker.module.install,docker.module.remove" {
-				t.Fatalf("expected compensating removal; operations = %#v", operations)
-			}
-			if _, err := underlying.Module(ctx, "demo"); !errors.Is(err, state.ErrModuleNotFound) {
-				t.Fatalf("failed registration was not cleaned up: %v", err)
-			}
-		})
+func TestInstallManifestStateFailureRetainsIntent(t *testing.T) {
+	ctx := context.Background()
+	db, err := state.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	failure := errors.New("simulated SQLite failure")
+	store := &brokenModuleStore{Store: db, upsertErr: failure}
+	registry := NewRegistry(store, "0.1.172-dev")
+	calls := 0
+	registry.helper = func(context.Context, string, string, string) (helperModuleResult, error) {
+		calls++
+		return helperModuleResult{State: "running"}, nil
+	}
+	manifest := validManifest("demo", "1.0.0")
+	if _, err := registry.InstallManifest(ctx, manifest); !errors.Is(err, failure) || calls != 0 {
+		t.Fatalf("side effects preceded durable intent: %v calls=%d", err, calls)
+	}
+	store.upsertErr = nil
+	store.statusErr = failure
+	if _, err := registry.InstallManifest(ctx, manifest); !errors.Is(err, failure) {
+		t.Fatal(err)
+	}
+	pending, err := db.Module(ctx, "demo")
+	if err != nil || pending.Status != "registered" {
+		t.Fatal("lost pending record")
+	}
+	store.statusErr = nil
+	if _, err := registry.InstallManifest(ctx, manifest); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPendingInstallAdvertisesNoCapabilities(t *testing.T) {
+	ctx := context.Background()
+	db, err := state.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	manifest := validManifest("demo", "1.0.0")
+	manifest.Capabilities.Provides = []string{"demo.ready"}
+	persistManifest(t, db, manifest, "registered")
+	values, err := NewRegistry(db).Capabilities(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if contains(values, "demo.ready") {
+		t.Fatal("unfinished install advertised a running capability")
 	}
 }
 

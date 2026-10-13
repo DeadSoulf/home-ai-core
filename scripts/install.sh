@@ -88,7 +88,7 @@ systemctl enable --now home-ai-core.service home-ai-core-updater.service
 
 echo "Checking Home-AI-Core..."
 i=0
-until curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1; do
+until curl --cacert "${HOME_AI_CA_FILE:-/var/lib/home-ai-core/tls/server.crt}" -fsS https://127.0.0.1:82/health >/dev/null 2>&1; do
   i=$((i + 1))
   if [ "$i" -ge 30 ]; then
     echo "Home-AI-Core did not become healthy" >&2
@@ -107,13 +107,18 @@ for address in $(hostname -I 2>/dev/null || true); do
     *:*) ;;
     127.*) ;;
     *)
-      echo "  http://$address:8080/"
+      echo "  https://$address:82/"
       found=1
       ;;
   esac
 done
 if [ "$found" -eq 0 ]; then
-  echo "  http://<SERVER-IP>:8080/"
+  echo "  https://<SERVER-IP>:82/"
 fi
 echo
 echo "Create the first owner account in the browser."
+
+echo "HTTPS certificate: /var/lib/home-ai-core/tls/server.crt"
+echo "Verify its SHA-256 fingerprint from the server console before trusting it on clients."
+echo "First-owner setup code (read locally only): sudo cat /var/lib/home-ai-core/bootstrap-token"
+echo "Signed updates require an administrator-provisioned Ed25519 public key: /etc/home-ai-core/update-trusted.pub"

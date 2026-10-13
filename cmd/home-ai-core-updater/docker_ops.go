@@ -16,7 +16,7 @@ const (
 )
 
 // Kept configurable for filesystem-isolated runtime tests.
-var moduleDataRoot = "/var/lib/home-ai-core/modules"
+var moduleDataRoot = "/var/lib/home-ai-modules"
 
 type dockerRuntimeStatus struct {
 	Available    bool

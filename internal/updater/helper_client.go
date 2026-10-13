@@ -73,7 +73,7 @@ func callUpdaterHelper(ctx context.Context, currentVersion, version string) erro
 		return err
 	}
 
-	conn, closeConn, err := dialUpdaterHelper(ctx)
+	conn, closeConn, err := dialUpdaterHelperWithTimeout(ctx, 5*time.Minute)
 	if err != nil {
 		return err
 	}
@@ -141,11 +141,15 @@ func callUpdaterRollback(ctx context.Context) (string, error) {
 // dialUpdaterHelper bounds every IPC exchange, not only the initial socket dial.
 // DialContext alone does not interrupt JSON reads after the connection succeeds.
 func dialUpdaterHelper(ctx context.Context) (net.Conn, func(), error) {
+	return dialUpdaterHelperWithTimeout(ctx, updaterHelperIOTimeout)
+}
+
+func dialUpdaterHelperWithTimeout(ctx context.Context, timeout time.Duration) (net.Conn, func(), error) {
 	conn, err := (&net.Dialer{}).DialContext(ctx, "unix", updaterSocketPath)
 	if err != nil {
 		return nil, nil, err
 	}
-	closeConn, err := protectUpdaterHelperConn(ctx, conn, updaterHelperIOTimeout)
+	closeConn, err := protectUpdaterHelperConn(ctx, conn, timeout)
 	if err != nil {
 		return nil, nil, err
 	}

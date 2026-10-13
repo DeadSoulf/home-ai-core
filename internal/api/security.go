@@ -22,6 +22,7 @@ const (
 
 type SecurityService interface {
 	Initialized(context.Context) (bool, error)
+	CheckBootstrapToken(context.Context, string) error
 	Bootstrap(context.Context, string, string, string, security.RequestContext) (security.AuthResult, error)
 	Login(context.Context, string, string, security.RequestContext) (security.AuthResult, error)
 	Authenticate(context.Context, string) (security.Actor, error)
@@ -46,7 +47,8 @@ func (s *server) setupStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"initialized": initialized,
+		"initialized":              initialized,
+		"bootstrap_token_required": !initialized,
 	})
 }
 
@@ -61,10 +63,11 @@ func (s *server) bootstrap(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var request struct {
-		Username    string `json:"username"`
-		DisplayName string `json:"display_name"`
-		Password    string `json:"password"`
-		SessionMode string `json:"session_mode,omitempty"`
+		BootstrapToken string `json:"bootstrap_token"`
+		Username       string `json:"username"`
+		DisplayName    string `json:"display_name"`
+		Password       string `json:"password"`
+		SessionMode    string `json:"session_mode,omitempty"`
 	}
 	if err := decodeJSON(w, r, &request); err != nil {
 		writeAPIError(w, r, http.StatusBadRequest, "invalid_request", err.Error(), nil)
@@ -77,6 +80,17 @@ func (s *server) bootstrap(w http.ResponseWriter, r *http.Request) {
 	}
 	request.SessionMode = mode
 
+	if err := s.security.CheckBootstrapToken(r.Context(), request.BootstrapToken); err != nil {
+		switch {
+		case errors.Is(err, security.ErrAlreadyInitialized):
+			writeAPIError(w, r, http.StatusConflict, "already_initialized", "security is already initialized", nil)
+		case errors.Is(err, security.ErrInvalidBootstrapToken):
+			writeAPIError(w, r, http.StatusForbidden, "invalid_bootstrap_token", security.ErrInvalidBootstrapToken.Error(), nil)
+		default:
+			writeAPIError(w, r, http.StatusServiceUnavailable, "setup_unavailable", "setup is unavailable", nil)
+		}
+		return
+	}
 	result, err := s.security.Bootstrap(
 		r.Context(),
 		request.Username,

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -53,7 +54,7 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 	} else {
 		// Control/remove must never install Docker or change host services.
 		status := inspectDockerRuntime(ctx)
-		if !status.Available || !status.Active || !status.NetworkReady {
+		if !moduleRuntimeAllows(request.Operation, status) {
 			return moduleContainerStatus{}, "", fmt.Errorf("Docker runtime is not ready: %s", status.Error)
 		}
 	}
@@ -89,13 +90,21 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 		}
 		// Never destroy a running module before a candidate has passed start,
 		// health and recovery checks. Transactional upgrades are a separate path.
-		return moduleContainerStatus{}, "", errors.New("module container already exists; in-place upgrade is disabled until rollback-safe replacement is implemented")
+		return resumeManagedModule(ctx, dockerPath, name, image)
 	}
 
 	if err := pullDockerModuleImage(ctx, dockerPath, image); err != nil {
 		return moduleContainerStatus{}, "", err
 	}
 
+	if moduleDataRoot == "/var/lib/home-ai-modules" {
+		legacy := filepath.Join("/var/lib/home-ai-core/modules", moduleID)
+		if _, err := os.Lstat(legacy); err == nil {
+			return moduleContainerStatus{}, "", errors.New("legacy module data exists; migrate it to the protected module data root before a new install (existing containers can still be resumed)")
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return moduleContainerStatus{}, "", err
+		}
+	}
 	dataDir := filepath.Join(moduleDataRoot, moduleID)
 	if err := os.MkdirAll(dataDir, 0o750); err != nil {
 		return moduleContainerStatus{}, "", fmt.Errorf("create module data directory: %w", err)
@@ -290,4 +299,66 @@ func cleanupFailedModuleStart(dockerPath, name string, cause error) error {
 		return errors.Join(cause, fmt.Errorf("remove failed module container: %s", commandError(output, err)))
 	}
 	return cause
+}
+
+// Stop/removal and compensation must remain available when only the bridge
+// network is broken. They still verify managed-container ownership below.
+func moduleRuntimeAllows(operation string, status dockerRuntimeStatus) bool {
+	if !status.Available || !status.Active {
+		return false
+	}
+	if operation == "docker.module.stop" || operation == "docker.module.remove" {
+		return true
+	}
+	return status.NetworkReady
+}
+
+func resumeManagedModule(ctx context.Context, dockerPath, name, image string) (moduleContainerStatus, string, error) {
+	output, err := exec.CommandContext(ctx, dockerPath, "inspect", "--format", "{{json .}}", name).CombinedOutput()
+	if err != nil {
+		return moduleContainerStatus{}, "", fmt.Errorf("inspect interrupted module: %s", commandError(output, err))
+	}
+	var info struct {
+		ID     string `json:"Id"`
+		Config struct {
+			Image string `json:"Image"`
+		} `json:"Config"`
+		State struct {
+			Status string `json:"Status"`
+			Health *struct {
+				Status string `json:"Status"`
+			} `json:"Health"`
+		} `json:"State"`
+	}
+	if err := json.Unmarshal(output, &info); err != nil {
+		return moduleContainerStatus{}, "", fmt.Errorf("invalid interrupted module state: %w", err)
+	}
+	if info.ID == "" || info.Config.Image != image {
+		return moduleContainerStatus{}, "", errors.New("existing managed container has a different image; in-place upgrade is disabled")
+	}
+	if info.State.Health != nil && info.State.Health.Status != "healthy" {
+		return moduleContainerStatus{}, "", errors.New("existing container is not healthy; repair or remove it before retrying")
+	}
+	switch info.State.Status {
+	case "running":
+	case "created", "exited":
+		if output, err := exec.CommandContext(ctx, dockerPath, "start", name).CombinedOutput(); err != nil {
+			return moduleContainerStatus{}, "", fmt.Errorf("resume module: %s", commandError(output, err))
+		}
+	default:
+		return moduleContainerStatus{}, "", fmt.Errorf("cannot adopt a module in state %q", info.State.Status)
+	}
+	select {
+	case <-ctx.Done():
+		return moduleContainerStatus{}, "", ctx.Err()
+	case <-time.After(300 * time.Millisecond):
+	}
+	status, err := inspectModuleContainer(ctx, dockerPath, name)
+	if err != nil {
+		return moduleContainerStatus{}, "", err
+	}
+	if status.State != "running" {
+		return moduleContainerStatus{}, "", fmt.Errorf("resumed module is not running (%s)", status.State)
+	}
+	return status, "same-image module installation recovered; persistent data preserved", nil
 }

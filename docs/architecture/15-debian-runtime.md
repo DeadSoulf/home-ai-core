@@ -39,7 +39,7 @@ The helper accepts only typed operations over a Unix socket and verifies the pee
 Core listens on:
 
 ```text
-127.0.0.1:8080
+127.0.0.1:82
 ```
 
 unless the administrator explicitly changes configuration.

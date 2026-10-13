@@ -351,13 +351,13 @@ func (s *Service) Download(ctx context.Context, version string) (State, error) {
 		s.failState(err)
 		return s.State(), err
 	}
-	if item.SignatureURL != "" {
-		if err := s.verifyChecksumSignatureFromURL(ctx, item.SignatureURL, checksumData); err != nil {
-			s.failState(err)
-			return s.State(), err
-		}
-	} else if requiresSignedUpdate(version) {
-		err := errors.New("stable update is missing required detached signature")
+	if item.SignatureURL == "" {
+		err := errors.New("update is missing its required Ed25519 signature")
+		s.failState(err)
+		return s.State(), err
+	}
+	signatureData, err := s.verifyChecksumSignatureFromURL(ctx, item.SignatureURL, checksumData)
+	if err != nil {
 		s.failState(err)
 		return s.State(), err
 	}
@@ -375,6 +375,16 @@ func (s *Service) Download(ctx context.Context, version string) (State, error) {
 		return s.State(), err
 	}
 
+	// The helper independently verifies these bytes; Core verification alone
+	// is not a privilege boundary. Persist alongside the archive for handoff.
+	if err := os.WriteFile(archivePath+".sha256", checksumData, 0o600); err != nil {
+		s.failState(err)
+		return s.State(), err
+	}
+	if err := os.WriteFile(archivePath+".sha256.sig", signatureData, 0o600); err != nil {
+		s.failState(err)
+		return s.State(), err
+	}
 	s.updateProgress(70, "Verifying update bundle")
 	preparedDir := filepath.Join(updateDir, "prepared-"+safeVersion(version))
 	if err := os.RemoveAll(preparedDir); err != nil {
@@ -721,7 +731,7 @@ func (s *Service) fetchChecksum(ctx context.Context, url, expectedFile string) (
 		return "", nil, err
 	}
 	fields := strings.Fields(string(data))
-	if len(fields) < 2 || strings.TrimPrefix(fields[1], "*") != expectedFile {
+	if len(fields) != 2 || strings.TrimPrefix(fields[1], "*") != expectedFile {
 		return "", nil, errors.New("invalid update checksum file")
 	}
 	hash := strings.ToLower(fields[0])
@@ -734,10 +744,7 @@ func (s *Service) fetchChecksum(ctx context.Context, url, expectedFile string) (
 	return hash, data, nil
 }
 
-func requiresSignedUpdate(version string) bool {
-	version = strings.ToLower(strings.TrimSpace(version))
-	return version != "" && !strings.Contains(version, "-dev")
-}
+func requiresSignedUpdate(_ string) bool { return true }
 
 func verifyChecksumSignature(checksumData, signatureData, publicKeyPEM []byte) error {
 	block, _ := pem.Decode(publicKeyPEM)
@@ -765,35 +772,35 @@ func verifyChecksumSignature(checksumData, signatureData, publicKeyPEM []byte) e
 	return nil
 }
 
-func (s *Service) verifyChecksumSignatureFromURL(ctx context.Context, url string, checksumData []byte) error {
+func (s *Service) verifyChecksumSignatureFromURL(ctx context.Context, url string, checksumData []byte) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	req.Header.Set("User-Agent", defaultUserAgent+"/"+s.currentVersion)
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("download update signature: %w", err)
+		return nil, fmt.Errorf("download update signature: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download update signature: HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("download update signature: HTTP %d", resp.StatusCode)
 	}
 	signatureData, err := io.ReadAll(io.LimitReader(resp.Body, maxSignatureBytes+1))
 	if err != nil {
-		return fmt.Errorf("read update signature: %w", err)
+		return nil, fmt.Errorf("read update signature: %w", err)
 	}
 	if len(signatureData) > maxSignatureBytes {
-		return errors.New("update signature exceeds maximum allowed size")
+		return nil, errors.New("update signature exceeds maximum allowed size")
 	}
 	publicKeyPEM, err := os.ReadFile(trustedUpdatePublicKeyPath)
 	if err != nil {
-		return fmt.Errorf("read trusted update public key: %w", err)
+		return nil, fmt.Errorf("read trusted update public key: %w", err)
 	}
 	if err := verifyChecksumSignature(checksumData, signatureData, publicKeyPEM); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return signatureData, nil
 }
 
 func (s *Service) downloadArchive(ctx context.Context, url, target string, expectedSize int64, expectedHash string) error {

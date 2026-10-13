@@ -36,13 +36,18 @@ func TestInstallDockerModuleDoesNotRemoveExistingContainer(t *testing.T) {
 	dir := t.TempDir()
 	logPath := filepath.Join(dir, "commands.log")
 	dockerPath := filepath.Join(dir, "docker")
-	script := "#!/bin/sh\n" +
-		"echo \"$*\" >> \"$HOME_AI_TEST_DOCKER_LOG\"\n" +
-		"case \"$1\" in\n" +
-		"  inspect) printf 'true|demo\\n'; exit 0;;\n" +
-		"  pull|rm|create|start) exit 89;;\n" +
-		"esac\n" +
-		"exit 1\n"
+	script := `#!/bin/sh
+printf '%s\n' "$*" >> "$HOME_AI_TEST_DOCKER_LOG"
+case "$1" in
+ inspect)
+  case "$*" in
+   *json*) echo '{"Id":"old-id","Config":{"Image":"other-image"},"State":{"Status":"running"}}';;
+   *) printf 'true|demo\n';;
+  esac; exit 0;;
+ pull|rm|create|start) exit 89;;
+esac
+exit 1
+`
 	if err := os.WriteFile(dockerPath, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}

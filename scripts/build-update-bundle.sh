@@ -53,7 +53,9 @@ chmod 0755 "$STAGE/bin/home-ai-core" "$STAGE/helper/home-ai-core-updater"
 find "$STAGE/web" -type d -exec chmod 0755 {} +
 find "$STAGE/web" -type f -exec chmod 0644 {} +
 
-STAGE="$STAGE" VERSION="$VERSION" ARCH="$ARCH" python3 - <<'PY'
+HELPER_PROTOCOL=$(sed -n 's/^const ProtocolVersion = \([0-9][0-9]*\)$/\1/p' "$ROOT/internal/updaterhelper/protocol.go")
+test -n "$HELPER_PROTOCOL"
+STAGE="$STAGE" VERSION="$VERSION" ARCH="$ARCH" HELPER_PROTOCOL="$HELPER_PROTOCOL" python3 - <<'PY'
 import hashlib
 import json
 import os
@@ -80,7 +82,7 @@ manifest = {
     "product": "home-ai-core",
     "version": version,
     "architecture": arch,
-    "helper_protocol": 7,
+    "helper_protocol": int(os.environ["HELPER_PROTOCOL"]),
     "helper_version": version,
     "files": files,
 }

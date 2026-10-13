@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/state"
@@ -117,9 +118,11 @@ type AuditEntry struct {
 }
 
 type Service struct {
-	store     *state.Store
-	dummyHash string
-	now       func() time.Time
+	bootstrapTokenPath string
+	bootstrapTokenHash string
+	store              *state.Store
+	dummyHash          string
+	now                func() time.Time
 }
 
 func New(ctx context.Context, store *state.Store, stateDir string) (*Service, error) {
@@ -135,6 +138,9 @@ func New(ctx context.Context, store *state.Store, stateDir string) (*Service, er
 	}
 
 	if err := store.CleanupExpiredSessions(ctx, service.now()); err != nil {
+		return nil, err
+	}
+	if err := service.initializeBootstrapToken(ctx, stateDir); err != nil {
 		return nil, err
 	}
 	return service, nil
@@ -189,6 +195,7 @@ func (s *Service) Bootstrap(
 	if err != nil {
 		return AuthResult{}, err
 	}
+	_ = os.Remove(s.bootstrapTokenPath)
 	s.audit(ctx, meta, Actor{Type: "user", ID: user.ID, Username: user.Username},
 		"security.bootstrap", "user", user.ID, "success", nil)
 	return result, nil

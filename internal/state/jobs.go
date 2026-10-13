@@ -282,22 +282,20 @@ func (s *Store) ClearTerminalJobs(ctx context.Context) (int64, error) {
 }
 
 func (s *Store) RecoverInterruptedJobs(ctx context.Context, nodeID string) (int64, error) {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
 	result, err := s.db.ExecContext(ctx, `
-		UPDATE jobs
-		SET status = 'queued',
-			started_at = NULL,
-			cancel_requested_at = NULL,
-			message = 'recovered after core restart'
-		WHERE node_id = ? AND status IN ('running', 'cancel_requested')
-	`, nodeID)
+  UPDATE jobs SET
+   status=CASE WHEN status='cancel_requested' THEN 'cancelled' WHEN type='module.install' THEN 'queued' ELSE 'failed' END,
+   error_code=CASE WHEN status='cancel_requested' THEN 'cancelled' WHEN type='module.install' THEN NULL ELSE 'interrupted' END,
+   error_message=CASE WHEN status='cancel_requested' THEN 'cancelled before Core restart' WHEN type='module.install' THEN NULL ELSE 'interrupted; verify the external result before retrying' END,
+   completed_at=CASE WHEN status='running' AND type='module.install' THEN NULL ELSE ? END,
+   started_at=CASE WHEN status='running' AND type='module.install' THEN NULL ELSE started_at END,
+   message=CASE WHEN status='running' AND type='module.install' THEN 'resuming an idempotent module installation' ELSE 'interrupted operation was not replayed automatically' END
+  WHERE node_id=? AND status IN ('running','cancel_requested')`, now, nodeID)
 	if err != nil {
 		return 0, fmt.Errorf("recover interrupted jobs: %w", err)
 	}
-	count, err := result.RowsAffected()
-	if err != nil {
-		return 0, fmt.Errorf("read recovered job count: %w", err)
-	}
-	return count, nil
+	return result.RowsAffected()
 }
 
 const jobSelect = `

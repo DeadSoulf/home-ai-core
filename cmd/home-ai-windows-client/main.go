@@ -61,7 +61,7 @@ type authFlags struct {
 }
 
 func addAuthFlags(fs *flag.FlagSet, flags *authFlags) {
-	fs.StringVar(&flags.server, "server", "", "Home-AI server URL, for example http://192.168.1.10:8080")
+	fs.StringVar(&flags.server, "server", "", "Home-AI server URL, for example https://192.168.1.10:82")
 	fs.StringVar(&flags.username, "username", "", "Home-AI username")
 }
 

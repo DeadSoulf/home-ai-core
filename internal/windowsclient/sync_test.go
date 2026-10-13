@@ -124,7 +124,7 @@ func TestSyncProfilePersistenceAndSchedule(t *testing.T) {
 	config := filepath.Join(t.TempDir(), "sync.json")
 
 	profile, err := AddSyncProfile(config, SyncProfileInput{
-		ServerURL:      "HTTP://Example.COM:80/",
+		ServerURL:      "HTTPS://Example.COM:443/",
 		Username:       "alice",
 		FolderID:       "nsf_test",
 		Source:         source,
@@ -135,7 +135,7 @@ func TestSyncProfilePersistenceAndSchedule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if profile.ServerURL != "http://example.com" || !profile.Enabled {
+	if profile.ServerURL != "https://example.com" || !profile.Enabled {
 		t.Fatalf("profile = %#v", profile)
 	}
 
@@ -195,7 +195,7 @@ func TestUpdateSyncProfilePreservesState(t *testing.T) {
 	config := filepath.Join(t.TempDir(), "sync.json")
 
 	profile, err := AddSyncProfile(config, SyncProfileInput{
-		ServerURL:      "http://example.com",
+		ServerURL:      "https://example.com",
 		Username:       "alice",
 		FolderID:       "nsf_old",
 		Source:         source,
@@ -249,9 +249,9 @@ func TestAddSyncProfileRejectsUnsafeConfiguration(t *testing.T) {
 	config := filepath.Join(t.TempDir(), "sync.json")
 
 	for _, input := range []SyncProfileInput{
-		{ServerURL: "http://example.com", Username: "alice", FolderID: "nsf", Source: source, Destination: "../escape", Every: time.Minute, ConflictPolicy: SyncConflictStop},
-		{ServerURL: "http://example.com", Username: "alice", FolderID: "nsf", Source: source, Destination: "safe", Every: time.Second, ConflictPolicy: SyncConflictStop},
-		{ServerURL: "http://example.com", Username: "alice", FolderID: "nsf", Source: source, Destination: "safe", Every: time.Minute, ConflictPolicy: "overwrite"},
+		{ServerURL: "https://example.com", Username: "alice", FolderID: "nsf", Source: source, Destination: "../escape", Every: time.Minute, ConflictPolicy: SyncConflictStop},
+		{ServerURL: "https://example.com", Username: "alice", FolderID: "nsf", Source: source, Destination: "safe", Every: time.Second, ConflictPolicy: SyncConflictStop},
+		{ServerURL: "https://example.com", Username: "alice", FolderID: "nsf", Source: source, Destination: "safe", Every: time.Minute, ConflictPolicy: "overwrite"},
 	} {
 		if _, err := AddSyncProfile(config, input); err == nil {
 			t.Fatalf("accepted unsafe sync input: %#v", input)
