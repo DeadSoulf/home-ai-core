@@ -75,12 +75,12 @@ export function QuickDiskSetup({disk, onChanged}: {disk: BlockNode; onChanged: (
         await api.storageOperation({operation: "preflight", device: disk.path});
         await api.storageOperation({
           operation: "partition.create", device: disk.path,
-          purpose: "files", dry_run: true,
+          purpose: "files", require_blank: true, dry_run: true,
         });
         setPhase(t("quickDiskCreating"));
         const created = await api.storageOperation({
           operation: "partition.create", device: disk.path,
-          purpose: "files", confirm: `CREATE ${disk.path}`,
+          purpose: "files", require_blank: true, confirm: `CREATE ${disk.path}`,
         });
         modified = true;
         if (!created.device) {
