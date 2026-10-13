@@ -74,3 +74,41 @@ func TestModuleControlDoesNotInstallMissingDocker(t *testing.T) {
 		t.Fatalf("missing Docker must cause a read-only failure, got %v", err)
 	}
 }
+
+func TestInstallDockerModuleRollsBackContainerThatExitsImmediately(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses a POSIX fake Docker CLI")
+	}
+	dir := t.TempDir()
+	logPath := filepath.Join(dir, "commands.log")
+	dockerPath := filepath.Join(dir, "docker")
+	script := `#!/bin/sh
+echo "$*" >> "$HOME_AI_TEST_DOCKER_LOG"
+case "$1" in
+  inspect)
+    case "$*" in
+      *State.Status*) printf 'fake-id|exited\n'; exit 0;;
+      *) echo 'Error: No such container' >&2; exit 1;;
+    esac;;
+  pull|start|rm) exit 0;;
+  create) echo 'fake-id'; exit 0;;
+esac
+exit 1
+`
+	if err := os.WriteFile(dockerPath, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("HOME_AI_TEST_DOCKER_LOG", logPath)
+	_, _, err := installDockerModule(context.Background(), "demo", "example.com/demo@sha256:"+strings.Repeat("a", 64), 1000, 1000)
+	if err == nil || !strings.Contains(err.Error(), "stopped during startup") {
+		t.Fatalf("unexpected install result: %v", err)
+	}
+	log, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(log), "\nrm -f home-ai-module-demo") {
+		t.Fatalf("failed new module was not removed: %s", log)
+	}
+}
