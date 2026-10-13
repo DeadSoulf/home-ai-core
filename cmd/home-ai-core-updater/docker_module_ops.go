@@ -9,11 +9,14 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
 
 var (
+	moduleOperationMu  sync.Mutex
 	moduleIDPattern    = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
 	imageDigestPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,447}@sha256:[a-f0-9]{64}$`)
 )
@@ -24,21 +27,40 @@ type moduleContainerStatus struct {
 }
 
 func performDockerModuleOperation(ctx context.Context, request updaterhelper.Request, serviceUID, serviceGID int) (moduleContainerStatus, string, error) {
+	if !moduleOperationMu.TryLock() {
+		return moduleContainerStatus{}, "", errors.New("another Docker module operation is already in progress")
+	}
+	defer moduleOperationMu.Unlock()
 	moduleID := strings.TrimSpace(request.ModuleID)
 	if !moduleIDPattern.MatchString(moduleID) || len(moduleID) > 96 {
 		return moduleContainerStatus{}, "", errors.New("invalid module id")
 	}
-	if _, err := ensureDockerRuntime(ctx, serviceGID); err != nil {
-		return moduleContainerStatus{}, "", err
+	// Reject malformed or unsupported operations before starting or installing Docker.
+	// Validation must not trigger privileged system changes.
+	switch request.Operation {
+	case "docker.module.install":
+		if !imageDigestPattern.MatchString(strings.TrimSpace(request.Image)) {
+			return moduleContainerStatus{}, "", errors.New("module image must be an immutable @sha256 reference")
+		}
+	case "docker.module.start", "docker.module.stop", "docker.module.restart", "docker.module.remove":
+	default:
+		return moduleContainerStatus{}, "", errors.New("unsupported Docker module operation")
+	}
+	if request.Operation == "docker.module.install" {
+		if _, err := ensureDockerRuntime(ctx, serviceGID); err != nil {
+			return moduleContainerStatus{}, "", err
+		}
+	} else {
+		// Control/remove must never install Docker or change host services.
+		status := inspectDockerRuntime(ctx)
+		if !status.Available || !status.Active || !status.NetworkReady {
+			return moduleContainerStatus{}, "", fmt.Errorf("Docker runtime is not ready: %s", status.Error)
+		}
 	}
 
 	switch request.Operation {
 	case "docker.module.install":
-		image := strings.TrimSpace(request.Image)
-		if !imageDigestPattern.MatchString(image) {
-			return moduleContainerStatus{}, "", errors.New("module image must be an immutable @sha256 reference")
-		}
-		return installDockerModule(ctx, moduleID, image, serviceUID, serviceGID)
+		return installDockerModule(ctx, moduleID, strings.TrimSpace(request.Image), serviceUID, serviceGID)
 	case "docker.module.start":
 		return controlDockerModule(ctx, moduleID, "start")
 	case "docker.module.stop":
@@ -58,10 +80,6 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 		return moduleContainerStatus{}, "", errors.New("Docker CLI is unavailable")
 	}
 
-	if err := pullDockerModuleImage(ctx, dockerPath, image); err != nil {
-		return moduleContainerStatus{}, "", err
-	}
-
 	name := moduleContainerName(moduleID)
 	if exists, managed, err := inspectManagedContainer(ctx, dockerPath, name, moduleID); err != nil {
 		return moduleContainerStatus{}, "", err
@@ -69,9 +87,13 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 		if !managed {
 			return moduleContainerStatus{}, "", errors.New("container name is already used by an unmanaged container")
 		}
-		if output, err := exec.CommandContext(ctx, dockerPath, "rm", "-f", name).CombinedOutput(); err != nil {
-			return moduleContainerStatus{}, "", fmt.Errorf("replace module container: %s", commandError(output, err))
-		}
+		// Never destroy a running module before a candidate has passed start,
+		// health and recovery checks. Transactional upgrades are a separate path.
+		return moduleContainerStatus{}, "", errors.New("module container already exists; in-place upgrade is disabled until rollback-safe replacement is implemented")
+	}
+
+	if err := pullDockerModuleImage(ctx, dockerPath, image); err != nil {
+		return moduleContainerStatus{}, "", err
 	}
 
 	dataDir := filepath.Join(moduleDataRoot, moduleID)
@@ -108,11 +130,23 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 	containerID := strings.TrimSpace(string(output))
 
 	if output, err := exec.CommandContext(ctx, dockerPath, "start", name).CombinedOutput(); err != nil {
-		_ = exec.CommandContext(context.Background(), dockerPath, "rm", "-f", name).Run()
-		return moduleContainerStatus{}, "", fmt.Errorf("start module container: %s", commandError(output, err))
+		return moduleContainerStatus{}, "", cleanupFailedModuleStart(dockerPath, name, fmt.Errorf("start module container: %s", commandError(output, err)))
 	}
-
-	return moduleContainerStatus{State: "running", ContainerID: containerID}, "module installed and started", nil
+	// Docker 'start' can return success when the container process exits
+	// immediately. Never publish such an instance as an enabled module.
+	select {
+	case <-ctx.Done():
+		return moduleContainerStatus{}, "", cleanupFailedModuleStart(dockerPath, name, ctx.Err())
+	case <-time.After(300 * time.Millisecond):
+	}
+	status, err := inspectModuleContainer(ctx, dockerPath, name)
+	if err != nil {
+		return moduleContainerStatus{}, "", cleanupFailedModuleStart(dockerPath, name, fmt.Errorf("inspect started module: %w", err))
+	}
+	if status.State != "running" {
+		return moduleContainerStatus{}, "", cleanupFailedModuleStart(dockerPath, name, fmt.Errorf("module stopped during startup (state: %s)", status.State))
+	}
+	return moduleContainerStatus{State: status.State, ContainerID: containerID}, "module installed and started", nil
 }
 
 func pullDockerModuleImage(ctx context.Context, dockerPath, image string) error {
@@ -244,4 +278,16 @@ func inspectModuleContainer(ctx context.Context, dockerPath, name string) (modul
 
 func moduleContainerName(moduleID string) string {
 	return "home-ai-module-" + moduleID
+}
+
+// cleanupFailedModuleStart bounds cleanup even if the parent job was canceled.
+// Preserve cleanup failures in the returned error for operator recovery.
+func cleanupFailedModuleStart(dockerPath, name string, cause error) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	output, err := exec.CommandContext(ctx, dockerPath, "rm", "-f", name).CombinedOutput()
+	if err != nil {
+		return errors.Join(cause, fmt.Errorf("remove failed module container: %s", commandError(output, err)))
+	}
+	return cause
 }
