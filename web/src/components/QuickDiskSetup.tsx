@@ -49,7 +49,7 @@ export function QuickDiskSetup({disk, onChanged}: {disk: BlockNode; onChanged: (
   if (setup.kind === "unavailable") return null;
 
   async function run() {
-    if (!disk.path || busy || confirmation.trim() !== disk.path || !acknowledged) return;
+    if (!disk.path || setup.kind === "unavailable" || busy || confirmation.trim() !== disk.path || !acknowledged) return;
     let modified = false;
     setBusy(true);
     setError("");
@@ -174,7 +174,7 @@ export function QuickDiskSetup({disk, onChanged}: {disk: BlockNode; onChanged: (
             {t("quickDiskAcknowledge")}
           </label>
           <label>
-            {t("quickDiskTypeDevice").replace("{device}", disk.path)}
+            {t("quickDiskTypeDevice").replace("{device}", disk.path || "")}
             <input value={confirmation} disabled={busy} className="mono"
               onChange={(event) => setConfirmation(event.target.value)}
               autoComplete="off" spellCheck={false} />
