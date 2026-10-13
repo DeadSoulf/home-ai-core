@@ -26,10 +26,10 @@ func callModuleHelper(ctx context.Context, operation, moduleID, image string) (h
 
 func callModuleUpgradeHelper(ctx context.Context, moduleID, image, previousImage string, health HealthSpec) (helperModuleResult, error) {
 	return callModuleHelperRequest(ctx, updaterhelper.Request{
-		Operation: "docker.module.upgrade",
-		ModuleID: moduleID,
-		Image: image,
-		PreviousImage: previousImage,
+		Operation:        "docker.module.upgrade",
+		ModuleID:         moduleID,
+		Image:            image,
+		PreviousImage:    previousImage,
 		ModuleHealthPort: health.Port,
 		ModuleHealthPath: health.Path,
 	})
