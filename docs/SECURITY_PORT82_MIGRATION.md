@@ -22,9 +22,10 @@ configuration-directory ownership and trusted update storage. Apply the reviewed
 Debian package from a local server console or trusted SSH session:
 
 ```sh
-sudo apt install ./home-ai-core_0.1.173-dev_amd64.deb
+sudo apt install ./home-ai-core_0.1.173.dev_amd64.deb
 ```
 
+The package filename uses `.dev`; the Core version remains `0.1.173-dev`.
 Use the arm64 package on arm64. Back up the existing database, configuration and
 module data first. Package configuration migrates the old `HOME_AI_LISTEN=*:8080`
 setting to the same host on port 82, saving the previous environment file as
