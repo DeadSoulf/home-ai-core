@@ -181,6 +181,7 @@ export default function App() {
 
 
   const authenticated = (nextActor: Actor) => {
+    setLogoutError(undefined);
     setActor(nextActor);
     setPhase("app");
   };
