@@ -37,11 +37,15 @@ function moduleIsEnabled(moduleId: string, modules?: ModuleNavigationState[]): b
   return modules.some((item) => item.module_id === moduleId && item.status === "enabled");
 }
 
+export function isModuleRoute(path: string): boolean {
+  return /^\/modules\/[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*(?:\/[A-Za-z0-9._~-]+)*$/.test(path) && !path.split("/").some((part) => part === "." || part === "..");
+}
+
 function dynamicModuleItems(modules?: ModuleNavigationState[]): NavigationItem[] {
   if (!modules) return [];
   return modules
     .filter((module) => module.status === "enabled")
-    .flatMap((module) => (module.items || []).map((item) => ({
+    .flatMap((module) => (module.items || []).filter((item) => isModuleRoute(item.route) && (item.route === "/modules/" + module.module_id || item.route.startsWith("/modules/" + module.module_id + "/"))).map((item) => ({
       path: item.route,
       title: item.title,
       permission: "security.self.read",
@@ -107,6 +111,7 @@ export function accessiblePath(actor: Actor, path: string, modules?: ModuleNavig
   }
 
   if (!hash) return route;
+  if (route === "/jobs" && /^job=[a-zA-Z0-9_-]{1,128}$/.test(hash)) return route + "#" + hash;
   if (route === "/system") {
     const section = systemSection(path);
     if (section === "updates" && !hasPermission(actor, "updates.read")) return route;

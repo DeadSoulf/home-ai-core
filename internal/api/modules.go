@@ -135,7 +135,7 @@ func (s *server) moduleInstall(
 		return
 	}
 	meta := metadataFromContext(r.Context())
-	job, err := s.jobs.Submit(r.Context(), state.JobRecord{
+	job, err := s.submitModuleJob(r.Context(), state.JobRecord{
 		Type:          "module.install",
 		ActorType:     actor.Type,
 		ActorID:       actor.ID,
@@ -147,7 +147,7 @@ func (s *server) moduleInstall(
 		},
 	})
 	if err != nil {
-		writeAPIError(w, r, http.StatusInternalServerError, "module_job_failed", "failed to queue module installation", nil)
+		writeModuleSubmitError(w, r, err)
 		return
 	}
 	s.security.RecordAudit(
@@ -209,7 +209,7 @@ func (s *server) moduleControl(
 	}
 
 	meta := metadataFromContext(r.Context())
-	job, err := s.jobs.Submit(r.Context(), state.JobRecord{
+	job, err := s.submitModuleJob(r.Context(), state.JobRecord{
 		Type:          "module.control",
 		ActorType:     actor.Type,
 		ActorID:       actor.ID,
@@ -218,7 +218,7 @@ func (s *server) moduleControl(
 		Input:         map[string]any{"module_id": id, "operation": input.Operation},
 	})
 	if err != nil {
-		writeAPIError(w, r, http.StatusInternalServerError, "module_job_failed", "failed to queue module operation", nil)
+		writeModuleSubmitError(w, r, err)
 		return
 	}
 	s.security.RecordAudit(
@@ -258,7 +258,7 @@ func (s *server) moduleRemove(
 	}
 
 	meta := metadataFromContext(r.Context())
-	job, err := s.jobs.Submit(r.Context(), state.JobRecord{
+	job, err := s.submitModuleJob(r.Context(), state.JobRecord{
 		Type:          "module.remove",
 		ActorType:     actor.Type,
 		ActorID:       actor.ID,
@@ -267,7 +267,7 @@ func (s *server) moduleRemove(
 		Input:         map[string]any{"module_id": id},
 	})
 	if err != nil {
-		writeAPIError(w, r, http.StatusInternalServerError, "module_job_failed", "failed to queue module removal", nil)
+		writeModuleSubmitError(w, r, err)
 		return
 	}
 	s.security.RecordAudit(

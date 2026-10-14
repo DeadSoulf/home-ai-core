@@ -192,6 +192,9 @@ export type RegisteredModule = {
 };
 
 export type Job = {
+  input?: {module_id?: string; operation?: string};
+  result?: {module_id?: string};
+  error_code?: string;
   id: string;
   node_id: string;
   type: string;
@@ -449,4 +452,9 @@ export type SMBStatus = {
   shares: SMBShare[];
   hard_quota_ready: boolean;
   hard_quota_error?: string;
+};
+
+export type ModuleRuntime = {
+  available: boolean; active: boolean; engine_ready: boolean; network_ready: boolean;
+  version: string; error?: string; checked_at: string;
 };
