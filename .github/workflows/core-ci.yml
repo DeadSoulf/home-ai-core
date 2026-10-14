@@ -115,6 +115,11 @@ jobs:
           sh -n scripts/server-smoke.sh
           sh -n packaging/debian/install-local.sh
 
+      - name: Release signing regressions (disposable keys only)
+        run: |
+          bash -n scripts/sign-release-assets.sh
+          python3 scripts/tests/test_release_signing.py
+
       - name: Install Web dependencies
         working-directory: web
         run: npm ci --ignore-scripts --no-audit --no-fund
