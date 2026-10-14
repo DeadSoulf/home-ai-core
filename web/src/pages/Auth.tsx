@@ -1,108 +1,66 @@
-import { useState, type FormEvent, type ReactNode } from "react";
-import { api, APIError } from "../api/client";
+import { useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { api } from "../api/client";
 import type { Actor } from "../api/types";
 import { COPYRIGHT_NOTICE } from "../branding";
 import { LanguageSwitch, useI18n } from "../i18n";
+import { ErrorNotice } from "../components/ErrorNotice";
+import { validateAuth } from "../ui/authValidation";
+import { useUI } from "../ui/useUI";
+import type { UIKey } from "../ui/messages";
 
+export function LoginPage(props: {onAuthenticated: (actor: Actor) => void}) { return <AuthPage {...props} setup={false} />; }
+export function FirstRunPage(props: {onAuthenticated: (actor: Actor) => void}) { return <AuthPage {...props} setup />; }
 
-export function LoginPage({onAuthenticated}: {onAuthenticated: (actor: Actor) => void}) {
-  const {t} = useI18n();
-  const messageFor = (error: unknown) => error instanceof APIError && error.code === "setup_network_only" ? t("setupNetworkOnly") : error instanceof Error ? error.message : t("requestFailed");
-  const [username, setUsername] = useState("owner");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-
+function AuthPage({onAuthenticated, setup}: {onAuthenticated: (actor: Actor) => void; setup: boolean}) {
+  const {t} = useI18n(); const u = useUI(); const prefix = useId();
+  const [username, setUsername] = useState("owner"), [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("Home Owner"), [bootstrapToken, setBootstrapToken] = useState("");
+  const [confirmation, setConfirmation] = useState(""), [visible, setVisible] = useState(false);
+  const [error, setError] = useState<unknown>(), [errors, setErrors] = useState<Record<string, UIKey>>({});
+  const [busy, setBusy] = useState(false); const submitting = useRef(false);
+  const inputProps = (field: string, hint?: string) => ({
+    id: prefix + field, name: field, "aria-invalid": Boolean(errors[field]),
+    "aria-describedby": [errors[field] ? prefix + field + "-error" : "", hint ? prefix + hint : ""].filter(Boolean).join(" ") || undefined,
+  });
+  const fieldError = (field: string) => errors[field] && <span className="form-error" id={prefix + field + "-error"}>{u(errors[field])}</span>;
   async function submit(event: FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setError("");
+    event.preventDefault(); if (submitting.current) return;
+    const next = validateAuth({username, password, displayName, bootstrapToken, confirmation}, setup);
+    setErrors(next); setError(undefined);
+    if (Object.keys(next).length) { document.getElementById(prefix + Object.keys(next)[0])?.focus(); return; }
+    submitting.current = true; setBusy(true);
     try {
-      const result = await api.login(username, password);
-      onAuthenticated(result.actor);
-    } catch (reason) {
-      setError(messageFor(reason));
-    } finally {
-      setBusy(false);
-    }
+      const result = setup ? await api.bootstrap({bootstrapToken: bootstrapToken.trim(), username: username.trim(), displayName, password}) : await api.login(username.trim(), password);
+      setPassword(""); setConfirmation(""); setBootstrapToken(""); onAuthenticated(result.actor);
+    } catch (reason) { setError(reason); }
+    finally { submitting.current = false; setBusy(false); }
   }
-
-  return (
-    <AuthLayout title={t("signIn")} subtitle={t("signInSubtitle")}>
-      <form onSubmit={submit} className="auth-form">
-        <label>
-          {t("username")}
-          <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
-        </label>
-        <label>
-          {t("password")}
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
-        </label>
-        {error && <div className="form-error">{error}</div>}
-        <button className="button primary" disabled={busy}>
-          {busy ? t("signingIn") : t("signIn")}
-        </button>
-      </form>
-    </AuthLayout>
-  );
-}
-
-export function FirstRunPage({onAuthenticated}: {onAuthenticated: (actor: Actor) => void}) {
-  const {t} = useI18n();
-  const messageFor = (error: unknown) => error instanceof APIError && error.code === "setup_network_only" ? t("setupNetworkOnly") : error instanceof Error ? error.message : t("requestFailed");
-  const [username, setUsername] = useState("owner");
-  const [displayName, setDisplayName] = useState("Home Owner");
-  const [bootstrapToken, setBootstrapToken] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      const result = await api.bootstrap({
-        bootstrapToken,
-        username,
-        displayName,
-        password,
-      });
-      onAuthenticated(result.actor);
-    } catch (reason) {
-      setError(messageFor(reason));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <AuthLayout title={t("createOwner")} subtitle={t("createOwnerSubtitle")}>
-      <form onSubmit={submit} className="auth-form">
-        <label>
-          {t("setupCode")}
-          <input type="password" value={bootstrapToken} onChange={(e) => setBootstrapToken(e.target.value)} required autoComplete="off" />
-          <small>{t("setupCodeHint")}</small>
-        </label>
-        <label>
-          {t("username")}
-          <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
-        </label>
-        <label>
-          {t("displayName")}
-          <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-        </label>
-        <label>
-          {t("password")}
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
-        </label>
-        {error && <div className="form-error">{error}</div>}
-        <button className="button primary" disabled={busy}>
-          {busy ? t("initializing") : t("initialize")}
-        </button>
-      </form>
-    </AuthLayout>
-  );
+  return <AuthLayout title={t(setup ? "createOwner" : "signIn")} subtitle={t(setup ? "createOwnerSubtitle" : "signInSubtitle")}>
+    <form onSubmit={submit} className="auth-form" noValidate aria-busy={busy}>
+      {setup && <label htmlFor={prefix + "bootstrapToken"}>{t("setupCode")}
+        <input {...inputProps("bootstrapToken", "setup-hint")} type="password" required value={bootstrapToken} disabled={busy}
+          onChange={(e) => setBootstrapToken(e.target.value)} autoComplete="off" />
+        <small id={prefix + "setup-hint"}>{t("setupCodeHint")}</small>{fieldError("bootstrapToken")}</label>}
+      <label htmlFor={prefix + "username"}>{t("username")}
+        <input {...inputProps("username", setup ? "username-hint" : undefined)} required minLength={3} maxLength={64}
+          autoCapitalize="none" spellCheck={false} value={username} disabled={busy} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
+        {setup && <small id={prefix + "username-hint"}>{u("usernameHint")}</small>}{fieldError("username")}</label>
+      {setup && <label htmlFor={prefix + "displayName"}>{t("displayName")}
+        <input {...inputProps("displayName")} value={displayName} disabled={busy} onChange={(e) => setDisplayName(e.target.value)} autoComplete="name" />{fieldError("displayName")}</label>}
+      <label htmlFor={prefix + "password"}>{t("password")}
+        <input {...inputProps("password", setup ? "password-hint" : undefined)} required type={visible ? "text" : "password"}
+          value={password} disabled={busy} onChange={(e) => setPassword(e.target.value)} autoComplete={setup ? "new-password" : "current-password"} />
+        {setup && <small id={prefix + "password-hint"}>{u("passwordHint")}</small>}{fieldError("password")}</label>
+      {setup && <label htmlFor={prefix + "confirmation"}>{u("confirmPassword")}
+        <input {...inputProps("confirmation")} required type={visible ? "text" : "password"} value={confirmation} disabled={busy}
+          onChange={(e) => setConfirmation(e.target.value)} autoComplete="new-password" />{fieldError("confirmation")}</label>}
+      <button type="button" className="button secondary password-toggle" aria-pressed={visible} aria-controls={prefix + "password"}
+        onClick={() => setVisible((value) => !value)}>{u(visible ? "hidePassword" : "showPassword")}</button>
+      {Object.keys(errors).length > 0 && <div className="sr-only" role="alert">{Object.values(errors).map(u).join(" ")}</div>}
+      {error !== undefined && <ErrorNotice error={error} />}
+      <button type="submit" className="button primary" disabled={busy}>{t(setup ? busy ? "initializing" : "initialize" : busy ? "signingIn" : "signIn")}</button>
+    </form>
+  </AuthLayout>;
 }
 
 function AuthLayout(props: {title: string; subtitle: string; children: ReactNode}) {

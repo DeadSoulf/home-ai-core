@@ -1,5 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, APIError, connectRealtime, setCSRFToken, type RealtimeStatus } from "./api/client";
+import { ErrorNotice } from "./components/ErrorNotice";
+import { LoadingState } from "./components/Panel";
+import { useUI } from "./ui/useUI";
+import { ModulePage } from "./pages/Module";
+import { isModuleRoute } from "./navigation";
 import type { Actor, ModuleNavigationState } from "./api/types";
 import { Shell } from "./components/Shell";
 import { useI18n } from "./i18n";
@@ -14,19 +19,25 @@ import { ModulesPage } from "./pages/Modules";
 import { SystemPage } from "./pages/System";
 import { UsersPage } from "./pages/Users";
 
-type Phase = "loading" | "setup" | "login" | "app";
+type Phase = "loading" | "unavailable" | "setup" | "login" | "app";
 
 function currentPath(): string {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
   const known = ["/", "/files", "/files/storage", "/files/windows", "/system", "/modules", "/jobs", "/audit", "/users", "/account"];
-  const moduleRoute = /^\/modules\/[a-z][a-z0-9.-]*$/.test(path);
+  const moduleRoute = isModuleRoute(path);
   if (!known.includes(path) && !moduleRoute) return "/";
-  return path + (path === "/system" || path === "/files" ? window.location.hash : "");
+  return path + (path === "/system" || path === "/files" || path === "/jobs" ? window.location.hash : "");
 }
 
 
 export default function App() {
   const {t} = useI18n();
+  const u = useUI();
+  const [startupRevision, retryStartup] = useState(0);
+  const [startupError, setStartupError] = useState<unknown>();
+  const [logoutError, setLogoutError] = useState<unknown>();
+  const [loggingOut, setLoggingOut] = useState(false);
+  const logoutLock = useRef(false);
   const [phase, setPhase] = useState<Phase>("loading");
   const [actor, setActor] = useState<Actor>();
   const [path, setPath] = useState(currentPath);
@@ -34,33 +45,33 @@ export default function App() {
   const [revision, setRevision] = useState(0);
   const [availableUpdate, setAvailableUpdate] = useState<string>();
   const [moduleNavigation, setModuleNavigation] = useState<ModuleNavigationState[]>();
+  const [navigationError, setNavigationError] = useState<unknown>();
 
   useEffect(() => {
-    api.setupStatus()
-      .then(async (status) => {
-        if (!status.initialized) {
-          setPhase("setup");
-          return;
-        }
-        try {
-          const current = await api.me();
-          setActor(current);
-          setPhase("app");
-        } catch (error) {
-          if (error instanceof APIError && error.status === 401) {
-            setPhase("login");
-            return;
-          }
-          throw error;
-        }
-      })
-      .catch(() => setPhase("login"));
-  }, []);
+    let stopped = false;
+    const controller = new AbortController();
+    setPhase("loading"); setStartupError(undefined);
+    (async () => {
+      try {
+        const status = await api.setupStatus(controller.signal);
+        if (stopped) return;
+        if (!status.initialized) { setPhase("setup"); return; }
+        const current = await api.me(controller.signal);
+        if (!stopped) { setActor(current); setPhase("app"); }
+      } catch (error) {
+        if (stopped) return;
+        if (error instanceof APIError && error.status === 401) { setActor(undefined); setPhase("login"); }
+        else { setStartupError(error); setPhase("unavailable"); }
+      }
+    })();
+    return () => { stopped = true; controller.abort(); };
+  }, [startupRevision]);
 
   useEffect(() => {
     const pop = () => setPath(currentPath());
     window.addEventListener("popstate", pop);
-    return () => window.removeEventListener("popstate", pop);
+    window.addEventListener("hashchange", pop);
+    return () => { window.removeEventListener("popstate", pop); window.removeEventListener("hashchange", pop); };
   }, []);
 
   useEffect(() => {
@@ -126,29 +137,33 @@ export default function App() {
 
   useEffect(() => {
     if (phase !== "app" || !actor) {
-      setModuleNavigation(undefined);
+      setModuleNavigation(undefined); setNavigationError(undefined);
       return;
     }
-    let stopped = false;
+    let stopped = false, checking = false;
     const refresh = async () => {
+      if (checking) return;
+      checking = true;
       try {
         const items = await api.moduleNavigation();
-        if (!stopped) setModuleNavigation(items);
-      } catch {
-        // Keep the previous navigation snapshot if the registry is temporarily unavailable.
-      }
+        if (!stopped) {setModuleNavigation(items); setNavigationError(undefined);}
+      } catch (error) {
+        if (!stopped) setNavigationError(error);
+      } finally {checking = false;}
     };
     void refresh();
     const changed = () => { void refresh(); };
     window.addEventListener("home-ai-core:modules-changed", changed);
+    const timer = window.setInterval(changed, 10000);
     return () => {
       stopped = true;
       window.removeEventListener("home-ai-core:modules-changed", changed);
+      window.clearInterval(timer);
     };
-  }, [phase, actor, revision]);
+  }, [phase, actor]);
 
   useEffect(() => {
-    if (phase !== "app" || !actor || !moduleNavigation) return;
+    if (phase !== "app" || !actor || !moduleNavigation || isModuleRoute(path)) return;
     const allowedPath = accessiblePath(actor, path, moduleNavigation);
     if (allowedPath !== path) {
       window.history.replaceState({}, "", allowedPath);
@@ -163,13 +178,14 @@ export default function App() {
   };
 
   const logout = async () => {
+    if (logoutLock.current) return;
+    logoutLock.current = true; setLoggingOut(true); setLogoutError(undefined);
     try {
-      await api.logout();
-    } finally {
-      setCSRFToken();
-      setActor(undefined);
-      setPhase("login");
-    }
+      try { await api.logout(); }
+      catch (error) { if (!(error instanceof APIError && error.status === 401)) throw error; }
+      setCSRFToken(); setActor(undefined); setPhase("login");
+    } catch (error) { setLogoutError(error); }
+    finally { logoutLock.current = false; setLoggingOut(false); }
   };
 
   const navigate = (nextPath: string) => {
@@ -181,8 +197,12 @@ export default function App() {
   };
 
   if (phase === "loading") {
-    return <div className="boot-screen"><div className="brand-mark">H</div><span>{t("starting")}</span></div>;
+    return <div className="boot-screen" role="status"><div className="brand-mark">H</div><span>{t("starting")}</span></div>;
   }
+  if (phase === "unavailable") return <main className="boot-screen connection-error">
+    <h1>{u("unavailable")}</h1><p>{u("unavailableHint")}</p><ErrorNotice error={startupError} />
+    <button className="button primary" type="button" onClick={() => retryStartup((value) => value + 1)}>{u("retry")}</button>
+  </main>;
   if (phase === "setup") {
     return <FirstRunPage onAuthenticated={authenticated} />;
   }
@@ -194,7 +214,8 @@ export default function App() {
   const dashboardAllowed = has("system.read") || has("modules.read") || has("jobs.read");
   const accountPage = <AccountPage actor={actor} onPasswordChanged={() => {setActor(undefined); setPhase("login");}} />;
 
-  const allowedPath = accessiblePath(actor, path, moduleNavigation);
+  const moduleRoute = isModuleRoute(path);
+  const allowedPath = moduleRoute ? path : accessiblePath(actor, path, moduleNavigation);
   let page;
   switch (allowedPath.split("#")[0]) {
     case "/account":
@@ -233,11 +254,11 @@ export default function App() {
       break;
     case "/modules":
       page = has("modules.read")
-        ? <ModulesPage revision={revision} canManage={has("modules.manage")} />
+        ? <ModulesPage revision={revision} canManage={has("modules.manage")} canReadJobs={has("jobs.read")} onNavigate={navigate} />
         : accountPage;
       break;
     case "/jobs":
-      page = has("jobs.read") ? <JobsPage revision={revision} canManage={has("jobs.cancel")} /> : accountPage;
+      page = has("jobs.read") ? <JobsPage revision={revision} canManage={has("jobs.cancel")} selectedJob={allowedPath.split("#job=")[1]} /> : accountPage;
       break;
     case "/audit":
       page = has("audit.read") ? <AuditPage revision={revision} /> : accountPage;
@@ -248,12 +269,15 @@ export default function App() {
         : accountPage;
       break;
     default:
-      page = dashboardAllowed ? <Dashboard actor={actor} revision={revision} onNavigate={navigate} /> : accountPage;
+      page = moduleRoute ? (!moduleNavigation ? navigationError ? <div className="page"><ErrorNotice error={navigationError} /><button type="button" className="button secondary" onClick={() => window.dispatchEvent(new CustomEvent("home-ai-core:modules-changed"))}>{u("retry")}</button></div> : <LoadingState /> : <ModulePage path={path} modules={moduleNavigation}
+        permitted={has("security.self.read")} canReadModules={has("modules.read")} onNavigate={navigate} />)
+        : dashboardAllowed ? <Dashboard actor={actor} revision={revision} onNavigate={navigate} /> : accountPage;
   }
 
 
   return (
-    <Shell actor={actor} path={allowedPath} realtime={realtime} availableUpdate={availableUpdate} modules={moduleNavigation} onNavigate={navigate} onLogout={logout}>
+    <Shell actor={actor} path={allowedPath} realtime={realtime} availableUpdate={availableUpdate} modules={moduleNavigation} onNavigate={navigate} onLogout={logout} loggingOut={loggingOut}>
+      {logoutError !== undefined && <ErrorNotice error={logoutError} message={u("logoutFailed")} />}
       {page}
     </Shell>
   );

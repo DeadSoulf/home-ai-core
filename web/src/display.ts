@@ -1,7 +1,7 @@
 import type { StringKey } from "./i18n";
 
 export function jobLabelKey(type: string): StringKey {
-  return type === "core.update.install" ? "jobUpdateInstall" : "backgroundTask";
+  return ({"core.update.install": "jobUpdateInstall", "module.install": "moduleInstall", "module.remove": "moduleRemove", "module.control": "modules"} as Record<string, StringKey>)[type] || "backgroundTask";
 }
 
 const auditLabels: Record<string, StringKey> = {

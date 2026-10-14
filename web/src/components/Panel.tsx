@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useUI } from "../ui/useUI";
 import { useI18n } from "../i18n";
 
 export function Panel(props: {
@@ -22,12 +23,13 @@ export function EmptyState({children}: {children: ReactNode}) {
   return <div className="empty-state">{children}</div>;
 }
 
-export function ErrorState({message}: {message?: string}) {
+export function ErrorState({message, onRetry}: {message?: string; onRetry?: () => void}) {
+  const u = useUI();
   const {t} = useI18n();
-  return <div className="error-state">{message || t("loadError")}</div>;
+  return <div className="error-state" role="alert">{message || t("loadError")}{onRetry && <button type="button" className="button secondary" onClick={onRetry}>{u("retry")}</button>}</div>;
 }
 
 export function LoadingState() {
   const {t} = useI18n();
-  return <div className="loading-state">{t("loading")}</div>;
+  return <div className="loading-state" role="status" aria-live="polite">{t("loading")}</div>;
 }

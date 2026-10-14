@@ -1,3 +1,4 @@
+import { browserLocale, errorText } from "../ui/messages";
 import type {
   Actor,
   AuditEntry,
@@ -36,6 +37,7 @@ type APIErrorBody = {
 };
 
 export class APIError extends Error {
+  readonly rawMessage: string;
   readonly status: number;
   readonly code: string;
   readonly requestId?: string;
@@ -44,6 +46,8 @@ export class APIError extends Error {
   constructor(status: number, body: APIErrorBody) {
     const error = body.error;
     super(error?.message || `Request failed with status ${status}`);
+    this.rawMessage = this.message;
+    this.message = errorText({code: error?.code, status}, browserLocale());
     this.name = "APIError";
     this.status = status;
     this.code = error?.code || "request_failed";
@@ -77,27 +81,29 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
 
-  const response = await fetch(path, {
-    ...init,
-    headers,
-    credentials: "same-origin",
-    cache: "no-store",
-  });
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  let body: unknown = {};
-  const contentType = response.headers.get("Content-Type") || "";
-  if (contentType.includes("application/json")) {
-    body = await response.json();
-  }
-
-  if (!response.ok) {
-    throw new APIError(response.status, body as APIErrorBody);
-  }
-  return body as T;
+  const shortRequest = !init.method || init.method === "GET" || path.startsWith("/api/v1/auth/") || path === "/api/v1/security/bootstrap" || path.startsWith("/api/v1/modules/");
+  const timeout = new AbortController();
+  const timer = shortRequest ? setTimeout(() => timeout.abort(), 30000) : undefined;
+  const signal = init.signal ? AbortSignal.any([init.signal, timeout.signal]) : timeout.signal;
+  let response: Response;
+  try {
+    response = await fetch(path, { ...init, signal, headers, credentials: "same-origin", cache: "no-store" });
+    // Read the body while the deadline is still active (not just response headers).
+    if (response.status === 204) return undefined as T;
+    const contentType = response.headers.get("Content-Type") || "";
+    let body: unknown = {};
+    if (contentType.includes("application/json")) {
+      try { body = await response.json(); }
+      catch { throw new APIError(response.ok ? 502 : response.status, {error: {code: "invalid_response"}}); }
+    } else if (response.ok) {
+      throw new APIError(502, {error: {code: "invalid_response"}});
+    }
+    if (!response.ok) throw new APIError(response.status, body as APIErrorBody);
+    return body as T;
+  } catch (error) {
+    if (timeout.signal.aborted && !init.signal?.aborted) throw new APIError(408, {error: {code: "request_timeout"}});
+    throw error;
+  } finally { if (timer !== undefined) clearTimeout(timer); }
 }
 
 async function requestBlob(path: string): Promise<Blob> {
@@ -132,7 +138,7 @@ async function postJSON<T>(path: string, body?: unknown, csrf = false): Promise<
 }
 
 export const api = {
-  setupStatus: () => request<SetupStatus>("/api/v1/security/setup-status"),
+  setupStatus: (signal?: AbortSignal) => request<SetupStatus>("/api/v1/security/setup-status", {signal}),
 
   bootstrap: async (input: {
     bootstrapToken: string;
@@ -165,8 +171,8 @@ export const api = {
     return result;
   },
 
-  me: async () => {
-    const result = await request<{actor: Actor}>("/api/v1/auth/me");
+  me: async (signal?: AbortSignal) => {
+    const result = await request<{actor: Actor}>("/api/v1/auth/me", {signal});
     return result.actor;
   },
 
@@ -486,7 +492,7 @@ export const api = {
     );
   },
 
-  system: () => request<SystemResponse>("/api/v1/system"),
+  system: (signal?: AbortSignal) => request<SystemResponse>("/api/v1/system", {signal}),
 
   setDiskName: async (device: string, name: string) =>
     postJSON<{name: string}>("/api/v1/storage/name", {device, name}, true),
@@ -630,10 +636,16 @@ export const api = {
   },
 
 
-  jobs: async () => {
-    const result = await request<{jobs: Job[]}>("/api/v1/jobs?limit=100");
+  jobs: async (signal?: AbortSignal) => {
+    const result = await request<{jobs: Job[]}>("/api/v1/jobs?limit=100", {signal});
     return result.jobs;
   },
+
+  job: async (id: string, signal?: AbortSignal) => (await request<{job: Job}>(`/api/v1/jobs/${encodeURIComponent(id)}`, {signal})).job,
+  cancelJob: async (id: string) => (await postJSON<{job: Job}>(`/api/v1/jobs/${encodeURIComponent(id)}/cancel`, undefined, true)).job,
+  moduleRuntime: async (signal?: AbortSignal) => (await request<{runtime: import("./types").ModuleRuntime}>("/api/v1/modules/runtime", {signal})).runtime,
+  moduleOperations: async (signal?: AbortSignal) => (await request<{jobs: Job[]}>("/api/v1/modules/operations", {signal})).jobs,
+  moduleOperation: async (id: string, signal?: AbortSignal) => (await request<{job: Job}>(`/api/v1/modules/operations/${encodeURIComponent(id)}`, {signal})).job,
 
   clearJobs: async () => {
     const headers = new Headers();

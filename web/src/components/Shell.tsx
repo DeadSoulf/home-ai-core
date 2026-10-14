@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { RealtimeStatus } from "../api/client";
 import type { Actor, ModuleNavigationState } from "../api/types";
+import { useUI } from "../ui/useUI";
 import { COPYRIGHT_NOTICE } from "../branding";
 import { LanguageSwitch, useI18n } from "../i18n";
 import { hasPermission, visibleNavigation } from "../navigation";
@@ -13,9 +14,11 @@ export function Shell(props: {
   modules?: ModuleNavigationState[];
   onNavigate: (path: string) => void;
   onLogout: () => void;
+  loggingOut?: boolean;
   children: ReactNode;
 }) {
   const {t, status} = useI18n();
+  const u = useUI();
   const [menuOpen, setMenuOpen] = useState(false);
   const wasOpen = useRef(false);
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -114,7 +117,7 @@ export function Shell(props: {
           <button type="button" className="button secondary" onClick={() => {props.onNavigate("/account"); if (menuOpen) closeMenu();}}>{t("yourAccount")}</button>
           <div className="account-actions">
             <LanguageSwitch />
-            <button type="button" className="button secondary" onClick={props.onLogout}>{t("signOut")}</button>
+            <button type="button" className="button secondary" disabled={props.loggingOut} onClick={() => { closeMenu(); props.onLogout(); }}>{props.loggingOut ? u("signingOut") : t("signOut")}</button>
           </div>
           <div className="product-copyright">{COPYRIGHT_NOTICE}</div>
         </div>

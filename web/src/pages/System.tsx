@@ -8,6 +8,7 @@ import { PageHeading } from "./Dashboard";
 import { StorageBrowser } from "../components/StorageBrowser";
 import { NetworkManagement } from "../components/NetworkManagement";
 import { ServerConsole } from "../components/ServerConsole";
+import { useUI } from "../ui/useUI";
 import type { SystemSection } from "../navigation";
 
 function bytes(value = 0) {
@@ -43,6 +44,7 @@ export function SystemPage({
   canUseConsole: boolean;
 }) {
   const {t, date} = useI18n();
+  const u = useUI();
   const activeSection =
     (section === "updates" && !canReadUpdates) ||
     (section === "console" && !canUseConsole)
@@ -65,8 +67,7 @@ export function SystemPage({
     }, delay);
     timers.current.add(timer);
   }
-  const load = useCallback(() => api.system(), []);
-  const [metricsTick, setMetricsTick] = useState(0);
+  const load = useCallback((signal: AbortSignal) => api.system(signal), []);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateStatus>();
   const [updaterState, setUpdaterState] = useState<UpdaterState>();
@@ -75,12 +76,7 @@ export function SystemPage({
   const [rollingBackUpdate, setRollingBackUpdate] = useState(false);
   const [updateError, setUpdateError] = useState("");
   const [lastChecked, setLastChecked] = useState<string>();
-  const {data, loading, error} = useResource(load, revision + metricsTick);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setMetricsTick((value) => value + 1), 2000);
-    return () => window.clearInterval(timer);
-  }, []);
+  const {data, loading, slow, error, updatedAt, reload} = useResource(load, revision, 2000);
 
   useEffect(() => {
     if (!canReadUpdates) return;
@@ -233,13 +229,18 @@ export function SystemPage({
     schedule(poll, 1000);
   }
 
-  if (loading && !data) return <LoadingState />;
-  if (error && !data) return <ErrorState message={error} />;
+  if (loading && !data) return <><LoadingState />{slow && <p role="status">{u("slow")}</p>}</>;
+  if (error && !data) return <ErrorState message={error} onRetry={reload} />;
   const value = data!;
 
   return (
     <div className="page">
       <PageHeading title={t("system")} subtitle={t("serverOverview")} />
+      <div className="resource-summary">
+        <span>{u("lastUpdated")}: {updatedAt ? date(new Date(updatedAt).toISOString()) : "—"}</span>
+        {slow && <span role="status">{u("slow")}</span>}
+        <button className="button secondary" type="button" disabled={loading} onClick={reload}>{u("refresh")}</button>
+      </div>
       <nav className="server-sections" aria-label={t("serverSections")}>
         {(["equipment", "storage", "network", "updates", "console"] as const)
           .filter((item) =>
@@ -401,7 +402,7 @@ export function SystemPage({
           <StorageBrowser
             devices={value.system.block_tree}
             canManage={canManageStorage}
-            onChanged={() => setMetricsTick((current) => current + 1)}
+            onChanged={reload}
           />
         </Panel>
 
@@ -412,7 +413,7 @@ export function SystemPage({
           interfaces={value.system.network_interfaces}
           canReadNetwork={canReadNetwork}
           canManage={canManageNetwork}
-          onChanged={() => setMetricsTick((current) => current + 1)}
+          onChanged={reload}
         />}
       </div>
 

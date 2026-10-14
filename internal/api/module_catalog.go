@@ -140,7 +140,7 @@ func (s *server) moduleCatalogInstall(
 		return
 	}
 	meta := metadataFromContext(r.Context())
-	job, err := s.jobs.Submit(r.Context(), state.JobRecord{
+	job, err := s.submitModuleJob(r.Context(), state.JobRecord{
 		Type:          "module.install",
 		ActorType:     actor.Type,
 		ActorID:       actor.ID,
@@ -152,7 +152,7 @@ func (s *server) moduleCatalogInstall(
 		},
 	})
 	if err != nil {
-		writeAPIError(w, r, http.StatusInternalServerError, "module_job_failed", "failed to queue module installation", nil)
+		writeModuleSubmitError(w, r, err)
 		return
 	}
 	s.security.RecordAudit(
