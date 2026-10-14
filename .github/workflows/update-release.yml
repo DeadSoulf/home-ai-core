@@ -6,12 +6,49 @@ on:
     paths:
       - VERSION
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish only after uploaded assets pass verification (otherwise keep a draft)
+        required: true
+        default: false
+        type: boolean
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: home-ai-core-release
+  cancel-in-progress: false
 
 jobs:
+  preflight:
+    name: Check release signing and source before building
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require the current main commit and a new release version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)" = "$GITHUB_SHA"
+          VERSION="$(tr -d '\r\n' < VERSION)"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo 'A release/draft already exists. Never overwrite published binaries; review the existing draft or use a new version.' >&2
+            exit 1
+          fi
+      - name: Validate Ed25519 signing key (no key material printed)
+        env:
+          HOME_AI_UPDATE_SIGNING_KEY: ${{ secrets.HOME_AI_UPDATE_SIGNING_KEY }}
+        run: bash scripts/sign-release-assets.sh --check-key
+
   build:
+    needs: preflight
     name: Build update bundle ${{ matrix.arch }}
     runs-on: ubuntu-latest
     strategy:
@@ -56,6 +93,7 @@ jobs:
           if-no-files-found: error
 
   debian-installer:
+    needs: preflight
     name: Build initial Debian installer ${{ matrix.arch }}
     runs-on: ubuntu-latest
     strategy:
@@ -103,6 +141,7 @@ jobs:
           if-no-files-found: error
 
   windows-client:
+    needs: preflight
     name: Build Windows file client
     runs-on: ubuntu-latest
 
@@ -137,6 +176,8 @@ jobs:
             dist/*.exe.sha256
           if-no-files-found: error
   release:
+    permissions:
+      contents: write
     name: Publish GitHub release
     needs: [build, debian-installer, windows-client]
     runs-on: ubuntu-latest
@@ -165,55 +206,54 @@ jobs:
           name: windows-client
           path: dist
 
-      - name: Sign Core update checksums
+      - name: Sign and verify every release artifact and source metadata
         env:
           HOME_AI_UPDATE_SIGNING_KEY: ${{ secrets.HOME_AI_UPDATE_SIGNING_KEY }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          VERSION="$(tr -d '\r\n' < VERSION)"
-          KEY_FILE="$RUNNER_TEMP/home-ai-update-signing-key.pem"
+        run: bash scripts/sign-release-assets.sh --sign dist "$(tr -d '\r\n' < VERSION)"
 
-          if [[ -z "${HOME_AI_UPDATE_SIGNING_KEY:-}" ]]; then
-            echo "HOME_AI_UPDATE_SIGNING_KEY is required for ALL Core releases, including development builds" >&2
-            exit 1
-          fi
-
-          printf '%s\n' "$HOME_AI_UPDATE_SIGNING_KEY" > "$KEY_FILE"
-          chmod 0600 "$KEY_FILE"
-          trap 'rm -f "$KEY_FILE" "$RUNNER_TEMP"/*.sig.bin' EXIT
-
-          found=0
-          for checksum in dist/home-ai-core-update_*.tar.gz.sha256; do
-            [[ -f "$checksum" ]] || continue
-            found=1
-            raw="$RUNNER_TEMP/$(basename "$checksum").sig.bin"
-            openssl pkeyutl -sign -rawin -inkey "$KEY_FILE" -in "$checksum" -out "$raw"
-            base64 -w 0 "$raw" > "$checksum.sig"
-            printf '\n' >> "$checksum.sig"
-          done
-          if [[ "$found" -ne 1 ]]; then
-            echo "No Core update checksum files found to sign" >&2
-            exit 1
-          fi
-
-      - name: Publish release
+      - name: Create draft, verify uploaded bytes, then optionally publish
         env:
           GH_TOKEN: ${{ github.token }}
+          PUBLISH: ${{ inputs.publish }}
         shell: bash
         run: |
           set -euo pipefail
           VERSION="$(tr -d '\r\n' < VERSION)"
           TAG="v$VERSION"
-
-          ls -lh dist
-
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/* --clobber
-          else
-            gh release create "$TAG" dist/* \
-              --target "$GITHUB_SHA" \
-              --title "Home-AI-Core $VERSION" \
-              --generate-notes \
-              --prerelease
+            echo 'Refusing to replace an existing release or draft.' >&2
+            exit 1
           fi
+          cat > "$RUNNER_TEMP/release-notes.md" <<EOF
+          ## Home-AI-Core $VERSION
+          Source commit: $GITHUB_SHA. Includes the latest merged Core and Web UI fixes.
+
+          **Migration from 0.1.172-dev requires a trusted Debian installer from console/SSH.**
+          Do not bootstrap protocol 8, systemd permissions or the new trust boundary through the old Web updater.
+          After migration use **https://SERVER-IP:82/** and verify/trust the server's TLS certificate.
+          Back up state/configuration/module data first. Existing users/data are not reset.
+          Different-image module upgrades remain blocked pending transactional rollback (#177).
+
+          [Migration guide](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_SHA/docs/SECURITY_PORT82_MIGRATION.md)
+          [Release verification](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_SHA/docs/RELEASE_SIGNING.md)
+
+          Every update archive, Debian package and Windows executable has a SHA-256 file and an Ed25519 detached signature.
+          SHA256SUMS also authenticates release-metadata.json and the public key.
+          Verify the public-key fingerprint against an independent trusted administrator record; a key downloaded next to a package alone is not a trust anchor.
+          EOF
+          gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "Home-AI-Core $VERSION" --notes-file "$RUNNER_TEMP/release-notes.md" --prerelease --draft
+          mkdir "$RUNNER_TEMP/verify-release"
+          gh release download "$TAG" --dir "$RUNNER_TEMP/verify-release"
+          for file in dist/*; do
+            cmp -- "$file" "$RUNNER_TEMP/verify-release/$(basename "$file")"
+          done
+          (
+            cd "$RUNNER_TEMP/verify-release"
+            base64 --decode SHA256SUMS.sig > "$RUNNER_TEMP/release-signature.bin"
+            openssl pkeyutl -verify -rawin -pubin -inkey home-ai-core-update-trusted.pub -in SHA256SUMS -sigfile "$RUNNER_TEMP/release-signature.bin"
+            sha256sum --check --strict SHA256SUMS
+          )
+          if [[ "$PUBLISH" == 'true' ]]; then
+            gh release edit "$TAG" --draft=false
+          fi
+          echo "Verified release $TAG; explicit publish=$PUBLISH" >> "$GITHUB_STEP_SUMMARY"
