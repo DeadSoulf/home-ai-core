@@ -30,7 +30,9 @@ it does not, by itself, prove which browser condition caused it.
   account is reused; no owner reset or database deletion is involved.
 - If persistent browser storage is unavailable, a freshly issued CSRF token
   is kept only in tab memory. A reload without persistent storage requires
-  login again. No authentication cookie becomes accessible to JavaScript.
+  login again. Locale preference reads/writes also tolerate blocked storage,
+  so the sign-in form remains renderable. No authentication cookie becomes
+  accessible to JavaScript.
 - A console ticket request is cancellable and time-bounded. Unmount, session
   recovery or disconnect invalidates its generation, so a late response cannot
   open a background shell or overwrite a later connection's state.

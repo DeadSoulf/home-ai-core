@@ -820,7 +820,12 @@ type I18nValue = {
 const Context = createContext<I18nValue | undefined>(undefined);
 
 export function I18nProvider({children}: {children: ReactNode}) {
-  const [locale, setLocaleState] = useState<Locale>(() => chooseInitialLocale(localStorage.getItem(storageKey), navigator.languages));
+  const [locale, setLocaleState] = useState<Locale>(() => {
+    let stored: string | null = null;
+    try { stored = localStorage.getItem(storageKey); }
+    catch { /* Private/restricted storage must not prevent the sign-in form rendering. */ }
+    return chooseInitialLocale(stored, navigator.languages);
+  });
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -829,7 +834,8 @@ export function I18nProvider({children}: {children: ReactNode}) {
   const value = useMemo<I18nValue>(() => ({
     locale,
     setLocale(next) {
-      localStorage.setItem(storageKey, next);
+      try { localStorage.setItem(storageKey, next); }
+      catch { /* The selected language remains valid in memory for this tab. */ }
       setLocaleState(next);
     },
     t(key) {
