@@ -1,6 +1,7 @@
 // UI messages added by the workflow audit. Keep both languages complete.
 export const uiMessages = {
   en: {
+    reauthentication: "Your browser session is out of sync. Sign in with your existing account. The previous server session has not been revoked; rejected actions will not be repeated automatically.",
     retry: "Retry", refresh: "Refresh status", unavailable: "Server unavailable",
     unavailableHint: "The connection could not be verified. Your session has not been cleared. Check the server and try again.",
     logoutFailed: "Sign-out was not confirmed. Your session may still be active. Retry when the server is available.",
@@ -55,6 +56,7 @@ export const uiMessages = {
     progress: "Progress", installAndPrepare: "Prepare Docker and install", accessDenied: "Access denied",
   },
   ru: {
+    reauthentication: "Сессия браузера рассинхронизирована. Войдите существующей учётной записью. Прежняя серверная сессия не отозвана; отклонённые действия не повторяются автоматически.",
     retry: "Повторить", refresh: "Проверить состояние", unavailable: "Сервер недоступен",
     unavailableHint: "Не удалось проверить соединение. Ваша сессия не сброшена. Проверьте сервер и повторите подключение.",
     logoutFailed: "Выход не подтверждён. Сессия может оставаться активной. Повторите выход, когда сервер станет доступен.",
@@ -114,7 +116,7 @@ export type UILocale = "en" | "ru";
 export function uiText(key: UIKey, locale: UILocale): string { return uiMessages[locale][key]; }
 const errorKeys: Record<string, UIKey> = {
   invalid_credentials: "invalidCredentials", permission_denied: "permissionDenied", administrator_required: "permissionDenied",
-  authentication_required: "sessionExpired", unauthorized: "sessionExpired", csrf_required: "csrf",
+  authentication_required: "sessionExpired", unauthorized: "sessionExpired", csrf_required: "csrf", session_changed: "reauthentication",
   setup_token_required: "setupCodeInvalid", bootstrap_token_required: "setupCodeInvalid", invalid_bootstrap_token: "setupCodeInvalid", bootstrap_token_invalid: "setupCodeInvalid",
   already_initialized: "alreadyInitialized", setup_network_only: "setupNetwork", module_catalog_unavailable: "catalogUnavailable",
   module_runtime_unavailable: "runtimeUnavailable", invalid_module_manifest: "invalidManifest",

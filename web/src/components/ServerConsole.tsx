@@ -17,6 +17,9 @@ export function ServerConsole() {
   const {t} = useI18n();
   const socketRef = useRef<WebSocket | undefined>(undefined);
   const outputRef = useRef<HTMLPreElement>(null);
+  const connectionGeneration = useRef(0);
+  const pendingTicket = useRef<AbortController | undefined>(undefined);
+  const connectionBusy = useRef(false);
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef(0);
   const [status, setStatus] = useState<ConsoleStatus>("disconnected");
@@ -28,6 +31,10 @@ export function ServerConsole() {
   };
 
   const disconnect = () => {
+    connectionGeneration.current += 1;
+    pendingTicket.current?.abort();
+    pendingTicket.current = undefined;
+    connectionBusy.current = false;
     const socket = socketRef.current;
     socketRef.current = undefined;
     if (socket && socket.readyState < WebSocket.CLOSING) {
@@ -37,18 +44,25 @@ export function ServerConsole() {
   };
 
   const connect = async () => {
-    if (status === "connecting" || status === "connected") return;
+    if (connectionBusy.current || (socketRef.current && socketRef.current.readyState < WebSocket.CLOSING)) return;
+    connectionBusy.current = true;
+    const generation = ++connectionGeneration.current;
+    const controller = new AbortController();
+    pendingTicket.current = controller;
+    const current = () => generation === connectionGeneration.current && !controller.signal.aborted;
     setStatus("connecting");
     try {
-      const ticket = await api.consoleTicket();
+      const ticket = await api.consoleTicket(controller.signal);
+      if (!current()) return;
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const socket = new WebSocket(
         `${protocol}//${window.location.host}/api/v1/system/console?ticket=${encodeURIComponent(ticket.ticket)}`,
       );
       socketRef.current = socket;
 
-      socket.onopen = () => setStatus("connected");
+      socket.onopen = () => { if (current()) setStatus("connected"); };
       socket.onmessage = (event) => {
+        if (!current()) return;
         let message: ConsoleMessage;
         try {
           message = JSON.parse(String(event.data)) as ConsoleMessage;
@@ -65,20 +79,29 @@ export function ServerConsole() {
           append(`\n[console] ${t("consoleProcessExited").replace("{code}", String(message.code ?? 0))}\n`);
         }
       };
-      socket.onerror = () => setStatus("error");
+      socket.onerror = () => { if (current()) setStatus("error"); };
       socket.onclose = () => {
+        if (!current() || socketRef.current !== socket) return;
         socketRef.current = undefined;
         setStatus((current) => current === "error" ? current : "disconnected");
       };
     } catch (reason) {
+      if (!current()) return;
       append(`\n[console] ${reason instanceof Error ? reason.message : t("requestFailed")}\n`);
       setStatus("error");
+    } finally {
+      if (generation === connectionGeneration.current) connectionBusy.current = false;
+      if (pendingTicket.current === controller) pendingTicket.current = undefined;
     }
   };
 
   useEffect(() => {
     void connect();
     return () => {
+      connectionGeneration.current += 1;
+      pendingTicket.current?.abort();
+      pendingTicket.current = undefined;
+      connectionBusy.current = false;
       const socket = socketRef.current;
       socketRef.current = undefined;
       socket?.close(1000, "console page closed");

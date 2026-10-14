@@ -8,10 +8,10 @@ import { validateAuth } from "../ui/authValidation";
 import { useUI } from "../ui/useUI";
 import type { UIKey } from "../ui/messages";
 
-export function LoginPage(props: {onAuthenticated: (actor: Actor) => void}) { return <AuthPage {...props} setup={false} />; }
+export function LoginPage(props: {onAuthenticated: (actor: Actor) => void; reauthentication?: boolean}) { return <AuthPage {...props} setup={false} />; }
 export function FirstRunPage(props: {onAuthenticated: (actor: Actor) => void}) { return <AuthPage {...props} setup />; }
 
-function AuthPage({onAuthenticated, setup}: {onAuthenticated: (actor: Actor) => void; setup: boolean}) {
+function AuthPage({onAuthenticated, setup, reauthentication = false}: {onAuthenticated: (actor: Actor) => void; setup: boolean; reauthentication?: boolean}) {
   const {t} = useI18n(); const u = useUI(); const prefix = useId();
   const [username, setUsername] = useState("owner"), [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("Home Owner"), [bootstrapToken, setBootstrapToken] = useState("");
@@ -36,6 +36,7 @@ function AuthPage({onAuthenticated, setup}: {onAuthenticated: (actor: Actor) => 
     finally { submitting.current = false; setBusy(false); }
   }
   return <AuthLayout title={t(setup ? "createOwner" : "signIn")} subtitle={t(setup ? "createOwnerSubtitle" : "signInSubtitle")}>
+    {reauthentication && <div className="notice" role="alert">{u("reauthentication")}</div>}
     <form onSubmit={submit} className="auth-form" noValidate aria-busy={busy}>
       {setup && <label htmlFor={prefix + "bootstrapToken"}>{t("setupCode")}
         <input {...inputProps("bootstrapToken", "setup-hint")} type="password" required value={bootstrapToken} disabled={busy}

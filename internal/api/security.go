@@ -154,7 +154,15 @@ func (s *server) me(w http.ResponseWriter, r *http.Request, actor security.Actor
 		methodNotAllowed(w, r, http.MethodGet)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"actor": actor})
+	// Cookie authentication alone does not prove that this browser origin has
+	// the session's synchronizer token (for example after an HTTP/port move).
+	// Report only validity; never expose session secrets or rotate stored tokens.
+	_, source := sessionToken(r)
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, map[string]any{
+		"actor":      actor,
+		"csrf_valid": source != authCookie || actor.ValidCSRF(r.Header.Get("X-CSRF-Token")),
+	})
 }
 
 func (s *server) logout(w http.ResponseWriter, r *http.Request, actor security.Actor, source authSource) {

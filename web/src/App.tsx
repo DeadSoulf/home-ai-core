@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, APIError, connectRealtime, setCSRFToken, type RealtimeStatus } from "./api/client";
+import { api, APIError, CSRF_FAILURE_EVENT, connectRealtime, setCSRFToken, type RealtimeStatus } from "./api/client";
 import { ErrorNotice } from "./components/ErrorNotice";
 import { LoadingState } from "./components/Panel";
 import { useUI } from "./ui/useUI";
@@ -19,7 +19,7 @@ import { ModulesPage } from "./pages/Modules";
 import { SystemPage } from "./pages/System";
 import { UsersPage } from "./pages/Users";
 
-type Phase = "loading" | "unavailable" | "setup" | "login" | "app";
+type Phase = "loading" | "unavailable" | "setup" | "login" | "reauth" | "app";
 
 function currentPath(): string {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
@@ -61,11 +61,19 @@ export default function App() {
       } catch (error) {
         if (stopped) return;
         if (error instanceof APIError && error.status === 401) { setActor(undefined); setPhase("login"); }
-        else { setStartupError(error); setPhase("unavailable"); }
+        else if (error instanceof APIError && error.code === "csrf_required") {
+          setActor(undefined); setPhase("reauth");
+        } else { setStartupError(error); setPhase("unavailable"); }
       }
     })();
     return () => { stopped = true; controller.abort(); };
   }, [startupRevision]);
+
+  useEffect(() => {
+    const expired = () => { setActor(undefined); setPhase("reauth"); };
+    window.addEventListener(CSRF_FAILURE_EVENT, expired);
+    return () => window.removeEventListener(CSRF_FAILURE_EVENT, expired);
+  }, []);
 
   useEffect(() => {
     const pop = () => setPath(currentPath());
@@ -206,8 +214,8 @@ export default function App() {
   if (phase === "setup") {
     return <FirstRunPage onAuthenticated={authenticated} />;
   }
-  if (phase === "login" || !actor) {
-    return <LoginPage onAuthenticated={authenticated} />;
+  if (phase === "login" || phase === "reauth" || !actor) {
+    return <LoginPage onAuthenticated={authenticated} reauthentication={phase === "reauth"} />;
   }
 
   const has = (permission: string) => actor.permissions.includes(permission);
