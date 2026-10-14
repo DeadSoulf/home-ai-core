@@ -158,10 +158,16 @@ func (r *Registry) Control(ctx context.Context, id, operation string) (Registere
 		_ = r.store.SetModuleStatus(recordCtx, id, item.Status, err.Error())
 		return Registered{}, err
 	}
-	if err := r.store.SetModuleStatus(ctx, id, nextStatus, ""); err != nil {
-		return Registered{}, err
+	// A successful helper reply means the external Docker side effect already
+	// happened. Persist the observed outcome even if the caller disconnected or
+	// cancelled its job while the helper was finishing. Do not start another
+	// helper operation or retry an ambiguous side effect here.
+	finishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if err := r.store.SetModuleStatus(finishCtx, id, nextStatus, ""); err != nil {
+		return Registered{}, fmt.Errorf("module %q operation %q completed in Docker but status persistence failed; inspect the module before retrying: %w", id, operation, err)
 	}
-	return r.Get(ctx, id)
+	return r.Get(finishCtx, id)
 }
 
 func (r *Registry) Remove(ctx context.Context, id string) error {
@@ -186,11 +192,16 @@ func (r *Registry) Remove(ctx context.Context, id string) error {
 		_ = r.store.SetModuleStatus(recordCtx, id, item.Status, err.Error())
 		return err
 	}
-	if err := r.store.DeleteModule(ctx, id); err != nil {
+	// Docker has confirmed removal. A cancellation after that acknowledgement
+	// must not leave a ghost registration for a container that is already gone.
+	// Persistent module data is intentionally kept by the helper.
+	finishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if err := r.store.DeleteModule(finishCtx, id); err != nil {
 		if errors.Is(err, state.ErrModuleNotFound) {
 			return ErrModuleNotFound
 		}
-		return err
+		return fmt.Errorf("module %q container removed but registry cleanup failed; inspect state before retrying: %w", id, err)
 	}
 	return nil
 }
