@@ -1,0 +1,61 @@
+name: Prepare verified UI source tree
+on:
+  pull_request:
+    branches: [main]
+    paths: ['_ui_patch/ready.json']
+permissions:
+  contents: write
+jobs:
+  prepare:
+    if: github.event.pull_request.head.repo.full_name == 'DeadSoulf/home-ai-core' && github.head_ref == 'chatgpt/web-ui-audit-fixes-20261014'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Validate exact tested patch and prepare source blobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 - <<'PY'
+          import base64, concurrent.futures, hashlib, json, lzma, os, pathlib, subprocess, urllib.request
+          parent = os.environ['EXPECTED_HEAD']
+          assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip() == parent
+          data = b''.join(pathlib.Path('_ui_patch',f'{i:02d}').read_bytes() for i in range(15))
+          assert len(data) == 56024
+          patch = lzma.decompress(base64.b64decode(data,validate=True),memlimit=128*1024*1024)
+          assert len(patch) == 182391
+          assert hashlib.sha256(patch).hexdigest() == '1c9e956d92ac050e6cc7309134f39d4fcc9e351a33868801f07d59110d4f9c58'
+          subprocess.run(['git','apply','--check','--index','-'],input=patch,check=True)
+          subprocess.run(['git','apply','--index','-'],input=patch,check=True)
+          subprocess.run(['git','diff','--cached','--check'],check=True)
+          def api(path,data=None):
+              req=urllib.request.Request('https://api.github.com/repos/DeadSoulf/home-ai-core/git/'+path,data=None if data is None else json.dumps(data).encode(),headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'})
+              with urllib.request.urlopen(req,timeout=60) as response:return json.load(response)
+          base=api('commits/'+parent)['tree']['sha']
+          lines=subprocess.check_output(['git','diff','--cached','--name-status'],text=True).splitlines()
+          def make_blob(line):
+              status,path=line.split('\t',1)
+              assert status in ('A','M') and path.startswith(('web/','internal/api/','internal/modules/','docs/'))
+              assert '..' not in pathlib.PurePosixPath(path).parts
+              raw=pathlib.Path(path).read_bytes()
+              sha=api('blobs',{'content':base64.b64encode(raw).decode(),'encoding':'base64'})['sha']
+              expected=hashlib.sha1(f'blob {len(raw)}\0'.encode()+raw).hexdigest()
+              assert sha == expected
+              mode=subprocess.check_output(['git','ls-files','-s','--',path],text=True).split()[0]
+              return {'path':path,'mode':mode,'type':'blob','sha':sha}
+          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:entries=list(pool.map(make_blob,lines))
+          tree=api('trees',{'base_tree':base,'tree':entries})['sha']
+          result={'parent':parent,'tree':tree,'patch_sha256':hashlib.sha256(patch).hexdigest(),'files':entries}
+          pathlib.Path(os.environ['RUNNER_TEMP'],'ui-prepared-tree.json').write_text(json.dumps(result,indent=2))
+          print(json.dumps({'parent':parent,'tree':tree,'files':len(entries)}))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-prepared-tree
+          path: ${{ runner.temp }}/ui-prepared-tree.json
+          retention-days: 1
+          if-no-files-found: error
