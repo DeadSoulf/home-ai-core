@@ -61,6 +61,7 @@ describe("API client", () => {
         },
         expires_at: "2026-09-29T00:00:00Z",
         csrf_token: "csrf-test",
+        csrf_valid: true,
       }), {
         status: 200,
         headers: {"Content-Type": "application/json"},
@@ -76,7 +77,7 @@ describe("API client", () => {
 
     const result = await api.login("owner", "secret");
     expect(result.actor.username).toBe("owner");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     const [, init] = fetchMock.mock.calls[0];
     expect(init?.credentials).toBe("same-origin");
     expect(String(init?.body)).toContain('"session_mode":"cookie"');

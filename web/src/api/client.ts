@@ -64,24 +64,55 @@ async function mutateJSON<T>(path: string, method: string, value: unknown): Prom
 }
 
 const csrfStorageKey = "home-ai-core.csrf";
+export const CSRF_FAILURE_EVENT = "home-ai-core:csrf-failure";
+let memoryCSRF = "";
+let memoryOnly = false;
 
 export function getCSRFToken(): string {
-  return localStorage.getItem(csrfStorageKey) || "";
+  if (memoryOnly) return memoryCSRF;
+  try { return localStorage.getItem(csrfStorageKey) || ""; }
+  catch { return memoryCSRF; }
 }
 
 export function setCSRFToken(value?: string): void {
-  if (value) {
-    localStorage.setItem(csrfStorageKey, value);
-  } else {
-    localStorage.removeItem(csrfStorageKey);
+  memoryCSRF = value || "";
+  try {
+    if (value) localStorage.setItem(csrfStorageKey, value);
+    else localStorage.removeItem(csrfStorageKey);
+    memoryOnly = false;
+  } catch {
+    // Browser privacy/quota restrictions must not break a fresh sign-in.
+    // No authentication cookie is exposed; this fallback lasts only this tab.
+    memoryOnly = true;
   }
+}
+
+async function browserSession(signal?: AbortSignal): Promise<Actor> {
+  const headers = new Headers();
+  const token = getCSRFToken();
+  if (token) headers.set("X-CSRF-Token", token);
+  const result = await request<{actor: Actor; csrf_valid: boolean}>("/api/v1/auth/me", {signal, headers});
+  if (result.csrf_valid !== true) {
+    throw new APIError(403, {error: {code: "csrf_required"}});
+  }
+  return result.actor;
+}
+
+async function confirmCookieLogin(result: AuthResponse): Promise<AuthResponse> {
+  if (!result.csrf_token) throw new APIError(502, {error: {code: "invalid_response"}});
+  setCSRFToken(result.csrf_token);
+  const actor = await browserSession();
+  if (actor.id !== result.actor.id) {
+    throw new APIError(409, {error: {code: "session_changed"}});
+  }
+  return {...result, actor};
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
 
-  const shortRequest = !init.method || init.method === "GET" || path.startsWith("/api/v1/auth/") || path === "/api/v1/security/bootstrap" || path.startsWith("/api/v1/modules/");
+  const shortRequest = !init.method || init.method === "GET" || path.startsWith("/api/v1/auth/") || path === "/api/v1/security/bootstrap" || path === "/api/v1/system/console/session" || path.startsWith("/api/v1/modules/");
   const timeout = new AbortController();
   const timer = shortRequest ? setTimeout(() => timeout.abort(), 30000) : undefined;
   const signal = init.signal ? AbortSignal.any([init.signal, timeout.signal]) : timeout.signal;
@@ -98,7 +129,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     } else if (response.ok) {
       throw new APIError(502, {error: {code: "invalid_response"}});
     }
-    if (!response.ok) throw new APIError(response.status, body as APIErrorBody);
+    if (!response.ok) {
+      const error = new APIError(response.status, body as APIErrorBody);
+      // Never repeat a rejected mutation automatically or pretend logout succeeded.
+      // Ignore an obsolete request's error if another tab/login has replaced its token.
+      if (error.status === 403 && error.code === "csrf_required" &&
+          (headers.get("X-CSRF-Token") || "") === getCSRFToken() &&
+          typeof window !== "undefined") {
+        window.dispatchEvent(new Event(CSRF_FAILURE_EVENT));
+      }
+      throw error;
+    }
     return body as T;
   } catch (error) {
     if (timeout.signal.aborted && !init.signal?.aborted) throw new APIError(408, {error: {code: "request_timeout"}});
@@ -157,8 +198,7 @@ export const api = {
         session_mode: "cookie",
       }),
     });
-    setCSRFToken(result.csrf_token);
-    return result;
+    return confirmCookieLogin(result);
   },
 
   login: async (username: string, password: string) => {
@@ -167,20 +207,19 @@ export const api = {
       password,
       session_mode: "cookie",
     });
-    setCSRFToken(result.csrf_token);
-    return result;
+    return confirmCookieLogin(result);
   },
 
-  me: async (signal?: AbortSignal) => {
-    const result = await request<{actor: Actor}>("/api/v1/auth/me", {signal});
-    return result.actor;
-  },
+  me: (signal?: AbortSignal) => browserSession(signal),
 
-  consoleTicket: () => postJSON<{ticket: string; expires_at: string}>(
-    "/api/v1/system/console/session",
-    undefined,
-    true,
-  ),
+  consoleTicket: (signal?: AbortSignal) => {
+    const headers = new Headers();
+    const token = getCSRFToken();
+    if (token) headers.set("X-CSRF-Token", token);
+    return request<{ticket: string; expires_at: string}>("/api/v1/system/console/session", {
+      method: "POST", headers, signal,
+    });
+  },
 
 
   logout: async () => {

@@ -95,7 +95,7 @@ class Harness:
             await self.overrides[path](route); return
         if path.startswith('/api/'):
             if path=='/api/v1/security/setup-status': await respond(dict(initialized=self.initialized),self.setup_status)
-            elif path=='/api/v1/auth/me': await respond(dict(actor=self.actor),self.me_status if self.auth else 401)
+            elif path=='/api/v1/auth/me': await respond(dict(actor=self.actor,csrf_valid=True),self.me_status if self.auth else 401)
             elif path=='/api/v1/auth/logout':
                 if self.logout_status==204:self.auth=False
                 await respond(status=self.logout_status)

@@ -32,7 +32,9 @@ jobs:
       - name: Exercise audited UI workflows with isolated API fixtures
         env:
           UI_EVIDENCE_DIR: ${{ runner.temp }}/ui-evidence
-        run: python web/tests/browser_regressions.py
+        run: |
+          python web/tests/browser_regressions.py
+          python web/tests/csrf_regressions.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
