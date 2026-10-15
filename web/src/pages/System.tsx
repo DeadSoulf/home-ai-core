@@ -8,18 +8,12 @@ import { PageHeading } from "./Dashboard";
 import { StorageBrowser } from "../components/StorageBrowser";
 import { NetworkManagement } from "../components/NetworkManagement";
 import { ServerConsole } from "../components/ServerConsole";
+import { UpdateOverview } from "../components/UpdateOverview";
 import { useUI } from "../ui/useUI";
 import type { SystemSection } from "../navigation";
 
 function bytes(value = 0) {
   return new Intl.NumberFormat(undefined, {maximumFractionDigits: 1}).format(value / 1024 ** 3) + " GiB";
-}
-
-function fileBytes(value = 0) {
-  if (value >= 1024 ** 3) return bytes(value);
-  if (value >= 1024 ** 2) return new Intl.NumberFormat(undefined, {maximumFractionDigits: 1}).format(value / 1024 ** 2) + " MiB";
-  if (value >= 1024) return new Intl.NumberFormat(undefined, {maximumFractionDigits: 1}).format(value / 1024) + " KiB";
-  return value + " B";
 }
 
 export function SystemPage({
@@ -185,7 +179,6 @@ export function SystemPage({
     if (!canManageUpdates) return;
     const version = updateInfo?.rollback_version;
     if (!version) return;
-    if (!window.confirm(t("rollbackConfirmation").replace("{version}", version))) return;
 
     setRollingBackUpdate(true);
     setUpdateError("");
@@ -279,97 +272,24 @@ export function SystemPage({
         </Panel>
 
         </>}
-        {activeSection === "updates" && canReadUpdates && <Panel
-          className="wide"
-          title={t("updateStatus")}
-          action={
-            <button
-              type="button"
-              className="button secondary"
-              disabled={checkingUpdate}
-              onClick={checkUpdate}
-            >
-              {checkingUpdate ? t("checking") : t("checkUpdates")}
-            </button>
-          }
-        >
-          <dl className="details">
-            <dt>{t("currentVersion")}</dt><dd className="mono">{updateInfo?.current_version || value.version}</dd>
-            <dt>{t("availableVersion")}</dt><dd className="mono">{updateInfo?.available_version || "—"}</dd>
-            <dt>{t("size")}</dt><dd>{updateInfo?.bundle_size_bytes ? fileBytes(updateInfo.bundle_size_bytes) : "—"}</dd>
-            <dt>{t("rollbackVersion")}</dt><dd className="mono">{updateInfo?.rollback_available ? (updateInfo.rollback_version || "—") : t("notAvailable")}</dd>
-            {updateInfo?.published_at && <><dt>{t("published")}</dt><dd>{date(updateInfo.published_at)}</dd></>}
-          </dl>
-          {updateInfo && (
-            <div className={updateInfo.available ? "update-callout available" : "update-callout current"}>
-              <strong>{updateInfo.available ? t("updateAvailable") : t("upToDate")}</strong>
-            </div>
-          )}
-          {updateInfo && !updateInfo.helper_available && (
-            <div className="form-error">{t("helperUnavailable")}</div>
-          )}
-          {updateInfo?.helper_available && !updateInfo.helper_compatible && (
-            <div className="form-error">{t("helperUpgradeRequired")}</div>
-          )}
-          <details className="technical-details"><summary>{t("technicalDetails")}</summary>
-            <dl className="details">
-              <dt>{t("architecture")}</dt><dd>{updateInfo?.architecture || value.system.architecture}</dd>
-              <dt>{t("systemHelper")}</dt><dd>{updateInfo?.helper_version || "—"}</dd>
-              <dt>{t("helperProtocol")}</dt><dd>{updateInfo?.helper_protocol || "—"}</dd>
-              {updaterState && <><dt>{t("state")}</dt><dd>{updaterState.phase}</dd><dt>{t("progress")}</dt><dd>{updaterState.message || "—"}</dd></>}
-            </dl>
-          </details>
-          {updaterState &&
-            ["downloading", "installing", "rolling_back", "restarting"].includes(updaterState.phase) && (
-            <div className="notice">
-              <div><strong>{updaterState.phase === "downloading" ? t("downloadingUpdate") : updaterState.phase === "installing" ? t("installing") : updaterState.phase === "rolling_back" ? t("rollingBack") : t("working")}</strong></div>
-              <div className="progress"><span style={{width: `${Math.min(100, updaterState.progress_percent || 0)}%`}} /></div>
-              <div className="small">{updaterState.progress_percent || 0}%</div>
-            </div>
-          )}
-          {canManageUpdates && updateInfo?.available && updaterState?.phase !== "ready" && (
-            <div className="update-action-stack">
-              <button
-                type="button"
-                className="button primary"
-                disabled={downloadingUpdate || checkingUpdate}
-                onClick={downloadUpdate}
-              >
-                {downloadingUpdate ? t("downloadingUpdate") : t("downloadUpdate")}
-              </button>
-            </div>
-          )}
-          {canManageUpdates && updaterState?.phase === "ready" && (
-            <div className="update-action-stack">
-              <div className="update-callout current"><strong>{t("updateReady")}</strong></div>
-              <button
-                type="button"
-                className="button primary"
-                disabled={installingUpdate || rollingBackUpdate || updateInfo?.helper_available === false || updateInfo?.helper_compatible === false}
-                onClick={installUpdate}
-              >
-                {installingUpdate ? t("installing") : t("installUpdate")}
-              </button>
-              <div className="notice">{t("updateRestartNotice")}</div>
-            </div>
-          )}
-          {canManageUpdates && updateInfo?.rollback_available && updateInfo.rollback_version && (
-            <div className="update-action-stack">
-              <button
-                type="button"
-                className="button danger"
-                disabled={installingUpdate || rollingBackUpdate || updateInfo.helper_available === false || updateInfo.helper_compatible === false}
-                onClick={rollbackUpdate}
-              >
-                {rollingBackUpdate ? t("rollingBack") : t("rollbackUpdate").replace("{version}", updateInfo.rollback_version)}
-              </button>
-              <div className="notice">{t("rollbackNotice")}</div>
-            </div>
-          )}
-          {(updateError || updaterState?.phase === "failed") && <div className="form-error">{updateError || updaterState?.error || t("requestFailed")}</div>}
-          {lastChecked && <div className="notice">{t("lastChecked")}: {date(lastChecked)}</div>}
-          {updateInfo?.notes && <details className="technical-details"><summary>{t("releaseNotes")}</summary><pre className="release-notes">{updateInfo.notes}</pre></details>}
-        </Panel>}
+        {activeSection === "updates" && canReadUpdates &&
+          <UpdateOverview
+            installedVersion={value.version}
+            architecture={value.system.architecture}
+            canManage={canManageUpdates}
+            status={updateInfo}
+            state={updaterState}
+            checking={checkingUpdate}
+            downloading={downloadingUpdate}
+            installing={installingUpdate}
+            rollingBack={rollingBackUpdate}
+            error={updateError}
+            lastChecked={lastChecked}
+            onCheck={() => {void checkUpdate();}}
+            onDownload={() => {void downloadUpdate();}}
+            onInstall={() => {void installUpdate();}}
+            onRollback={() => {void rollbackUpdate();}}
+          />}
 
         {activeSection === "equipment" && <Panel title={t("gpuDevices")} className="wide">
           <div className="table-wrap">
