@@ -52,7 +52,7 @@ describe("guided Core updater interface", () => {
     expect(available.phase).toBe("available");
     expect(available.canDownload).toBe(true);
     expect(available.canInstall).toBe(false);
-    expect(available.step).toBe(1);
+    expect(available.step).toBe(2);
 
     const stale = updateViewState(status, {...ready, available_version: "0.1.174-dev"}, flags);
     expect(stale.canDownload).toBe(true);
