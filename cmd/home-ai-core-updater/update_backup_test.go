@@ -174,3 +174,29 @@ func TestRollbackStageRejectsUnknownSourceVersion(t *testing.T) {
 		t.Fatalf("invalid version created backup files: %v", entries)
 	}
 }
+
+func TestUnresolvedUpdateStagingBlocksAnotherInstall(t *testing.T) {
+	root := t.TempDir()
+	rollbackWeb := filepath.Join(root, "web-rollback")
+	if err := refuseInterruptedBackupStaging(root, rollbackWeb); err != nil {
+		t.Fatalf("clean root rejected: %v", err)
+	}
+	pending := filepath.Join(root, ".backup-candidate-orphan")
+	writeBackupTestFile(t, filepath.Join(pending, "marker"), "recover-me")
+	if err := refuseInterruptedBackupStaging(root, rollbackWeb); err == nil {
+		t.Fatal("interrupted rollback snapshot was not detected")
+	}
+	if got := readBackupTestFile(t, filepath.Join(pending, "marker")); got != "recover-me" {
+		t.Fatalf("previous recovery snapshot altered: %q", got)
+	}
+	if err := os.RemoveAll(pending); err != nil {
+		t.Fatal(err)
+	}
+	writeBackupTestFile(t, filepath.Join(rollbackWeb, "index.html"), "previous-web")
+	if err := refuseInterruptedBackupStaging(root, rollbackWeb); err == nil {
+		t.Fatal("interrupted Web UI backup was not detected")
+	}
+	if got := readBackupTestFile(t, filepath.Join(rollbackWeb, "index.html")); got != "previous-web" {
+		t.Fatalf("previous Web UI backup altered: %q", got)
+	}
+}
