@@ -47,9 +47,9 @@ func stageRollbackBackup(root, corePath, webPath, helperPath, currentVersion, ne
 		}
 	}
 	if err := writeBackupMetadata(staged, backupMetadata{
-		Version: currentVersion,
+		Version:    currentVersion,
 		ReplacedBy: nextVersion,
-		CreatedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		CreatedAt:  time.Now().UTC().Format(time.RFC3339Nano),
 	}); err != nil {
 		return "", fmt.Errorf("write staged rollback metadata: %w", err)
 	}
