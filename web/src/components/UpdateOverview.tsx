@@ -73,7 +73,7 @@ export function UpdateOverview({
         <div className="updates-version">
           <span>{t("availableVersion")}</span>
           <strong className="mono">{target || (status ? u("coreUpdateNoNewVersion") : "—")}</strong>
-          <small>{target ? u("coreUpdateFromGitHub") : u("coreUpdateCheckFirst")}</small>
+          <small>{target ? u("coreUpdateFromGitHub") : status ? u("coreUpdateNoNewHint") : u("coreUpdateCheckFirst")}</small>
         </div>
       </div>
 
