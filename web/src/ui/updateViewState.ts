@@ -68,8 +68,8 @@ export function updateViewState(
   else phase = "unknown";
 
   const step: 1 | 2 | 3 =
-    phase === "installing" || phase === "restarting" || phase === "rolling_back" ? 3 :
-    phase === "ready" || phase === "downloading" ? 2 : 1;
+    phase === "ready" || phase === "installing" || phase === "restarting" || phase === "rolling_back" ? 3 :
+    phase === "downloading" ? 2 : 1;
   const progressValue = state?.progress_percent;
   const progress = busy && phase !== "checking" &&
     typeof progressValue === "number" && Number.isFinite(progressValue) ?
