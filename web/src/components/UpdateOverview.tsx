@@ -175,7 +175,7 @@ export function UpdateOverview({
       )}
 
       {confirmation === "install" && target && (
-        <ConfirmDialog title={u("coreUpdateConfirmInstall")} confirmLabel={t("installUpdate")}
+        <ConfirmDialog title={u("coreUpdateConfirmInstall")} confirmLabel={t("installUpdate")} confirmStyle="primary"
           onCancel={() => setConfirmation(null)}
           onConfirm={() => {setConfirmation(null); onInstall();}}>
           <p>{u("coreUpdateConfirmInstallHint").replace("{version}", target)}</p>
