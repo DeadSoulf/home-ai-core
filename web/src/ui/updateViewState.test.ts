@@ -62,7 +62,7 @@ describe("guided Core updater interface", () => {
     expect(verified.phase).toBe("ready");
     expect(verified.canDownload).toBe(false);
     expect(verified.canInstall).toBe(true);
-    expect(verified.step).toBe(2);
+    expect(verified.step).toBe(3);
   });
 
   it("disables sensitive operations while an update is underway", () => {
