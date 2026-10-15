@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -57,6 +58,27 @@ func stageRollbackBackup(root, corePath, webPath, helperPath, currentVersion, ne
 	}
 	complete = true
 	return staged, nil
+}
+
+// refuseInterruptedBackupStaging prevents an update from discarding evidence
+// of a previously interrupted install. Recovery of a leftover snapshot must be
+// explicit: it might be the only complete copy of the former installation.
+func refuseInterruptedBackupStaging(root, rollbackWeb string) error {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return fmt.Errorf("inspect previous update state: %w", err)
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".backup-candidate-") {
+			return fmt.Errorf("unresolved rollback snapshot %q: inspect or recover the interrupted update before retrying", filepath.Join(root, entry.Name()))
+		}
+	}
+	if _, err := os.Lstat(rollbackWeb); err == nil {
+		return fmt.Errorf("unresolved Web UI backup %q: inspect or recover the interrupted update before retrying", rollbackWeb)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("inspect previous Web UI backup: %w", err)
+	}
+	return nil
 }
 
 // replaceDirectoryAtomically exchanges two directories within a single
