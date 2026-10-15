@@ -64,18 +64,18 @@ func availableRollback() (backupMetadata, bool) {
 }
 
 func performInstall(ctx context.Context, currentVersion, version, prepared string, uid, gid int) (helperUpdated bool, resultErr error) {
+	rollbackWeb := filepath.Join(filepath.Dir(liveWeb), ".home-ai-core-web-rollback")
+	if err := refuseInterruptedBackupStaging(trustedUpdateRoot, rollbackWeb); err != nil {
+		return false, err
+	}
 	// Prepare the replacement entirely before touching the running installation.
 	newBinary := filepath.Join(filepath.Dir(liveBinary), ".home-ai-core.new")
 	if err := copyFile(filepath.Join(prepared, "bin", "home-ai-core"), newBinary, 0o755); err != nil {
 		return false, fmt.Errorf("stage new core binary: %w", err)
 	}
 	newWeb := filepath.Join(filepath.Dir(liveWeb), ".home-ai-core-web-new")
-	rollbackWeb := filepath.Join(filepath.Dir(liveWeb), ".home-ai-core-web-rollback")
 	if err := os.RemoveAll(newWeb); err != nil {
 		return false, fmt.Errorf("clear previous web staging: %w", err)
-	}
-	if err := os.RemoveAll(rollbackWeb); err != nil {
-		return false, fmt.Errorf("clear previous web rollback staging: %w", err)
 	}
 	if err := copyTree(filepath.Join(prepared, "web"), newWeb); err != nil {
 		return false, fmt.Errorf("stage new web ui: %w", err)
