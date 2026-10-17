@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DeadSoulf/home-ai-core/internal/nvrdiscovery"
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/storage"
@@ -19,6 +20,10 @@ type server struct {
 	nvrEndpoint         func(context.Context) (string, error)
 	nvrTransport        http.RoundTripper
 	nvrDataRoot         string
+	nvrScanMu           sync.Mutex
+	nvrLastScan         time.Time
+	nvrNetworks         func() ([]nvrdiscovery.Network, error)
+	nvrScanner          func(context.Context, nvrdiscovery.Network) ([]nvrdiscovery.Device, error)
 	nodeID              string
 	logger              *slog.Logger
 	state               State
@@ -103,6 +108,8 @@ func New(
 	// The NVR UI is native to Core. It never embeds the unauthenticated
 	// module web console or makes the Docker container publicly reachable.
 	s.mux.HandleFunc("GET /api/v1/nvr/status", s.requireAuth("modules.read", s.nvrStatus))
+	s.mux.HandleFunc("GET /api/v1/nvr/discovery/networks", s.requireAuth("modules.manage", s.nvrDiscoveryNetworks))
+	s.mux.HandleFunc("POST /api/v1/nvr/discovery/search", s.requireAuth("modules.manage", s.nvrDiscover))
 	s.mux.HandleFunc("GET /api/v1/nvr/cameras", s.requireAuth("modules.read", s.nvrCameras))
 	s.mux.HandleFunc("GET /api/v1/nvr/recordings", s.requireAuth("modules.read", s.nvrRecordings))
 	s.mux.HandleFunc("GET /api/v1/nvr/output/{path...}", s.requireAuth("modules.read", s.nvrOutput))
