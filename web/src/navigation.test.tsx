@@ -133,7 +133,7 @@ describe("navigation rendering", () => {
     for (const path of ["/modules/installed", "/modules/catalog", "/modules/operations", "/modules/settings"]) {
       const nav = renderNavigation(actor(allReads), path);
       expect(nav.match(/aria-current="page"/g)).toHaveLength(1);
-      expect(nav).toMatch(/<button\\b[^>]*aria-current="page"[^>]*>[\\s\\S]*?<span>Modules<\\/span>/);
+    expect(nav).toMatch(/<button\b[^>]*aria-current="page"[^>]*>[\s\S]*?<span>Modules<\/span>/);
     }
   });
 
