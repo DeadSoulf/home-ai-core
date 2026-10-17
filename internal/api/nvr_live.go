@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
@@ -102,6 +101,3 @@ func (s *server) nvrDeleteCamera(w http.ResponseWriter, r *http.Request, actor s
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "deleted": result.Deleted})
 }
-
-// Prevent unbounded or malformed camera metadata exposure in native Core API.
-var _ = json.Valid
