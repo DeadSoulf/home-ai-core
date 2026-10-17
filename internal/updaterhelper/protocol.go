@@ -42,6 +42,8 @@ type Request struct {
 	SMBUsers        []string          `json:"smb_users,omitempty"`
 	SMBShares       []SMBShareRequest `json:"smb_shares,omitempty"`
 	ModuleID        string            `json:"module_id,omitempty"`
+	NVRStorageDevice string          `json:"nvr_storage_device,omitempty"`
+	NVRStorageUUID string            `json:"nvr_storage_uuid,omitempty"`
 	Image           string            `json:"image,omitempty"`
 	AIGPUPCI        []string          `json:"ai_gpu_pci,omitempty"`
 }
