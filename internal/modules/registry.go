@@ -32,6 +32,8 @@ type Registry struct {
 	coreVersion string
 	mu          sync.Mutex
 	helper      func(context.Context, string, string, string) (helperModuleResult, error)
+	upgradeHelper func(context.Context, string, string, string, string) (helperModuleResult, error)
+	videoMount func(context.Context) (string, error)
 }
 
 func NewRegistry(store Store, coreVersion ...string) *Registry {
@@ -43,6 +45,7 @@ func NewRegistry(store Store, coreVersion ...string) *Registry {
 		store:       store,
 		coreVersion: version,
 		helper:      callModuleHelper,
+		upgradeHelper: callModuleUpgradeHelper,
 	}
 }
 
