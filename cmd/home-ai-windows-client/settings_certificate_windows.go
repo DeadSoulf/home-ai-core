@@ -12,8 +12,8 @@ import (
 
 type settingsCertificateProbeResult struct {
 	server string
-	info windowsclient.ServerCertificateInfo
-	err error
+	info   windowsclient.ServerCertificateInfo
+	err    error
 }
 
 func (state *windowsSettingsUI) refreshCertificatePinStatus() {
