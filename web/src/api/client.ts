@@ -9,6 +9,7 @@ import type {
   RealtimeEvent,
   RegisteredModule, ModuleNavigationState, NVRStatus, NVRCamera, NVRRecording,
   NVRDiscoveryNetwork, NVRDiscoveryResult,
+  NVRVideoStorageState,
   SetupStatus,
   SystemResponse,
   UpdateStatus,
@@ -684,6 +685,24 @@ export const api = {
   }) => postJSON<{ok: boolean}>("/api/v1/nvr/cameras", camera, true),
   nvrControlCamera: (id: string, action: "start" | "stop" | "restart") =>
     postJSON<{ok: boolean}>(`/api/v1/nvr/cameras/${encodeURIComponent(id)}/${action}`, {}, true),
+  nvrLiveStart: (id: string): Promise<{ok: boolean; playlist_url: string}> =>
+    postJSON<{ok: boolean; playlist_url: string}>(`/api/v1/nvr/cameras/${encodeURIComponent(id)}/live/start`, {}, true),
+  nvrLiveStop: (id: string): Promise<{ok: boolean; stopped: boolean}> =>
+    postJSON<{ok: boolean; stopped: boolean}>(`/api/v1/nvr/cameras/${encodeURIComponent(id)}/live/stop`, {}, true),
+  nvrDeleteCamera: (id: string, removeArchive: boolean): Promise<{ok: boolean; deleted: boolean}> => {
+    const headers = new Headers();
+    const csrf = getCSRFToken();
+    if (csrf) headers.set("X-CSRF-Token", csrf);
+    if (removeArchive) headers.set("X-NVR-Delete-Recordings", "confirm");
+    return request<{ok: boolean; deleted: boolean}>(
+      `/api/v1/nvr/cameras/${encodeURIComponent(id)}` + (removeArchive ? "?delete_recordings=true" : ""),
+      {method: "DELETE", headers},
+    );
+  },
+  nvrVideoStorage: () => request<NVRVideoStorageState>("/api/v1/nvr/storage"),
+  nvrActivateVideoStorage: (device: string) =>
+    postJSON<{ok: boolean; message: string; mountpoint: string}>("/api/v1/nvr/storage/activate",
+      {device, confirm: "MIGRATE_NVR_RECORDINGS"}, true),
 
   modules: async () => {
     const result = await request<{modules: RegisteredModule[]}>("/api/v1/modules");
