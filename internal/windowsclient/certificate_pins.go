@@ -25,18 +25,18 @@ const serverPinStoreMaxBytes = 64 << 10
 const maxPinnedServers = 128
 
 type serverPinStore struct {
-	Version int `json:"version"`
+	Version int               `json:"version"`
 	Servers map[string]string `json:"servers"`
 }
 
 // ServerCertificateInfo is public server certificate metadata. Probing sends
 // no Home-AI credentials or requests; it must never authenticate the server.
 type ServerCertificateInfo struct {
-	SHA256 string
-	Subject string
-	Issuer string
+	SHA256    string
+	Subject   string
+	Issuer    string
 	NotBefore time.Time
-	NotAfter time.Time
+	NotAfter  time.Time
 }
 
 func pinnedServerFile() (string, error) {
@@ -78,7 +78,7 @@ func serverPinOrigin(raw string) (string, error) {
 
 func normalizedFingerprint(fingerprint string) (string, error) {
 	pin := strings.ToLower(strings.TrimSpace(fingerprint))
-	if len(pin) != sha256.Size * 2 {
+	if len(pin) != sha256.Size*2 {
 		return "", errors.New("server certificate SHA-256 must have 64 hex characters")
 	}
 	b, err := hex.DecodeString(pin)
@@ -272,8 +272,8 @@ func pinnedTLSConfig(serverName, fingerprint string) (*tls.Config, error) {
 	var expected [32]byte
 	copy(expected[:], raw)
 	return &tls.Config{
-		MinVersion: tls.VersionTLS12,
-		ServerName: serverName,
+		MinVersion:         tls.VersionTLS12,
+		ServerName:         serverName,
 		InsecureSkipVerify: true,
 		VerifyConnection: func(state tls.ConnectionState) error {
 			return verifyPinnedCertificate(state, expected)
