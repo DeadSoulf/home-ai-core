@@ -33,6 +33,7 @@ type APIErrorBody = {
     message?: string;
     request_id?: string;
     correlation_id?: string;
+    details?: Record<string, unknown>;
   };
 };
 
@@ -42,6 +43,7 @@ export class APIError extends Error {
   readonly code: string;
   readonly requestId?: string;
   readonly correlationId?: string;
+  readonly details?: Record<string, unknown>;
 
   constructor(status: number, body: APIErrorBody) {
     const error = body.error;
@@ -53,6 +55,7 @@ export class APIError extends Error {
     this.code = error?.code || "request_failed";
     this.requestId = error?.request_id;
     this.correlationId = error?.correlation_id;
+    this.details = error?.details;
   }
 }
 

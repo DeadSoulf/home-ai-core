@@ -97,3 +97,76 @@ func TestRemoveEmptyLogicalFolderRejectsSymlinkScaffold(t *testing.T) {
 		t.Fatalf("outside target was changed: %v", err)
 	}
 }
+
+func TestInspectLogicalFolderForDeletionRevealsHiddenBlockers(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		paths []string
+		files []string
+		visible, uploads, items, metadata, other int
+	}{
+		{name: "empty"},
+		{name: "empty trash scaffold", paths: []string{
+			filepath.Join(trashDirName, "items"),
+			filepath.Join(trashDirName, "meta"),
+		}},
+		{name: "ordinary file", files: []string{"visible.txt"}, visible: 1},
+		{name: "orphan upload artifact hidden in file browser", files: []string{
+			".home-ai-upload-orphan.part",
+		}, uploads: 1},
+		{name: "upload pair with invalid metadata", files: []string{
+			".home-ai-upload-stale.part",
+			".home-ai-upload-stale.json",
+		}, uploads: 2},
+		{name: "trashed file hidden in file browser", files: []string{
+			filepath.Join(trashDirName, "items", "trash_id"),
+			filepath.Join(trashDirName, "meta", "trash_id.json"),
+		}, paths: []string{filepath.Join(trashDirName, "items"),filepath.Join(trashDirName, "meta")}, items: 1, metadata: 1},
+		{name: "unknown orphan in trash", files: []string{
+			filepath.Join(trashDirName, "orphan.tmp"),
+		}, other: 1},
+		{name: "incomplete trash scaffold", paths: []string{
+			filepath.Join(trashDirName, "items"),
+		}, other: 1},
+	} {
+		t.Run(tc.name,func(t *testing.T){
+			root := filepath.Join(t.TempDir(), "logical-folder")
+			if err := os.Mkdir(root, 0o750); err != nil { t.Fatal(err) }
+			for _, name := range tc.paths {
+				if err := os.MkdirAll(filepath.Join(root,name),0o750); err != nil { t.Fatal(err) }
+			}
+			for _, name := range tc.files {
+				target:=filepath.Join(root,name)
+				if err:=os.MkdirAll(filepath.Dir(target),0o750);err!=nil {t.Fatal(err)}
+				if err:=os.WriteFile(target,[]byte("retain me"),0o600);err!=nil{t.Fatal(err)}
+			}
+			got,err:=InspectLogicalFolderForDeletion(root)
+			if err!=nil {t.Fatal(err)}
+			if got.VisibleEntries!=tc.visible || got.UploadArtifacts!=tc.uploads || got.TrashItems!=tc.items ||
+				got.TrashMetadata!=tc.metadata || got.OtherHidden!=tc.other {
+				t.Fatalf("blocker counts = %#v, want visible=%d uploads=%d items=%d metadata=%d other=%d",
+					got,tc.visible,tc.uploads,tc.items,tc.metadata,tc.other)
+			}
+			if got.HasBlockers() {
+				if err:=RemoveEmptyLogicalFolder(root); !errors.Is(err,ErrLogicalFolderNotEmpty) {
+					t.Fatalf("protected data must reject deletion: %v",err)
+				}
+				for _, name:=range tc.files {
+					if _,err:=os.Lstat(filepath.Join(root,name));err!=nil {t.Fatalf("file lost: %s: %v",name,err)}
+				}
+			}
+		})
+	}
+}
+
+func TestInspectLogicalFolderForDeletionDoesNotFollowTrashSymlink(t *testing.T) {
+	root:=filepath.Join(t.TempDir(),"nsf")
+	outside:=t.TempDir()
+	if err:=os.Mkdir(root,0o750);err!=nil{t.Fatal(err)}
+	if err:=os.WriteFile(filepath.Join(outside,"user-data"),[]byte("keep"),0o600);err!=nil{t.Fatal(err)}
+	if err:=os.Symlink(outside,filepath.Join(root,trashDirName));err!=nil{t.Fatal(err)}
+	got,err:=InspectLogicalFolderForDeletion(root)
+	if err!=nil || got.OtherHidden!=1 {t.Fatalf("trash symlink should be an unknown blocker: %#v %v",got,err)}
+	if err:=RemoveEmptyLogicalFolder(root);!errors.Is(err,ErrLogicalFolderNotEmpty){t.Fatalf("symlink deletion: %v",err)}
+	if _,err:=os.Lstat(filepath.Join(outside,"user-data"));err!=nil{t.Fatalf("symlink target lost: %v",err)}
+}

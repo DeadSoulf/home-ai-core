@@ -94,6 +94,10 @@ export function FilesPage({
   const [trashVisible, setTrashVisible] = useState(false);
   const [trashEntries, setTrashEntries] = useState<Awaited<ReturnType<typeof api.fileTrash>>>([]);
   const [trashLoading, setTrashLoading] = useState(false);
+  const [uploadsVisible, setUploadsVisible] = useState(false);
+  const [pendingUploads, setPendingUploads] = useState<Awaited<ReturnType<typeof api.fileUploads>>>([]);
+  const [pendingUploadsLoading, setPendingUploadsLoading] = useState(false);
+  const [deleteBlockers, setDeleteBlockers] = useState<{folderID: string; counts: FolderDeletionBlockers}>();
   const [uploadProgress, setUploadProgress] = useState<{
     name: string;
     received: number;
@@ -276,6 +280,7 @@ export function FilesPage({
     }
     setBusy("folder-delete-" + folder.id);
     reportFormError("");
+    setDeleteBlockers(undefined);
     setNotice("");
     try {
       const result = await api.deleteFileFolder(folder.id, confirmation);
@@ -288,9 +293,14 @@ export function FilesPage({
         reportBrowserError("");
       }
       if (settingsFolderID === folder.id) setSettingsFolderID("");
+      setDeleteBlockers(undefined);
       setNotice(result.warning || u("fileDeleteFolderDone"));
       resource.reload();
     } catch (reason) {
+      if (reason instanceof APIError && reason.code === "file_folder_not_empty") {
+        const counts = parseFolderDeletionBlockers(reason.details?.blockers);
+        if (counts) setDeleteBlockers({folderID: folder.id, counts});
+      }
       reportFormError(describeFileError(reason, locale, t("requestFailed")), reason);
     } finally {
       setBusy("");
@@ -327,6 +337,8 @@ export function FilesPage({
     setEntries([]);
     setTrashVisible(false);
     setTrashEntries([]);
+    setUploadsVisible(false);
+    setPendingUploads([]);
     reportBrowserError("");
   }
 
@@ -496,6 +508,55 @@ export function FilesPage({
     }
   }
 
+  async function loadPendingUploads(folderID: string) {
+    setPendingUploadsLoading(true);
+    reportBrowserError("");
+    try {
+      setPendingUploads(await api.fileUploads(folderID));
+    } catch (reason) {
+      reportBrowserError(describeFileError(reason, locale, t("requestFailed")), reason);
+    } finally {
+      setPendingUploadsLoading(false);
+    }
+  }
+
+  async function togglePendingUploads() {
+    if (!selectedFolder?.can_write) return;
+    const next = !uploadsVisible;
+    setUploadsVisible(next);
+    if (next) await loadPendingUploads(selectedFolder.id);
+  }
+
+  async function cancelPendingUpload(upload: {id: string; path: string}) {
+    if (!selectedFolder?.can_write || busy !== "") return;
+    if (!window.confirm(u("fileCancelUploadConfirm").replace("{name}", upload.path))) return;
+    setBusy("upload-cancel");
+    reportBrowserError("");
+    try {
+      await api.cancelFileUpload(selectedFolder.id, upload.id);
+      setDeleteBlockers(undefined);
+      reportFormError("");
+      setNotice(u("fileCancelUploadComplete"));
+      await loadPendingUploads(selectedFolder.id);
+    } catch (reason) {
+      reportBrowserError(describeFileError(reason, locale, t("requestFailed")), reason);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function inspectBlockingTrash(folderID: string) {
+    openFolder(folderID);
+    setTrashVisible(true);
+    await loadTrash(folderID);
+  }
+
+  async function inspectBlockingUploads(folderID: string) {
+    openFolder(folderID);
+    setUploadsVisible(true);
+    await loadPendingUploads(folderID);
+  }
+
   async function restoreTrashEntry(id: string) {
     if (!selectedFolder?.can_write) return;
     setBusy("trash-restore");
@@ -636,6 +697,30 @@ export function FilesPage({
                   disabled={busy !== ""}
                   onClick={() => void deleteLogicalFolder(folder)}>{u("fileDeleteFolder")}</button>}
               </div>
+              {deleteBlockers?.folderID === folder.id && (
+                <div className="notice folder-delete-blockers" role="status">
+                  <strong>{u("fileDeleteHiddenData")}</strong>
+                  <ul>
+                    {deleteBlockers.counts.visible_entries > 0 && <li>{u("fileDeleteVisibleCount").replace("{count}", String(deleteBlockers.counts.visible_entries))}</li>}
+                    {deleteBlockers.counts.upload_artifacts > 0 && <li>{u("fileDeleteUploadCount").replace("{count}", String(deleteBlockers.counts.upload_artifacts))}</li>}
+                    {deleteBlockers.counts.trash_items > 0 && <li>{u("fileDeleteTrashItemsCount").replace("{count}", String(deleteBlockers.counts.trash_items))}</li>}
+                    {deleteBlockers.counts.trash_metadata > 0 && <li>{u("fileDeleteTrashMetadataCount").replace("{count}", String(deleteBlockers.counts.trash_metadata))}</li>}
+                    {deleteBlockers.counts.other_hidden > 0 && <li>{u("fileDeleteOtherCount").replace("{count}", String(deleteBlockers.counts.other_hidden))}</li>}
+                  </ul>
+                  <div className="network-actions">
+                    {(deleteBlockers.counts.trash_items > 0 || deleteBlockers.counts.trash_metadata > 0) && (
+                      <button className="button compact secondary" type="button"
+                        onClick={() => void inspectBlockingTrash(folder.id)}>{u("fileDeleteInspectTrash")}</button>
+                    )}
+                    {deleteBlockers.counts.upload_artifacts > 0 && (
+                      <button className="button compact secondary" type="button"
+                        onClick={() => void inspectBlockingUploads(folder.id)}>{u("fileDeleteInspectUploads")}</button>
+                    )}
+                  </div>
+                  {(deleteBlockers.counts.other_hidden > 0 || deleteBlockers.counts.upload_artifacts > 0 || deleteBlockers.counts.trash_items > 0 || deleteBlockers.counts.trash_metadata > 0) &&
+                    <p className="muted small">{u("fileDeleteManualInspection")}</p>}
+                </div>
+              )}
             </article>
           ))}
           {folders.length === 0 && <p className="muted">{t("fileNoFolders")}</p>}
@@ -670,6 +755,11 @@ export function FilesPage({
             >
               {t("fileTrash")}
             </button>
+            {selectedFolder.can_write && (
+              <button className={"button compact " + (uploadsVisible ? "primary" : "secondary")}
+                type="button" disabled={pendingUploadsLoading}
+                onClick={() => void togglePendingUploads()}>{u("filePendingUploads")}</button>
+            )}
           </div>
 
           {selectedFolder.can_write && (
@@ -798,6 +888,31 @@ export function FilesPage({
                   )}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {uploadsVisible && selectedFolder.can_write && (
+            <div className="file-pending-uploads">
+              <h3>{u("filePendingUploads")}</h3>
+              {pendingUploadsLoading ? <p className="muted">{t("loading")}</p> : pendingUploads.length > 0 ? (
+                <div className="table-wrap">
+                  <table>
+                    <thead><tr><th>{t("name")}</th><th>{t("progress")}</th><th>{t("actions")}</th></tr></thead>
+                    <tbody>
+                      {pendingUploads.map((upload) => (
+                        <tr key={upload.id}>
+                          <td className="mono">{upload.path}</td>
+                          <td>{formatFileSize(upload.received_bytes)} / {formatFileSize(upload.total_bytes)}</td>
+                          <td><button className="button compact danger" type="button"
+                            disabled={busy !== ""} onClick={() => void cancelPendingUpload(upload)}>
+                            {u("fileCancelUpload")}
+                          </button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : <p className="notice">{u("filePendingUploadsEmpty")}</p>}
             </div>
           )}
 
@@ -1297,6 +1412,36 @@ export function FilesPage({
       )}
     </div>
   );
+}
+
+type FolderDeletionBlockers = {
+  visible_entries: number;
+  upload_artifacts: number;
+  trash_items: number;
+  trash_metadata: number;
+  other_hidden: number;
+};
+
+function parseFolderDeletionBlockers(value: unknown): FolderDeletionBlockers | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const data = value as Record<string, unknown>;
+  const count = (key: string): number | undefined => {
+    const item = data[key];
+    return typeof item === "number" && Number.isSafeInteger(item) && item >= 0 ? item : undefined;
+  };
+  const visible_entries = count("visible_entries");
+  const upload_artifacts = count("upload_artifacts");
+  const trash_items = count("trash_items");
+  const trash_metadata = count("trash_metadata");
+  const other_hidden = count("other_hidden");
+  if ([visible_entries, upload_artifacts, trash_items, trash_metadata, other_hidden].some((v) => v === undefined)) return undefined;
+  return {
+    visible_entries: visible_entries!,
+    upload_artifacts: upload_artifacts!,
+    trash_items: trash_items!,
+    trash_metadata: trash_metadata!,
+    other_hidden: other_hidden!,
+  };
 }
 
 type NASMountOption = {

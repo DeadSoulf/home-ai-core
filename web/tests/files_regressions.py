@@ -71,6 +71,7 @@ class FilesHarness(Harness):
         self.next_id = 1
         self.api_status = {}
         self.api_errors = {}
+        self.orphan_upload_artifacts = {}
         for key, value in kwargs.items():
             setattr(self, key, value)
 
@@ -149,8 +150,16 @@ class FilesHarness(Harness):
                     return await respond({"error": {"code": "file_folder_confirmation_mismatch", "message": "confirmation mismatch"}}, 409)
                 if folder.get("hard_quota_bytes", 0):
                     return await respond({"error": {"code": "file_folder_hard_quota_active", "message": "hard quota must be disabled"}}, 409)
-                if any(tree.values()) or self.trash.get(folder_id) or self.uploads.get(folder_id):
-                    return await respond({"error": {"code": "file_folder_not_empty", "message": "folder contains files, uploads or trash"}}, 409)
+                blockers = {
+                    "visible_entries": sum(len(items) for items in tree.values()),
+                    "upload_artifacts": 2*len(self.uploads.get(folder_id, [])) + self.orphan_upload_artifacts.get(folder_id, 0),
+                    "trash_items": len(self.trash.get(folder_id, [])),
+                    "trash_metadata": len(self.trash.get(folder_id, [])),
+                    "other_hidden": 0,
+                }
+                if any(blockers.values()):
+                    return await respond({"error": {"code": "file_folder_not_empty",
+                        "message": "folder contains hidden entries", "details": {"blockers": blockers}}}, 409)
                 self.folders = [f for f in self.folders if f["id"] != folder_id]
                 del self.entries[folder_id]
                 return await respond({"warning": ""})
@@ -515,6 +524,68 @@ async def run_suite(browser):
             assert h.folders,which
             await h.close()
 
+    async def delete_hidden_upload_reports_and_cancel():
+        h=FilesHarness(browser)
+        h.entries["fld-test"]={"": []}
+        h.uploads["fld-test"]=[{"id":"upload-pending","path":"backup.partial",
+            "total_bytes":1024,"received_bytes":100,"created_at":TIME,"updated_at":TIME}]
+        await h.start("/files")
+        await h.page.locator(".ux-folder-card button.primary").click()
+        h.page.once("dialog",lambda dialog: asyncio.create_task(dialog.accept("Документы")))
+        await h.page.locator(".ux-folder-card button.danger").click()
+        blocker=h.page.locator(".folder-delete-blockers")
+        await expect(blocker).to_contain_text("Скрытых файлов загрузок: 2")
+        await expect(blocker.get_by_role("button",name="Просмотреть незавершённые загрузки")).to_be_visible()
+        await blocker.get_by_role("button",name="Просмотреть незавершённые загрузки").click()
+        panel=h.page.locator(".file-pending-uploads")
+        await expect(panel).to_contain_text("backup.partial")
+        h.page.once("dialog",lambda dialog: asyncio.create_task(dialog.accept()))
+        await panel.get_by_role("button",name="Отменить загрузку").click()
+        await expect(panel).to_contain_text("Действующих незавершённых загрузок нет")
+        assert not h.uploads["fld-test"],h.uploads
+        h.page.once("dialog",lambda dialog: asyncio.create_task(dialog.accept("Документы")))
+        await h.page.locator(".ux-folder-card button.danger").click()
+        await expect(h.page.locator(".ux-folder-card")).to_have_count(0)
+        assert not h.unhandled,h.unhandled
+        await h.close()
+
+    async def delete_hidden_trash_reports_and_reveals():
+        h=FilesHarness(browser)
+        h.entries["fld-test"]={"": []}
+        h.trash["fld-test"]=[{"id":"trash-1","original_path":"old.txt","name":"old.txt",
+                             "kind":"file","deleted_at":TIME,"size_bytes":12}]
+        await h.start("/files")
+        h.page.once("dialog",lambda dialog: asyncio.create_task(dialog.accept("Документы")))
+        await h.page.locator(".ux-folder-card button.danger").click()
+        blockers=h.page.locator(".folder-delete-blockers")
+        await expect(blockers).to_contain_text("Элементов корзины: 1")
+        await blockers.get_by_role("button",name="Открыть корзину этой папки").click()
+        trash=h.page.locator(".file-trash-section")
+        await expect(trash).to_contain_text("old.txt")
+        h.page.once("dialog",lambda dialog: asyncio.create_task(dialog.accept()))
+        await trash.get_by_role("button",name="Удалить навсегда").click()
+        assert not h.trash["fld-test"]
+        h.page.once("dialog",lambda dialog: asyncio.create_task(dialog.accept("Документы")))
+        await h.page.locator(".ux-folder-card button.danger").click()
+        await expect(h.page.locator(".ux-folder-card")).to_have_count(0)
+        await h.close()
+
+    async def delete_hidden_orphan_never_autoremoves():
+        h=FilesHarness(browser)
+        h.entries["fld-test"]={"": []}
+        h.orphan_upload_artifacts["fld-test"]=1
+        await h.start("/files")
+        h.page.once("dialog",lambda dialog: asyncio.create_task(dialog.accept("Документы")))
+        await h.page.locator(".ux-folder-card button.danger").click()
+        blockers=h.page.locator(".folder-delete-blockers")
+        await expect(blockers).to_contain_text("Скрытых файлов загрузок: 1")
+        await blockers.get_by_role("button",name="Просмотреть незавершённые загрузки").click()
+        await expect(h.page.locator(".file-pending-uploads")).to_contain_text("Действующих незавершённых загрузок нет")
+        assert h.orphan_upload_artifacts["fld-test"]==1
+        assert await h.page.locator(".ux-folder-card").count()==1
+        assert not [r for r in h.requests if "/uploads/" in r[1] and r[0]=="DELETE"]
+        await h.close()
+
     scenarios=[
         ("FILES-01: list/open/nested navigation",basic_folders),
         ("FILES-02: mkdir/move/delete/trash listing",directories_and_move),
@@ -535,6 +606,9 @@ async def run_suite(browser):
         ("FILES-17: delete refuses a folder with user files",delete_nonempty_is_blocked),
         ("FILES-18: non-managers cannot delete logical folders",delete_folder_requires_admin),
         ("FILES-19: unfinished uploads and trash prevent deletion",delete_with_pending_upload_or_trash_blocked),
+        ("FILES-20: hidden active upload is visible and cancellable",delete_hidden_upload_reports_and_cancel),
+        ("FILES-21: hidden trash is identified and accessible",delete_hidden_trash_reports_and_reveals),
+        ("FILES-22: orphan upload metadata is never deleted automatically",delete_hidden_orphan_never_autoremoves),
     ]
     failures=[]
     for name, fn in scenarios:

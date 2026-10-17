@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 )
 
@@ -12,62 +13,108 @@ import (
 // data, unfinished uploads, recoverable trash, or unknown hidden entries.
 var ErrLogicalFolderNotEmpty = errors.New("logical folder contains files, directories, uploads or trashed items")
 
-// CheckEmptyLogicalFolder never writes. It allows only a completely empty
-// logical folder or an empty internal trash-directory scaffold.
-func CheckEmptyLogicalFolder(root string) error {
+// FolderRemovalBlockers reports which entries hidden from ordinary file listing
+// prevent deletion. Counts are diagnostic only: nothing here removes data.
+type FolderRemovalBlockers struct {
+	VisibleEntries  int `json:"visible_entries"`
+	UploadArtifacts int `json:"upload_artifacts"`
+	TrashItems      int `json:"trash_items"`
+	TrashMetadata   int `json:"trash_metadata"`
+	OtherHidden     int `json:"other_hidden"`
+}
+
+func (b FolderRemovalBlockers) HasBlockers() bool {
+	return b.VisibleEntries > 0 || b.UploadArtifacts > 0 ||
+		b.TrashItems > 0 || b.TrashMetadata > 0 || b.OtherHidden > 0
+}
+
+// InspectLogicalFolderForDeletion uses Lstat/ReadDir and never follows
+// symlinks or removes files. A malformed trash layout fails closed.
+// Upload artifacts are counted whether or not their session metadata is valid.
+func InspectLogicalFolderForDeletion(root string) (FolderRemovalBlockers, error) {
+	var blockers FolderRemovalBlockers
 	info, err := os.Lstat(root)
 	if err != nil {
-		return fmt.Errorf("inspect logical folder before deletion: %w", err)
+		return blockers, fmt.Errorf("inspect logical folder before deletion: %w", err)
 	}
 	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
-		return errors.New("refusing to delete a symlink or non-directory logical folder")
+		return blockers, errors.New("refusing to delete a symlink or non-directory logical folder")
 	}
 	entries, err := os.ReadDir(root)
 	if err != nil {
-		return fmt.Errorf("read logical folder before deletion: %w", err)
+		return blockers, fmt.Errorf("read logical folder before deletion: %w", err)
 	}
-	if len(entries) == 0 {
-		return nil
+	for _, entry := range entries {
+		switch {
+		case entry.Name() == trashDirName:
+			if err := inspectFolderTrashForDeletion(root, &blockers); err != nil {
+				return blockers, err
+			}
+		case strings.HasPrefix(entry.Name(), uploadPrefix):
+			blockers.UploadArtifacts++
+		default:
+			blockers.VisibleEntries++
+		}
 	}
-	if len(entries) != 1 || entries[0].Name() != trashDirName {
-		return ErrLogicalFolderNotEmpty
-	}
+	return blockers, nil
+}
+
+func inspectFolderTrashForDeletion(root string, blockers *FolderRemovalBlockers) error {
 	trashRoot := filepath.Join(root, trashDirName)
-	info, err = os.Lstat(trashRoot)
+	info, err := os.Lstat(trashRoot)
 	if err != nil {
 		return fmt.Errorf("inspect logical folder trash: %w", err)
 	}
 	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
-		return ErrLogicalFolderNotEmpty
+		blockers.OtherHidden++
+		return nil
 	}
 	children, err := os.ReadDir(trashRoot)
 	if err != nil {
 		return fmt.Errorf("inspect logical folder trash: %w", err)
 	}
-	if len(children) != 2 {
-		return ErrLogicalFolderNotEmpty
-	}
-	for _, name := range []string{"items", "meta"} {
-		sub := filepath.Join(trashRoot, name)
-		info, err := os.Lstat(sub)
+	found := map[string]bool{}
+	for _, child := range children {
+		name := child.Name()
+		if name != "items" && name != "meta" {
+			blockers.OtherHidden++
+			continue
+		}
+		found[name] = true
+		dir := filepath.Join(trashRoot, name)
+		info, err := os.Lstat(dir)
 		if err != nil {
 			return fmt.Errorf("inspect logical folder trash: %w", err)
 		}
 		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
-			return ErrLogicalFolderNotEmpty
+			blockers.OtherHidden++
+			continue
 		}
-		entries, err := os.ReadDir(sub)
+		entries, err := os.ReadDir(dir)
 		if err != nil {
 			return fmt.Errorf("inspect logical folder trash: %w", err)
 		}
-		if len(entries) > 0 {
-			return ErrLogicalFolderNotEmpty
+		if name == "items" {
+			blockers.TrashItems += len(entries)
+		} else {
+			blockers.TrashMetadata += len(entries)
 		}
 	}
-	for _, child := range children {
-		if child.Name() != "items" && child.Name() != "meta" {
-			return ErrLogicalFolderNotEmpty
-		}
+	if !found["items"] || !found["meta"] {
+		blockers.OtherHidden++
+	}
+	return nil
+}
+
+// CheckEmptyLogicalFolder never writes. It allows only a completely empty
+// logical folder or an empty internal trash-directory scaffold.
+func CheckEmptyLogicalFolder(root string) error {
+	blockers, err := InspectLogicalFolderForDeletion(root)
+	if err != nil {
+		return err
+	}
+	if blockers.HasBlockers() {
+		return ErrLogicalFolderNotEmpty
 	}
 	return nil
 }

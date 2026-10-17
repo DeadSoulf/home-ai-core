@@ -304,7 +304,7 @@ func (s *server) fileFolderDelete(
 		return
 	}
 	if err := filedata.CheckEmptyLogicalFolder(root); err != nil {
-		s.writeEmptyFolderDeleteError(w, r, err)
+		s.writeEmptyFolderDeleteError(w, r, root, err)
 		return
 	}
 	active, err := s.beginSMBAccessChange(r)
@@ -317,7 +317,7 @@ func (s *server) fileFolderDelete(
 		if warning != "" {
 			s.logger.Warn("restore SMB after failed empty folder deletion", "folder_id", folder.ID, "warning", warning)
 		}
-		s.writeEmptyFolderDeleteError(w, r, err)
+		s.writeEmptyFolderDeleteError(w, r, root, err)
 		return
 	}
 	if err := s.state.DeleteNASFolder(r.Context(), folder.ID); err != nil {
@@ -346,9 +346,14 @@ func (s *server) fileFolderDelete(
 	writeJSON(w, http.StatusOK, map[string]any{"warning": warning})
 }
 
-func (s *server) writeEmptyFolderDeleteError(w http.ResponseWriter, r *http.Request, err error) {
+func (s *server) writeEmptyFolderDeleteError(w http.ResponseWriter, r *http.Request, root string, err error) {
 	if errors.Is(err, filedata.ErrLogicalFolderNotEmpty) {
-		writeAPIError(w, r, http.StatusConflict, "file_folder_not_empty", "folder contains files, directories, unfinished uploads or trash; empty it before deletion", nil)
+		var details map[string]any
+		if blockers, inspectErr := filedata.InspectLogicalFolderForDeletion(root); inspectErr == nil {
+			details = map[string]any{"blockers": blockers}
+		}
+		writeAPIError(w, r, http.StatusConflict, "file_folder_not_empty",
+			"folder contains files, hidden upload artifacts, trash data or unrecognized entries; inspect blockers before deletion", details)
 		return
 	}
 	writeAPIError(w, r, http.StatusBadGateway, "file_folder_storage_unavailable", err.Error(), nil)
