@@ -42,6 +42,44 @@ The last server URL and username are stored in `%APPDATA%\HomeAI\windows-client.
 
 Once the background agent is enabled, the tray menu includes **Settings** and **Sync now**. Double-clicking the tray icon opens the settings window. If the agent is already running, GUI **Sync now** signals that existing scheduler instead of starting another one.
 
+## Windows display and transfer activity
+
+The Windows settings window has a **Per-Monitor v2 DPI-aware** embedded
+manifest and opts in to **Common Controls v6**. Text and controls are
+recreated/repositioned on monitor-DPI changes (100%, 125%, 150%, 200%) and
+on window resizing. The compact Figma design (976 × 635 at 96 DPI) is the
+minimum size, and the main pane grows with the desktop.
+
+Connection, Synchronization, Backups, Settings and Transfers share consistent
+section outlines, headings, status presentation and owner-drawn buttons.
+The **Transfers / Передачи** page shows actual current file upload bytes
+and completed/total items, with a frequently refreshed history of file
+results (including background sync and persistent queue runs).
+This is the progress of the *current file*, not a guessed total-time estimate.
+
+Progress is stored atomically in `<sync-profiles.json>.transfer-progress.json`.
+Recent completed, unchanged, skipped and failed transfer events are stored in
+`<sync-profiles.json>.transfer-history.jsonl`; the event log rotates at 4 MiB,
+keeping one previous segment. The GUI shows up to 50 recent events and
+marks progress as stale if a running transfer stops updating for two minutes.
+The files contain paths, profile/job identifiers, timestamps, status and
+sanitized error text, **not passwords or tokens**. They use the same
+`--config` path as the agent and settings UI; the default queue command
+also writes to the default sync-profile path.
+
+For a local or CI build, generate the embedded Windows resources before
+building the executable:
+
+```sh
+sh ./scripts/build-windows-client-resource.sh amd64
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o home-ai-windows-client.exe ./cmd/home-ai-windows-client
+```
+
+The script uses a pinned `go-winres` version and creates a package-local
+`rsrc_windows_amd64.syso` with the manifest. Release and CI workflows
+invoke the same step automatically; a raw `go build` without that step
+does not embed the manifest.
+
 ## PowerShell authentication
 
 Set the password only for the current PowerShell process:
@@ -205,7 +243,7 @@ The installed client can also discover, download, verify and hand off the newest
 
 ## Current limitations
 
-- the first native settings UI focuses on connection, sync profiles and agent control; richer transfer history/progress is still deferred;
+- the Transfers page now reports sync and queue operations; aggregate transfer ETA, advanced history filtering and immediate one-off CLI copy/upload history are not yet implemented;
 - release update is currently an explicit `client update` action; background update checks and unattended installation are deferred;
 - a conventional Windows installer / Start Menu / uninstall entry is still deferred;
 - no bidirectional sync or local-delete propagation;
