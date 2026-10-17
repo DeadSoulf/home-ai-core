@@ -28,10 +28,12 @@ type Store interface {
 }
 
 type Registry struct {
-	store       Store
-	coreVersion string
-	mu          sync.Mutex
-	helper      func(context.Context, string, string, string) (helperModuleResult, error)
+	store         Store
+	coreVersion   string
+	mu            sync.Mutex
+	helper        func(context.Context, string, string, string) (helperModuleResult, error)
+	upgradeHelper func(context.Context, string, string, string, string) (helperModuleResult, error)
+	videoMount    func(context.Context) (string, error)
 }
 
 func NewRegistry(store Store, coreVersion ...string) *Registry {
@@ -40,9 +42,10 @@ func NewRegistry(store Store, coreVersion ...string) *Registry {
 		version = strings.TrimSpace(coreVersion[0])
 	}
 	return &Registry{
-		store:       store,
-		coreVersion: version,
-		helper:      callModuleHelper,
+		store:         store,
+		coreVersion:   version,
+		helper:        callModuleHelper,
+		upgradeHelper: callModuleUpgradeHelper,
 	}
 }
 

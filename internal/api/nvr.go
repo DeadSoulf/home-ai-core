@@ -94,7 +94,7 @@ func (s *server) nvrReady(w http.ResponseWriter, r *http.Request) bool {
 
 // No connection pooling, redirect-following, environmental proxy, forwarded
 // cookies, Authorization header, or client-selected destination.
-func (s *server) nvrRequest(ctx context.Context, method, endpoint string, payload []byte) (*http.Response, error) {
+func (s *server) nvrRequest(ctx context.Context, method, endpoint string, payload []byte, mediaRange ...string) (*http.Response, error) {
 	address, err := s.nvrAddress(ctx)
 	if err != nil {
 		return nil, err
@@ -110,6 +110,9 @@ func (s *server) nvrRequest(ctx context.Context, method, endpoint string, payloa
 	}
 	if method == http.MethodPost {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	if strings.HasPrefix(endpoint, "/output/video/") && len(mediaRange) != 0 {
+		req.Header.Set("Range", mediaRange[0])
 	}
 	transport := &http.Transport{
 		Proxy: nil, DisableKeepAlives: true,
@@ -182,7 +185,7 @@ func (s *server) nvrCameras(w http.ResponseWriter, r *http.Request, _ security.A
 
 func validNVROutputPath(value string) bool {
 	parts := strings.Split(value, "/")
-	if len(parts) != 3 || (parts[0] != "recordings" && parts[0] != "hls") {
+	if len(parts) != 3 || (parts[0] != "recordings" && parts[0] != "hls" && parts[0] != "video") {
 		return false
 	}
 	for _, part := range parts[1:] {
@@ -190,7 +193,7 @@ func validNVROutputPath(value string) bool {
 			return false
 		}
 	}
-	if parts[0] == "recordings" {
+	if parts[0] == "recordings" || parts[0] == "video" {
 		return strings.HasSuffix(parts[2], ".mp4")
 	}
 	return strings.HasSuffix(parts[2], ".m3u8") || strings.HasSuffix(parts[2], ".ts")
@@ -325,6 +328,68 @@ func (s *server) nvrControlCamera(w http.ResponseWriter, r *http.Request, actor 
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
+// Only the module ID from the authenticated route is used as an upstream
+// path segment. The NVR resolves the configured camera credentials internally.
+func (s *server) nvrLive(w http.ResponseWriter, r *http.Request, actor security.Actor, source authSource) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	if !s.nvrReady(w, r) {
+		return
+	}
+	id, action := r.PathValue("cameraID"), r.PathValue("action")
+	if !nvrSafeSegment.MatchString(id) || id == ".." || (action != "start" && action != "stop") {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_camera_operation", "Unsupported live preview operation", nil)
+		return
+	}
+	var upstream struct {
+		OK  bool   `json:"ok"`
+		Key string `json:"key"`
+	}
+	if !s.nvrJSON(w, r, http.MethodPost, "/api/nvr/live/"+id+"/"+action, []byte("{}"), &upstream) {
+		return
+	}
+	result := map[string]any{"ok": upstream.OK}
+	if action == "start" && upstream.OK {
+		// The stream key is derived locally, not trusted from the upstream.
+		// This avoids arbitrary file URLs or escapes in the response.
+		result["playlist_url"] = "/api/v1/nvr/output/hls/camera_" + id + "/index.m3u8"
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *server) nvrDeleteCamera(w http.ResponseWriter, r *http.Request, actor security.Actor, source authSource) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	if !s.nvrReady(w, r) {
+		return
+	}
+	id := r.PathValue("cameraID")
+	if !nvrSafeSegment.MatchString(id) || id == ".." {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_camera_id", "Invalid camera ID", nil)
+		return
+	}
+	// Retain the recording files and index. A separate, deliberately
+	// destructive workflow must be implemented before deletion of archives.
+	var upstream struct {
+		OK      bool `json:"ok"`
+		Deleted bool `json:"deleted"`
+	}
+	if !s.nvrJSON(w, r, http.MethodDelete, "/api/nvr/cameras/"+id, nil, &upstream) {
+		return
+	}
+	if !upstream.Deleted {
+		writeAPIError(w, r, http.StatusNotFound, "nvr_camera_not_found", "Camera not found", nil)
+		return
+	}
+	s.security.RecordAudit(r.Context(), s.securityRequestContext(r), actor, "nvr.camera.remove", "nvr.camera", id, "success",
+		map[string]any{"recordings_preserved": true})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "recordings_preserved": true})
+}
+
 func (s *server) nvrOutput(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
 	if !s.nvrReady(w, r) {
 		return
@@ -342,13 +407,13 @@ func (s *server) nvrOutput(w http.ResponseWriter, r *http.Request, _ security.Ac
 		s.nvrRecordingFile(w, r, path)
 		return
 	}
-	response, err := s.nvrRequest(r.Context(), http.MethodGet, "/output/"+path, nil)
+	response, err := s.nvrRequest(r.Context(), http.MethodGet, "/output/"+path, nil, r.Header.Get("Range"))
 	if err != nil {
 		writeAPIError(w, r, http.StatusBadGateway, "nvr_unavailable", "NVR media is unavailable", nil)
 		return
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
+	if response.StatusCode != http.StatusOK && response.StatusCode != http.StatusPartialContent {
 		writeAPIError(w, r, http.StatusBadGateway, "nvr_media_unavailable", "NVR media could not be read", nil)
 		return
 	}
@@ -363,10 +428,16 @@ func (s *server) nvrOutput(w http.ResponseWriter, r *http.Request, _ security.Ac
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "private, no-store")
 	w.Header().Set("Content-Disposition", "inline")
+	if strings.HasPrefix(path, "video/") {
+		w.Header().Set("Accept-Ranges", "bytes")
+		if value := response.Header.Get("Content-Range"); response.StatusCode == http.StatusPartialContent && value != "" {
+			w.Header().Set("Content-Range", value)
+		}
+	}
 	if count, err := strconv.ParseInt(response.Header.Get("Content-Length"), 10, 64); err == nil && count >= 0 {
 		w.Header().Set("Content-Length", fmt.Sprint(count))
 	}
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(response.StatusCode)
 	_, _ = io.Copy(w, response.Body)
 }
 

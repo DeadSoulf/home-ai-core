@@ -67,3 +67,26 @@ func TestStoragePurposeRejectsInvalidPurpose(t *testing.T) {
 		t.Fatal("invalid storage purpose was accepted")
 	}
 }
+
+func TestModuleStoragePurposeSchemaMigrationAndValidation(t *testing.T) {
+	ctx := context.Background()
+	db, err := Open(ctx, t.TempDir())
+	if err != nil { t.Fatal(err) }
+	defer db.Close()
+	for _, good := range []string{"module:nvr.module", "module:reference.module", "files"} {
+		if got, err := NormalizeStoragePurpose(good); err != nil || got != good {
+			t.Fatalf("valid purpose %q rejected: %q %v", good, got, err)
+		}
+	}
+	for _, bad := range []string{"module:", "module:UPPERCASE", "module:../bad", "module:test/escape", "module:nvr.module; rm -rf /", "backup"} {
+		if _, err := NormalizeStoragePurpose(bad); err == nil {
+			t.Fatalf("unsafe module purpose accepted %q", bad)
+		}
+	}
+	record, err := db.SetStoragePurpose(ctx, "/dev/sdz1", "nvr-test-uuid", "module:nvr.module", time.Now())
+	if err != nil || record.Purpose != "module:nvr.module" { t.Fatalf("failed module storage assign: %#v %v", record, err) }
+	all, err := db.ListStoragePurposes(ctx)
+	if err != nil || len(all) != 1 || all[0].Purpose != "module:nvr.module" {
+		t.Fatalf("module purpose missing after migration: %+v %v", all, err)
+	}
+}

@@ -163,3 +163,82 @@ func (s *server) moduleCatalogInstall(
 	)
 	writeJSON(w, http.StatusAccepted, map[string]any{"job": job})
 }
+
+func (s *server) moduleCatalogUpgrade(w http.ResponseWriter, r *http.Request, actor security.Actor, source authSource) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	id := strings.TrimSpace(r.PathValue("moduleID"))
+	// Only the official NVR is currently eligible for rollback-capable upgrades.
+	if id != "nvr.module" {
+		writeAPIError(w, r, http.StatusConflict, "module_upgrade_not_supported",
+			"Safe upgrades are currently supported for NVR only", nil)
+		return
+	}
+	if _, err := s.modules.Get(r.Context(), id); err != nil {
+		writeAPIError(w, r, http.StatusNotFound, "module_not_found", "Module is not installed", nil)
+		return
+	}
+	catalog, err := loadOfficialModuleCatalog(r)
+	if err != nil {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "module_catalog_unavailable", err.Error(), nil)
+		return
+	}
+	var candidate *modules.Manifest
+	for i := range catalog.Modules {
+		if catalog.Modules[i].ID == id {
+			candidate = &catalog.Modules[i]
+			break
+		}
+	}
+	if candidate == nil {
+		writeAPIError(w, r, http.StatusNotFound, "module_not_in_catalog", "Module not present in official catalog", nil)
+		return
+	}
+	raw, err := json.Marshal(candidate)
+	if err != nil {
+		writeAPIError(w, r, http.StatusInternalServerError, "module_job_failed", "Prepare upgrade failed", nil)
+		return
+	}
+	meta := metadataFromContext(r.Context())
+	job, err := s.submitModuleJob(r.Context(), state.JobRecord{
+		Type:      "module.upgrade",
+		ActorType: actor.Type, ActorID: actor.ID,
+		RequestID: meta.RequestID, CorrelationID: meta.CorrelationID,
+		Input: map[string]any{"module_id": id, "manifest_json": string(raw)},
+	})
+	if err != nil {
+		writeModuleSubmitError(w, r, err)
+		return
+	}
+	s.security.RecordAudit(r.Context(), s.securityRequestContext(r), actor,
+		"modules.catalog.upgrade.queued", "module", id, "success",
+		map[string]any{"version": candidate.Version, "job_id": job.ID})
+	writeJSON(w, http.StatusAccepted, map[string]any{"job": job})
+}
+
+func (s *server) nvrAttachStorage(w http.ResponseWriter, r *http.Request, actor security.Actor, source authSource) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	if !s.nvrReady(w, r) {
+		return
+	}
+	meta := metadataFromContext(r.Context())
+	job, err := s.submitModuleJob(r.Context(), state.JobRecord{
+		Type:      "module.storage.attach",
+		ActorType: actor.Type, ActorID: actor.ID,
+		RequestID: meta.RequestID, CorrelationID: meta.CorrelationID,
+		Input: map[string]any{"module_id": "nvr.module"},
+	})
+	if err != nil {
+		writeModuleSubmitError(w, r, err)
+		return
+	}
+	s.security.RecordAudit(r.Context(), s.securityRequestContext(r), actor,
+		"nvr.storage.attach.queued", "module", "nvr.module", "success",
+		map[string]any{"job_id": job.ID})
+	writeJSON(w, http.StatusAccepted, map[string]any{"job": job})
+}

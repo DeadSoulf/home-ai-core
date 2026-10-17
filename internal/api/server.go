@@ -107,6 +107,7 @@ func New(
 	s.mux.HandleFunc("GET /api/v1/modules/operations/{jobID}", s.requireAuth("modules.manage", s.moduleOperation))
 	s.mux.HandleFunc("GET /api/v1/modules/catalog", s.requireAuth("modules.read", s.moduleCatalog))
 	s.mux.HandleFunc("POST /api/v1/modules/catalog/{moduleID}/install", s.requireAuth("modules.manage", s.moduleCatalogInstall))
+	s.mux.HandleFunc("POST /api/v1/modules/catalog/{moduleID}/upgrade", s.requireAuth("modules.manage", s.moduleCatalogUpgrade))
 	s.mux.HandleFunc("POST /api/v1/modules/install", s.requireAuth("modules.manage", s.moduleInstall))
 	s.mux.HandleFunc("GET /api/v1/modules/navigation", s.requireAuth("", s.moduleNavigation))
 	// The AI provider store currently has no per-user namespaces. Until it does,
@@ -117,6 +118,7 @@ func New(
 	// The NVR UI is native to Core. It never embeds the unauthenticated
 	// module web console or makes the Docker container publicly reachable.
 	s.mux.HandleFunc("GET /api/v1/nvr/status", s.requireAuth("modules.read", s.nvrStatus))
+	s.mux.HandleFunc("POST /api/v1/nvr/storage/attach", s.requireAuth("modules.manage", s.nvrAttachStorage))
 	s.mux.HandleFunc("GET /api/v1/nvr/discovery/networks", s.requireAuth("modules.manage", s.nvrDiscoveryNetworks))
 	s.mux.HandleFunc("POST /api/v1/nvr/discovery/search", s.requireAuth("modules.manage", s.nvrDiscover))
 	s.mux.HandleFunc("GET /api/v1/nvr/cameras", s.requireAuth("modules.read", s.nvrCameras))
@@ -124,6 +126,8 @@ func New(
 	s.mux.HandleFunc("GET /api/v1/nvr/output/{path...}", s.requireAuth("modules.read", s.nvrOutput))
 	s.mux.HandleFunc("POST /api/v1/nvr/cameras", s.requireAuth("modules.manage", s.nvrAddCamera))
 	s.mux.HandleFunc("POST /api/v1/nvr/cameras/{cameraID}/{action}", s.requireAuth("modules.manage", s.nvrControlCamera))
+	s.mux.HandleFunc("POST /api/v1/nvr/cameras/{cameraID}/live/{action}", s.requireAuth("modules.read", s.nvrLive))
+	s.mux.HandleFunc("DELETE /api/v1/nvr/cameras/{cameraID}", s.requireAuth("modules.manage", s.nvrDeleteCamera))
 	s.mux.HandleFunc("GET /api/v1/modules/capabilities", s.requireAuth("modules.read", s.moduleCapabilities))
 	s.mux.HandleFunc("POST /api/v1/modules/{moduleID}/control", s.requireAuth("modules.manage", s.moduleControl))
 	s.mux.HandleFunc("DELETE /api/v1/modules/{moduleID}", s.requireAuth("modules.manage", s.moduleRemove))

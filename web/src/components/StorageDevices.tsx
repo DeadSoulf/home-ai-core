@@ -107,6 +107,7 @@ export function StorageDevices({
   const [diskName, setDiskName] = useState("");
   const [partitionPurpose, setPartitionPurpose] = useState<StoragePurpose>("files");
   const [purposes, setPurposes] = useState<StoragePurposeAssignment[]>([]);
+  const [moduleChoices, setModuleChoices] = useState<Array<{id: string; name: string}>>([]);
   const [collapsed, setCollapsed] = useState<string[]>(() =>
     expandedByDefault
       ? []
@@ -138,6 +139,12 @@ export function StorageDevices({
 
   useEffect(() => {
     void refreshPurposes();
+    if (canManage) {
+      void api.modules().then((installed) => setModuleChoices(
+        installed.filter((item) => item.status === "enabled" || item.status === "disabled")
+          .map((item) => ({id: item.manifest.id, name: item.manifest.name})),
+      )).catch(() => setModuleChoices([]));
+    }
   }, [canManage]);
 
   function purposeForNode(node: BlockNode): StoragePurposeAssignment | undefined {
@@ -864,7 +871,8 @@ export function StorageDevices({
                         {node.label && <span className="storage-inline-label">{node.label}</span>}
                         {purposeAssignment && (
                           <span className="status-badge">
-                            {t("storagePurposeFiles")}
+                            {purposeAssignment.purpose === "files" ? t("storagePurposeFiles") :
+                              "Модуль: " + (moduleChoices.find((item) => `module:${item.id}` === purposeAssignment.purpose)?.name || purposeAssignment.purpose)}
                           </span>
                         )}
                         {storageInUse && (
@@ -985,7 +993,9 @@ export function StorageDevices({
                               onChange={(event) => void changePurpose(node, event.target.value as "" | StoragePurpose)}
                             >
                               <option value="">{t("storagePurposeNone")}</option>
-                              <option value="files">{t("storagePurposeFiles")}</option>                            </select>
+                              <option value="files">{t("storagePurposeFiles")}</option>
+                              {moduleChoices.map((module) => <option key={module.id} value={`module:${module.id}`}>Модуль: {module.name}</option>)}
+                            </select>
                           </label>
                         )}
                         {node.type === "part" && (
@@ -1066,7 +1076,9 @@ export function StorageDevices({
                                   onChange={(event) => void changePurpose(node, event.target.value as "" | StoragePurpose)}
                                 >
                                   <option value="">{t("storagePurposeNone")}</option>
-                                  <option value="files">{t("storagePurposeFiles")}</option>                                </select>
+                                  <option value="files">{t("storagePurposeFiles")}</option>
+                                  {moduleChoices.map((module) => <option key={module.id} value={`module:${module.id}`}>Модуль: {module.name}</option>)}
+                                </select>
                               </label>
                             )}
                           </div>
@@ -1130,7 +1142,9 @@ export function StorageDevices({
                                 value={partitionPurpose}
                                 onChange={(event) => setPartitionPurpose(event.target.value as StoragePurpose)}
                               >
-                                <option value="files">{t("storagePurposeFiles")}</option>                              </select>
+                                <option value="files">{t("storagePurposeFiles")}</option>
+                                {moduleChoices.map((module) => <option key={module.id} value={`module:${module.id}`}>Модуль: {module.name}</option>)}
+                              </select>
                             </label>
                           </div>
                           <div className="storage-capacity-summary">

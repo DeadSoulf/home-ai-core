@@ -5,13 +5,25 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 )
 
 const (
-	StoragePurposeFiles = "files"
+	StoragePurposeFiles        = "files"
+	StoragePurposeModulePrefix = "module:"
 )
+
+var storageModuleID = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
+
+func StoragePurposeModuleID(purpose string) (string, bool) {
+	if !strings.HasPrefix(purpose, StoragePurposeModulePrefix) {
+		return "", false
+	}
+	id := strings.TrimPrefix(purpose, StoragePurposeModulePrefix)
+	return id, len(id) <= 96 && storageModuleID.MatchString(id)
+}
 
 type StoragePurposeRecord struct {
 	DevicePath     string
@@ -22,12 +34,14 @@ type StoragePurposeRecord struct {
 }
 
 func NormalizeStoragePurpose(value string) (string, error) {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case StoragePurposeFiles:
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == StoragePurposeFiles {
 		return StoragePurposeFiles, nil
-	default:
-		return "", errors.New("storage purpose must be files")
 	}
+	if _, ok := StoragePurposeModuleID(value); ok {
+		return value, nil
+	}
+	return "", errors.New("storage purpose must be files or module:<module-id>")
 }
 
 func (s *Store) SetStoragePurpose(

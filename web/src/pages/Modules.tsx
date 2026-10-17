@@ -23,6 +23,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
   const [sending, setSending] = useState(false), [uncertain, setUncertain] = useState(false);
   const [accepted, setAccepted] = useState<Job>();
   const [confirmRemove, setConfirmRemove] = useState<RegisteredModule>();
+  const [confirmUpgrade, setConfirmUpgrade] = useState<{id: string; name: string; version: string}>();
   const mutation = useRef(false);
   // Catalog outages never hide the installed registry or stop/remove controls.
   const load = useCallback(() => Promise.all([api.modules(), api.capabilities()]).then(([modules, capabilities]) => ({modules, capabilities})), []);
@@ -151,6 +152,8 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
                   onClick={() => void run(() => api.controlModule(module.manifest.id, module.status === "enabled" ? "disable" : "enable"))}>{t(module.status === "enabled" ? "moduleStop" : "moduleStart")}</button>
                 <button type="button" className="button secondary" disabled={busy || (!core.data || Boolean(core.error))}
                   onClick={() => void run(() => api.controlModule(module.manifest.id, "restart"))}>{t("moduleRestart")}</button>
+                {module.manifest.id === "nvr.module" && <button type="button" className="button secondary"
+                  disabled={busy || Boolean(core.error)} onClick={() => onSectionChange("catalog")}>Обновить модуль</button>}
               </>}
             </div>
             <div className="button-row destructive-actions"><button type="button" className="button danger" disabled={busy || (!core.data || Boolean(core.error))} onClick={() => setConfirmRemove(module)}>{t("moduleRemove")}</button></div>
@@ -184,11 +187,18 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
                 <dt>{t("coreVersion")}</dt><dd>{manifest.core}</dd></dl>
               {hint && <p className="notice">{hint}</p>}
               {resumable && <p>{u("resumeHint")}</p>}
-              {canManage && <div className="button-row"><button type="button" className="button primary"
-                disabled={busy || (!core.data || Boolean(core.error)) || Boolean(existing && !resumable)}
-                onClick={() => void run(() => resumable ? api.installModule(resumable.manifest) : api.installCatalogModule(manifest.id))}>
-                {resumable ? u("retryInstall") : existing ? t("moduleInstalled") : runtime.data?.network_ready ? t("moduleInstall") : u("installAndPrepare")}
-              </button></div>}
+              {canManage && <div className="button-row">
+                {state === "newer" && existing && manifest.id === "nvr.module" ? (
+                  <button type="button" className="button primary" disabled={busy || Boolean(core.error)}
+                    onClick={() => setConfirmUpgrade({id: manifest.id, name: manifest.name, version: manifest.version})}>
+                    Обновить до {manifest.version}
+                  </button>
+                ) : <button type="button" className="button primary"
+                  disabled={busy || (!core.data || Boolean(core.error)) || Boolean(existing && !resumable)}
+                  onClick={() => void run(() => resumable ? api.installModule(resumable.manifest) : api.installCatalogModule(manifest.id))}>
+                  {resumable ? u("retryInstall") : existing ? t("moduleInstalled") : runtime.data?.network_ready ? t("moduleInstall") : u("installAndPrepare")}
+                </button>}
+              </div>}
             </article>;
           })}
           {catalog.data.modules.length === 0 && <EmptyState>{t("moduleCatalogEmpty")}</EmptyState>}
@@ -208,6 +218,17 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
         <div className="button-row"><button type="button" className="button primary" disabled={busy || !manifestText.trim() || (!core.data || Boolean(core.error))} onClick={installManifest}>{t("moduleInstall")}</button></div>
       </Panel>
     </details>}
+    {confirmUpgrade && <ConfirmDialog title="Обновить модуль NVR?"
+      confirmLabel={"Обновить до " + confirmUpgrade.version}
+      onCancel={() => setConfirmUpgrade(undefined)}
+      onConfirm={() => {
+        const target = confirmUpgrade;
+        setConfirmUpgrade(undefined);
+        void run(() => api.upgradeCatalogModule(target.id));
+      }}>
+      <p>Обновление <strong>{confirmUpgrade.name}</strong> до {confirmUpgrade.version} остановит видеозапись на время замены контейнера.</p>
+      <p>Система сохранит базу данных и записи, проверит работоспособность новой версии и попытается восстановить предыдущий контейнер при ошибке.</p>
+    </ConfirmDialog>}
     {confirmRemove && <ConfirmDialog title={u("removeTitle")} confirmLabel={u("confirmRemove")} onCancel={() => setConfirmRemove(undefined)}
       onConfirm={() => {void run(() => api.removeModule(confirmRemove.manifest.id)); setConfirmRemove(undefined);}}>
       <p><strong>{confirmRemove.manifest.name}</strong></p><p>{u("removeHint")}</p>
