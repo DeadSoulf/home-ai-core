@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	StoragePurposeFiles = "files"
+	StoragePurposeFiles        = "files"
 	StoragePurposeModulePrefix = "module:"
 )
 
