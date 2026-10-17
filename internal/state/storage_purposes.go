@@ -11,6 +11,7 @@ import (
 
 const (
 	StoragePurposeFiles = "files"
+	StoragePurposeNVR = "nvr"
 )
 
 type StoragePurposeRecord struct {
@@ -25,8 +26,10 @@ func NormalizeStoragePurpose(value string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case StoragePurposeFiles:
 		return StoragePurposeFiles, nil
+	case StoragePurposeNVR:
+		return StoragePurposeNVR, nil
 	default:
-		return "", errors.New("storage purpose must be files")
+		return "", errors.New("storage purpose must be files or nvr")
 	}
 }
 
