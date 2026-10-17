@@ -172,3 +172,28 @@ func TestScanRejectsUnsafeCIDRBeforeNetworking(t *testing.T) {
 		}
 	}
 }
+
+
+func TestHTTPHeaderFingerprintDoesNotWaitForConnectionClose(t *testing.T) {
+	client, server := net.Pipe()
+	defer client.Close()
+	defer server.Close()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_ = server.SetDeadline(time.Now().Add(time.Second))
+		buffer := make([]byte, 512)
+		n, err := server.Read(buffer)
+		if err != nil || !strings.HasPrefix(string(buffer[:n]), "HEAD / HTTP/1.1") {
+			return
+		}
+		_, _ = server.Write([]byte("HTTP/1.1 401 Unauthorized\r\nServer: AXIS Camera\r\nContent-Length: 0\r\n\r\n"))
+		// Keep the connection open; the client must stop at the blank line.
+	}()
+	_ = client.SetDeadline(time.Now().Add(300 * time.Millisecond))
+	result := probeHTTP(client, "192.168.1.12", 80)
+	<-done
+	if result.Service != "HTTP" || result.Vendor != "Axis" || !result.Confirmed {
+		t.Fatalf("HTTP camera fingerprint failed: %#v", result)
+	}
+}
