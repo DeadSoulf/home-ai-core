@@ -385,7 +385,8 @@ export type NetworkProfileStatus = {
   profiles: NetworkProfile[];
 };
 
-export type StoragePurpose = "files";
+export type StoragePurpose = "files" | `module:${string}`;
+export type StoragePurposeOption = {id: StoragePurpose; name: string; module_id?: string};
 
 export type StoragePurposeUsage = {
   type: "file_pool";
