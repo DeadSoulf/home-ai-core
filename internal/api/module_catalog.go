@@ -203,12 +203,15 @@ func (s *server) moduleCatalogUpgrade(w http.ResponseWriter, r *http.Request, ac
 	}
 	meta := metadataFromContext(r.Context())
 	job, err := s.submitModuleJob(r.Context(), state.JobRecord{
-		Type: "module.upgrade",
+		Type:      "module.upgrade",
 		ActorType: actor.Type, ActorID: actor.ID,
 		RequestID: meta.RequestID, CorrelationID: meta.CorrelationID,
 		Input: map[string]any{"module_id": id, "manifest_json": string(raw)},
 	})
-	if err != nil { writeModuleSubmitError(w, r, err); return }
+	if err != nil {
+		writeModuleSubmitError(w, r, err)
+		return
+	}
 	s.security.RecordAudit(r.Context(), s.securityRequestContext(r), actor,
 		"modules.catalog.upgrade.queued", "module", id, "success",
 		map[string]any{"version": candidate.Version, "job_id": job.ID})
@@ -220,15 +223,20 @@ func (s *server) nvrAttachStorage(w http.ResponseWriter, r *http.Request, actor 
 		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
 		return
 	}
-	if !s.nvrReady(w, r) { return }
+	if !s.nvrReady(w, r) {
+		return
+	}
 	meta := metadataFromContext(r.Context())
 	job, err := s.submitModuleJob(r.Context(), state.JobRecord{
-		Type: "module.storage.attach",
+		Type:      "module.storage.attach",
 		ActorType: actor.Type, ActorID: actor.ID,
 		RequestID: meta.RequestID, CorrelationID: meta.CorrelationID,
 		Input: map[string]any{"module_id": "nvr.module"},
 	})
-	if err != nil { writeModuleSubmitError(w, r, err); return }
+	if err != nil {
+		writeModuleSubmitError(w, r, err)
+		return
+	}
 	s.security.RecordAudit(r.Context(), s.securityRequestContext(r), actor,
 		"nvr.storage.attach.queued", "module", "nvr.module", "success",
 		map[string]any{"job_id": job.ID})
