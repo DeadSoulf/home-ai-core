@@ -15,7 +15,7 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 )
 
-var aiPCIID = regexp.MustCompile(`^[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}.[0-7]$`)
+var aiPCIID = regexp.MustCompile(`^[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]$`)
 
 func aiAgentSupportsGPU(version string) bool {
 	parts := strings.Split(version, ".")
@@ -120,7 +120,7 @@ func (s *server) aiGPUApply(w http.ResponseWriter, r *http.Request, actor securi
 	if err != nil {
 		// Outcome may be uncertain after a disconnect: never silently
 		// resubmit a privileged side effect; ask the UI to inspect status.
-		if !errors.Is(err, context.Canceled) {
+		if !errors.Is(err, context.Canceled) && s.logger != nil {
 			s.logger.Error("AI GPU reconfiguration failed", "error", err)
 		}
 		writeAPIError(w, r, http.StatusBadGateway, "ai_gpu_apply_failed",
