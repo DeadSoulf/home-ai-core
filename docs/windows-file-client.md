@@ -22,6 +22,17 @@ Each Home-AI development release publishes two separate Windows client assets:
 home-ai-windows-client_<version>_amd64.exe
 home-ai-windows-client_<version>_amd64.exe.sha256
 
+## HTTPS certificate trust
+
+If the client reports `x509: certificate signed by unknown authority` or a
+certificate hostname mismatch, this is a server TLS identity problem, not a
+login/password failure. The GUI now displays certificate-specific guidance.
+
+See [Windows client TLS troubleshooting](windows-client-tls-troubleshooting.md)
+for the correct setup with a public-domain certificate, independently verified
+private-CA fallback and the requirement for an exact hostname SAN.
+Do not bypass TLS verification or import an unverified certificate.
+
 ## Windows client language
 
 The native Windows UI supports **Русский** and **English** in the same executable. On the first GUI launch, Russian Windows locales default to Russian; other Windows locales default to English. The language selector in the settings window applies immediately and the selection is saved for later GUI and tray sessions.
