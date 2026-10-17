@@ -25,7 +25,7 @@ func NormalizeReleaseChannel(channel string) (string, error) {
 
 type releaseParts struct {
 	major, minor, patch uint64
-	suffix string
+	suffix              string
 }
 
 func parseWindowsClientVersion(raw string) (releaseParts, bool) {
