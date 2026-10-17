@@ -98,7 +98,7 @@ func (s *server) nvrVideoStorage(w http.ResponseWriter, r *http.Request, _ secur
 		candidates[i].Active = assigned && candidates[i].FilesystemUUID == active.FilesystemUUID && verified
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"devices": candidates,
+		"devices":  candidates,
 		"assigned": assigned, "verified": verified,
 		"active": active,
 	})
@@ -198,6 +198,6 @@ func (s *server) nvrVideoStorageActivate(w http.ResponseWriter, r *http.Request,
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok": true, "device": candidate.Device,
 		"mountpoint": candidate.Mountpoint,
-		"message": "NVR video storage activated; original archive remains as a backup",
+		"message":    "NVR video storage activated; original archive remains as a backup",
 	})
 }
