@@ -80,7 +80,7 @@ func Networks() ([]Network, error) {
 			if !ok {
 				continue
 			}
-			hosts := (1 << (32 - prefix.Bits())) - 2
+			hosts := (1 << (32 - prefix.Bits())) - 3 // network, broadcast and this Core host
 			if hosts < 1 || hosts > maxNetworkHosts {
 				continue
 			}
