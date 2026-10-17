@@ -217,8 +217,9 @@ async def suite(browser):
         h=await Harness(browser,runtime=runtime).start('/modules/catalog'); await h.ready()
         button=h.page.locator('[data-catalog-id=\"demo.nvr\"] button')
         await expect(button).to_be_enabled(); await expect(button).to_contain_text('Подготовить Docker')
-        await button.click(); await expect(button).to_be_disabled()
+        await button.click()
         await expect(h.page.get_by_role('progressbar')).to_be_visible()
+        assert (await h.url()).endswith('/modules/operations')
         await expect(h.page.get_by_role('button',name='Открыть операцию')).to_be_visible()
         assert len(h.posts('/install'))==1
         h.jobs[0].update(status='succeeded',progress=10000); h.modules=[module()]
