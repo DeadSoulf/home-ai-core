@@ -7,8 +7,8 @@ import "testing"
 func TestSettingsDPIScale(t *testing.T) {
 	for _, sample := range []struct {
 		value int32
-		dpi uint32
-		want int32
+		dpi   uint32
+		want  int32
 	}{
 		{96, 96, 96},
 		{96, 120, 120},
@@ -24,11 +24,11 @@ func TestSettingsDPIScale(t *testing.T) {
 
 func TestSettingsReflowAnchors(t *testing.T) {
 	tests := []struct {
-		name string
-		base settingsLayoutRect
-		page int
+		name   string
+		base   settingsLayoutRect
+		page   int
 		dx, dy int32
-		want settingsLayoutRect
+		want   settingsLayoutRect
 	}{
 		{"sidebar stays fixed", settingsLayoutRect{16, 112, 164, 36}, -1, 320, 220, settingsLayoutRect{16, 112, 164, 36}},
 		{"list grows with client", settingsLayoutRect{224, 398, 680, 120}, settingsPageSync, 320, 220, settingsLayoutRect{224, 398, 1000, 340}},
