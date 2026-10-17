@@ -153,6 +153,39 @@ export type SystemResponse = {
   };
 };
 
+export type NVRStatus = {
+  ok: boolean;
+  service: string;
+  cameras: number;
+  max_cameras: number;
+  active_recorders: number;
+  recordings: number;
+  storage_bytes: number;
+  retention_days: number;
+  max_storage_gb: number;
+};
+
+export type NVRCamera = {
+  id: string;
+  name: string;
+  source_type: "hikvision" | "rtsp";
+  ip?: string;
+  port?: number;
+  username?: string;
+  channel?: number;
+  enabled: boolean;
+  recording: boolean;
+};
+
+export type NVRRecording = {
+  id: number;
+  camera_id: string;
+  started_at: number;
+  ended_at: number;
+  size_bytes: number;
+  play_url?: string;
+};
+
 export type RegisteredModule = {
   manifest: {
     schema_version: number;

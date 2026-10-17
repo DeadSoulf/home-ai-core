@@ -1,0 +1,18 @@
+.nvr-page .nvr-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 18px 0; }
+.nvr-page .nvr-stat { border: 1px solid var(--border, #d9e0e8); border-radius: 12px; background: var(--surface, transparent); padding: 16px; min-width: 0; }
+.nvr-page .nvr-stat small { display: block; opacity: .7; margin-bottom: 8px; }
+.nvr-page .nvr-stat strong { font-size: 1.45rem; }
+.nvr-page .nvr-camera-list { display: grid; gap: 10px; margin-top: 14px; }
+.nvr-page .nvr-camera { padding: 14px; border: 1px solid var(--border, #d9e0e8); border-radius: 10px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 14px; align-items: center; }
+.nvr-page .nvr-camera p { margin: 5px 0 0; }
+.nvr-page .nvr-camera-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; padding: 14px; margin-top: 14px; border: 1px solid var(--border, #d9e0e8); border-radius: 10px; }
+.nvr-page .nvr-camera-form label, .nvr-page .nvr-archive-filter label { display: flex; flex-direction: column; gap: 5px; }
+.nvr-page .nvr-camera-form input, .nvr-page .nvr-camera-form select, .nvr-page .nvr-archive-filter select { width: 100%; max-width: 100%; border-radius: 7px; padding: 9px; }
+.nvr-page .nvr-camera-form .button-row { align-self: end; }
+.nvr-page .nvr-archive-filter { max-width: 300px; margin: 12px 0; }
+.nvr-page .nvr-player { margin: 15px 0; max-width: 900px; }
+.nvr-page .nvr-player video { width: 100%; max-height: 540px; background: #121212; border-radius: 10px; }
+.nvr-page .nvr-active { color: #2c9956; }
+.nvr-page .nvr-notice-error { padding: 12px; color: #b42318; border: 1px solid currentColor; border-radius: 8px; }
+.nvr-page .nvr-notice-success { padding: 12px; border: 1px solid var(--border, #d9e0e8); border-radius: 8px; }
+@media (max-width: 640px) { .nvr-page .nvr-camera { align-items: stretch; flex-direction: column; } }

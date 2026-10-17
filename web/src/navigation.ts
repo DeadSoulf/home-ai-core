@@ -49,7 +49,7 @@ function dynamicModuleItems(modules?: ModuleNavigationState[]): NavigationItem[]
     .flatMap((module) => (module.items || []).filter((item) => isModuleRoute(item.route) && (item.route === "/modules/" + module.module_id || item.route.startsWith("/modules/" + module.module_id + "/"))).map((item) => ({
       path: item.route,
       title: item.title,
-      permission: "security.self.read",
+      permission: module.module_id === "nvr.module" ? "modules.read" : "security.self.read",
       moduleId: module.module_id,
       order: item.order || 0,
     })))

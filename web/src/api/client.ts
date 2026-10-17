@@ -5,7 +5,7 @@ import type {
   AuthResponse,
   Job,
   RealtimeEvent,
-  RegisteredModule, ModuleNavigationState,
+  RegisteredModule, ModuleNavigationState, NVRStatus, NVRCamera, NVRRecording,
   SetupStatus,
   SystemResponse,
   UpdateStatus,
@@ -636,6 +636,20 @@ export const api = {
     const result = await postJSON<{state: UpdaterState}>("/api/v1/update/rollback", undefined, true);
     return result.state;
   },
+
+  nvrStatus: (signal?: AbortSignal) => request<NVRStatus>("/api/v1/nvr/status", {signal}),
+  nvrCameras: async (signal?: AbortSignal) =>
+    (await request<{ok: boolean; cameras: NVRCamera[]}>("/api/v1/nvr/cameras", {signal})).cameras,
+  nvrRecordings: async (cameraID?: string, signal?: AbortSignal) =>
+    (await request<{ok: boolean; recordings: NVRRecording[]}>(
+      "/api/v1/nvr/recordings" + (cameraID ? "?camera_id=" + encodeURIComponent(cameraID) : ""), {signal},
+    )).recordings,
+  nvrAddCamera: (camera: {
+    name: string; source_type: "hikvision" | "rtsp"; ip?: string; port?: number;
+    username?: string; password?: string; channel?: number; rtsp_url?: string;
+  }) => postJSON<{ok: boolean}>("/api/v1/nvr/cameras", camera, true),
+  nvrControlCamera: (id: string, action: "start" | "stop" | "restart") =>
+    postJSON<{ok: boolean}>(`/api/v1/nvr/cameras/${encodeURIComponent(id)}/${action}`, {}, true),
 
   modules: async () => {
     const result = await request<{modules: RegisteredModule[]}>("/api/v1/modules");

@@ -226,6 +226,27 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		})
 		return
 	}
+	if request.Operation == "docker.module.endpoint" {
+		// Read-only, fixed-module discovery. No endpoint or URL is taken from
+		// the client and no Docker socket is exposed to Core.
+		if request.ModuleID != "nvr.module" {
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: "unsupported module endpoint"})
+			return
+		}
+		ctx, cancel := context.WithTimeout(parent, 8*time.Second)
+		defer cancel()
+		address, err := inspectNVRModuleAddress(ctx)
+		if err != nil {
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})
+			return
+		}
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+			OK: true, ModuleAddress: address,
+			HelperVersion:   updaterhelper.HelperVersion,
+			ProtocolVersion: updaterhelper.ProtocolVersion,
+		})
+		return
+	}
 	if strings.HasPrefix(request.Operation, "docker.module.") {
 		_ = conn.SetDeadline(time.Now().Add(31 * time.Minute))
 		ctx, cancel := context.WithTimeout(parent, 30*time.Minute)
