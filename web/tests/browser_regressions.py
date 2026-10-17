@@ -37,7 +37,7 @@ class Harness:
         self.system_delay=0; self.system_status=200; self.catalog_status=200; self.runtime_status=200; self.nav_status=200
         self.requests=[]; self.errors=[]; self.system_active=0; self.system_max=0; self.calls=0
         self.ai_providers=[]; self.ai_conversations=[]; self.ai_approvals=[]; self.ai_messages={}
-        self.ai_gpus=[]; self.ai_installed=['qwen3:0.6b']; self.ai_download_status='ready'
+        self.ai_gpus=[]; self.ai_assigned=[]; self.ai_installed=['qwen3:0.6b']; self.ai_download_status='ready'
         self.overrides={}; self.unhandled=[]; self.offline=os.environ.get('UI_OFFLINE')=='1'
         for k,v in kw.items(): setattr(self,k,v)
     async def start(self,path='/modules',width=1440):
@@ -129,6 +129,11 @@ class Harness:
                         memory=dict(total_bytes=17179869184,available_bytes=8589934592),
                         gpus=self.ai_gpus,
                     ))
+                elif sub=='gpu/assignment' and method=='GET':
+                    await respond(dict(assigned_gpu_pci=self.ai_assigned,mode='nvidia' if self.ai_assigned else 'cpu'))
+                elif sub=='gpu/assignment' and method=='POST':
+                    self.ai_assigned=request.post_data_json['pci_addresses']
+                    await respond(dict(assigned_gpu_pci=self.ai_assigned,mode='nvidia' if self.ai_assigned else 'cpu'))
                 elif sub=='local/status' and method=='GET':
                     await respond(dict(enabled=True,engine_state='ready',model_state=self.ai_download_status,
                                        active_model='qwen3:0.6b',cpu_first=True,ram_bytes=17179869184,
@@ -501,6 +506,17 @@ async def suite(browser):
         await h.page.locator('.ai-gpu-device input').last.check()
         await expect(h.page.get_by_text('Выбрано GPU:',exact=False)).to_contain_text('2')
         assert await h.page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
+        assert h.ai_assigned==[], 'GPU must not auto-allocate after hot plug'
+        h.page.once('dialog',lambda d: asyncio.create_task(d.accept()))
+        await h.page.get_by_role('button',name='Применить выбранные GPU').click()
+        await expect(h.page.get_by_text('Текущий режим:',exact=False)).to_contain_text('NVIDIA GPU')
+        assert len(h.ai_assigned)==2, h.ai_assigned
+        await h.page.locator('.ai-gpu-device input').first.uncheck()
+        await h.page.locator('.ai-gpu-device input').last.uncheck()
+        h.page.once('dialog',lambda d: asyncio.create_task(d.accept()))
+        await h.page.get_by_role('button',name='Переключить на CPU').click()
+        await expect(h.page.get_by_text('Текущий режим:',exact=False)).to_contain_text('CPU')
+        assert h.ai_assigned==[]
         h.page.once('dialog',lambda d: asyncio.create_task(d.accept()))
         await h.page.locator('.ai-model-entry').filter(has_text='qwen3:1.7b').get_by_role('button',name='Загрузить').click()
         assert any(p=='/api/v1/ai/local/pull' for _,p,_ in h.requests)
