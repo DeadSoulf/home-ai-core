@@ -33,20 +33,20 @@ const (
 )
 
 const (
-	settingsIDNavOverview      = 2101
-	settingsIDNavConnection    = 2102
-	settingsIDNavSync          = 2103
-	settingsIDNavBackup        = 2104
-	settingsIDNavGeneral       = 2105
-	settingsIDOpenLocal        = 2106
-	settingsIDBackupProfile    = 2107
-	settingsIDSaveSchedule     = 2108
-	settingsIDNavTransfers     = 2109
-	settingsIDRefreshTransfers = 2110
-	settingsIDUpdateChannel    = 2111
-	settingsIDUpdateCheck      = 2112
-	settingsIDUpdateInstall    = 2113
-	settingsIDTrustCertificate = 2114
+	settingsIDNavOverview       = 2101
+	settingsIDNavConnection     = 2102
+	settingsIDNavSync           = 2103
+	settingsIDNavBackup         = 2104
+	settingsIDNavGeneral        = 2105
+	settingsIDOpenLocal         = 2106
+	settingsIDBackupProfile     = 2107
+	settingsIDSaveSchedule      = 2108
+	settingsIDNavTransfers      = 2109
+	settingsIDRefreshTransfers  = 2110
+	settingsIDUpdateChannel     = 2111
+	settingsIDUpdateCheck       = 2112
+	settingsIDUpdateInstall     = 2113
+	settingsIDTrustCertificate  = 2114
 	settingsIDForgetCertificate = 2115
 
 	settingsWSGroup      = 0x00020000
@@ -59,7 +59,7 @@ const (
 	settingsSSIcon       = 0x00000003
 	settingsSTMSetIcon   = 0x0170
 	settingsWMKeyDown    = 0x0100
-	settingsENChange = 0x0300
+	settingsENChange     = 0x0300
 	settingsVKTab        = 0x09
 	settingsVKShift      = 0x10
 	settingsVKControl    = 0x11
