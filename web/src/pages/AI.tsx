@@ -3,12 +3,13 @@ import {api} from "../api/client";
 import type {AIApproval, AIConversation, AIMessage, AIProvider, AIStatus} from "../api/types";
 import {Panel} from "../components/Panel";
 import {PageHeading} from "./Dashboard";
+import {AILocalPage} from "./AILocal";
 import "./AI.css";
 
-type AITab = "chat" | "providers" | "approvals";
+type AITab = "chat" | "local" | "providers" | "approvals";
 const messageOf = (error: unknown) => error instanceof Error ? error.message : String(error);
 const tabNames: Record<AITab, string> = {
-  chat: "Чат", providers: "AI-провайдеры", approvals: "Подтверждения",
+  chat: "Чат", local: "Локальный AI", providers: "AI-провайдеры", approvals: "Подтверждения",
 };
 
 export function AIPage() {
@@ -30,6 +31,7 @@ export function AIPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [gpuNotice, setGpuNotice] = useState<string[]>([]);
 
   const reload = useCallback(async () => {
     const [nextStatus, nextProviders, nextConversations, nextApprovals] = await Promise.all([
@@ -116,7 +118,7 @@ export function AIPage() {
   return <div className="page ai-page">
     <PageHeading title="AI Agent" subtitle="Локальные модели и внешние AI — через защищённый интерфейс HomeAICore" />
     <nav className="ai-tabs" aria-label="Разделы AI Agent">
-      {(["chat", "providers", "approvals"] as const).map((item) =>
+      {(["chat", "local", "providers", "approvals"] as const).map((item) =>
         <button key={item} type="button" className={"button " + (tab === item ? "primary" : "secondary")}
           aria-current={tab === item ? "page" : undefined}
           onClick={() => {setTab(item); setError(""); setNotice("");}}>
@@ -129,9 +131,24 @@ export function AIPage() {
     {loading && !status && <p role="status">Подключение к AI-модулю…</p>}
     {error && <p className="ai-error" role="alert">{error}</p>}
     {notice && <p className="ai-notice" role="status">{notice}</p>}
+    {gpuNotice.length > 0 && <div className="ai-notice" role="status">
+      Новое оборудование: {gpuNotice.join(", ")}.
+      <button type="button" className="button secondary" onClick={() => {setTab("local"); setGpuNotice([]);}}>
+        Посмотреть доступные GPU
+      </button>
+    </div>}
 
     {status && <p className="ai-status">AI Agent {status.version} · Подключено моделей: {status.providers} ·
       Выполнение команд ядра: {status.core_actions_enabled ? "включено" : "отключено"}</p>}
+
+    {/* Always mounted: GPU hot-plug events are detected while using chat too. */}
+    <div hidden={tab !== "local"}>
+      <AILocalPage
+        onNewGPU={(names) => setGpuNotice(names)}
+        onModelsReady={() => {void reload().catch(() => {});}}
+        onOpenChat={() => {void reload().then(() => setTab("chat")).catch((err: unknown) => setError(messageOf(err)));}}
+      />
+    </div>
 
     {tab === "chat" && <section aria-label="Чат с AI">
       <Panel title="Разговор с агентом">
