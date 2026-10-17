@@ -55,7 +55,7 @@ func (s *server) nvrLiveCamera(w http.ResponseWriter, r *http.Request, actor sec
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok": true,
+		"ok":           true,
 		"playlist_url": "/api/v1/nvr/output/" + relative,
 	})
 }
