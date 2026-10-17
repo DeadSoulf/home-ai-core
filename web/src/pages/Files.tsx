@@ -4,6 +4,7 @@ import { ErrorNotice } from "../components/ErrorNotice";
 import { describeFileError } from "../ui/fileErrors";
 import type { StoragePurposeAssignment } from "../api/types";
 import { FolderSettings } from "../components/FolderSettings";
+import {NVRDiskSetup} from "../components/NVRDiskSetup";
 import { SectionGuide } from "../components/SectionGuide";
 import { filesGuides } from "../ui/experience";
 import { useUI } from "../ui/useUI";
@@ -1133,6 +1134,12 @@ export function FilesPage({
       )}
 
       {canManage && section === "windows" && !smbStatus && !loadErrors?.smb && <div className="notice">{t("fileSMBUnavailable")}</div>}
+      {canManage && canManageStorage && canReadSystem && section === "storage" && (
+        <Panel title="Физические диски для NVR" className="wide">
+          <NVRDiskSetup onChanged={resource.reload} />
+        </Panel>
+      )}
+
       {canManage && section === "storage" && (
         <Panel title={t("filePoolsTitle")} className="wide">
           <div className="table-wrap">

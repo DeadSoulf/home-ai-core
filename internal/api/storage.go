@@ -86,6 +86,13 @@ func (s *server) storageOperation(
 				return
 			}
 			usage := storageUsageForNode(node, pools)
+			nvrUsage, usageErr := s.nvrStorageUsage(r.Context(), node)
+			if usageErr != nil {
+				writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_storage_usage_unavailable",
+					"NVR disk safety state is unavailable", nil)
+				return
+			}
+			usage = append(usage, nvrUsage...)
 			if len(usage) > 0 {
 				writeAPIError(
 					w,

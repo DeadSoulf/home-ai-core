@@ -12,6 +12,7 @@ type Request struct {
 	CurrentVersion  string            `json:"current_version,omitempty"`
 	Device          string            `json:"device,omitempty"`
 	Mountpoint      string            `json:"mountpoint,omitempty"`
+	FilesystemUUID  string            `json:"filesystem_uuid,omitempty"`
 	Filesystem      string            `json:"filesystem,omitempty"`
 	Label           string            `json:"label,omitempty"`
 	Confirm         string            `json:"confirm,omitempty"`
@@ -156,6 +157,7 @@ type Response struct {
 	ModuleState        string                `json:"module_state,omitempty"`
 	ContainerID        string                `json:"container_id,omitempty"`
 	ModuleAddress      string                `json:"module_address,omitempty"`
+	ModuleStorageMount string                `json:"module_storage_mount,omitempty"`
 	AIGPUPCI           []string              `json:"ai_gpu_pci,omitempty"`
 }
 

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -56,6 +57,14 @@ func (s *server) storagePurposes(
 		for _, record := range records {
 			response := storagePurposeResponseFor(record, nodes)
 			response.UsedBy = storageUsageForPurposeRecord(record, nodes, pools)
+			if node, ok := blockNodeForStoragePurpose(nodes, record); ok {
+				videoUsage, err := s.nvrStorageUsage(r.Context(), node)
+				if err != nil {
+					writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_storage_usage_unavailable", "NVR storage assignment cannot be verified", nil)
+					return
+				}
+				response.UsedBy = append(response.UsedBy, videoUsage...)
+			}
 			response.InUse = len(response.UsedBy) > 0
 			assignments = append(assignments, response)
 		}
@@ -112,14 +121,21 @@ func (s *server) storagePurposes(
 			writeAPIError(w, r, http.StatusInternalServerError, "storage_usage_unavailable", "storage usage is unavailable", nil)
 			return
 		}
-		usage := storageUsageForNode(node, pools)
-		if len(usage) > 0 && purpose != state.StoragePurposeFiles {
+		fileUsage := storageUsageForNode(node, pools)
+		videoUsage, err := s.nvrStorageUsage(r.Context(), node)
+		if err != nil {
+			writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_storage_usage_unavailable", "NVR storage assignment cannot be verified", nil)
+			return
+		}
+		usage := append(fileUsage, videoUsage...)
+		if (len(fileUsage) > 0 && purpose != state.StoragePurposeFiles) ||
+			(len(videoUsage) > 0 && purpose != state.StoragePurposeNVR) {
 			writeAPIError(
 				w,
 				r,
 				http.StatusConflict,
 				"storage_in_use",
-				"storage is used by a Home-AI file pool and cannot be reassigned or cleared",
+				"storage is used by Home-AI files or NVR recordings and cannot be reassigned or cleared",
 				map[string]any{"used_by": usage},
 			)
 			return
@@ -371,4 +387,31 @@ func pathUsesStorageMount(rootPath, mountpoint string) bool {
 		return false
 	}
 	return relative == "." || (relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)))
+}
+
+func (s *server) nvrStorageUsage(ctx context.Context, node systeminfo.BlockNode) ([]storagePurposeUsageResponse, error) {
+	repo, ok := s.state.(nvrVideoState)
+	if !ok {
+		return nil, nil
+	}
+	record, assigned, err := repo.NVRVideoStorage(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !assigned {
+		return nil, nil
+	}
+	var mounts []string
+	paths := map[string]bool{}
+	uuids := map[string]bool{}
+	collectStorageIdentity(node, &mounts, paths, uuids)
+	matched := (record.FilesystemUUID != "" && uuids[record.FilesystemUUID]) ||
+		(record.DevicePath != "" && paths[record.DevicePath])
+	if !matched {
+		return nil, nil
+	}
+	return []storagePurposeUsageResponse{{
+		Type: "nvr_video_storage", ID: "nvr.module",
+		Name: "NVR — видеозаписи", RootPath: record.Mountpoint,
+	}}, nil
 }

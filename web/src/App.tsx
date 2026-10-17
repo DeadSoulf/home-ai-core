@@ -293,7 +293,7 @@ export default function App() {
         ? <AIPage />
         : moduleRoute && allowedPath === "/modules/nvr.module" &&
         has("modules.read") && moduleNavigation?.some((item) => item.module_id === "nvr.module" && item.status === "enabled")
-        ? <NVRPage canManage={has("modules.manage")} />
+        ? <NVRPage canManage={has("modules.manage")} canManageStorage={has("storage.manage")} onNavigate={navigate} />
         : moduleRoute ? (!moduleNavigation ? navigationError ? <div className="page"><ErrorNotice error={navigationError} /><button type="button" className="button secondary" onClick={() => window.dispatchEvent(new CustomEvent("home-ai-core:modules-changed"))}>{u("retry")}</button></div> : <LoadingState /> : <ModulePage path={path} modules={moduleNavigation}
         permitted={has("security.self.read")} canReadModules={has("modules.read")} onNavigate={navigate} />)
         : dashboardAllowed ? <Dashboard actor={actor} revision={revision} onNavigate={navigate} /> : accountPage;

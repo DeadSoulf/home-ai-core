@@ -374,6 +374,29 @@ func (s *server) nvrRecordingFile(w http.ResponseWriter, r *http.Request, relati
 	dataRoot := s.nvrDataRoot
 	if dataRoot == "" {
 		dataRoot = "/var/lib/home-ai-modules/nvr.module"
+		// After activation the new NVR container overlays /data/recordings
+		// with the dedicated video disk. Serve those same bytes from the
+		// host-mounted filesystem, never the stale pre-migration backup.
+		if repo, ok := s.state.(nvrVideoState); ok {
+			active, assigned, err := repo.NVRVideoStorage(r.Context())
+			if err != nil {
+				writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_storage_unavailable",
+					"NVR video storage state is unavailable", nil)
+				return
+			}
+			if assigned {
+				ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+				mount, verifyErr := modules.NVRStorageStatus(ctx, active.FilesystemUUID)
+				cancel()
+				expected := filepath.Join(active.Mountpoint, ".home-ai-nvr", "recordings")
+				if verifyErr != nil || mount != expected {
+					writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_storage_offline",
+						"The assigned NVR recording disk is not mounted; refusing stale storage", nil)
+					return
+				}
+				dataRoot = filepath.Join(active.Mountpoint, ".home-ai-nvr")
+			}
+		}
 	}
 	root, err := os.OpenRoot(dataRoot)
 	if err != nil {

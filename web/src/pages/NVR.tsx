@@ -3,16 +3,23 @@ import {api} from "../api/client";
 import type {NVRCamera, NVRRecording, NVRStatus, NVRDiscoveryNetwork, NVRDiscoveredCamera} from "../api/types";
 import {Panel} from "../components/Panel";
 import {PageHeading} from "./Dashboard";
+import {ConfirmDialog} from "../components/ConfirmDialog";
+import {NVRLive} from "./NVRLive";
+import {NVRStorage} from "./NVRStorage";
 import "./NVR.css";
 
-type NVRTab = "cameras" | "discovery" | "archive";
+type NVRTab = "cameras" | "live" | "discovery" | "archive" | "storage";
 
 const localDate = (seconds: number) => new Date(seconds * 1000).toLocaleString();
 const bytes = (value: number) => value >= 1024 ** 3
   ? (value / (1024 ** 3)).toFixed(1) + " ГБ"
   : (value / (1024 ** 2)).toFixed(1) + " МБ";
 
-export function NVRPage({canManage}: {canManage: boolean}) {
+export function NVRPage({canManage, canManageStorage = false, onNavigate = () => {}}: {
+  canManage: boolean;
+  canManageStorage?: boolean;
+  onNavigate?: (path: string) => void;
+}) {
   const [tab, setTab] = useState<NVRTab>("cameras");
   const [status, setStatus] = useState<NVRStatus>();
   const [cameras, setCameras] = useState<NVRCamera[]>([]);
@@ -31,6 +38,9 @@ export function NVRPage({canManage}: {canManage: boolean}) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [channel, setChannel] = useState(1);
+  const [deleteTarget, setDeleteTarget] = useState<NVRCamera>();
+  const [deleteArchive, setDeleteArchive] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [networks, setNetworks] = useState<NVRDiscoveryNetwork[]>([]);
   const [selectedNetwork, setSelectedNetwork] = useState("");
   const [discovered, setDiscovered] = useState<NVRDiscoveredCamera[]>([]);
@@ -153,6 +163,21 @@ export function NVRPage({canManage}: {canManage: boolean}) {
     setTab("cameras");
   }
 
+  async function confirmDeleteCamera() {
+    if (!deleteTarget || busy) return;
+    if (deleteArchive && deleteConfirmation !== deleteTarget.name) {
+      setError("Введите название камеры точно, чтобы подтвердить удаление видеоархива.");
+      return;
+    }
+    const deleted = await act(() => api.nvrDeleteCamera(deleteTarget.id, deleteArchive),
+      deleteArchive ? "Камера и её записи удалены." : "Камера удалена. Видеоархив сохранён.");
+    if (deleted) {
+      setDeleteTarget(undefined);
+      setDeleteArchive(false);
+      setDeleteConfirmation("");
+    }
+  }
+
   const archiveSelected = selected && recordings.some((item) => item.id === selected.id) ? selected : undefined;
 
   return <div className="page nvr-page">
@@ -160,10 +185,14 @@ export function NVRPage({canManage}: {canManage: boolean}) {
     <div className="button-row">
       <button type="button" className={"button " + (tab === "cameras" ? "primary" : "secondary")}
         onClick={() => setTab("cameras")}>Камеры</button>
+      <button type="button" className={"button " + (tab === "live" ? "primary" : "secondary")}
+        onClick={() => setTab("live")}>В реальном времени</button>
       {canManage && <button type="button" className={"button " + (tab === "discovery" ? "primary" : "secondary")}
         onClick={() => setTab("discovery")}>Поиск камер</button>}
       <button type="button" className={"button " + (tab === "archive" ? "primary" : "secondary")}
         onClick={() => setTab("archive")}>Архив записей</button>
+      <button type="button" className={"button " + (tab === "storage" ? "primary" : "secondary")}
+        onClick={() => setTab("storage")}>Хранилище</button>
       <button type="button" className="button secondary" disabled={busy}
         onClick={() => { setLoading(true); void reload().then(() => setError("")).catch((e: unknown) => setError(String(e))).finally(() => setLoading(false)); }}>
         Обновить
@@ -222,10 +251,19 @@ export function NVRPage({canManage}: {canManage: boolean}) {
             {camera.enabled && <button type="button" className="button secondary" disabled={busy} onClick={() => {
               void act(() => api.nvrControlCamera(camera.id, "restart"), "Камера перезапущена");
             }}>Перезапустить</button>}
+            <button type="button" className="button danger" disabled={busy} onClick={() => {
+              setDeleteTarget(camera);
+              setDeleteArchive(false);
+              setDeleteConfirmation("");
+            }}>Удалить камеру</button>
           </div>}
         </article>)}
       </div>
     </Panel>}
+
+    {tab === "live" && <NVRLive cameras={cameras} canManage={canManage} />}
+    {tab === "storage" && <NVRStorage canManage={canManage}
+      canManageStorage={canManageStorage} onNavigate={onNavigate} />}
 
     {tab === "discovery" && canManage && <Panel title="Поиск сетевых камер">
       <p className="muted">
@@ -314,6 +352,24 @@ export function NVRPage({canManage}: {canManage: boolean}) {
         </article>)}
       </div>
     </Panel>}
+    {deleteTarget && <ConfirmDialog title={`Удалить камеру «${deleteTarget.name}»?`}
+      confirmLabel={deleteArchive ? "Удалить камеру и все записи" : "Удалить камеру"}
+      onCancel={() => { setDeleteTarget(undefined); setDeleteArchive(false); setDeleteConfirmation(""); }}
+      onConfirm={() => void confirmDeleteCamera()}>
+      <p>По умолчанию камера удаляется из списка, но её архив сохраняется.</p>
+      <label className="nvr-delete-archive">
+        <input type="checkbox" checked={deleteArchive} onChange={(event) => {
+          setDeleteArchive(event.target.checked);
+          setDeleteConfirmation("");
+        }} />
+        Также безвозвратно удалить видеоархив этой камеры
+      </label>
+      {deleteArchive && <label className="nvr-delete-confirmation">
+        Для удаления файлов введите название камеры: <strong>{deleteTarget.name}</strong>
+        <input value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} />
+      </label>}
+      {error && <p role="alert" className="nvr-notice-error">{error}</p>}
+    </ConfirmDialog>}
     <p className="muted small">Доступ к NVR защищён сессией HOME AI Core. Порт контейнера не опубликован наружу.</p>
   </div>;
 }
