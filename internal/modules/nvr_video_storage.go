@@ -48,7 +48,7 @@ func callNVRStorageHelper(ctx context.Context, req updaterhelper.Request, timeou
 
 func NVRStorageActivate(ctx context.Context, mountpoint, uuid string) (string, error) {
 	resp, err := callNVRStorageHelper(ctx, updaterhelper.Request{
-		Operation: "docker.nvr.storage.activate",
+		Operation:  "docker.nvr.storage.activate",
 		Mountpoint: mountpoint, FilesystemUUID: uuid,
 		Confirm: nvrStorageMigrationConfirm,
 	}, 31*time.Minute)
