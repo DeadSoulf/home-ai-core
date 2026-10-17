@@ -38,7 +38,7 @@ class FilesHarness(Harness):
     def __init__(self, browser, **kwargs):
         super().__init__(browser)
         self.actor["permissions"] = [
-            "security.self.read", "files.manage", "system.read", "network.read",
+            "security.self.read", "files.manage", "storage.manage", "system.read", "network.read",
             "security.users.read",
         ]
         self.folders = [copy.deepcopy(FOLDER)]
@@ -342,6 +342,60 @@ async def run_suite(browser):
         await expect(h.page.locator(".ux-folder-card")).to_have_count(1,timeout=4500)
         await h.close()
 
+    async def create_folder_and_pool():
+        h=await FilesHarness(browser).start("/files")
+        form=h.page.locator(".user-form").last
+        await form.locator("select").first.select_option("pool-test")
+        await form.locator("input").first.fill("Shared-Test")
+        await form.locator("select").nth(1).select_option("shared")
+        await form.locator("button").last.click()
+        await expect(h.page.locator(".ux-folder-card")).to_have_count(2)
+        assert any(x[1]=="/api/v1/files/folders" and x[0]=="POST" for x in h.requests)
+        await h.close()
+        h=await FilesHarness(browser).start("/files/storage")
+        await h.page.get_by_role("row").filter(has_text="/dev/sdc1").get_by_role("button").click()
+        form=h.page.locator(".user-form").first
+        await form.locator("input").first.fill("New-Test-Pool")
+        await form.locator("select").first.select_option("/mnt/home-ai-core/sdc1")
+        await form.locator("button").last.click()
+        assert any(p["name"]=="New-Test-Pool" for p in h.pools),h.pools
+        await h.close()
+
+    async def install_and_apply_smb():
+        h=FilesHarness(browser)
+        h.smb["available"]=False; h.smb["active"]=False
+        await h.start("/files/windows")
+        await h.page.locator(".smb-install button").click()
+        await expect(h.page.locator(".smb-actions input")).to_be_visible()
+        await h.page.locator(".smb-actions input").fill("HOMEGROUP")
+        await h.page.locator(".smb-actions button").click()
+        assert h.smb["workgroup"]=="HOMEGROUP",h.smb
+        assert [x[2]["operation"] for x in h.requests if x[1]=="/api/v1/files/smb/operation"]==["install","apply"]
+        await h.close()
+
+    async def missing_system_read():
+        # Files managers can open /files/storage without system.read,
+        # but GET /api/v1/storage/purposes rejects them. The page
+        # must explain the access problem rather than say no disks exist.
+        h=FilesHarness(browser)
+        h.actor["permissions"].remove("system.read")
+        h.api_status["/api/v1/storage/purposes"]=403
+        await h.start("/files/storage")
+        await expect(h.page.get_by_role("alert")).to_be_visible(timeout=4500)
+        await h.close()
+
+    async def missing_storage_manage():
+        # Files managers do not automatically have storage.manage.
+        # The mount button must not invite a guaranteed 403 response.
+        h=FilesHarness(browser)
+        h.actor["permissions"].remove("storage.manage")
+        h.api_status["/api/v1/storage/operation"]=403
+        await h.start("/files/storage")
+        mount=h.page.get_by_role("row").filter(has_text="/dev/sdc1")
+        await expect(mount.get_by_role("button")).to_be_disabled(timeout=4500)
+        assert not any(x[1]=="/api/v1/storage/operation" for x in h.requests)
+        await h.close()
+
     scenarios=[
         ("FILES-01: list/open/nested navigation",basic_folders),
         ("FILES-02: mkdir/move/delete/trash listing",directories_and_move),
@@ -351,6 +405,10 @@ async def run_suite(browser):
         ("FILES-06: storage mount/policy and SMB password",admin_storage_and_smb),
         ("FILES-07: read-only permission enforcement",read_only_role),
         ("FILES-08: partial API outage does not hide folders",ancillary_api_failure),
+        ("FILES-09: create shared folder and new pool",create_folder_and_pool),
+        ("FILES-10: SMB install and workgroup apply",install_and_apply_smb),
+        ("FILES-11: file manager without system.read sees truthful storage error",missing_system_read),
+        ("FILES-12: file manager without storage.manage cannot attempt mount",missing_storage_manage),
     ]
     failures=[]
     for name, fn in scenarios:
