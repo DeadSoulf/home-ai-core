@@ -104,7 +104,19 @@ func (r *Registry) InstallManifest(ctx context.Context, manifest Manifest) (Regi
 	default:
 		return Registered{}, err
 	}
-	if _, err := r.helper(ctx, "docker.module.install", manifest.ID, manifest.Runtime.Docker.Image); err != nil {
+	operation := "docker.module.install"
+	helperCtx := ctx
+	if manifest.ID == "nvr.module" {
+		volume, err := chooseNVRVolume(ctx, r.store)
+		if err != nil {
+			return Registered{}, fmt.Errorf("resolve selected NVR recordings disk: %w", err)
+		}
+		if volume.Device != "" {
+			operation = "docker.module.install.nvr-storage"
+			helperCtx = withNVRStorage(ctx, volume)
+		}
+	}
+	if _, err := r.helper(helperCtx, operation, manifest.ID, manifest.Runtime.Docker.Image); err != nil {
 		recordCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		recordErr := r.store.SetModuleStatus(recordCtx, manifest.ID, "registered", "install incomplete; retry the same manifest or remove: "+err.Error())

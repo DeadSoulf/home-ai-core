@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, APIError } from "../api/client";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { describeFileError } from "../ui/fileErrors";
-import type { StoragePurposeAssignment } from "../api/types";
+import type { BlockNode, StoragePurposeAssignment } from "../api/types";
+import {StorageDevices} from "../components/StorageDevices";
 import { FolderSettings } from "../components/FolderSettings";
 import { SectionGuide } from "../components/SectionGuide";
 import { filesGuides } from "../ui/experience";
@@ -65,6 +66,8 @@ export function FilesPage({
   const resource = useResource(load, revision);
 
   const [settingsFolderID, setSettingsFolderID] = useState("");
+  const [nvrDiskWizard, setNVRDiskWizard] = useState(false);
+  const [nvrDiskDevices, setNVRDiskDevices] = useState<BlockNode[]>([]);
   const [poolName, setPoolName] = useState("");
   const [poolRoot, setPoolRoot] = useState("");
   const [mountedStorageOverrides, setMountedStorageOverrides] = useState<Record<string, string>>({});
@@ -194,6 +197,37 @@ export function FilesPage({
     } finally {
       setBusy("");
     }
+  }
+
+  async function loadNVRDiskInventory() {
+    if (!canReadSystem || !canManageStorage) return;
+    try {
+      const current = await api.system();
+      setNVRDiskDevices(current.system.block_tree);
+      reportFormError("");
+    } catch (reason) {
+      reportFormError(reason instanceof Error ? reason.message : t("requestFailed"), reason);
+    }
+  }
+
+  async function toggleNVRDiskWizard() {
+    if (nvrDiskWizard) { setNVRDiskWizard(false); return; }
+    await loadNVRDiskInventory();
+    setNVRDiskWizard(true);
+  }
+
+  async function mountNVRDisk(storage: StoragePurposeAssignment) {
+    if (!canManageStorage || storage.purpose !== "nvr" || busy !== "") return;
+    setBusy("nvr-mount");
+    reportFormError("");
+    try {
+      await api.storageOperation({operation: "mount", device: storage.device});
+      setNotice("Диск NVR смонтирован. Применение к записи требует безопасной переустановки модуля.");
+      resource.reload();
+      await loadNVRDiskInventory();
+    } catch (reason) {
+      reportFormError(reason instanceof Error ? reason.message : t("requestFailed"), reason);
+    } finally { setBusy(""); }
   }
 
   async function createPool(event: FormEvent) {
@@ -617,6 +651,7 @@ export function FilesPage({
   const pools = resource.data?.pools || [];
   const users = resource.data?.users || [];
   const fileStorage = (resource.data?.storagePurposes || []).filter((item) => item.purpose === "files");
+  const nvrStorage = (resource.data?.storagePurposes || []).filter((item) => item.purpose === "nvr");
   const effectiveFileStorage = fileStorage.map((storage) => {
     const override = mountedStorageOverrides[storage.device];
     const mountpoints = storage.mountpoints || [];
@@ -1300,6 +1335,52 @@ export function FilesPage({
             </table>
           </div>
           <p className="muted small">{t("fileAssignedStorageNotice")}</p>
+        </Panel>
+      )}
+
+      {canManage && section === "storage" && canReadSystem && (
+        <Panel title="Видеодиски NVR" >
+          <p className="muted">
+            Для архива видеонаблюдения можно создать отдельный раздел диска и назначить
+            его для «Видеозаписи NVR». Файловые пулы и видеодиски не смешиваются.
+          </p>
+          <div className="button-row">
+            {canManageStorage && <button className="button primary" type="button"
+              onClick={() => void toggleNVRDiskWizard()}>
+              {nvrDiskWizard ? "Скрыть управление дисками" : "Создать или выбрать диск для NVR"}
+            </button>}
+          </div>
+          {nvrStorage.length > 0 && <div className="table-wrap"><table>
+            <thead><tr><th>Раздел</th><th>Метка</th><th>Файловая система</th><th>Точка монтирования</th><th>Состояние</th><th>Действие</th></tr></thead>
+            <tbody>{nvrStorage.map((storage) => {
+              const mounted = (storage.mountpoints || []).some((path) => path.startsWith("/mnt/home-ai-core/"));
+              return <tr key={storage.filesystem_uuid || storage.device}>
+                <td className="mono">{storage.device}</td>
+                <td>{storage.label || "—"}</td>
+                <td>{storage.filesystem || "Не отформатирован"}</td>
+                <td className="mono">{(storage.mountpoints || []).join(", ") || "—"}</td>
+                <td>{!storage.present ? "Диск отсутствует" : mounted ? "Смонтирован" : "Требуется монтирование"}</td>
+                <td>{storage.present && storage.filesystem && !mounted && canManageStorage ?
+                  <button type="button" className="button compact primary" disabled={busy !== ""}
+                    onClick={() => void mountNVRDisk(storage)}>Смонтировать</button>
+                  : "—"}</td>
+              </tr>;
+            })}</tbody>
+          </table></div>}
+          {nvrStorage.length === 0 && <p className="muted">
+            Диск для NVR ещё не назначен. Создайте раздел и выберите назначение «Видеозаписи NVR».
+          </p>}
+          {nvrDiskWizard && canManageStorage && <StorageDevices
+            devices={nvrDiskDevices} onChanged={() => {
+              resource.reload();
+              void loadNVRDiskInventory();
+            }} canManage defaultPurpose="nvr" mode="tree" />}
+          <p className="muted small">
+            Создание раздела и форматирование могут уничтожить существующие данные на выбранном диске.
+            Записи уже установленного NVR не переносятся автоматически. Новое хранилище будет
+            подключено при безопасной переустановке NVR с сохранением его данных.
+            После назначения и монтирования нового раздела не удаляйте папку данных NVR.
+          </p>
         </Panel>
       )}
 

@@ -2,10 +2,12 @@ import {useCallback, useEffect, useState, type FormEvent} from "react";
 import {api} from "../api/client";
 import type {NVRCamera, NVRRecording, NVRStatus, NVRDiscoveryNetwork, NVRDiscoveredCamera} from "../api/types";
 import {Panel} from "../components/Panel";
+import {ConfirmDialog} from "../components/ConfirmDialog";
+import {NVRLive} from "./NVRLive";
 import {PageHeading} from "./Dashboard";
 import "./NVR.css";
 
-type NVRTab = "cameras" | "discovery" | "archive";
+type NVRTab = "live" | "cameras" | "discovery" | "archive";
 
 const localDate = (seconds: number) => new Date(seconds * 1000).toLocaleString();
 const bytes = (value: number) => value >= 1024 ** 3
@@ -31,6 +33,9 @@ export function NVRPage({canManage}: {canManage: boolean}) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [channel, setChannel] = useState(1);
+  const [deleteTarget, setDeleteTarget] = useState<NVRCamera>();
+  const [deleteRecordings, setDeleteRecordings] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [networks, setNetworks] = useState<NVRDiscoveryNetwork[]>([]);
   const [selectedNetwork, setSelectedNetwork] = useState("");
   const [discovered, setDiscovered] = useState<NVRDiscoveredCamera[]>([]);
@@ -153,11 +158,30 @@ export function NVRPage({canManage}: {canManage: boolean}) {
     setTab("cameras");
   }
 
+  async function removeCamera() {
+    if (!deleteTarget || busy) return;
+    if (deleteRecordings && deleteConfirmation !== deleteTarget.id) {
+      setError("Для удаления архива введите точный ID камеры");
+      return;
+    }
+    const removed = await act(
+      () => api.nvrDeleteCamera(deleteTarget.id, deleteRecordings),
+      deleteRecordings ? "Камера и её записи удалены" : "Камера удалена, записи сохранены",
+    );
+    if (removed) {
+      setDeleteTarget(undefined);
+      setDeleteRecordings(false);
+      setDeleteConfirmation("");
+    }
+  }
+
   const archiveSelected = selected && recordings.some((item) => item.id === selected.id) ? selected : undefined;
 
   return <div className="page nvr-page">
     <PageHeading title="NVR · Видеонаблюдение" subtitle="Камеры, запись и архив — внутри HOME AI Core" />
     <div className="button-row">
+      <button type="button" className={"button " + (tab === "live" ? "primary" : "secondary")}
+        onClick={() => setTab("live")}>В реальном времени</button>
       <button type="button" className={"button " + (tab === "cameras" ? "primary" : "secondary")}
         onClick={() => setTab("cameras")}>Камеры</button>
       {canManage && <button type="button" className={"button " + (tab === "discovery" ? "primary" : "secondary")}
@@ -178,6 +202,8 @@ export function NVRPage({canManage}: {canManage: boolean}) {
       <div className="nvr-stat"><small>Файлы архива</small><strong>{status.recordings}</strong></div>
       <div className="nvr-stat"><small>Занято на диске</small><strong>{bytes(status.storage_bytes)}</strong></div>
     </div>}
+
+    {tab === "live" && <NVRLive cameras={cameras} canManage={canManage} />}
 
     {tab === "cameras" && <Panel title="Подключённые камеры">
       <div className="button-row">
@@ -222,6 +248,11 @@ export function NVRPage({canManage}: {canManage: boolean}) {
             {camera.enabled && <button type="button" className="button secondary" disabled={busy} onClick={() => {
               void act(() => api.nvrControlCamera(camera.id, "restart"), "Камера перезапущена");
             }}>Перезапустить</button>}
+            <button type="button" className="button danger" disabled={busy} onClick={() => {
+              setDeleteTarget(camera);
+              setDeleteRecordings(false);
+              setDeleteConfirmation("");
+            }}>Удалить</button>
           </div>}
         </article>)}
       </div>
@@ -314,6 +345,20 @@ export function NVRPage({canManage}: {canManage: boolean}) {
         </article>)}
       </div>
     </Panel>}
+    {deleteTarget && <ConfirmDialog title={"Удалить камеру «" + deleteTarget.name + "»?"}
+      confirmLabel={busy ? "Удаление…" : "Удалить камеру"}
+      onCancel={() => { if (!busy) setDeleteTarget(undefined); }}
+      onConfirm={() => { void removeCamera(); }}>
+      <p>По умолчанию камера удаляется из списка, а её существующие записи остаются в архиве.</p>
+      <label className="nvr-destructive-choice">
+        <input type="checkbox" checked={deleteRecordings} onChange={(event) => setDeleteRecordings(event.target.checked)} />
+        Также безвозвратно удалить все записи этой камеры
+      </label>
+      {deleteRecordings && <label className="nvr-delete-confirm">
+        Для удаления записей введите ID камеры: <strong>{deleteTarget.id}</strong>
+        <input autoComplete="off" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} />
+      </label>}
+    </ConfirmDialog>}
     <p className="muted small">Доступ к NVR защищён сессией HOME AI Core. Порт контейнера не опубликован наружу.</p>
   </div>;
 }

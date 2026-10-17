@@ -684,6 +684,21 @@ export const api = {
   }) => postJSON<{ok: boolean}>("/api/v1/nvr/cameras", camera, true),
   nvrControlCamera: (id: string, action: "start" | "stop" | "restart") =>
     postJSON<{ok: boolean}>(`/api/v1/nvr/cameras/${encodeURIComponent(id)}/${action}`, {}, true),
+  nvrDeleteCamera: (id: string, deleteRecordings = false) =>
+    mutateJSON<{ok: boolean; deleted: boolean; recordings_preserved: boolean}>(
+      `/api/v1/nvr/cameras/${encodeURIComponent(id)}`, "DELETE",
+      {confirm: id, delete_recordings: deleteRecordings},
+    ),
+  nvrLiveStart: (id: string, streamType: 0 | 1 | 2 = 1) =>
+    postJSON<{ok: boolean; playlist_url: string}>(
+      `/api/v1/nvr/cameras/${encodeURIComponent(id)}/live/start`,
+      {stream_type: streamType}, true,
+    ),
+  nvrLiveStop: (id: string, streamType: 0 | 1 | 2 = 1) =>
+    postJSON<{ok: boolean; stopped: boolean}>(
+      `/api/v1/nvr/cameras/${encodeURIComponent(id)}/live/stop`,
+      {stream_type: streamType}, true,
+    ),
 
   modules: async () => {
     const result = await request<{modules: RegisteredModule[]}>("/api/v1/modules");
