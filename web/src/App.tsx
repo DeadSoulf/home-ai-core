@@ -238,6 +238,8 @@ export default function App() {
           <FilesPage
             revision={revision}
             canManage={has("files.manage")}
+            canReadSystem={has("system.read")}
+            canManageStorage={has("storage.manage")}
             section={fileSection(allowedPath)}
             onSectionChange={(section) => navigate(fileSectionPath(section))}
           />

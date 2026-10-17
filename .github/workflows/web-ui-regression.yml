@@ -35,6 +35,7 @@ jobs:
         run: |
           python web/tests/browser_regressions.py
           python web/tests/csrf_regressions.py
+          python web/tests/files_regressions.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

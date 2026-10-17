@@ -14,29 +14,52 @@ import { PageHeading } from "./Dashboard";
 export function FilesPage({
   revision,
   canManage,
+  canReadSystem,
+  canManageStorage,
   section,
   onSectionChange,
 }: {
   revision: number;
   canManage: boolean;
+  canReadSystem: boolean;
+  canManageStorage: boolean;
   section: FileSection;
   onSectionChange: (section: FileSection) => void;
 }) {
   const {t, date, locale} = useI18n();
   const u = useUI();
   const load = useCallback(async () => {
+    // A failure in optional administrator metadata must never hide the
+    // user's accessible folders. Keep each failed section identifiable.
     const folders = await api.fileFolders();
     if (!canManage) {
-      return {folders, pools: [], users: [], storagePurposes: [], smb: undefined};
+      return {folders, pools: [], users: [], storagePurposes: [], smb: undefined,
+        loadErrors: {pools: "", owners: "", storage: "", smb: ""}};
     }
-    const [pools, users, storagePurposes, smb] = await Promise.all([
+    const [poolResult, ownerResult, storageResult, smbResult] = await Promise.allSettled([
       api.filePools(),
       api.fileOwners(),
-      api.storagePurposes().catch(() => []),
-      api.smbStatus().catch(() => undefined),
+      canReadSystem ? api.storagePurposes() : Promise.resolve([] as StoragePurposeAssignment[]),
+      api.smbStatus(),
     ]);
-    return {folders, pools, users, storagePurposes, smb};
-  }, [canManage]);
+    const message = (result: PromiseSettledResult<unknown>): string =>
+      result.status === "rejected"
+        ? (result.reason instanceof Error ? result.reason.message : u("requestFailed"))
+        : "";
+    return {
+      folders,
+      pools: poolResult.status === "fulfilled" ? poolResult.value : [],
+      users: ownerResult.status === "fulfilled" ? ownerResult.value : [],
+      storagePurposes: storageResult.status === "fulfilled" ? storageResult.value : [],
+      smb: smbResult.status === "fulfilled" ? smbResult.value : undefined,
+      loadErrors: {
+        pools: message(poolResult),
+        owners: message(ownerResult),
+        storage: message(storageResult),
+        smb: message(smbResult),
+      },
+    };
+  }, [canManage, canReadSystem, u]);
   const resource = useResource(load, revision);
 
   const [settingsFolderID, setSettingsFolderID] = useState("");
@@ -135,6 +158,7 @@ export function FilesPage({
   }
 
   async function mountFileStorage(storage: StoragePurposeAssignment) {
+    if (!canManageStorage) return;
     const busyKey = `storage-mount-${storage.device}`;
     setBusy(busyKey);
     setFormError("");
@@ -497,10 +521,25 @@ export function FilesPage({
   const poolRoots = new Set(pools.map((pool) => pool.root_path));
   const smbStatus = resource.data?.smb;
   const userName = new Map(users.map((user) => [user.id, user.display_name || user.username]));
+  const loadErrors = resource.data?.loadErrors;
+  const canShowStorageInventory = canReadSystem && !loadErrors?.storage;
 
   return (
     <div className="page">
       <PageHeading title={t("files")} subtitle={t("filesSubtitle")} />
+
+      {canManage && (section === "folders" || section === "storage") && loadErrors?.pools &&
+        <ErrorState message={u("filesPoolsLoadFailed") + " " + loadErrors.pools} onRetry={resource.reload} />}
+      {canManage && section === "folders" && loadErrors?.owners &&
+        <ErrorState message={u("filesOwnersLoadFailed") + " " + loadErrors.owners} onRetry={resource.reload} />}
+      {canManage && section === "storage" && !canReadSystem &&
+        <ErrorState message={u("filesSystemReadRequired")} />}
+      {canManage && section === "storage" && canReadSystem && loadErrors?.storage &&
+        <ErrorState message={u("filesStorageLoadFailed") + " " + loadErrors.storage} onRetry={resource.reload} />}
+      {canManage && section === "storage" && !canManageStorage &&
+        <p className="notice" role="status">{u("filesStorageManageRequired")}</p>}
+      {canManage && section === "windows" && loadErrors?.smb &&
+        <ErrorState message={u("filesSMBLoadFailed") + " " + loadErrors.smb} onRetry={resource.reload} />}
 
       {formError && <div className="form-error">{formError}</div>}
       {notice && <div className="storage-success">{notice}</div>}
@@ -930,7 +969,7 @@ export function FilesPage({
         </Panel>
       )}
 
-      {canManage && section === "windows" && !smbStatus && <div className="notice">{t("fileSMBUnavailable")}</div>}
+      {canManage && section === "windows" && !smbStatus && !loadErrors?.smb && <div className="notice">{t("fileSMBUnavailable")}</div>}
       {canManage && section === "storage" && (
         <Panel title={t("filePoolsTitle")} className="wide">
           <div className="table-wrap">
@@ -1035,7 +1074,7 @@ export function FilesPage({
         </Panel>
       )}
 
-      {canManage && section === "storage" && (
+      {canManage && section === "storage" && canShowStorageInventory && (
         <Panel title={t("fileAssignedStorage")} className="wide">
           <div className="table-wrap">
             <table>
@@ -1078,7 +1117,8 @@ export function FilesPage({
                           <button
                             className="button compact primary"
                             type="button"
-                            disabled={busy !== ""}
+                            disabled={busy !== "" || !canManageStorage}
+                            title={!canManageStorage ? u("filesStorageManageRequired") : undefined}
                             onClick={() => void mountFileStorage(storage)}
                           >
                             {busy === `storage-mount-${storage.device}` ? t("working") : t("mount")}
@@ -1100,7 +1140,7 @@ export function FilesPage({
         </Panel>
       )}
 
-      {canManage && section === "storage" && (
+      {canManage && section === "storage" && canShowStorageInventory && (
 <Panel title={t("fileCreatePool")}>
             <form className="user-form" onSubmit={createPool}>
               <label>
