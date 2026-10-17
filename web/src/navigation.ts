@@ -14,12 +14,13 @@ type NavigationGroup = { label: StringKey; items: NavigationItem[] };
 
 export const navigationGroups: NavigationGroup[] = [
   { label: "home", items: [{ path: "/", label: "home" }] },
-  { label: "serverGroup", items: [
-    { path: "/system", label: "system", permission: "system.read" },
-  ] },
+  // Everyday services appear before advanced server administration.
   { label: "serviceGroup", items: [
     { path: "/files", label: "files", permission: "security.self.read" },
     { path: "/modules", label: "modules", permission: "modules.read" },
+  ] },
+  { label: "serverGroup", items: [
+    { path: "/system", label: "system", permission: "system.read" },
   ] },
   { label: "managementGroup", items: [
     { path: "/users", label: "users", permission: "security.users.read" },
