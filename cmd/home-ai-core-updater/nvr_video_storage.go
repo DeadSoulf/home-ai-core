@@ -193,14 +193,19 @@ func copyNVRRecordings(ctx context.Context, source, destination string, uid, gid
 		if err != nil {
 			return err
 		}
-		defer input.Close()
 		output, err := os.CreateTemp(filepath.Dir(target), ".nvr-copy-*")
 		if err != nil {
+			_ = input.Close()
 			return err
 		}
 		tmp := output.Name()
 		defer os.Remove(tmp)
 		if _, err := io.Copy(output, input); err != nil {
+			_ = input.Close()
+			_ = output.Close()
+			return err
+		}
+		if err := input.Close(); err != nil {
 			_ = output.Close()
 			return err
 		}
