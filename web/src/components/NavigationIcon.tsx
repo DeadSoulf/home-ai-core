@@ -1,6 +1,7 @@
 /** Compact navigation pictograms; labels are always displayed alongside them. */
 export function NavigationIcon({path}: {path: string}) {
-  const kind = path === "/" ? "home" : path.startsWith("/modules/") ? "module" : path.split("/")[1];
+  const route = path.split("#")[0];
+  const kind = route === "/" ? "home" : route.startsWith("/modules/") ? "module" : route.split("/")[1];
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"
       stroke="currentColor" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
