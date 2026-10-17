@@ -6,7 +6,7 @@ import {Panel} from "../components/Panel";
 
 export function NVRLive({cameras, canManage}: {cameras: NVRCamera[]; canManage: boolean}) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const activeRef = useRef<string>();
+  const activeRef = useRef<string | undefined>(undefined);
   const [cameraID, setCameraID] = useState("");
   const [playlist, setPlaylist] = useState("");
   const [busy, setBusy] = useState(false);
