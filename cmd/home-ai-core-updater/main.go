@@ -242,7 +242,7 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		}
 		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
 			OK: true, ModuleAddress: address,
-			HelperVersion: updaterhelper.HelperVersion,
+			HelperVersion:   updaterhelper.HelperVersion,
 			ProtocolVersion: updaterhelper.ProtocolVersion,
 		})
 		return
