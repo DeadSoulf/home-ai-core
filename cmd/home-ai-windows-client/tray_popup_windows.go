@@ -216,6 +216,10 @@ func (state *windowsAgentTray) handleTrayCommand(id uint16) {
 		}
 	case traySettings:
 		_ = startSettingsProcess(state.configPath)
+	case trayCheckUpdates:
+		state.checkTrayUpdates()
+	case trayInstallUpdate:
+		state.installTrayUpdate()
 	case trayExit:
 		state.signalExit()
 		if state.hwnd != 0 {
