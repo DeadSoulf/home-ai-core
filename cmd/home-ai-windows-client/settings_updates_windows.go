@@ -13,7 +13,7 @@ import (
 type settingsUpdateCheckResult struct {
 	release windowsclient.WindowsClientRelease
 	channel string
-	err error
+	err     error
 }
 
 func (state *windowsSettingsUI) loadUpdateChannel() {
