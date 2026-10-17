@@ -155,6 +155,7 @@ type Response struct {
 	ModuleState        string                `json:"module_state,omitempty"`
 	ContainerID        string                `json:"container_id,omitempty"`
 	ModuleAddress      string                `json:"module_address,omitempty"`
+	ModuleStorageRoot  string                `json:"module_storage_root,omitempty"`
 }
 
 type Result struct {
