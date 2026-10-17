@@ -72,6 +72,26 @@ jobs:
       - name: Test Windows copy engine, queue and CLI
         run: go test ./internal/windowsclient ./cmd/home-ai-windows-client
 
+      - name: Build Windows UI preview for PR review
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          go build -trimpath -o dist/home-ai-windows-client-preview_amd64.exe ./cmd/home-ai-windows-client
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $hash = (Get-FileHash -Algorithm SHA256 dist/home-ai-windows-client-preview_amd64.exe).Hash.ToLowerInvariant()
+          "$hash  home-ai-windows-client-preview_amd64.exe" | Out-File -FilePath dist/home-ai-windows-client-preview_amd64.exe.sha256 -NoNewline -Encoding ascii
+
+      - name: Upload unsigned test preview
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-client-ui-preview
+          path: |
+            dist/*.exe
+            dist/*.exe.sha256
+          if-no-files-found: error
+
   test:
     runs-on: ubuntu-latest
     steps:
