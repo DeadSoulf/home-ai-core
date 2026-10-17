@@ -80,6 +80,15 @@ func (s *server) storageOperation(
 	case "unmount", "format", "partition.delete", "partition.delete_all", "preflight":
 		node, ok := blockNodeByPath(beforeTree, input.Device)
 		if ok {
+			purposes, purposeErr := s.state.ListStoragePurposes(r.Context())
+			if purposeErr != nil {
+				writeAPIError(w, r, http.StatusServiceUnavailable, "storage_purposes_unavailable", purposeErr.Error(), nil)
+				return
+			}
+			if err := s.ensureStorageNodeNotUsedByModule(r.Context(), node, purposes); err != nil {
+				writeAPIError(w, r, http.StatusConflict, "storage_in_use", err.Error(), nil)
+				return
+			}
 			pools, listErr := s.state.ListNASPools(r.Context())
 			if listErr != nil {
 				writeAPIError(w, r, http.StatusInternalServerError, "storage_usage_unavailable", "storage usage is unavailable", nil)
