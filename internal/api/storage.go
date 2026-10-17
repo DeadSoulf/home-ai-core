@@ -75,6 +75,20 @@ func (s *server) storageOperation(
 	if input.Operation == "format" {
 		beforePurposes, _ = s.state.ListStoragePurposes(r.Context())
 	}
+	if input.Purpose == state.StoragePurposeNVR && input.Operation == "partition.create" {
+		records, err := s.state.ListStoragePurposes(r.Context())
+		if err != nil {
+			writeAPIError(w, r, http.StatusInternalServerError, "storage_purposes_unavailable", err.Error(), nil)
+			return
+		}
+		for _, assigned := range records {
+			if assigned.Purpose == state.StoragePurposeNVR {
+				writeAPIError(w, r, http.StatusConflict, "nvr_storage_already_selected",
+					"Only one NVR recording disk can be selected", nil)
+				return
+			}
+		}
+	}
 
 	switch input.Operation {
 	case "unmount", "format", "partition.delete", "partition.delete_all", "preflight":
@@ -86,6 +100,26 @@ func (s *server) storageOperation(
 				return
 			}
 			usage := storageUsageForNode(node, pools)
+			records, readErr := s.state.ListStoragePurposes(r.Context())
+			if readErr != nil {
+				writeAPIError(w, r, http.StatusServiceUnavailable, "storage_purposes_unavailable", readErr.Error(), nil)
+				return
+			}
+			if s.nvrModuleEnabled(r.Context()) {
+				for _, assigned := range records {
+					if assigned.Purpose != state.StoragePurposeNVR {
+						continue
+					}
+					paths := map[string]bool{}
+					uuids := map[string]bool{}
+					collectStorageIdentity(node, new([]string), paths, uuids)
+					if paths[assigned.DevicePath] || (assigned.FilesystemUUID != "" && uuids[assigned.FilesystemUUID]) {
+						usage = append(usage, storagePurposeUsageResponse{
+							Type: "nvr_recordings", ID: "nvr.module", Name: "NVR video archive",
+						})
+					}
+				}
+			}
 			if len(usage) > 0 {
 				writeAPIError(
 					w,
