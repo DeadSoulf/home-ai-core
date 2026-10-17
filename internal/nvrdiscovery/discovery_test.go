@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"fmt"
 	"net"
 	"net/netip"
 	"slices"
@@ -162,5 +161,4 @@ func TestScanRejectsUnsafeCIDRBeforeNetworking(t *testing.T) {
 			t.Fatalf("scan accepted arbitrary target %q",network.CIDR)
 		}
 	}
-	_ = fmt.Sprint
 }
