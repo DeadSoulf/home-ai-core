@@ -111,8 +111,10 @@ func (s *server) nvrRequest(ctx context.Context, method, endpoint string, payloa
 		ResponseHeaderTimeout: 12 * time.Second,
 	}
 	defer transport.CloseIdleConnections()
+	var roundTrip http.RoundTripper = transport
+	if s.nvrTransport != nil { roundTrip = s.nvrTransport }
 	client := &http.Client{
-		Transport: transport,
+		Transport: roundTrip,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
 	return client.Do(req)
