@@ -33,10 +33,10 @@ const (
 	settingsWMSetFont = 0x0030
 	settingsWMApp     = 0x8000
 
-	settingsWMConnected       = settingsWMApp + 201
-	settingsWMSyncDone        = settingsWMApp + 202
-	settingsWMAgentDone       = settingsWMApp + 203
-	settingsWMUpdateCheckDone = settingsWMApp + 204
+	settingsWMConnected            = settingsWMApp + 201
+	settingsWMSyncDone             = settingsWMApp + 202
+	settingsWMAgentDone            = settingsWMApp + 203
+	settingsWMUpdateCheckDone      = settingsWMApp + 204
 	settingsWMCertificateProbeDone = settingsWMApp + 205
 
 	settingsWSOverlappedWindow = 0x00CF0000
@@ -188,8 +188,8 @@ type windowsSettingsUI struct {
 	updateCheckBtn       windows.Handle
 	updateInstallBtn     windows.Handle
 	updateStatusLabel    windows.Handle
-	certificateStatus windows.Handle
-	certificateTrustBtn windows.Handle
+	certificateStatus    windows.Handle
+	certificateTrustBtn  windows.Handle
 	certificateForgetBtn windows.Handle
 	certificateProbeBusy bool
 	updateBusy           bool
@@ -231,11 +231,11 @@ type windowsSettingsUI struct {
 	profiles          []windowsclient.SyncProfile
 	selectedProfileID string
 
-	asyncMu       sync.Mutex
-	connectResult *settingsConnectResult
-	syncResult    *settingsAsyncResult
-	agentResult   *settingsAsyncResult
-	updateResult  *settingsUpdateCheckResult
+	asyncMu          sync.Mutex
+	connectResult    *settingsConnectResult
+	syncResult       *settingsAsyncResult
+	agentResult      *settingsAsyncResult
+	updateResult     *settingsUpdateCheckResult
 	certificateProbe *settingsCertificateProbeResult
 }
 
