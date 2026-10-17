@@ -132,6 +132,7 @@ case "$1" in
 esac
 exit 99
 `, testNVRImageID))
+	t.Setenv("PATH", filepath.Dir(docker)+string(os.PathListSeparator)+os.Getenv("PATH"))
 	oldDataRoot := moduleDataRoot
 	moduleDataRoot = filepath.Join(t.TempDir(), "module-data")
 	t.Cleanup(func() { moduleDataRoot = oldDataRoot })
