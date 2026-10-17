@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -118,6 +117,11 @@ func dockerAICommand(ctx context.Context, binary string, args ...string) error {
 // inspectAIContainer is strict about the managed identity and /data mount,
 // before the helper is allowed to recreate the container with another device set.
 func inspectAIContainer(ctx context.Context, binary string) (aiGPUContainer, error) {
+	// Reuse Core's trusted endpoint proof: running managed container, exact
+	// module label, private IP, and matching managed Docker network identity.
+	if _, err := inspectManagedModuleAddress(ctx, aiManagedID); err != nil {
+		return aiGPUContainer{}, fmt.Errorf("verify managed AI network: %w", err)
+	}
 	name := moduleContainerName(aiManagedID)
 	exists, managed, err := inspectManagedContainer(ctx, binary, name, aiManagedID)
 	if err != nil {
