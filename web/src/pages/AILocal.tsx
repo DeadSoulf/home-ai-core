@@ -127,9 +127,32 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat}: {
   const installed = new Set(models?.installed || []);
   const gpus = hardware?.gpus || [];
   const isBusy = busy || local?.model_state === "downloading";
+  const availableRAMGiB = (hardware?.memory.available_bytes || 0) / (1024 ** 3);
+  const fittingModels = recommended.filter((item) => item.minimum_ram_gb <= availableRAMGiB);
+  const suggestedModel = fittingModels.length ? fittingModels[fittingModels.length - 1].name : "qwen3:0.6b";
+  const nvidiaCandidates = gpus.filter((gpu) =>
+    ((gpu.vendor_id || "").toLowerCase() === "0x10de" ||
+      (gpu.vendor || "").toLowerCase().includes("nvidia")) && gpu.driver === "nvidia");
+
 
   return <div className="ai-local-page">
     {error && <p role="alert" className="ai-error">{error}</p>}
+    {hardware && <Panel title="Автоматический анализ ресурсов">
+      <p>Сервер: <strong>{hardware.cpu.logical_cpus}</strong> потоков CPU,
+        доступная ОЗУ <strong>{gib(hardware.memory.available_bytes)}</strong>.
+        Видеокарт обнаружено: <strong>{gpus.length}</strong>.</p>
+      <p>По объёму доступной оперативной памяти рекомендуем модель
+        <strong> {suggestedModel}</strong> (консервативная оценка для CPU).
+        Базовая qwen3:0.6b запускается первой независимо от доступности GPU.</p>
+      {nvidiaCandidates.length > 0
+        ? <p>Есть {nvidiaCandidates.length} NVIDIA GPU с драйвером.
+            Их можно выбрать ниже и подтвердить назначение для Ollama; автоматического
+            захвата ресурса не происходит.</p>
+        : <p>Пока доступен CPU-режим. Подключённая GPU появится после обнаружения её ОС.</p>}
+      <p className="muted">Предварительная рекомендация основана на объёме ОЗУ, а не на замере VRAM
+        или производительности: перед выбором крупной модели проверьте свободную память и диск.</p>
+    </Panel>}
+
     <Panel title="Встроенный Ollama">
       <p className="muted">AI Agent автоматически запускает локальную модель без облачного ключа.
         Первый запуск требует загрузки файлов модели; после этого можно работать без Интернета.</p>
