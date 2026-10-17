@@ -129,8 +129,24 @@ func New(rawBaseURL string) (*Client, error) {
 	}
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	// The default remains full system/CA/hostname verification. An explicit,
+	// independently verified fingerprint can authenticate a fixed certificate
+	// even when a private server certificate lacks a public DNS SAN.
+	if parsed.Scheme == "https" {
+		pin, err := LoadServerCertificatePin(rawBaseURL)
+		if err != nil {
+			return nil, fmt.Errorf("load pinned TLS server identity: %w", err)
+		}
+		if pin != "" {
+			transport.TLSClientConfig, err = pinnedTLSConfig(parsed.Hostname(), pin)
+			if err != nil {
+				return nil, fmt.Errorf("configure pinned TLS server identity: %w", err)
+			}
+		}
+	}
 	// Import a public certificate/CA only after verifying its fingerprint through
-	// a trusted channel. Never disable TLS hostname or chain validation.
+	// a trusted channel. Do not silently bypass pinned identity verification.
+	if transport.TLSClientConfig != nil && !transport.TLSClientConfig.InsecureSkipVerify {
 	if caFile := strings.TrimSpace(os.Getenv("HOME_AI_CA_FILE")); caFile != "" {
 		pem, err := os.ReadFile(caFile)
 		if err != nil {
@@ -144,6 +160,7 @@ func New(rawBaseURL string) (*Client, error) {
 			return nil, errors.New("server CA file contains no valid certificate")
 		}
 		transport.TLSClientConfig.RootCAs = pool
+	}
 	}
 	parsed.Path = strings.TrimRight(parsed.Path, "/")
 	return &Client{
