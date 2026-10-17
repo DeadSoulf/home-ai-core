@@ -47,6 +47,8 @@ const (
 	trayExit       = 1004
 	traySettings   = 1005
 	trayOpenFolder = 1006
+	trayCheckUpdates = 1007
+	trayInstallUpdate = 1008
 
 	niifInfo  = 0x00000001
 	niifError = 0x00000003
@@ -119,6 +121,7 @@ type windowsAgentTray struct {
 	popupRows     [3]windows.Handle
 	trayProfileIDs []string
 
+	updateCheckBusy bool
 	statusMu    sync.Mutex
 	statusText  string
 	notifyTitle string
@@ -429,6 +432,9 @@ func (state *windowsAgentTray) showMenu() {
 		appendTrayMenu(menu, mfString, trayOpenFolder, textForLanguage(language, "open_home_folder"))
 	}
 	appendTrayMenu(menu, mfString, traySettings, textForLanguage(language, "settings"))
+	appendTrayMenu(menu, mfSeparator, 0, "")
+	appendTrayMenu(menu, mfString, trayCheckUpdates, textForLanguage(language, "tray_update_check"))
+	appendTrayMenu(menu, mfString, trayInstallUpdate, textForLanguage(language, "tray_update_install"))
 	appendTrayMenu(menu, mfSeparator, 0, "")
 	appendTrayMenu(menu, mfString, trayOpenLog, textForLanguage(language, "open_log"))
 	appendTrayMenu(menu, mfSeparator, 0, "")
