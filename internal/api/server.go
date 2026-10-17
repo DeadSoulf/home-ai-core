@@ -16,18 +16,19 @@ import (
 )
 
 type server struct {
-	moduleSubmitMu sync.Mutex
-	nvrEndpoint    func(context.Context) (string, error)
-	nvrTransport   http.RoundTripper
-	nvrDataRoot    string
-	aiEndpoint     func(context.Context) (string, error)
-	aiTransport    http.RoundTripper
-	aiDataRoot     string
-	nvrScanMu      sync.Mutex
-	nvrLastScan    time.Time
-	nvrNetworks    func() ([]nvrdiscovery.Network, error)
-	nvrScanner     func(context.Context, nvrdiscovery.Network) ([]nvrdiscovery.Device, error)
-
+	moduleSubmitMu      sync.Mutex
+	nvrEndpoint         func(context.Context) (string, error)
+	nvrTransport        http.RoundTripper
+	nvrDataRoot         string
+	nvrStorageResolver  func(context.Context) (string, error)
+	nvrStorageAttacher  func(context.Context, string, string) error
+	aiEndpoint          func(context.Context) (string, error)
+	aiTransport         http.RoundTripper
+	aiDataRoot          string
+	nvrScanMu           sync.Mutex
+	nvrLastScan         time.Time
+	nvrNetworks         func() ([]nvrdiscovery.Network, error)
+	nvrScanner          func(context.Context, nvrdiscovery.Network) ([]nvrdiscovery.Device, error)
 	nodeID              string
 	logger              *slog.Logger
 	state               State
@@ -107,6 +108,7 @@ func New(
 	s.mux.HandleFunc("GET /api/v1/modules/operations/{jobID}", s.requireAuth("modules.manage", s.moduleOperation))
 	s.mux.HandleFunc("GET /api/v1/modules/catalog", s.requireAuth("modules.read", s.moduleCatalog))
 	s.mux.HandleFunc("POST /api/v1/modules/catalog/{moduleID}/install", s.requireAuth("modules.manage", s.moduleCatalogInstall))
+	s.mux.HandleFunc("POST /api/v1/modules/catalog/{moduleID}/upgrade", s.requireAuth("modules.manage", s.moduleCatalogUpgrade))
 	s.mux.HandleFunc("POST /api/v1/modules/install", s.requireAuth("modules.manage", s.moduleInstall))
 	s.mux.HandleFunc("GET /api/v1/modules/navigation", s.requireAuth("", s.moduleNavigation))
 	// The AI provider store currently has no per-user namespaces. Until it does,
@@ -116,12 +118,16 @@ func New(
 	// The NVR UI is native to Core. It never embeds the unauthenticated
 	// module web console or makes the Docker container publicly reachable.
 	s.mux.HandleFunc("GET /api/v1/nvr/status", s.requireAuth("modules.read", s.nvrStatus))
+	s.mux.HandleFunc("GET /api/v1/nvr/storage", s.requireAuth("modules.manage", s.nvrStorageStatus))
+	s.mux.HandleFunc("POST /api/v1/nvr/storage/attach", s.requireAuth("modules.manage", s.nvrStorageAttach))
 	s.mux.HandleFunc("GET /api/v1/nvr/discovery/networks", s.requireAuth("modules.manage", s.nvrDiscoveryNetworks))
 	s.mux.HandleFunc("POST /api/v1/nvr/discovery/search", s.requireAuth("modules.manage", s.nvrDiscover))
 	s.mux.HandleFunc("GET /api/v1/nvr/cameras", s.requireAuth("modules.read", s.nvrCameras))
 	s.mux.HandleFunc("GET /api/v1/nvr/recordings", s.requireAuth("modules.read", s.nvrRecordings))
 	s.mux.HandleFunc("GET /api/v1/nvr/output/{path...}", s.requireAuth("modules.read", s.nvrOutput))
 	s.mux.HandleFunc("POST /api/v1/nvr/cameras", s.requireAuth("modules.manage", s.nvrAddCamera))
+	s.mux.HandleFunc("DELETE /api/v1/nvr/cameras/{cameraID}", s.requireAuth("modules.manage", s.nvrDeleteCamera))
+	s.mux.HandleFunc("POST /api/v1/nvr/cameras/{cameraID}/live/{action}", s.requireAuth("modules.manage", s.nvrLiveCamera))
 	s.mux.HandleFunc("POST /api/v1/nvr/cameras/{cameraID}/{action}", s.requireAuth("modules.manage", s.nvrControlCamera))
 	s.mux.HandleFunc("GET /api/v1/modules/capabilities", s.requireAuth("modules.read", s.moduleCapabilities))
 	s.mux.HandleFunc("POST /api/v1/modules/{moduleID}/control", s.requireAuth("modules.manage", s.moduleControl))
@@ -139,6 +145,7 @@ func New(
 	s.mux.HandleFunc("/api/v1/storage/operation", s.requireAuth("storage.manage", s.storageOperation))
 	s.mux.HandleFunc("/api/v1/storage/name", s.requireAuth("storage.manage", s.storageName))
 	s.mux.HandleFunc("GET /api/v1/storage/purposes", s.requireAuth("system.read", s.storagePurposes))
+	s.mux.HandleFunc("GET /api/v1/storage/purpose-options", s.requireAuth("storage.manage", s.storagePurposeOptions))
 	s.mux.HandleFunc("POST /api/v1/storage/purposes", s.requireAuth("storage.manage", s.storagePurposes))
 	s.mux.HandleFunc("GET /api/v1/files/owners", s.requireAuth("files.manage", s.fileOwners))
 	s.mux.HandleFunc("GET /api/v1/files/quotas", s.requireAuth("files.manage", s.fileUserQuotas))

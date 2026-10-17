@@ -11,6 +11,7 @@ import (
 
 const (
 	StoragePurposeFiles = "files"
+	StoragePurposeNVR = "module:nvr.module"
 )
 
 type StoragePurposeRecord struct {
@@ -21,13 +22,40 @@ type StoragePurposeRecord struct {
 	UpdatedAt      time.Time
 }
 
+// NormalizeStoragePurpose keeps the database forward-compatible with new
+// modules without granting callers arbitrary host paths or mount privileges.
+// API handlers separately verify that the referenced module is registered.
 func NormalizeStoragePurpose(value string) (string, error) {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case StoragePurposeFiles:
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == StoragePurposeFiles {
 		return StoragePurposeFiles, nil
-	default:
-		return "", errors.New("storage purpose must be files")
 	}
+	if strings.HasPrefix(value, "module:") {
+		module := strings.TrimPrefix(value, "module:")
+		if len(module) > 0 && len(module) <= 96 && moduleIDValid(module) {
+			return value, nil
+		}
+	}
+	return "", errors.New("storage purpose must be files or module:<registered-id>")
+}
+
+func moduleIDValid(id string) bool {
+	if len(id) > 96 || len(id) == 0 || id[0] < 'a' || id[0] > 'z' {
+		return false
+	}
+	separator := false
+	for _, char := range id {
+		switch {
+		case char >= 'a' && char <= 'z', char >= '0' && char <= '9':
+			separator = false
+		case char == '.' || char == '-':
+			if separator { return false }
+			separator = true
+		default:
+			return false
+		}
+	}
+	return !separator
 }
 
 func (s *Store) SetStoragePurpose(

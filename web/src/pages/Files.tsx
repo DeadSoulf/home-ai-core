@@ -4,6 +4,7 @@ import { ErrorNotice } from "../components/ErrorNotice";
 import { describeFileError } from "../ui/fileErrors";
 import type { StoragePurposeAssignment } from "../api/types";
 import { FolderSettings } from "../components/FolderSettings";
+import { NVRStoragePanel } from "../components/NVRStorage";
 import { SectionGuide } from "../components/SectionGuide";
 import { filesGuides } from "../ui/experience";
 import { useUI } from "../ui/useUI";
@@ -18,6 +19,7 @@ export function FilesPage({
   canManage,
   canReadSystem,
   canManageStorage,
+  canManageModules,
   section,
   onSectionChange,
 }: {
@@ -25,6 +27,7 @@ export function FilesPage({
   canManage: boolean;
   canReadSystem: boolean;
   canManageStorage: boolean;
+  canManageModules: boolean;
   section: FileSection;
   onSectionChange: (section: FileSection) => void;
 }) {
@@ -617,6 +620,7 @@ export function FilesPage({
   const pools = resource.data?.pools || [];
   const users = resource.data?.users || [];
   const fileStorage = (resource.data?.storagePurposes || []).filter((item) => item.purpose === "files");
+  const nvrStorage = (resource.data?.storagePurposes || []).filter((item) => item.purpose === "module:nvr.module");
   const effectiveFileStorage = fileStorage.map((storage) => {
     const override = mountedStorageOverrides[storage.device];
     const mountpoints = storage.mountpoints || [];
@@ -1237,6 +1241,10 @@ export function FilesPage({
         </Panel>
       )}
 
+      {section === "storage" && canShowStorageInventory && canManage && (
+        <NVRStoragePanel assigned={nvrStorage} canManageStorage={canManageStorage}
+          canManageModules={canManageModules} onRefresh={resource.reload} />
+      )}
       {canManage && section === "storage" && canShowStorageInventory && (
         <Panel title={t("fileAssignedStorage")} className="wide">
           <div className="table-wrap">

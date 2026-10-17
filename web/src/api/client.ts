@@ -322,6 +322,8 @@ export const api = {
     return {...result.user, warning: result.warning};
   },
 
+  storagePurposeOptions: async () =>
+    (await request<{purposes: import("./types").StoragePurposeOption[]}>("/api/v1/storage/purpose-options")).purposes,
   storagePurposes: async () => {
     const result = await request<{assignments: StoragePurposeAssignment[]}>("/api/v1/storage/purposes");
     return result.assignments;
@@ -663,6 +665,10 @@ export const api = {
     (await request<{networks: NVRDiscoveryNetwork[]}>("/api/v1/nvr/discovery/networks", {signal})).networks,
   nvrDiscover: (networkID: string): Promise<NVRDiscoveryResult> =>
     postJSON<NVRDiscoveryResult>("/api/v1/nvr/discovery/search", {network_id: networkID}, true),
+  nvrStorageStatus: async () =>
+    request<{attached: boolean; path: string}>("/api/v1/nvr/storage"),
+  nvrStorageAttach: (device: string) =>
+    postJSON<{attached: boolean; path: string}>("/api/v1/nvr/storage/attach", {device}, true),
   nvrStatus: (signal?: AbortSignal) => request<NVRStatus>("/api/v1/nvr/status", {signal}),
   nvrCameras: async (signal?: AbortSignal) =>
     (await request<{ok: boolean; cameras: NVRCamera[]}>("/api/v1/nvr/cameras", {signal})).cameras,
@@ -674,6 +680,16 @@ export const api = {
     name: string; source_type: "hikvision" | "rtsp"; ip?: string; port?: number;
     username?: string; password?: string; channel?: number; rtsp_url?: string;
   }) => postJSON<{ok: boolean}>("/api/v1/nvr/cameras", camera, true),
+  nvrDeleteCamera: (id: string) => {
+    const headers = new Headers();
+    const token = getCSRFToken();
+    if (token) headers.set("X-CSRF-Token", token);
+    return request<{ok: boolean; deleted: boolean; recordings_preserved: boolean}>(
+      `/api/v1/nvr/cameras/${encodeURIComponent(id)}`, {method: "DELETE", headers});
+  },
+  nvrLiveCamera: (id: string, action: "start" | "stop") =>
+    postJSON<{ok: boolean; playlist_url: string; stopped?: boolean}>(
+      `/api/v1/nvr/cameras/${encodeURIComponent(id)}/live/${action}`, {}, true),
   nvrControlCamera: (id: string, action: "start" | "stop" | "restart") =>
     postJSON<{ok: boolean}>(`/api/v1/nvr/cameras/${encodeURIComponent(id)}/${action}`, {}, true),
 
@@ -685,6 +701,11 @@ export const api = {
   moduleCatalog: async () => {
     const result = await request<{catalog: {id: string; generated_at?: string; modules: RegisteredModule["manifest"][]}}>("/api/v1/modules/catalog");
     return result.catalog;
+  },
+
+  upgradeCatalogModule: async (id: string) => {
+    const result = await postJSON<{job: Job}>(`/api/v1/modules/catalog/${encodeURIComponent(id)}/upgrade`, undefined, true);
+    return result.job;
   },
 
   installCatalogModule: async (id: string) => {

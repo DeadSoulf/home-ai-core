@@ -40,6 +40,18 @@ func registerModuleJobs(service *jobs.Service, registry *modules.Registry) error
 		return err
 	}
 
+	if err := service.Register("module.upgrade", func(ctx context.Context, job state.JobRecord, reporter jobs.Reporter) (map[string]any, error) {
+		raw, _ := job.Input["manifest_json"].(string)
+		manifest, err := modules.DecodeManifest(strings.NewReader(raw))
+		if err != nil { return nil, err }
+		_ = reporter.Progress(ctx, 1000, "validating module upgrade")
+		_ = reporter.Progress(ctx, 2400, "pulling and validating replacement container")
+		item, err := registry.UpgradeManifest(ctx, manifest)
+		if err != nil { return nil, err }
+		_ = reporter.Progress(ctx, 9500, "module upgraded and healthy")
+		return map[string]any{"module_id":item.Manifest.ID, "version":item.Manifest.Version, "status":item.Status},nil
+	}); err != nil { return err }
+
 	if err := service.Register("module.control", func(ctx context.Context, job state.JobRecord, reporter jobs.Reporter) (map[string]any, error) {
 		moduleID, _ := job.Input["module_id"].(string)
 		operation, _ := job.Input["operation"].(string)

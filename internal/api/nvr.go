@@ -325,6 +325,72 @@ func (s *server) nvrControlCamera(w http.ResponseWriter, r *http.Request, actor 
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
+func (s *server) nvrDeleteCamera(w http.ResponseWriter, r *http.Request, actor security.Actor, source authSource) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	if !s.nvrReady(w, r) {
+		return
+	}
+	id := r.PathValue("cameraID")
+	if !nvrSafeSegment.MatchString(id) || id == ".." || id == "." {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_camera_id", "Invalid camera ID", nil)
+		return
+	}
+	// Preserves all recordings. There is deliberately no delete_recordings=true
+	// option in the Core API: destructive archive management needs separate UX.
+	var result struct {
+		OK      bool `json:"ok"`
+		Deleted bool `json:"deleted"`
+	}
+	if !s.nvrJSON(w, r, http.MethodDelete, "/api/nvr/cameras/"+id+"?delete_recordings=0", nil, &result) {
+		return
+	}
+	s.security.RecordAudit(r.Context(), s.securityRequestContext(r), actor,
+		"nvr.camera.delete", "module", "nvr.module", "success",
+		map[string]any{"camera_id": id, "recordings_preserved": true})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": result.OK, "deleted": result.Deleted, "recordings_preserved": true})
+}
+
+func (s *server) nvrLiveCamera(w http.ResponseWriter, r *http.Request, actor security.Actor, source authSource) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	if !s.nvrReady(w, r) {
+		return
+	}
+	id, action := r.PathValue("cameraID"), r.PathValue("action")
+	if !nvrSafeSegment.MatchString(id) || id == ".." ||
+		(action != "start" && action != "stop") {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_nvr_live", "Invalid live-stream operation", nil)
+		return
+	}
+	var result struct {
+		OK bool `json:"ok"`
+		Key string `json:"key"`
+		PlaylistURL string `json:"playlist_url"`
+		Stopped bool `json:"stopped"`
+	}
+	if !s.nvrJSON(w, r, http.MethodPost,
+		"/api/nvr/cameras/"+id+"/live/"+action, []byte("{}"), &result) {
+		return
+	}
+	// The upstream URL must never be trusted as an arbitrary redirect or
+	// proxy destination. Core generates a fixed protected HLS path itself.
+	playlist := ""
+	if action == "start" && result.OK {
+		playlist = "/api/v1/nvr/output/hls/saved_" + id + "/index.m3u8"
+	}
+	s.security.RecordAudit(r.Context(), s.securityRequestContext(r), actor,
+		"nvr.live."+action, "module", "nvr.module", "success",
+		map[string]any{"camera_id": id})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok": result.OK, "stopped": result.Stopped, "playlist_url": playlist,
+	})
+}
+
 func (s *server) nvrOutput(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
 	if !s.nvrReady(w, r) {
 		return
@@ -374,6 +440,17 @@ func (s *server) nvrRecordingFile(w http.ResponseWriter, r *http.Request, relati
 	dataRoot := s.nvrDataRoot
 	if dataRoot == "" {
 		dataRoot = "/var/lib/home-ai-modules/nvr.module"
+		ctx, cancel := context.WithTimeout(r.Context(), 9*time.Second)
+		defer cancel()
+		external, err := s.resolveNVRExternalRoot(ctx)
+		if err != nil {
+			writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_storage_unavailable", "NVR volume state could not be verified", nil)
+			return
+		}
+		if external != "" {
+			dataRoot = external
+			relativePath = strings.TrimPrefix(relativePath, "recordings/")
+		}
 	}
 	root, err := os.OpenRoot(dataRoot)
 	if err != nil {

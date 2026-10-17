@@ -85,3 +85,31 @@ func protectModuleHelperConn(ctx context.Context, conn net.Conn, timeout time.Du
 		_ = conn.Close()
 	}, nil
 }
+
+func callModuleUpgradeHelper(ctx context.Context, moduleID, previousImage, nextImage string) (helperModuleResult, error) {
+	conn, err := (&net.Dialer{}).DialContext(ctx, "unix", moduleHelperSocketPath)
+	if err != nil {
+		return helperModuleResult{}, fmt.Errorf("connect privileged upgrade helper: %w", err)
+	}
+	cleanup, err := protectModuleHelperConn(ctx, conn, moduleHelperIOTimeout)
+	if err != nil {
+		return helperModuleResult{}, err
+	}
+	defer cleanup()
+	if err := json.NewEncoder(conn).Encode(updaterhelper.Request{
+		Operation: "docker.module.upgrade", ProtocolVersion: updaterhelper.ProtocolVersion,
+		ModuleID: moduleID, PreviousImage: previousImage, Image: nextImage,
+	}); err != nil {
+		return helperModuleResult{}, err
+	}
+	var response updaterhelper.Response
+	if err := json.NewDecoder(conn).Decode(&response); err != nil {
+		return helperModuleResult{}, err
+	}
+	if !response.OK {
+		if response.Error == "" { response.Error = "module upgrade helper failed" }
+		return helperModuleResult{}, errors.New(response.Error)
+	}
+	return helperModuleResult{State: response.ModuleState,
+		ContainerID: response.ContainerID, Message: response.Message}, nil
+}
