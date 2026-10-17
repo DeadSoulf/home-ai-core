@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,8 +13,6 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	"crypto/sha256"
-	"bytes"
 	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
@@ -29,7 +29,7 @@ type nvrContainerMetadata struct {
 	ID     string `json:"Id"`
 	Image  string `json:"Image"`
 	Config struct {
-		Image  string `json:"Image"`
+		Image  string            `json:"Image"`
 		Labels map[string]string `json:"Labels"`
 	} `json:"Config"`
 	State struct {
