@@ -307,7 +307,7 @@ func runSettingsUI(args []string) error {
 	fs.SetOutput(os.Stderr)
 	var configPath, settingsPath string
 	var updated bool
-	fs.StringVar(&updated, "updated", false, "show update success after relaunch")
+	fs.BoolVar(&updated, "updated", false, "show update success after relaunch")
 	fs.StringVar(&configPath, "config", "", "sync profile file")
 	fs.StringVar(&settingsPath, "settings", "", "Windows client settings file")
 	if err := fs.Parse(args); err != nil {
