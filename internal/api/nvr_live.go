@@ -1,12 +1,48 @@
 package api
 
 import (
+	"context"
 	"net/http"
+	"strconv"
 	"net/url"
 	"strings"
 
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 )
+
+// Older NVR images implement DELETE with a hard SQLite foreign-key cascade.
+// Do not route camera deletion (or managed live preview) to that implementation:
+// the old delete handler can lose indexed archive rows even when MP4 files stay.
+func (s *server) nvrCameraLifecycleSupported(ctx context.Context) bool {
+	if s.modules == nil {
+		return false
+	}
+	item, err := s.modules.Get(ctx, "nvr.module")
+	if err != nil {
+		return false
+	}
+	version := strings.SplitN(item.Manifest.Version, "-", 2)[0]
+	parts := strings.Split(version, ".")
+	if len(parts) != 3 {
+		return false
+	}
+	major, errMajor := strconv.Atoi(parts[0])
+	minor, errMinor := strconv.Atoi(parts[1])
+	patch, errPatch := strconv.Atoi(parts[2])
+	if errMajor != nil || errMinor != nil || errPatch != nil {
+		return false
+	}
+	return major > 1 || (major == 1 && (minor > 1 || minor == 1 && patch >= 3))
+}
+
+func (s *server) requireNVRLifecycleVersion(w http.ResponseWriter, r *http.Request) bool {
+	if s.nvrCameraLifecycleSupported(r.Context()) {
+		return true
+	}
+	writeAPIError(w, r, http.StatusConflict, "nvr_upgrade_required",
+		"Update NVR to version 1.1.3 or later before managed live view or camera removal", nil)
+	return false
+}
 
 // Live-video API never receives an RTSP URL or camera password from the UI.
 // The NVR itself retrieves the stored credentials, and Core permits only a
@@ -17,6 +53,9 @@ func (s *server) nvrLiveCamera(w http.ResponseWriter, r *http.Request, actor sec
 		return
 	}
 	if !s.nvrReady(w, r) {
+		return
+	}
+	if !s.requireNVRLifecycleVersion(w, r) {
 		return
 	}
 	cameraID := r.PathValue("cameraID")
@@ -66,6 +105,9 @@ func (s *server) nvrDeleteCamera(w http.ResponseWriter, r *http.Request, actor s
 		return
 	}
 	if !s.nvrReady(w, r) {
+		return
+	}
+	if !s.requireNVRLifecycleVersion(w, r) {
 		return
 	}
 	cameraID := r.PathValue("cameraID")
