@@ -16,6 +16,7 @@ import (
 
 type server struct {
 	moduleSubmitMu      sync.Mutex
+	nvrEndpoint         func(context.Context) (string, error)
 	nodeID              string
 	logger              *slog.Logger
 	state               State
@@ -97,6 +98,14 @@ func New(
 	s.mux.HandleFunc("POST /api/v1/modules/catalog/{moduleID}/install", s.requireAuth("modules.manage", s.moduleCatalogInstall))
 	s.mux.HandleFunc("POST /api/v1/modules/install", s.requireAuth("modules.manage", s.moduleInstall))
 	s.mux.HandleFunc("GET /api/v1/modules/navigation", s.requireAuth("", s.moduleNavigation))
+	// The NVR UI is native to Core. It never embeds the unauthenticated
+	// module web console or makes the Docker container publicly reachable.
+	s.mux.HandleFunc("GET /api/v1/nvr/status", s.requireAuth("modules.read", s.nvrStatus))
+	s.mux.HandleFunc("GET /api/v1/nvr/cameras", s.requireAuth("modules.read", s.nvrCameras))
+	s.mux.HandleFunc("GET /api/v1/nvr/recordings", s.requireAuth("modules.read", s.nvrRecordings))
+	s.mux.HandleFunc("GET /api/v1/nvr/output/{path...}", s.requireAuth("modules.read", s.nvrOutput))
+	s.mux.HandleFunc("POST /api/v1/nvr/cameras", s.requireAuth("modules.manage", s.nvrAddCamera))
+	s.mux.HandleFunc("POST /api/v1/nvr/cameras/{cameraID}/{action}", s.requireAuth("modules.manage", s.nvrControlCamera))
 	s.mux.HandleFunc("GET /api/v1/modules/capabilities", s.requireAuth("modules.read", s.moduleCapabilities))
 	s.mux.HandleFunc("POST /api/v1/modules/{moduleID}/control", s.requireAuth("modules.manage", s.moduleControl))
 	s.mux.HandleFunc("DELETE /api/v1/modules/{moduleID}", s.requireAuth("modules.manage", s.moduleRemove))
