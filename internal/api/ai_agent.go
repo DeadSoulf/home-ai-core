@@ -50,10 +50,10 @@ func (s *server) aiGateway(w http.ResponseWriter, r *http.Request, actor securit
 		path, auditAction = "/api/chat", "ai.chat.send"
 	case method == http.MethodDelete && len(parts) == 2 &&
 		parts[0] == "providers" && aiObjectID.MatchString(parts[1]):
-		path, auditAction = "/api/providers/" + parts[1], "ai.provider.delete"
+		path, auditAction = "/api/providers/"+parts[1], "ai.provider.delete"
 	case method == http.MethodPost && len(parts) == 3 &&
 		parts[0] == "approvals" && parts[2] == "decision" && aiObjectID.MatchString(parts[1]):
-		path, auditAction = "/api/approvals/" + parts[1] + "/decision", "ai.approval.decide"
+		path, auditAction = "/api/approvals/"+parts[1]+"/decision", "ai.approval.decide"
 	default:
 		s.notFound(w, r)
 		return
@@ -204,10 +204,10 @@ func (s *server) aiRequest(ctx context.Context, method, path string, data []byte
 		req.Header.Set("Content-Type", "application/json")
 	}
 	transport := &http.Transport{
-		Proxy: nil,
-		DisableKeepAlives: true,
-		DialContext: (&net.Dialer{Timeout: 4*time.Second}).DialContext,
-		ResponseHeaderTimeout: 62*time.Second,
+		Proxy:                 nil,
+		DisableKeepAlives:     true,
+		DialContext:           (&net.Dialer{Timeout: 4 * time.Second}).DialContext,
+		ResponseHeaderTimeout: 62 * time.Second,
 	}
 	defer transport.CloseIdleConnections()
 	var roundTrip http.RoundTripper = transport
@@ -215,7 +215,7 @@ func (s *server) aiRequest(ctx context.Context, method, path string, data []byte
 		roundTrip = s.aiTransport
 	}
 	client := &http.Client{
-		Transport: roundTrip,
+		Transport:     roundTrip,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
 	return client.Do(req)
