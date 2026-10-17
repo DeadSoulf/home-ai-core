@@ -247,6 +247,39 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		})
 		return
 	}
+	if request.Operation == "docker.ai.gpu.status" || request.Operation == "docker.ai.gpu.apply" {
+		// Fixed managed AI GPU operations only, on the UID-verified helper socket.
+		// No client-supplied container name, Docker args or image is accepted.
+		if request.ModuleID != aiManagedID {
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: "unsupported GPU module"})
+			return
+		}
+		if request.Operation == "docker.ai.gpu.apply" && request.Confirm != aiGPUConfirm {
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: "explicit AI GPU confirmation required"})
+			return
+		}
+		_ = conn.SetDeadline(time.Now().Add(180 * time.Second))
+		ctx, cancel := context.WithTimeout(parent, 150*time.Second)
+		defer cancel()
+		var selected []string
+		var gpuError error
+		if request.Operation == "docker.ai.gpu.status" {
+			selected, gpuError = aiGPUStatus(ctx)
+		} else {
+			selected, gpuError = applyAIGPUSelection(ctx, request.AIGPUPCI, uid, gid)
+		}
+		if gpuError != nil {
+			logger.Error("AI GPU operation rejected", "operation", request.Operation, "error", gpuError)
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: gpuError.Error()})
+			return
+		}
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+			OK: true, Message: "AI GPU allocation verified", AIGPUPCI: selected,
+			HelperVersion: updaterhelper.HelperVersion,
+			ProtocolVersion: updaterhelper.ProtocolVersion,
+		})
+		return
+	}
 	if strings.HasPrefix(request.Operation, "docker.module.") {
 		_ = conn.SetDeadline(time.Now().Add(31 * time.Minute))
 		ctx, cancel := context.WithTimeout(parent, 30*time.Minute)
