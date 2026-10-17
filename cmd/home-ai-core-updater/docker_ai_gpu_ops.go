@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,7 +22,31 @@ const (
 )
 
 var (
-	aiGPUAddressPattern = regexp.MustCompile(`^[a-fA-F0-9]{4}:[a-fA-F0-9]{2}:[a-fA-F0-9]{2}.[0-7]$`)
+	aiGPUAddressPattern = regexp.MustCompile(`^[a-fA-F0-9]{4}:[a-fA-F0-9]{2}:[a-fA-F0-9]{2}\.[0-7]package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"time"
+)
+
+const (
+	aiManagedID       = "ai.agent"
+	aiGPUConfirm      = "ASSIGN_AI_GPU"
+	aiGPUCandidate    = "home-ai-module-ai.agent-gpu-candidate"
+	aiGPUPrevious     = "home-ai-module-ai.agent-gpu-previous"
+	aiGPUHealthWindow = 95 * time.Second
+)
+
+var (
+	aiGPUAddressPattern = )
 	aiGPUUUIDPattern    = regexp.MustCompile(`^GPU-[0-9a-fA-F-]{36}$`)
 )
 
@@ -63,7 +86,7 @@ func validateAIGPUPCI(values []string) ([]string, error) {
 // whereas sysfs/Core uses 4 hex digits (0000:01:00.0).
 func normalizeNvidiaBusID(value string) string {
 	value = strings.ToLower(strings.TrimSpace(value))
-	if len(value) == 17 && value[8] == ':' {
+	if len(value) == 16 && value[8] == ':' {
 		value = value[4:]
 	}
 	if !aiGPUAddressPattern.MatchString(value) {
@@ -314,9 +337,4 @@ func applyAIGPUSelection(ctx context.Context, requested []string, serviceUID, se
 	defer done()
 	_ = dockerAICommand(cleanup, dockerPath, "rm", aiGPUPrevious)
 	return selected, nil
-}
-
-// Core uses this only for trusted fixed-site AI inspection (not network).
-func aiGPUHealthTarget(ip string) string {
-	return net.JoinHostPort(ip, "8080")
 }
