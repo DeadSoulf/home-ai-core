@@ -33,9 +33,9 @@ const (
 	settingsWMSetFont = 0x0030
 	settingsWMApp     = 0x8000
 
-	settingsWMConnected = settingsWMApp + 201
-	settingsWMSyncDone  = settingsWMApp + 202
-	settingsWMAgentDone = settingsWMApp + 203
+	settingsWMConnected       = settingsWMApp + 201
+	settingsWMSyncDone        = settingsWMApp + 202
+	settingsWMAgentDone       = settingsWMApp + 203
 	settingsWMUpdateCheckDone = settingsWMApp + 204
 
 	settingsWSOverlappedWindow = 0x00CF0000
@@ -166,32 +166,32 @@ type windowsSettingsUI struct {
 	language     string
 	localized    map[string]windows.Handle
 
-	serverEdit         windows.Handle
-	usernameEdit       windows.Handle
-	passwordEdit       windows.Handle
-	folderCombo        windows.Handle
-	sourceEdit         windows.Handle
-	destination        windows.Handle
-	interval           windows.Handle
-	conflict           windows.Handle
-	profileList        windows.Handle
-	transferProgress   windows.Handle
-	transferDetails    windows.Handle
-	transferHistory    windows.Handle
-	statusLabel        windows.Handle
-	agentLabel         windows.Handle
-	saveProfileBtn     windows.Handle
-	languageCombo      windows.Handle
-	backupProfileCombo windows.Handle
-	updateChannelCombo windows.Handle
-	updateCheckBtn windows.Handle
-	updateInstallBtn windows.Handle
-	updateStatusLabel windows.Handle
-	updateBusy bool
-	updateAvailable bool
-	updateLatestVersion string
+	serverEdit           windows.Handle
+	usernameEdit         windows.Handle
+	passwordEdit         windows.Handle
+	folderCombo          windows.Handle
+	sourceEdit           windows.Handle
+	destination          windows.Handle
+	interval             windows.Handle
+	conflict             windows.Handle
+	profileList          windows.Handle
+	transferProgress     windows.Handle
+	transferDetails      windows.Handle
+	transferHistory      windows.Handle
+	statusLabel          windows.Handle
+	agentLabel           windows.Handle
+	saveProfileBtn       windows.Handle
+	languageCombo        windows.Handle
+	backupProfileCombo   windows.Handle
+	updateChannelCombo   windows.Handle
+	updateCheckBtn       windows.Handle
+	updateInstallBtn     windows.Handle
+	updateStatusLabel    windows.Handle
+	updateBusy           bool
+	updateAvailable      bool
+	updateLatestVersion  string
 	updateCheckedChannel string
-	updateError string
+	updateError          string
 
 	page                   int
 	pageControls           [settingsPageCount][]windows.Handle
@@ -229,7 +229,7 @@ type windowsSettingsUI struct {
 	connectResult *settingsConnectResult
 	syncResult    *settingsAsyncResult
 	agentResult   *settingsAsyncResult
-	updateResult *settingsUpdateCheckResult
+	updateResult  *settingsUpdateCheckResult
 }
 
 var (
