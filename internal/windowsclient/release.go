@@ -38,6 +38,7 @@ type WindowsClientRelease struct {
 type githubRelease struct {
 	TagName string               `json:"tag_name"`
 	Draft   bool                 `json:"draft"`
+	Prerelease bool             `json:"prerelease"`
 	Assets  []githubReleaseAsset `json:"assets"`
 }
 
@@ -48,10 +49,23 @@ type githubReleaseAsset struct {
 }
 
 func DiscoverLatestWindowsClientRelease(ctx context.Context, client *http.Client) (WindowsClientRelease, error) {
-	return discoverLatestWindowsClientReleaseFromURL(ctx, client, defaultWindowsClientReleasesURL)
+	return DiscoverWindowsClientRelease(ctx, client, ReleaseChannelBeta)
+}
+
+func DiscoverWindowsClientRelease(ctx context.Context, client *http.Client, channel string) (WindowsClientRelease, error) {
+	return discoverWindowsClientReleaseFromURL(ctx, client, defaultWindowsClientReleasesURL, channel)
 }
 
 func discoverLatestWindowsClientReleaseFromURL(ctx context.Context, client *http.Client, releasesURL string) (WindowsClientRelease, error) {
+	return discoverWindowsClientReleaseFromURL(ctx, client, releasesURL, ReleaseChannelBeta)
+}
+
+func discoverWindowsClientReleaseFromURL(ctx context.Context, client *http.Client, releasesURL, channel string) (WindowsClientRelease, error) {
+	var err error
+	channel, err = NormalizeReleaseChannel(channel)
+	if err != nil {
+		return WindowsClientRelease{}, err
+	}
 	if err := validateReleaseURL(releasesURL); err != nil {
 		return WindowsClientRelease{}, fmt.Errorf("validate releases URL: %w", err)
 	}
@@ -63,12 +77,16 @@ func discoverLatestWindowsClientReleaseFromURL(ctx context.Context, client *http
 	if err := json.Unmarshal(data, &releases); err != nil {
 		return WindowsClientRelease{}, fmt.Errorf("decode release metadata: %w", err)
 	}
+	var newest WindowsClientRelease
 	for _, release := range releases {
 		if release.Draft {
 			continue
 		}
 		version := strings.TrimPrefix(strings.TrimSpace(release.TagName), "v")
-		if version == "" {
+		if version == "" || !validReleaseVersion(version) {
+			continue
+		}
+		if channel == ReleaseChannelStable && (release.Prerelease || strings.Contains(version, "-")) {
 			continue
 		}
 		executableName := fmt.Sprintf("home-ai-windows-client_%s_amd64.exe", version)
@@ -95,7 +113,7 @@ func discoverLatestWindowsClientReleaseFromURL(ctx context.Context, client *http
 		if err := validateReleaseURL(checksum.BrowserDownloadURL); err != nil {
 			continue
 		}
-		return WindowsClientRelease{
+		candidate := WindowsClientRelease{
 			Version:        version,
 			TagName:        release.TagName,
 			ExecutableName: executableName,
@@ -103,7 +121,13 @@ func discoverLatestWindowsClientReleaseFromURL(ctx context.Context, client *http
 			ExecutableSize: executable.Size,
 			ChecksumName:   checksumName,
 			ChecksumURL:    checksum.BrowserDownloadURL,
-		}, nil
+		}
+		if newest.Version == "" || CompareWindowsClientVersions(candidate.Version, newest.Version) > 0 {
+			newest = candidate
+		}
+	}
+	if newest.Version != "" {
+		return newest, nil
 	}
 	return WindowsClientRelease{}, ErrNoCompatibleWindowsClientRelease
 }
