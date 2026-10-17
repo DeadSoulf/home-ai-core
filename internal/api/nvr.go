@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -317,6 +319,14 @@ func (s *server) nvrOutput(w http.ResponseWriter, r *http.Request, _ security.Ac
 		writeAPIError(w, r, http.StatusBadRequest, "invalid_nvr_media", "Invalid NVR media path", nil)
 		return
 	}
+	// Archived MP4 files are persisted under the Core-owned module data root.
+	// Serve them from a rooted filesystem with native HTTP Range support:
+	// NVR's original file endpoint loads the entire video into memory and
+	// does not implement Range requests, which is unsafe for large recordings.
+	if strings.HasPrefix(path, "recordings/") {
+		s.nvrRecordingFile(w, r, path)
+		return
+	}
 	response, err := s.nvrRequest(r.Context(), http.MethodGet, "/output/"+path, nil)
 	if err != nil {
 		writeAPIError(w, r, http.StatusBadGateway, "nvr_unavailable", "NVR media is unavailable", nil)
@@ -343,4 +353,33 @@ func (s *server) nvrOutput(w http.ResponseWriter, r *http.Request, _ security.Ac
 	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, response.Body)
+}
+
+func (s *server) nvrRecordingFile(w http.ResponseWriter, r *http.Request, relativePath string) {
+	dataRoot := s.nvrDataRoot
+	if dataRoot == "" {
+		dataRoot = "/var/lib/home-ai-modules/nvr.module"
+	}
+	root, err := os.OpenRoot(dataRoot)
+	if err != nil {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_media_unavailable", "NVR recording storage is unavailable", nil)
+		return
+	}
+	defer root.Close()
+	file, err := root.Open(relativePath)
+	if err != nil {
+		writeAPIError(w, r, http.StatusNotFound, "nvr_media_unavailable", "Recording not found", nil)
+		return
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil || !info.Mode().IsRegular() {
+		writeAPIError(w, r, http.StatusNotFound, "nvr_media_unavailable", "Recording not found", nil)
+		return
+	}
+	w.Header().Set("Content-Type", "video/mp4")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "private, no-store")
+	w.Header().Set("Content-Disposition", "inline")
+	http.ServeContent(w, r, filepath.Base(relativePath), info.ModTime(), file)
 }
