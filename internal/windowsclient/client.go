@@ -147,20 +147,20 @@ func New(rawBaseURL string) (*Client, error) {
 	// Import a public certificate/CA only after verifying its fingerprint through
 	// a trusted channel. Do not silently bypass pinned identity verification.
 	if transport.TLSClientConfig != nil && !transport.TLSClientConfig.InsecureSkipVerify {
-	if caFile := strings.TrimSpace(os.Getenv("HOME_AI_CA_FILE")); caFile != "" {
-		pem, err := os.ReadFile(caFile)
-		if err != nil {
-			return nil, fmt.Errorf("read server CA: %w", err)
+		if caFile := strings.TrimSpace(os.Getenv("HOME_AI_CA_FILE")); caFile != "" {
+			pem, err := os.ReadFile(caFile)
+			if err != nil {
+				return nil, fmt.Errorf("read server CA: %w", err)
+			}
+			pool, err := x509.SystemCertPool()
+			if err != nil {
+				pool = x509.NewCertPool()
+			}
+			if !pool.AppendCertsFromPEM(pem) {
+				return nil, errors.New("server CA file contains no valid certificate")
+			}
+			transport.TLSClientConfig.RootCAs = pool
 		}
-		pool, err := x509.SystemCertPool()
-		if err != nil {
-			pool = x509.NewCertPool()
-		}
-		if !pool.AppendCertsFromPEM(pem) {
-			return nil, errors.New("server CA file contains no valid certificate")
-		}
-		transport.TLSClientConfig.RootCAs = pool
-	}
 	}
 	parsed.Path = strings.TrimRight(parsed.Path, "/")
 	return &Client{
