@@ -6,9 +6,9 @@ import "time"
 // It deliberately ignores elapsed time while the process is not copying.
 // ETA is an approximation for the current file, not the whole sync run.
 type transferRate struct {
-	at        time.Time
-	bytes     int64
-	speed     int64
+	at    time.Time
+	bytes int64
+	speed int64
 }
 
 func (r *transferRate) observe(now time.Time, uploaded, total int64) (bytesPerSecond, etaSeconds int64) {
