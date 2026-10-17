@@ -22,31 +22,7 @@ const (
 )
 
 var (
-	aiGPUAddressPattern = regexp.MustCompile(`^[a-fA-F0-9]{4}:[a-fA-F0-9]{2}:[a-fA-F0-9]{2}\.[0-7]package main
-
-import (
-	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"regexp"
-	"strings"
-	"time"
-)
-
-const (
-	aiManagedID       = "ai.agent"
-	aiGPUConfirm      = "ASSIGN_AI_GPU"
-	aiGPUCandidate    = "home-ai-module-ai.agent-gpu-candidate"
-	aiGPUPrevious     = "home-ai-module-ai.agent-gpu-previous"
-	aiGPUHealthWindow = 95 * time.Second
-)
-
-var (
-	aiGPUAddressPattern = )
+	aiGPUAddressPattern = regexp.MustCompile(`^[a-fA-F0-9]{4}:[a-fA-F0-9]{2}:[a-fA-F0-9]{2}\.[0-7]$`)
 	aiGPUUUIDPattern    = regexp.MustCompile(`^GPU-[0-9a-fA-F-]{36}$`)
 )
 
