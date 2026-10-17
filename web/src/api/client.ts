@@ -6,6 +6,7 @@ import type {
   Job,
   RealtimeEvent,
   RegisteredModule, ModuleNavigationState, NVRStatus, NVRCamera, NVRRecording,
+  NVRDiscoveryNetwork, NVRDiscoveryResult,
   SetupStatus,
   SystemResponse,
   UpdateStatus,
@@ -637,6 +638,10 @@ export const api = {
     return result.state;
   },
 
+  nvrDiscoveryNetworks: async (signal?: AbortSignal) =>
+    (await request<{networks: NVRDiscoveryNetwork[]}>("/api/v1/nvr/discovery/networks", {signal})).networks,
+  nvrDiscover: (networkID: string): Promise<NVRDiscoveryResult> =>
+    postJSON<NVRDiscoveryResult>("/api/v1/nvr/discovery/search", {network_id: networkID}, true),
   nvrStatus: (signal?: AbortSignal) => request<NVRStatus>("/api/v1/nvr/status", {signal}),
   nvrCameras: async (signal?: AbortSignal) =>
     (await request<{ok: boolean; cameras: NVRCamera[]}>("/api/v1/nvr/cameras", {signal})).cameras,

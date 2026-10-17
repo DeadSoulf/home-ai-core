@@ -1,11 +1,11 @@
 import {useCallback, useEffect, useState, type FormEvent} from "react";
 import {api} from "../api/client";
-import type {NVRCamera, NVRRecording, NVRStatus} from "../api/types";
+import type {NVRCamera, NVRRecording, NVRStatus, NVRDiscoveryNetwork, NVRDiscoveredCamera} from "../api/types";
 import {Panel} from "../components/Panel";
 import {PageHeading} from "./Dashboard";
 import "./NVR.css";
 
-type NVRTab = "cameras" | "archive";
+type NVRTab = "cameras" | "discovery" | "archive";
 
 const localDate = (seconds: number) => new Date(seconds * 1000).toLocaleString();
 const bytes = (value: number) => value >= 1024 ** 3
@@ -31,6 +31,14 @@ export function NVRPage({canManage}: {canManage: boolean}) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [channel, setChannel] = useState(1);
+  const [networks, setNetworks] = useState<NVRDiscoveryNetwork[]>([]);
+  const [selectedNetwork, setSelectedNetwork] = useState("");
+  const [discovered, setDiscovered] = useState<NVRDiscoveredCamera[]>([]);
+  const [discoveryError, setDiscoveryError] = useState("");
+  const [discoveryLoading, setDiscoveryLoading] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanSummary, setScanSummary] = useState("");
+  const [hasScanned, setHasScanned] = useState(false);
 
   const reload = useCallback(async (signal?: AbortSignal) => {
     const [nextStatus, nextCameras, nextRecordings] = await Promise.all([
@@ -90,6 +98,61 @@ export function NVRPage({canManage}: {canManage: boolean}) {
     }
   }
 
+  useEffect(() => {
+    if (tab !== "discovery" || !canManage) return;
+    const controller = new AbortController();
+    setDiscoveryLoading(true);
+    void api.nvrDiscoveryNetworks(controller.signal).then((available) => {
+      if (controller.signal.aborted) return;
+      setNetworks(available);
+      setSelectedNetwork((old) => available.some((net) => net.id === old) ? old : available[0]?.id || "");
+      setDiscoveryError("");
+    }).catch((err: unknown) => {
+      if (!controller.signal.aborted) {
+        setDiscoveryError(err instanceof Error ? err.message : "Не удалось получить список локальных сетей");
+      }
+    }).finally(() => {
+      if (!controller.signal.aborted) setDiscoveryLoading(false);
+    });
+    return () => controller.abort();
+  }, [tab, canManage]);
+
+  async function searchForCameras() {
+    if (!selectedNetwork || scanning || !canManage) return;
+    setScanning(true);
+    setDiscoveryError("");
+    setScanSummary("");
+    setHasScanned(false);
+    setDiscovered([]);
+    try {
+      const result = await api.nvrDiscover(selectedNetwork);
+      setDiscovered(result.devices);
+      setHasScanned(true);
+      setScanSummary(`Проверено до ${result.scanned_hosts} адресов · ${(result.duration_ms / 1000).toFixed(1)} с`);
+    } catch (err) {
+      setDiscoveryError(err instanceof Error ? err.message : "Ошибка поиска камер");
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  function configureFoundCamera(device: NVRDiscoveredCamera) {
+    const viaHikvision = device.vendor === "Hikvision" && device.sdk_port === 8000;
+    setSourceType(viaHikvision ? "hikvision" : "rtsp");
+    setName((device.name || (device.vendor === "Не определён" ? "Камера" : device.vendor)) + " " + device.address);
+    setAddress(viaHikvision ? device.address : `rtsp://${device.address}:${device.rtsp_port || 554}/`);
+    setPort(8000);
+    setChannel(1);
+    setUsername("");
+    setPassword("");
+    setMessage(viaHikvision
+      ? "Найдена камера Hikvision. Укажите логин и пароль для подключения через HCNetSDK."
+      : "Проверьте RTSP-путь для этой модели и укажите учётные данные, если они требуются.");
+    setDiscoveryError("");
+    setAdding(true);
+    setTab("cameras");
+  }
+
   const archiveSelected = selected && recordings.some((item) => item.id === selected.id) ? selected : undefined;
 
   return <div className="page nvr-page">
@@ -97,6 +160,8 @@ export function NVRPage({canManage}: {canManage: boolean}) {
     <div className="button-row">
       <button type="button" className={"button " + (tab === "cameras" ? "primary" : "secondary")}
         onClick={() => setTab("cameras")}>Камеры</button>
+      {canManage && <button type="button" className={"button " + (tab === "discovery" ? "primary" : "secondary")}
+        onClick={() => setTab("discovery")}>Поиск камер</button>}
       <button type="button" className={"button " + (tab === "archive" ? "primary" : "secondary")}
         onClick={() => setTab("archive")}>Архив записей</button>
       <button type="button" className="button secondary" disabled={busy}
@@ -160,6 +225,66 @@ export function NVRPage({canManage}: {canManage: boolean}) {
           </div>}
         </article>)}
       </div>
+    </Panel>}
+
+    {tab === "discovery" && canManage && <Panel title="Поиск сетевых камер">
+      <p className="muted">
+        Найдите камеры разных производителей без обязательного ONVIF: RTSP, WS-Discovery, SSDP,
+        mDNS и сервисные порты. Обнаружение работает на сервере HOME AI Core, а не в браузере.
+      </p>
+      <div className="nvr-discovery-toolbar">
+        <label>Локальная сеть
+          <select value={selectedNetwork} disabled={scanning || discoveryLoading}
+            onChange={(event) => {
+              setSelectedNetwork(event.target.value);
+              setDiscovered([]);
+              setHasScanned(false);
+              setScanSummary("");
+            }}>
+            {networks.length === 0 && <option value="">Не найдены доступные сети</option>}
+            {networks.map((network) => <option key={network.id} value={network.id}>
+              {network.interface} — {network.cidr} ({network.address})
+            </option>)}
+          </select>
+        </label>
+        <button className="button primary" type="button"
+          disabled={!selectedNetwork || scanning || discoveryLoading}
+          onClick={() => void searchForCameras()}>
+          {scanning ? "Поиск камер…" : "Найти камеры"}
+        </button>
+      </div>
+      {discoveryLoading && <p role="status">Определяем доступные сетевые интерфейсы…</p>}
+      {scanning && <p role="status">Сканирование локальной сети. Поиск может занять до 15 секунд.</p>}
+      {discoveryError && <p role="alert" className="nvr-notice-error">{discoveryError}</p>}
+      {hasScanned && <p role="status" className="muted">{scanSummary} · Найдено устройств: {discovered.length}</p>}
+      {hasScanned && discovered.length === 0 && <p className="muted">
+        Камеры не обнаружены автоматически. Проверьте выбранную подсеть, VLAN и настройки сети
+        камеры либо добавьте источник вручную на вкладке «Камеры».
+      </p>}
+      <div className="nvr-discovery-list">
+        {discovered.map((camera) => <article className="nvr-discovery-device" key={camera.address}>
+          <div className="nvr-discovery-main">
+            <div className="nvr-discovery-title">
+              <strong>{camera.name || camera.vendor}</strong>
+              <span className="muted small">{camera.confidence === "detected" ? "Сервис обнаружен" : "Возможное устройство"}</span>
+            </div>
+            <p className="mono small">{camera.address} · {camera.vendor}</p>
+            <div className="nvr-discovery-services">
+              {camera.services.map((service) => <span className="tag" key={service}>{service}</span>)}
+            </div>
+          </div>
+          <button type="button" className="button secondary" onClick={() => configureFoundCamera(camera)}>
+            Настроить подключение
+          </button>
+        </article>)}
+      </div>
+      <p className="muted small">
+        Важное ограничение: некоторые камеры используют закрытые протоколы, не отвечают на
+        обнаружение или находятся в другой VLAN. Найденное устройство не означает, что
+        видеопоток будет доступен без адреса RTSP-потока и учётных данных.
+        Поиск ограничен напрямую подключённой локальной подсетью, не более /24,
+        и никогда не перебирает пароли.
+      </p>
     </Panel>}
 
     {tab === "archive" && <Panel title="Архив видеозаписей">

@@ -16,3 +16,21 @@
 .nvr-page .nvr-notice-error { padding: 12px; color: #b42318; border: 1px solid currentColor; border-radius: 8px; }
 .nvr-page .nvr-notice-success { padding: 12px; border: 1px solid var(--border, #d9e0e8); border-radius: 8px; }
 @media (max-width: 640px) { .nvr-page .nvr-camera { align-items: stretch; flex-direction: column; } }
+
+
+/* Multi-vendor LAN discovery — intentionally separate from camera management. */
+.nvr-page .nvr-discovery-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin: 18px 0; }
+.nvr-page .nvr-discovery-toolbar label { display: flex; flex: 1 1 300px; max-width: 480px; flex-direction: column; gap: 6px; }
+.nvr-page .nvr-discovery-toolbar select { max-width: 100%; width: 100%; padding: 9px; border-radius: 8px; }
+.nvr-page .nvr-discovery-list { display: grid; gap: 12px; margin: 16px 0; }
+.nvr-page .nvr-discovery-device { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding: 16px; border: 1px solid var(--border, #d9e0e8); border-radius: 11px; }
+.nvr-page .nvr-discovery-main { flex: 1 1 260px; min-width: 0; }
+.nvr-page .nvr-discovery-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; }
+.nvr-page .nvr-discovery-main p { margin: 6px 0; }
+.nvr-page .nvr-discovery-services { display: flex; flex-wrap: wrap; gap: 5px; }
+.nvr-page .nvr-discovery-services .tag { font-size: .78rem; max-width: 100%; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .nvr-page .nvr-discovery-device { align-items: stretch; flex-direction: column; }
+  .nvr-page .nvr-discovery-toolbar { align-items: stretch; flex-direction: column; }
+  .nvr-page .nvr-discovery-toolbar label { width: 100%; flex: 1 1 auto; }
+}
