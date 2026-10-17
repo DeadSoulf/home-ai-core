@@ -349,7 +349,7 @@ async def suite(browser):
         h=await Harness(browser,modules=[module()]).start('/modules',390);await h.ready()
         await h.page.get_by_role('button',name='Меню',exact=True).click()
         await expect(h.page.locator('main')).to_have_attribute('inert','')
-        await expect(h.page.locator('nav button[aria-current=page]')).to_be_focused()
+        await expect(h.page.locator('#main-sidebar nav button[aria-current=page]')).to_be_focused()
         await h.page.keyboard.press('Escape')
         assert await h.page.locator('main[inert]').count()==0
         await expect(h.page.get_by_role('button',name='Меню',exact=True)).to_be_focused();await h.close()
