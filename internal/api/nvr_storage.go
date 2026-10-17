@@ -41,7 +41,8 @@ func (s *server) nvrVideoCandidateList(ctx context.Context) ([]nvrVideoCandidate
 			continue
 		}
 		node, ok := blockNodeForStoragePurpose(nodes, record)
-		if !ok || node.System || (node.Type != "part" && node.Type != "lvm") {
+		if !ok || node.System || (node.Type != "part" && node.Type != "lvm") ||
+			node.UUID == "" || node.UUID != record.FilesystemUUID {
 			continue
 		}
 		fs := strings.ToLower(node.Filesystem)
