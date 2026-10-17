@@ -130,6 +130,32 @@ func (s *server) storagePurposes(
 				}
 			}
 		}
+		// An attached module may still have a Docker bind mount on this device.
+		// Never allow reassignment or clearing of its disk via the UI while
+		// the registered container could reference it.
+		previousAssignments, err := s.state.ListStoragePurposes(r.Context())
+		if err != nil {
+			writeAPIError(w, r, http.StatusInternalServerError, "storage_usage_unavailable", "Storage assignments are unavailable", nil)
+			return
+		}
+		for _, previous := range previousAssignments {
+			if previous.Purpose == purpose {
+				continue
+			}
+			if id, isModule := state.StoragePurposeModuleID(previous.Purpose); isModule &&
+				storagePurposeUsesNode(node, previous) {
+				if s.modules == nil {
+					writeAPIError(w, r, http.StatusConflict, "storage_module_in_use",
+						"Module storage registry is unavailable", nil)
+					return
+				}
+				if _, err := s.modules.Get(r.Context(), id); err == nil {
+					writeAPIError(w, r, http.StatusConflict, "storage_module_in_use",
+						"Remove or detach the module before changing its assigned disk", nil)
+					return
+				}
+			}
+		}
 		pools, err := s.state.ListNASPools(r.Context())
 		if err != nil {
 			writeAPIError(w, r, http.StatusInternalServerError, "storage_usage_unavailable", "storage usage is unavailable", nil)
