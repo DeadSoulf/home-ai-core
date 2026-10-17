@@ -33,6 +33,47 @@ for the correct setup with a public-domain certificate, independently verified
 private-CA fallback and the requirement for an exact hostname SAN.
 Do not bypass TLS verification or import an unverified certificate.
 
+## Use a self-signed server without installing a CA certificate
+
+The **Connection / Подключение** page now offers **Trust this server… /
+Доверять серверу…** for users who do not want to install a certificate
+into the Windows trust store or obtain a public CA certificate.
+
+1. Enter the HTTPS server URL, e.g. `https://homeaicore.ru:82`.
+2. Click **Trust this server…**. The client performs an anonymous TLS
+   handshake and shows the presented certificate's SHA-256 fingerprint
+   **without sending a password or token**.
+3. Independently verify the fingerprint on the trusted server console:
+   `sudo openssl x509 -in /var/lib/home-ai-core/tls/server.crt -noout -fingerprint -sha256`
+   (or the administrator-supplied `HOME_AI_TLS_CERT` certificate).
+4. Only if it matches, confirm the warning. The client stores a
+   **per-HTTPS-origin pin** in the user's HomeAI configuration and
+   connects using that exact certificate.
+5. Future GUI, CLI, queued file transfers and per-user background agent
+   connections use the same pin. A changed, expired or missing certificate
+   **blocks all requests**, including password submission. Use the
+   **Remove saved trust** button to revoke a pin.
+
+This is HTTPS with certificate pinning, **not plaintext HTTP and not an
+unrestricted skip-certificate-verification switch**. Because the pinned
+fingerprint establishes the server identity independently, the certificate
+can be self-signed or lack the public hostname in its SAN. The pin is only
+safe if you verify the initial fingerprint *out of band*: approving an
+unverified fingerprint can allow a man-in-the-middle to capture credentials
+or files. The fingerprint is not a secret, but the server's private key must
+never be copied to clients.
+
+Trust is per exact hostname and port and is separate from credentials.
+Certificates for other servers still use normal Windows root and hostname
+checks. After revoking a pin the client reverts to normal HTTPS validation.
+The pin is stored in `%APPDATA%\\HomeAI\\trusted-servers.json`.
+For deployments using a custom configuration root, the OS user config
+directory is used.
+
+Home AI Core still needs to present an actual TLS certificate on port 82:
+there is no safe certificate-free HTTPS handshake. Plain HTTP with passwords
+over a public internet address is **not supported**.
+
 ## Windows client language
 
 The native Windows UI supports **Русский** and **English** in the same executable. On the first GUI launch, Russian Windows locales default to Russian; other Windows locales default to English. The language selector in the settings window applies immediately and the selection is saved for later GUI and tray sessions.
