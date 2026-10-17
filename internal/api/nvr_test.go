@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -161,5 +163,32 @@ func TestNVRStatusJSONDoesNotLeakDatabasePath(t *testing.T) {
 	}
 	if _, ok := result["database"]; ok {
 		t.Fatal("private NVR database path leaked")
+	}
+}
+
+func TestNVRArchiveSupportsRangesAndRejectsEscapingSymlinks(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "recordings", "cam1")
+	if err := os.MkdirAll(target, 0o700); err != nil { t.Fatal(err) }
+	if err := os.WriteFile(filepath.Join(target, "sample.mp4"), []byte("abcdefghij"), 0o600); err != nil { t.Fatal(err) }
+	s := nvrTestUpstream(t, "{}")
+	s.nvrDataRoot = dir
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/nvr/output/recordings/cam1/sample.mp4", nil)
+	req.SetPathValue("path", "recordings/cam1/sample.mp4")
+	req.Header.Set("Range", "bytes=2-5")
+	w := httptest.NewRecorder()
+	s.nvrOutput(w, req, security.Actor{}, authBearer)
+	if w.Code != http.StatusPartialContent || w.Body.String() != "cdef" {
+		t.Fatalf("range status %d body %q", w.Code, w.Body.String())
+	}
+	external := filepath.Join(t.TempDir(), "secret.mp4")
+	if err := os.WriteFile(external, []byte("DO_NOT_EXPOSE"), 0o600); err != nil { t.Fatal(err) }
+	if err := os.Symlink(external, filepath.Join(target, "escaped.mp4")); err != nil { t.Skipf("symlinks unavailable: %v", err) }
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/nvr/output/recordings/cam1/escaped.mp4", nil)
+	req.SetPathValue("path", "recordings/cam1/escaped.mp4")
+	w = httptest.NewRecorder()
+	s.nvrOutput(w, req, security.Actor{}, authBearer)
+	if w.Code == http.StatusOK || strings.Contains(w.Body.String(), "DO_NOT_EXPOSE") {
+		t.Fatalf("root escape accepted: %d %q", w.Code, w.Body.String())
 	}
 }
