@@ -181,7 +181,7 @@ func probeHost(ctx context.Context, host string, results chan<- signal) {
 			return
 		}
 		address := net.JoinHostPort(host, strconv.Itoa(port))
-		conn, err := (&net.Dialer{Timeout: 300*time.Millisecond}).DialContext(ctx, "tcp4", address)
+		conn, err := (&net.Dialer{Timeout: 300 * time.Millisecond}).DialContext(ctx, "tcp4", address)
 		if err != nil {
 			continue
 		}
