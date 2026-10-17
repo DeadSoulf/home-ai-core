@@ -103,9 +103,9 @@ func (s *server) nvrDiscover(w http.ResponseWriter, r *http.Request, actor secur
 		"nvr.discovery.scan", "module", "nvr.module", "success",
 		map[string]any{"network": scope.CIDR, "devices": len(found)})
 	writeJSON(w, http.StatusOK, map[string]any{
-		"devices": found,
-		"network": scope,
+		"devices":       found,
+		"network":       scope,
 		"scanned_hosts": scope.Hosts,
-		"duration_ms": time.Since(started).Milliseconds(),
+		"duration_ms":   time.Since(started).Milliseconds(),
 	})
 }
