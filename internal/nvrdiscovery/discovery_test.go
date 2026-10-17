@@ -39,21 +39,27 @@ func TestSubnetForAddressIsBoundedAndPrivate(t *testing.T) {
 		t.Fatal("host-only interface mask should not be scanned")
 	}
 	for _, iface := range []string{"docker0", "veth01", "br-e22", "virbr0", "cni0"} {
-		if !excludedInterface(iface) { t.Fatalf("Docker network exposed %s", iface) }
+		if !excludedInterface(iface) {
+			t.Fatalf("Docker network exposed %s", iface)
+		}
 	}
 }
 
 func TestHostEnumerationExcludesBroadcastAndSelf(t *testing.T) {
-	network := Network{ID:"eth0|192.168.4.0/29", CIDR:"192.168.4.0/29", Address:"192.168.4.3"}
+	network := Network{ID: "eth0|192.168.4.0/29", CIDR: "192.168.4.0/29", Address: "192.168.4.3"}
 	hosts, err := hostsForNetwork(network)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(hosts) != 5 || slices.Contains(hosts, "192.168.4.3") ||
 		slices.Contains(hosts, "192.168.4.0") || slices.Contains(hosts, "192.168.4.7") {
 		t.Fatalf("hosts=%v", hosts)
 	}
 	for _, bad := range []string{"8.8.8.0/24", "10.0.0.0/8", "invalid", "127.0.0.0/24"} {
-		_, err := hostsForNetwork(Network{CIDR:bad,Address:"192.168.4.3"})
-		if err == nil { t.Fatalf("unsafe target accepted: %s", bad) }
+		_, err := hostsForNetwork(Network{CIDR: bad, Address: "192.168.4.3"})
+		if err == nil {
+			t.Fatalf("unsafe target accepted: %s", bad)
+		}
 	}
 	if _, err := SelectNetwork([]Network{network}, "8.8.8.0/24"); err == nil {
 		t.Fatal("user-chosen arbitrary subnet accepted")
@@ -61,7 +67,7 @@ func TestHostEnumerationExcludesBroadcastAndSelf(t *testing.T) {
 }
 
 func TestWSDiscoveryParsesScopedNameAndValidatesReplyID(t *testing.T) {
-	const id="urn:uuid:44-55"
+	const id = "urn:uuid:44-55"
 	body := `<?xml version="1.0"?>
 <e:Envelope xmlns:e="http://www.w3.org/2003/05/soap-envelope">
 <e:Header><a:RelatesTo xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing">` + id + `</a:RelatesTo></e:Header>
@@ -97,68 +103,72 @@ func TestMDNSPTRDeviceDetectionAndCompressionBounds(t *testing.T) {
 		t.Fatalf("bad mDNS query: %x", query)
 	}
 	packet := append([]byte(nil), query...)
-	packet[2],packet[3] = 0x84,0
+	packet[2], packet[3] = 0x84, 0
 	binary.BigEndian.PutUint16(packet[6:8], 1)
 	// Answer name: compressed pointer to the service in the question.
 	packet = append(packet, 0xc0, 0x0c, 0, 12, 0, 1, 0, 0, 0, 30)
-	pointer := make([]byte,0)
-	pointer=append(pointer, byte(len("Gate Camera")))
-	pointer=append(pointer, []byte("Gate Camera")...)
-	pointer=append(pointer, 0xc0,0x0c)
+	pointer := make([]byte, 0)
+	pointer = append(pointer, byte(len("Gate Camera")))
+	pointer = append(pointer, []byte("Gate Camera")...)
+	pointer = append(pointer, 0xc0, 0x0c)
 	var lenBytes [2]byte
-	binary.BigEndian.PutUint16(lenBytes[:],uint16(len(pointer)))
-	packet=append(packet,lenBytes[:]...)
-	packet=append(packet,pointer...)
-	result:=parseMDNSResponse(packet)
-	if result.Service!="mDNS" || result.Name!="Gate Camera" {
-		t.Fatalf("mDNS response %#v",result)
+	binary.BigEndian.PutUint16(lenBytes[:], uint16(len(pointer)))
+	packet = append(packet, lenBytes[:]...)
+	packet = append(packet, pointer...)
+	result := parseMDNSResponse(packet)
+	if result.Service != "mDNS" || result.Name != "Gate Camera" {
+		t.Fatalf("mDNS response %#v", result)
 	}
-	bad:=append([]byte(nil),packet...)
-	bad[12],bad[13]=0xc0,0x0c
-	if parseMDNSResponse(bad).Service!="" {
+	bad := append([]byte(nil), packet...)
+	bad[12], bad[13] = 0xc0, 0x0c
+	if parseMDNSResponse(bad).Service != "" {
 		t.Fatal("recursive compression pointer accepted")
 	}
-	if parseMDNSResponse(bytes.Repeat([]byte{0xff},20)).Service!="" {
+	if parseMDNSResponse(bytes.Repeat([]byte{0xff}, 20)).Service != "" {
 		t.Fatal("malformed packet accepted")
 	}
 }
 
 func TestProbesRecognizeRTSPWithoutAuthentication(t *testing.T) {
-	client,server := net.Pipe()
+	client, server := net.Pipe()
 	defer client.Close()
 	defer server.Close()
-	done:=make(chan struct{})
-	go func(){
+	done := make(chan struct{})
+	go func() {
 		defer close(done)
-		_ = server.SetDeadline(time.Now().Add(2*time.Second))
-		buf:=make([]byte,512)
-		n,_:=server.Read(buf)
-		if n==0 || !strings.Contains(string(buf[:n]),"OPTIONS * RTSP/1.0") {return}
-		_,_=server.Write([]byte("RTSP/1.0 401 Unauthorized\r\nServer: Reolink RTSP\r\nWWW-Authenticate: Digest realm=\"camera\"\r\n\r\n"))
+		_ = server.SetDeadline(time.Now().Add(2 * time.Second))
+		buf := make([]byte, 512)
+		n, _ := server.Read(buf)
+		if n == 0 || !strings.Contains(string(buf[:n]), "OPTIONS * RTSP/1.0") {
+			return
+		}
+		_, _ = server.Write([]byte("RTSP/1.0 401 Unauthorized\r\nServer: Reolink RTSP\r\nWWW-Authenticate: Digest realm=\"camera\"\r\n\r\n"))
 	}()
-	got:=probeRTSP(client,"127.0.0.1",554)
+	got := probeRTSP(client, "127.0.0.1", 554)
 	<-done
-	if !got.Confirmed || got.Vendor!="Reolink" || got.Port!=554 {
-		t.Fatalf("RTSP= %#v",got)
+	if !got.Confirmed || got.Vendor != "Reolink" || got.Port != 554 {
+		t.Fatalf("RTSP= %#v", got)
 	}
 }
 
 func TestCameraVendorBannerClassification(t *testing.T) {
-	for _, tc := range []struct{banner,vendor string}{
+	for _, tc := range []struct{ banner, vendor string }{
 		{"Server: AXIS Network Camera", "Axis"},
 		{"Server: Dahua HTTP", "Dahua"},
-		{"RTSP/1.0 200 OK\r\nServer: Foscam","Foscam"},
-		{"Server: Xiongmai XM","Xiongmai"},
-		{"Server: generic router",""},
+		{"RTSP/1.0 200 OK\r\nServer: Foscam", "Foscam"},
+		{"Server: Xiongmai XM", "Xiongmai"},
+		{"Server: generic router", ""},
 	} {
-		if got:=vendorFromText(tc.banner);got!=tc.vendor {t.Fatalf("%q => %q",tc.banner,got)}
+		if got := vendorFromText(tc.banner); got != tc.vendor {
+			t.Fatalf("%q => %q", tc.banner, got)
+		}
 	}
 }
 
 func TestScanRejectsUnsafeCIDRBeforeNetworking(t *testing.T) {
-	for _, network := range []Network{{CIDR:"0.0.0.0/0"},{CIDR:"192.168.0.0/16"},{CIDR:"8.8.8.0/24"}} {
-		if _,err:=Scan(context.Background(),network);err==nil {
-			t.Fatalf("scan accepted arbitrary target %q",network.CIDR)
+	for _, network := range []Network{{CIDR: "0.0.0.0/0"}, {CIDR: "192.168.0.0/16"}, {CIDR: "8.8.8.0/24"}} {
+		if _, err := Scan(context.Background(), network); err == nil {
+			t.Fatalf("scan accepted arbitrary target %q", network.CIDR)
 		}
 	}
 }
