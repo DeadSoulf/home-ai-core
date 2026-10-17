@@ -11,7 +11,7 @@ import (
 func TestCompareWindowsClientVersions(t *testing.T) {
 	tests := []struct {
 		left, right string
-		want int
+		want        int
 	}{
 		{"0.1.184", "0.1.184-dev", 1},
 		{"0.1.185-dev", "0.1.184", 1},
@@ -28,7 +28,7 @@ func TestCompareWindowsClientVersions(t *testing.T) {
 }
 
 func TestWindowsReleaseChannel(t *testing.T) {
-	for _, tt := range []struct { raw, normalized string }{
+	for _, tt := range []struct{ raw, normalized string }{
 		{"", ReleaseChannelBeta},
 		{" BETA ", ReleaseChannelBeta},
 		{"stable", ReleaseChannelStable},
