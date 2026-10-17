@@ -41,13 +41,13 @@ const (
 
 	tpmRightButton = 0x0002
 
-	traySyncNow    = 1001
-	trayOpenLog    = 1002
-	trayOpenConfig = 1003
-	trayExit       = 1004
-	traySettings   = 1005
-	trayOpenFolder = 1006
-	trayCheckUpdates = 1007
+	traySyncNow       = 1001
+	trayOpenLog       = 1002
+	trayOpenConfig    = 1003
+	trayExit          = 1004
+	traySettings      = 1005
+	trayOpenFolder    = 1006
+	trayCheckUpdates  = 1007
 	trayInstallUpdate = 1008
 
 	niifInfo  = 0x00000001
@@ -106,27 +106,27 @@ type trayNotifyIconData struct {
 }
 
 type windowsAgentTray struct {
-	hwnd          windows.Handle
-	logPath       string
-	configPath    string
-	runNow        chan struct{}
-	exit          chan struct{}
-	exitOnce      sync.Once
-	closeOnce     sync.Once
-	done          chan struct{}
-	icon          windows.Handle
-	popup         windows.Handle
-	popupStatus   windows.Handle
-	popupSubtitle windows.Handle
-	popupRows     [3]windows.Handle
+	hwnd           windows.Handle
+	logPath        string
+	configPath     string
+	runNow         chan struct{}
+	exit           chan struct{}
+	exitOnce       sync.Once
+	closeOnce      sync.Once
+	done           chan struct{}
+	icon           windows.Handle
+	popup          windows.Handle
+	popupStatus    windows.Handle
+	popupSubtitle  windows.Handle
+	popupRows      [3]windows.Handle
 	trayProfileIDs []string
 
 	updateCheckBusy bool
-	statusMu    sync.Mutex
-	statusText  string
-	notifyTitle string
-	notifyText  string
-	notifyFlags uint32
+	statusMu        sync.Mutex
+	statusText      string
+	notifyTitle     string
+	notifyText      string
+	notifyFlags     uint32
 }
 
 var (
