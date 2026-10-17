@@ -4,12 +4,6 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
-	"syscall"
 	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/version"
@@ -137,39 +131,9 @@ func (state *windowsSettingsUI) startUpdateFromUI() {
 	if !state.confirm(state.tr("update_unsigned_confirmation")) {
 		return
 	}
-	executable, err := os.Executable()
-	if err != nil {
+	if err := launchWindowsClientUpdate(state.selectedUpdateChannel()); err != nil {
 		state.showTechnicalError(err)
 		return
-	}
-	base, err := os.UserCacheDir()
-	if err != nil {
-		state.showTechnicalError(err)
-		return
-	}
-	logPath := filepath.Join(base, "HomeAI", "windows-client-update.log")
-	if err := os.MkdirAll(filepath.Dir(logPath), 0o700); err != nil {
-		state.showTechnicalError(err)
-		return
-	}
-	log, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-	if err != nil {
-		state.showTechnicalError(err)
-		return
-	}
-	fmt.Fprintf(log, "%s requested update from UI (%s channel)\n", time.Now().Format(time.RFC3339), state.selectedUpdateChannel())
-	command := exec.Command(executable, "client", "update", "--channel", state.selectedUpdateChannel())
-	command.SysProcAttr = &syscall.SysProcAttr{CreationFlags: settingsCreateNoWindow}
-	command.Stdout = log
-	command.Stderr = log
-	startErr := command.Start()
-	_ = log.Close()
-	if startErr != nil {
-		state.showTechnicalError(startErr)
-		return
-	}
-	if err := command.Process.Release(); err != nil {
-		state.setStatus(state.tr("update_started") + ": " + strings.TrimSpace(err.Error()))
 	}
 	// Closing the GUI releases the executable so the existing bounded install
 	// handoff can replace it. The independent CLI process writes update-log.
