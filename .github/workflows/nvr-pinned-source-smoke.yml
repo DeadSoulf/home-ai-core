@@ -39,6 +39,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/nvr-data"
           sudo chown 1001:1001 "$RUNNER_TEMP/nvr-data"
+          image_id="$(docker image inspect --format '{{.Id}}' home-ai-core-nvr-pinned-smoke:1.1.1)"
           docker run -d --name home-ai-nvr-pinned-smoke \
             --user 1001:1001 \
             --read-only \
@@ -47,8 +48,17 @@ jobs:
             --pids-limit 512 \
             --tmpfs /tmp:rw,noexec,nosuid,size=64m \
             --mount "type=bind,src=$RUNNER_TEMP/nvr-data,dst=/data" \
-            home-ai-core-nvr-pinned-smoke:1.1.1
+            --label home-ai.module.requested-image=ghcr.io/deadsoulf/home-ai-core-nvr@sha256:9f89c074832380b9e7cf9cdd41454ceffa5c2bdb364cdb6be45f02de6f9910d1 \
+            --label home-ai.module.source-revision=1793b39553c4aac37fd7a468db93e170c9e616d2 \
+            "$image_id"
           trap 'docker logs home-ai-nvr-pinned-smoke || true; docker rm -f home-ai-nvr-pinned-smoke >/dev/null || true' EXIT
+          used_ref="$(docker inspect --format '{{.Config.Image}}' home-ai-nvr-pinned-smoke)"
+          used_id="$(docker inspect --format '{{.Image}}' home-ai-nvr-pinned-smoke)"
+          original_ref="$(docker inspect --format '{{index .Config.Labels "home-ai.module.requested-image"}}' home-ai-nvr-pinned-smoke)"
+          revision="$(docker inspect --format '{{index .Config.Labels "home-ai.module.source-revision"}}' home-ai-nvr-pinned-smoke)"
+          [[ "$used_ref" = "$image_id" && "$used_id" = "$image_id" ]] || { echo 'Docker source image ID mismatch'; exit 1; }
+          [[ "$original_ref" = "ghcr.io/deadsoulf/home-ai-core-nvr@sha256:9f89c074832380b9e7cf9cdd41454ceffa5c2bdb364cdb6be45f02de6f9910d1" ]] || { echo 'source identity lost'; exit 1; }
+          [[ "$revision" = "1793b39553c4aac37fd7a468db93e170c9e616d2" ]] || { echo 'source revision lost'; exit 1; }
           for attempt in $(seq 1 40); do
             if docker exec home-ai-nvr-pinned-smoke python3 -c \
               "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/api/nvr/status', timeout=2).read()" \
