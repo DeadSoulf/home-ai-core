@@ -39,6 +39,8 @@ func callModuleHelper(ctx context.Context, operation, moduleID, image string) (h
 		ProtocolVersion: updaterhelper.ProtocolVersion,
 		ModuleID:        moduleID,
 		Image:           image,
+		NVRStorageDevice: nvrSelectionFromContext(ctx).Device,
+		NVRStorageUUID: nvrSelectionFromContext(ctx).UUID,
 	}
 	if err := json.NewEncoder(conn).Encode(request); err != nil {
 		return helperModuleResult{}, err
