@@ -11,7 +11,7 @@ import (
 
 const (
 	StoragePurposeFiles = "files"
-	StoragePurposeNVR = "nvr"
+	StoragePurposeNVR   = "nvr"
 )
 
 type StoragePurposeRecord struct {
