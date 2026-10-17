@@ -57,17 +57,21 @@ func nvrRootHasRecordings(dataDir string) (bool, error) {
 	// no longer have SQLite rows. Even a single archive must be migrated
 	// explicitly; never obscure it by a new bind mount.
 	root := filepath.Join(dataDir, "recordings")
-	items, err := os.ReadDir(root)
-	if errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Lstat(root); errors.Is(err, os.ErrNotExist) {
 		return false, nil
-	}
-	if err != nil {
+	} else if err != nil {
 		return true, err
 	}
-	if len(items) == 0 {
-		return false, nil
-	}
-	return true, nil
+	var hasFiles bool
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil { return walkErr }
+		if path != root && (!entry.IsDir() || entry.Type()&os.ModeSymlink != 0) {
+			hasFiles = true
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	return hasFiles, err
 }
 
 func inspectNVRRecordingMount(ctx context.Context, dockerPath string) (string, error) {
