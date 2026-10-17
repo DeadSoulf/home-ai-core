@@ -107,7 +107,7 @@ func runCopy(args []string) error {
 			}
 			return fmt.Errorf("copy %s: %w", transfer.Destination, err)
 		}
-		activity.ItemsDone = index+1
+		activity.ItemsDone = index + 1
 		activity.Status = "copied"
 		if activityErr == nil {
 			_ = appendTransferHistory(activityConfig, activity)
