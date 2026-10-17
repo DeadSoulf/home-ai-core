@@ -301,6 +301,8 @@ export const api = {
     return {...result.user, warning: result.warning};
   },
 
+  storagePurposeOptions: async () =>
+    (await request<{purposes: import("./types").StoragePurposeOption[]}>("/api/v1/storage/purpose-options")).purposes,
   storagePurposes: async () => {
     const result = await request<{assignments: StoragePurposeAssignment[]}>("/api/v1/storage/purposes");
     return result.assignments;
