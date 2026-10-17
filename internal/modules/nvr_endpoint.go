@@ -32,9 +32,9 @@ func ResolveNVREndpoint(ctx context.Context) (string, error) {
 	stop := context.AfterFunc(ctx, func() { _ = conn.SetDeadline(time.Now()) })
 	defer stop()
 	if err := json.NewEncoder(conn).Encode(updaterhelper.Request{
-		Operation: "docker.module.endpoint",
+		Operation:       "docker.module.endpoint",
 		ProtocolVersion: updaterhelper.ProtocolVersion,
-		ModuleID: "nvr.module",
+		ModuleID:        "nvr.module",
 	}); err != nil {
 		return "", err
 	}
