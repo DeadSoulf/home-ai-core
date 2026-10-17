@@ -17,15 +17,15 @@ import (
 )
 
 const (
-	nvrStorageConfirm = "MIGRATE_NVR_RECORDINGS"
-	nvrVideoDirectory = ".home-ai-nvr"
-	nvrVideoContainerMount = "/data/recordings"
+	nvrStorageConfirm         = "MIGRATE_NVR_RECORDINGS"
+	nvrVideoDirectory         = ".home-ai-nvr"
+	nvrVideoContainerMount    = "/data/recordings"
 	nvrStorageBackupContainer = "home-ai-module-nvr.module-pre-video-storage"
 )
 
 type nvrContainerMetadata struct {
-	ID    string `json:"Id"`
-	Image string `json:"Image"`
+	ID     string `json:"Id"`
+	Image  string `json:"Image"`
 	Config struct {
 		Labels map[string]string `json:"Labels"`
 	} `json:"Config"`
@@ -33,8 +33,8 @@ type nvrContainerMetadata struct {
 		Running bool `json:"Running"`
 	} `json:"State"`
 	Mounts []struct {
-		Type string `json:"Type"`
-		Source string `json:"Source"`
+		Type        string `json:"Type"`
+		Source      string `json:"Source"`
 		Destination string `json:"Destination"`
 	} `json:"Mounts"`
 }
@@ -297,14 +297,14 @@ func activateNVRVideoStorage(ctx context.Context, req updaterhelper.Request, uid
 	args := []string{
 		"--name", oldName, "--label", "home-ai.managed=true",
 		"--label", "home-ai.module.id=nvr.module",
-		"--label", "home-ai.nvr.video-storage="+req.FilesystemUUID,
+		"--label", "home-ai.nvr.video-storage=" + req.FilesystemUUID,
 		"--network", dockerNetworkName,
 		"--user", fmt.Sprintf("%d:%d", uid, gid), "--restart", "unless-stopped",
 		"--cap-drop", "ALL", "--security-opt", "no-new-privileges",
 		"--pids-limit", "512", "--read-only",
 		"--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
-		"--mount", "type=bind,src="+dataRoot+",dst=/data",
-		"--mount", "type=bind,src="+destination+",dst=/data/recordings",
+		"--mount", "type=bind,src=" + dataRoot + ",dst=/data",
+		"--mount", "type=bind,src=" + destination + ",dst=/data/recordings",
 		info.Image,
 	}
 	if err := nvrDockerCommand(ctx, docker, "create", args...); err != nil {
