@@ -134,6 +134,11 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat}: {
     </Panel>
 
     <Panel title="Ресурсы сервера и видеокарты">
+      <div className="button-row">
+        <button type="button" className="button secondary" onClick={() => {void refresh();}}>
+          Проверить оборудование
+        </button>
+      </div>
       {hardware && <div className="ai-hardware-facts">
         <span>CPU: <strong>{hardware.cpu.model || "Сервер"} ({hardware.cpu.logical_cpus} потоков)</strong></span>
         <span>Память: <strong>{gib(hardware.memory.available_bytes)} доступно из {gib(hardware.memory.total_bytes)}</strong></span>
