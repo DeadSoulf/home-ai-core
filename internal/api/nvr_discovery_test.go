@@ -14,7 +14,7 @@ import (
 
 func testDiscoveryNetwork() nvrdiscovery.Network {
 	return nvrdiscovery.Network{
-		ID: "eth0|192.168.42.0/24",
+		ID:        "eth0|192.168.42.0/24",
 		Interface: "eth0", Address: "192.168.42.4", CIDR: "192.168.42.0/24", Hosts: 253,
 	}
 }
@@ -42,7 +42,7 @@ func TestNVRDiscoverySearchRejectsUnlistedNetworkAndRateLimits(t *testing.T) {
 	actor := defaultFakeSecurity().actor
 	calls := 0
 	s := &server{
-		modules: nvrTestService(true),
+		modules:  nvrTestService(true),
 		security: defaultFakeSecurity(),
 		nvrNetworks: func() ([]nvrdiscovery.Network, error) {
 			return []nvrdiscovery.Network{allowed}, nil
@@ -82,11 +82,13 @@ func TestNVRDiscoverySearchRejectsUnlistedNetworkAndRateLimits(t *testing.T) {
 	if w.Code != 200 || calls != 1 {
 		t.Fatalf("valid search failed %d %s", w.Code, w.Body.String())
 	}
-	var parsed struct{
-		Devices []nvrdiscovery.Device `json:"devices"`
-		ScannedHosts int `json:"scanned_hosts"`
+	var parsed struct {
+		Devices      []nvrdiscovery.Device `json:"devices"`
+		ScannedHosts int                   `json:"scanned_hosts"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &parsed); err != nil {t.Fatal(err)}
+	if err := json.Unmarshal(w.Body.Bytes(), &parsed); err != nil {
+		t.Fatal(err)
+	}
 	if len(parsed.Devices) != 1 || parsed.Devices[0].Vendor != "Axis" || parsed.ScannedHosts != 253 {
 		t.Fatalf("unexpected result %+v", parsed)
 	}
