@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -17,9 +18,22 @@ import (
 )
 
 var (
-	moduleOperationMu  sync.Mutex
-	moduleIDPattern    = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
-	imageDigestPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,447}@sha256:[a-f0-9]{64}$`)
+	moduleOperationMu    sync.Mutex
+	moduleIDPattern      = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
+	imageDigestPattern    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,447}@sha256:[a-f0-9]{64}$`)
+	localImageIDPattern  = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
+)
+
+// The official NVR digest was once published successfully but is not now
+// anonymously readable. Only this exact historical digest can fall back
+// to a local build from the *same immutable source revision*. Arbitrary
+// manifest image references can never choose a source URL.
+const (
+	nvrLegacyImage        = "ghcr.io/deadsoulf/home-ai-core-nvr@sha256:9f89c074832380b9e7cf9cdd41454ceffa5c2bdb364cdb6be45f02de6f9910d1"
+	nvrPinnedRevision     = "1793b39553c4aac37fd7a468db93e170c9e616d2"
+	nvrPinnedRepository   = "https://github.com/DeadSoulf/home-ai-core_dvr"
+	nvrPinnedBuildContext = nvrPinnedRepository + ".git#" + nvrPinnedRevision
+	nvrPinnedLocalTag     = "home-ai-core-local-nvr:1.1.1-1793b39553c4"
 )
 
 type moduleContainerStatus struct {
@@ -93,7 +107,8 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 		return resumeManagedModule(ctx, dockerPath, name, image)
 	}
 
-	if err := pullDockerModuleImage(ctx, dockerPath, image); err != nil {
+	installImage, fromPinnedSource, err := resolveInstallModuleImage(ctx, dockerPath, moduleID, image)
+	if err != nil {
 		return moduleContainerStatus{}, "", err
 	}
 
@@ -130,8 +145,14 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 		"--read-only",
 		"--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
 		"--mount", "type=bind,src=" + dataDir + ",dst=/data",
-		image,
 	}
+	if fromPinnedSource {
+		args = append(args,
+			"--label", "home-ai.module.requested-image="+image,
+			"--label", "home-ai.module.source-revision="+nvrPinnedRevision,
+		)
+	}
+	args = append(args, installImage)
 	output, err := exec.CommandContext(ctx, dockerPath, args...).CombinedOutput()
 	if err != nil {
 		return moduleContainerStatus{}, "", fmt.Errorf("create module container: %s", commandError(output, err))
@@ -155,7 +176,72 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 	if status.State != "running" {
 		return moduleContainerStatus{}, "", cleanupFailedModuleStart(dockerPath, name, fmt.Errorf("module stopped during startup (state: %s)", status.State))
 	}
-	return moduleContainerStatus{State: status.State, ContainerID: containerID}, "module installed and started", nil
+	message := "module installed and started"
+	if fromPinnedSource {
+		message = "module built from pinned official NVR source and started; GHCR image was not anonymously available"
+	}
+	return moduleContainerStatus{State: status.State, ContainerID: containerID}, message, nil
+}
+
+func resolveInstallModuleImage(ctx context.Context, dockerPath, moduleID, manifestImage string) (string, bool, error) {
+	pullErr := pullDockerModuleImage(ctx, dockerPath, manifestImage)
+	if pullErr == nil {
+		return manifestImage, false, nil
+	}
+	if moduleID != "nvr.module" || manifestImage != nvrLegacyImage || !nvrRegistrySourceFallbackAllowed(pullErr) {
+		return "", false, pullErr
+	}
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		return "", false, fmt.Errorf("pinned NVR source build requires Linux amd64: %w", pullErr)
+	}
+	localImage, err := buildPinnedNVRImage(ctx, dockerPath)
+	if err != nil {
+		return "", false, fmt.Errorf("NVR image access was denied in GHCR (%v); build from pinned GitHub source failed: %w", pullErr, err)
+	}
+	return localImage, true, nil
+}
+
+func nvrRegistrySourceFallbackAllowed(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	for _, fragment := range []string{
+		"unauthorized", "authentication required", "insufficient_scope",
+		"manifest unknown", "manifest not found", "denied: requested access",
+	} {
+		if strings.Contains(message, fragment) {
+			return true
+		}
+	}
+	return false
+}
+
+func buildPinnedNVRImage(ctx context.Context, dockerPath string) (string, error) {
+	// Docker's remote Git context is pinned to a full 40-digit commit SHA.
+	// No shell is invoked, mutable refs are not used, and the resulting
+	// container uses the local content-addressed ID rather than a tag.
+	output, err := exec.CommandContext(
+		ctx, dockerPath, "build",
+		"--tag", nvrPinnedLocalTag,
+		"--label", "org.opencontainers.image.source="+nvrPinnedRepository,
+		"--label", "org.opencontainers.image.revision="+nvrPinnedRevision,
+		nvrPinnedBuildContext,
+	).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("build trusted NVR source: %s", commandError(output, err))
+	}
+	output, err = exec.CommandContext(
+		ctx, dockerPath, "image", "inspect", "--format", "{{.Id}}", nvrPinnedLocalTag,
+	).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("inspect locally built NVR image: %s", commandError(output, err))
+	}
+	imageID := strings.TrimSpace(string(output))
+	if !localImageIDPattern.MatchString(imageID) {
+		return "", errors.New("locally built NVR image has an invalid immutable SHA-256 image ID")
+	}
+	return imageID, nil
 }
 
 func pullDockerModuleImage(ctx context.Context, dockerPath, image string) error {
@@ -316,9 +402,11 @@ func resumeManagedModule(ctx context.Context, dockerPath, name, image string) (m
 		return moduleContainerStatus{}, "", fmt.Errorf("inspect interrupted module: %s", commandError(output, err))
 	}
 	var info struct {
-		ID     string `json:"Id"`
+		ID    string `json:"Id"`
+		Image string `json:"Image"`
 		Config struct {
-			Image string `json:"Image"`
+			Image  string            `json:"Image"`
+			Labels map[string]string `json:"Labels"`
 		} `json:"Config"`
 		State struct {
 			Status string `json:"Status"`
@@ -330,7 +418,13 @@ func resumeManagedModule(ctx context.Context, dockerPath, name, image string) (m
 	if err := json.Unmarshal(output, &info); err != nil {
 		return moduleContainerStatus{}, "", fmt.Errorf("invalid interrupted module state: %w", err)
 	}
-	if info.ID == "" || info.Config.Image != image {
+	originalImageMatches := info.Config.Image == image
+	pinnedSourceMatches := image == nvrLegacyImage &&
+		localImageIDPattern.MatchString(info.Config.Image) &&
+		info.Image == info.Config.Image &&
+		info.Config.Labels["home-ai.module.requested-image"] == nvrLegacyImage &&
+		info.Config.Labels["home-ai.module.source-revision"] == nvrPinnedRevision
+	if info.ID == "" || (!originalImageMatches && !pinnedSourceMatches) {
 		return moduleContainerStatus{}, "", errors.New("existing managed container has a different image; in-place upgrade is disabled")
 	}
 	if info.State.Health != nil && info.State.Health.Status != "healthy" {

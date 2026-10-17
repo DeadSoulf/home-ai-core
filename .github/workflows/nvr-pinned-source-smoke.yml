@@ -1,0 +1,62 @@
+name: NVR pinned source fallback smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cmd/home-ai-core-updater/docker_module_ops.go"
+      - "cmd/home-ai-core-updater/docker_module_source_fallback_test.go"
+      - ".github/workflows/nvr-pinned-source-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nvr-pinned-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Build NVR from immutable public Git revision (no registry upload)
+        shell: bash
+        env:
+          DOCKER_BUILDKIT: "1"
+        run: |
+          set -euo pipefail
+          # Identical build context to the limited helper recovery path.
+          docker build \
+            --tag home-ai-core-nvr-pinned-smoke:1.1.1 \
+            --label org.opencontainers.image.source=https://github.com/DeadSoulf/home-ai-core_dvr \
+            --label org.opencontainers.image.revision=1793b39553c4aac37fd7a468db93e170c9e616d2 \
+            'https://github.com/DeadSoulf/home-ai-core_dvr.git#1793b39553c4aac37fd7a468db93e170c9e616d2'
+          actual="$(docker image inspect --format '{{.Id}}' home-ai-core-nvr-pinned-smoke:1.1.1)"
+          [[ "$actual" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo 'invalid built image ID'; exit 1; }
+          echo "Pinned source image build completed, ID: $actual"
+
+      - name: Smoke NVR API with Core-restricted Docker runtime (no registry upload)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/nvr-data"
+          sudo chown 1001:1001 "$RUNNER_TEMP/nvr-data"
+          docker run -d --name home-ai-nvr-pinned-smoke \
+            --user 1001:1001 \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 512 \
+            --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            --mount "type=bind,src=$RUNNER_TEMP/nvr-data,dst=/data" \
+            home-ai-core-nvr-pinned-smoke:1.1.1
+          trap 'docker logs home-ai-nvr-pinned-smoke || true; docker rm -f home-ai-nvr-pinned-smoke >/dev/null || true' EXIT
+          for attempt in $(seq 1 40); do
+            if docker exec home-ai-nvr-pinned-smoke python3 -c \
+              "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/api/nvr/status', timeout=2).read()" \
+              >/dev/null 2>&1; then
+              echo "Pinned NVR source builds and runs under the Core runtime profile."
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Pinned NVR source image failed the NVR API health check" >&2
+          exit 1
