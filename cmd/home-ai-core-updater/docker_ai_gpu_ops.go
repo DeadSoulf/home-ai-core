@@ -83,8 +83,7 @@ func mapAIGPUsToUUIDs(ctx context.Context, selected []string) ([]string, error) 
 		return nil, errors.New("NVIDIA GPU enumeration failed; check driver")
 	}
 	mapping := map[string]string{}
-	for _, line := range strings.Split(string(output), "
-") {
+	for _, line := range strings.Split(string(output), "\n") {
 		pair := strings.SplitN(strings.TrimSpace(line), ",", 2)
 		if len(pair) != 2 {
 			continue
@@ -239,7 +238,7 @@ func applyAIGPUSelection(ctx context.Context, requested []string, serviceUID, se
 		// Docker CLI's CSV parser requires the quoted device=... value when
 		// a comma-separated list of UUIDs is supplied.
 		args = append(args,
-			"--gpus", ""device="+strings.Join(ids, ",")+""",
+			"--gpus", "\"device="+strings.Join(ids, ",")+"\"",
 			"--env", "CUDA_VISIBLE_DEVICES="+strings.Join(ids, ","),
 			"--env", "NVIDIA_DRIVER_CAPABILITIES=compute,utility",
 		)
