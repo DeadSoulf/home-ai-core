@@ -72,12 +72,15 @@ func ensureNVRRecordingDirectory(ctx context.Context, device, uuid string, servi
 			return "", errors.New("NVR recording directory is not a regular directory")
 		}
 	}
-	root := filepath.Join(mountpoint, "home-ai-nvr", "recordings")
-	if err := os.Chown(root, serviceUID, serviceGID); err != nil {
-		return "", err
-	}
-	if err := os.Chmod(root, 0o700); err != nil {
-		return "", err
+	parent := filepath.Join(mountpoint, "home-ai-nvr")
+	root := filepath.Join(parent, "recordings")
+	for _, dir := range []string{parent, root} {
+		if err := os.Chown(dir, serviceUID, serviceGID); err != nil {
+			return "", err
+		}
+		if err := os.Chmod(dir, 0o700); err != nil {
+			return "", err
+		}
 	}
 	return root, nil
 }
