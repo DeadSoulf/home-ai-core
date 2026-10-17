@@ -184,7 +184,7 @@ func (state *windowsSettingsUI) createLightControls(module windows.Handle) error
 	for i := range state.overviewRecent {
 		state.overviewRecent[i] = staticText("", state.tr("recent_activity_empty"), 242, int32(384+i*46), 416, 38, settingsPageOverview, settingsVisualCardMuted)
 	}
-	static("overview_recent_hint", "recent_activity_hint", 242, 536, 360, 16, settingsPageOverview, settingsVisualCardMuted)
+	state.overviewRecentHint = static("overview_recent_hint", "recent_activity_hint", 242, 536, 410, 16, settingsPageOverview, settingsVisualCardMuted)
 
 	backupTitle := static("overview_backup_title", "backup_summary", 714, 348, 190, 18, settingsPageOverview, settingsVisualCardMuted)
 	state.setControlFont(backupTitle, state.visual.cardTitleFont)
@@ -629,6 +629,38 @@ func (state *windowsSettingsUI) refreshOverview() {
 }
 
 func (state *windowsSettingsUI) refreshRecentActivity() {
+	events, historyErr := readTransferHistory(state.configPath, 200)
+	if historyErr == nil && len(events) > 0 {
+		copied, failed := 0, 0
+		now := time.Now()
+		for _, event := range events {
+			if !event.At.IsZero() && now.Sub(event.At) <= 24*time.Hour && now.After(event.At) {
+				if event.Status == "copied" {
+					copied++
+				} else if event.Status == "failed" {
+					failed++
+				}
+			}
+		}
+		state.setText(state.overviewRecentHint, state.trf("overview_activity_summary", copied, failed))
+		for i := range state.overviewRecent {
+			if i >= len(events) {
+				state.setText(state.overviewRecent[i], "")
+				continue
+			}
+			event := events[i]
+			name := filepath.Base(event.Path)
+			if name == "" || name == "." || name == string(filepath.Separator) {
+				name = event.ProfileID
+			}
+			label := state.trf("recent_activity_row",
+				safeActivityText(name, 42), transferStatusText(state, event.Status),
+				dashboardTime(event.At.Local(), state.language))
+			state.setText(state.overviewRecent[i], label)
+		}
+		return
+	}
+	state.setText(state.overviewRecentHint, state.tr("recent_activity_hint"))
 	profiles := append([]windowsclient.SyncProfile(nil), state.profiles...)
 	sort.SliceStable(profiles, func(i, j int) bool {
 		var left, right time.Time
