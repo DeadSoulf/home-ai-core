@@ -799,7 +799,11 @@ func (state *windowsSettingsUI) finishConnect() {
 	if result.err != nil {
 		state.connected = false
 		if !result.silent {
-			state.setStatus(state.tr("connection_failed") + ": " + result.err.Error())
+			details := result.err.Error()
+			if key := certificateErrorMessageKey(result.err); key != "" {
+				details = state.tr(key)
+			}
+			state.setStatus(state.tr("connection_failed") + ": " + details)
 		}
 		state.refreshOverview()
 		if !result.silent {
@@ -1251,6 +1255,11 @@ func (state *windowsSettingsUI) showError(text string) {
 
 func (state *windowsSettingsUI) showTechnicalError(err error) {
 	if err == nil {
+		return
+	}
+	if key := certificateErrorMessageKey(err); key != "" {
+		state.showError(state.tr(key) + "\n\n" + state.tr("tls_resolution") +
+			"\n\n" + state.tr("tls_diagnostic") + ": " + err.Error())
 		return
 	}
 	state.showError(state.tr("error_prefix") + ": " + err.Error())
