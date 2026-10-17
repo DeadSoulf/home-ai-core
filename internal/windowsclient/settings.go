@@ -20,6 +20,7 @@ type ClientSettings struct {
 	ServerURL string `json:"server_url,omitempty"`
 	Username  string `json:"username,omitempty"`
 	Language  string `json:"language,omitempty"`
+	UpdateChannel string `json:"update_channel,omitempty"`
 }
 
 func LoadClientSettings(filename string) (ClientSettings, error) {
@@ -121,6 +122,9 @@ func normalizeClientSettingsFilename(filename string) (string, error) {
 func validateClientSettings(settings ClientSettings) error {
 	if settings.Version != clientSettingsVersion {
 		return fmt.Errorf("unsupported client settings version %d", settings.Version)
+	}
+	if settings.UpdateChannel != "" && settings.UpdateChannel != ReleaseChannelBeta && settings.UpdateChannel != ReleaseChannelStable {
+		return errors.New("unsupported Windows update channel")
 	}
 	if settings.Language != "" && settings.Language != "en" && settings.Language != "ru" {
 		return errors.New("unsupported client language")
