@@ -2,8 +2,8 @@ package api
 
 import (
 	"context"
-	"errors"
 	"encoding/json"
+	"errors"
 	"github.com/DeadSoulf/home-ai-core/internal/filedata"
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
@@ -67,7 +67,6 @@ func quotaRequest(handler http.Handler, method, path, body string) *httptest.Res
 	return rec
 }
 
-
 func TestDeleteEmptyLogicalFolderAndItsGrants(t *testing.T) {
 	handler, store, folder := quotaFixture(t)
 	root, err := filedata.FolderRoot(folder.PoolRoot, folder.RelativePath)
@@ -101,7 +100,7 @@ func TestDeleteLogicalFolderRejectsNonEmptyAndWrongName(t *testing.T) {
 		t.Fatal(err)
 	}
 	url := "/api/v1/files/folders/" + folder.ID
-	for _, tc := range []struct {body, code string}{
+	for _, tc := range []struct{ body, code string }{
 		{"{\"confirm_name\":\"incorrect\"}", "file_folder_confirmation_mismatch"},
 		{"{\"confirm_name\":\"Personal\"}", "file_folder_not_empty"},
 	} {
