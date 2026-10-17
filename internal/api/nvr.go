@@ -440,6 +440,17 @@ func (s *server) nvrRecordingFile(w http.ResponseWriter, r *http.Request, relati
 	dataRoot := s.nvrDataRoot
 	if dataRoot == "" {
 		dataRoot = "/var/lib/home-ai-modules/nvr.module"
+		ctx, cancel := context.WithTimeout(r.Context(), 9*time.Second)
+		defer cancel()
+		external, err := s.resolveNVRExternalRoot(ctx)
+		if err != nil {
+			writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_storage_unavailable", "NVR volume state could not be verified", nil)
+			return
+		}
+		if external != "" {
+			dataRoot = external
+			relativePath = strings.TrimPrefix(relativePath, "recordings/")
+		}
 	}
 	root, err := os.OpenRoot(dataRoot)
 	if err != nil {
