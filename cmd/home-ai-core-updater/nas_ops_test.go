@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestValidateNASRelativePath(t *testing.T) {
 	valid := []string{
@@ -60,5 +63,17 @@ func TestParseDUUsageOutput(t *testing.T) {
 func TestParseDUUsageOutputRejectsInvalidData(t *testing.T) {
 	if used, ok := parseDUUsageOutput([]byte("invalid output")); ok {
 		t.Fatalf("unexpected parsed usage: %d", used)
+	}
+}
+
+func TestNASMountTargetMismatchExplainsSavedRootAndActualMount(t *testing.T) {
+	root := "/mnt/home-ai-core/storage1"
+	for _, covering := range []string{"/", "/mnt/home-ai-core", "/mnt/home-ai-core/other"} {
+		err := nasMountTargetMismatch(root, covering)
+		if err == nil || !strings.Contains(err.Error(), root) ||
+			!strings.Contains(err.Error(), covering) ||
+			!strings.Contains(err.Error(), "must be the filesystem mount point itself") {
+			t.Fatalf("mount diagnostic root=%q covering=%q: %v", root, covering, err)
+		}
 	}
 }
