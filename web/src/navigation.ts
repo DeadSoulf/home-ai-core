@@ -38,8 +38,26 @@ function moduleIsEnabled(moduleId: string, modules?: ModuleNavigationState[]): b
   return modules.some((item) => item.module_id === moduleId && item.status === "enabled");
 }
 
+export const moduleSections = ["installed", "catalog", "operations", "settings"] as const;
+export type ModuleSection = typeof moduleSections[number];
+
+export function moduleSectionPath(section: ModuleSection): string {
+  return "/modules/" + section;
+}
+
+export function isModuleManagementRoute(path: string): boolean {
+  return path === "/modules" || moduleSections.some((section) => path === moduleSectionPath(section));
+}
+
+export function moduleSection(path: string): ModuleSection {
+  const route = path.split("#")[0].replace(/\/+$/, "") || "/";
+  return moduleSections.find((section) => route === moduleSectionPath(section)) || "installed";
+}
+
 export function isModuleRoute(path: string): boolean {
-  return /^\/modules\/[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*(?:\/[A-Za-z0-9._~-]+)*$/.test(path) && !path.split("/").some((part) => part === "." || part === "..");
+  return !isModuleManagementRoute(path) &&
+    /^\/modules\/[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*(?:\/[A-Za-z0-9._~-]+)*$/.test(path) &&
+    !path.split("/").some((part) => part === "." || part === "..");
 }
 
 function dynamicModuleItems(modules?: ModuleNavigationState[]): NavigationItem[] {
@@ -100,10 +118,13 @@ export function accessiblePath(actor: Actor, path: string, modules?: ModuleNavig
   const [raw, hash] = path.split("#");
   const route = raw.replace(/\/+$/, "") || "/";
   const fileRoute = route === "/files" || route.startsWith("/files/");
-  const navigationRoute = fileRoute ? "/files" : route;
+  const navigationRoute = fileRoute ? "/files" : isModuleManagementRoute(route) ? "/modules" : route;
   const allowed = navigationRoute === "/account" ||
     visibleNavigation(actor, modules).some((group) => group.items.some((item) => item.path === navigationRoute));
   if (!allowed) return "/";
+
+  // Management sections are first-party pages, never routes owned by a Docker module.
+  if (isModuleManagementRoute(route)) return route;
 
   if (fileRoute) {
     const section = fileSection(path);
