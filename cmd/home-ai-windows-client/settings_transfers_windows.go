@@ -22,7 +22,7 @@ const (
 )
 
 type settingsInitCommonControlsEx struct {
-	size uint32
+	size    uint32
 	classes uint32
 }
 
