@@ -249,7 +249,7 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: "NVR migration confirmation required"})
 			return
 		}
-		_ = conn.SetDeadline(time.Now().Add(31*time.Minute))
+		_ = conn.SetDeadline(time.Now().Add(31 * time.Minute))
 		ctx, cancel := context.WithTimeout(parent, 30*time.Minute)
 		defer cancel()
 		go func() { var extra [1]byte; _, _ = conn.Read(extra[:]); cancel() }()
