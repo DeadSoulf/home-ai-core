@@ -191,6 +191,7 @@ type windowsSettingsUI struct {
 	updateBusy           bool
 	updateInstalling     bool
 	updateWasInstalled   bool
+	updateWasCurrent     bool
 	updateAvailable      bool
 	updateRelease        windowsclient.WindowsClientRelease
 	updateLatestVersion  string
@@ -306,8 +307,9 @@ func runSettingsUI(args []string) error {
 	fs := flag.NewFlagSet("settings", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	var configPath, settingsPath string
-	var updated bool
+	var updated, alreadyCurrent bool
 	fs.BoolVar(&updated, "updated", false, "show update success after relaunch")
+	fs.BoolVar(&alreadyCurrent, "update-current", false, "show already-current status after relaunch")
 	fs.StringVar(&configPath, "config", "", "sync profile file")
 	fs.StringVar(&settingsPath, "settings", "", "Windows client settings file")
 	if err := fs.Parse(args); err != nil {
@@ -388,6 +390,7 @@ func runSettingsUI(args []string) error {
 		windowIcon:         windows.Handle(icon),
 		dpi:                settingsSystemDPI(),
 		updateWasInstalled: updated,
+		updateWasCurrent:   alreadyCurrent,
 		controlRects:       make(map[windows.Handle]settingsLayoutRect),
 		controlFonts:       make(map[windows.Handle]windows.Handle),
 	}
@@ -437,9 +440,13 @@ func runSettingsUI(args []string) error {
 	state.applyLanguageTexts()
 	state.loadInitial()
 	state.loadUpdateChannel()
-	if updated {
+	if updated || alreadyCurrent {
 		state.showPage(settingsPageGeneral)
-		state.setStatus(state.tr("update_completed_short"))
+		if updated {
+			state.setStatus(state.tr("update_completed_short"))
+		} else {
+			state.setStatus(state.tr("update_already_current_short"))
+		}
 		state.renderUpdateStatus()
 	}
 	state.layoutControls()
