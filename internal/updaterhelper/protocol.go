@@ -12,7 +12,7 @@ type Request struct {
 	CurrentVersion  string            `json:"current_version,omitempty"`
 	Device          string            `json:"device,omitempty"`
 	Mountpoint      string            `json:"mountpoint,omitempty"`
-	FilesystemUUID string            `json:"filesystem_uuid,omitempty"`
+	FilesystemUUID  string            `json:"filesystem_uuid,omitempty"`
 	Filesystem      string            `json:"filesystem,omitempty"`
 	Label           string            `json:"label,omitempty"`
 	Confirm         string            `json:"confirm,omitempty"`
