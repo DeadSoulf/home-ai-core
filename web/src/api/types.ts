@@ -282,6 +282,29 @@ export type NVRStatus = {
   max_storage_gb: number;
 };
 
+export type NVRVideoDisk = {
+  device: string;
+  filesystem_uuid: string;
+  mountpoint: string;
+  filesystem: string;
+  label: string;
+  size_bytes: number;
+  free_bytes: number;
+  active: boolean;
+};
+
+export type NVRVideoStorageState = {
+  devices: NVRVideoDisk[];
+  assigned: boolean;
+  verified: boolean;
+  active?: {
+    device: string;
+    filesystem_uuid: string;
+    mountpoint: string;
+    active_at: string;
+  };
+};
+
 export type NVRCamera = {
   id: string;
   name: string;
