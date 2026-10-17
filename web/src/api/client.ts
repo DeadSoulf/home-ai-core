@@ -589,6 +589,7 @@ export const api = {
     dry_run?: boolean;
     size_mib?: number;
     purpose?: StoragePurpose;
+    require_blank?: boolean;
   }) => postJSON<{
     message: string;
     mountpoint?: string;
