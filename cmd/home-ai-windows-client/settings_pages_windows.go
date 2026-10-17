@@ -33,19 +33,21 @@ const (
 )
 
 const (
-	settingsIDNavOverview      = 2101
-	settingsIDNavConnection    = 2102
-	settingsIDNavSync          = 2103
-	settingsIDNavBackup        = 2104
-	settingsIDNavGeneral       = 2105
-	settingsIDOpenLocal        = 2106
-	settingsIDBackupProfile    = 2107
-	settingsIDSaveSchedule     = 2108
-	settingsIDNavTransfers     = 2109
-	settingsIDRefreshTransfers = 2110
-	settingsIDUpdateChannel    = 2111
-	settingsIDUpdateCheck      = 2112
-	settingsIDUpdateInstall    = 2113
+	settingsIDNavOverview       = 2101
+	settingsIDNavConnection     = 2102
+	settingsIDNavSync           = 2103
+	settingsIDNavBackup         = 2104
+	settingsIDNavGeneral        = 2105
+	settingsIDOpenLocal         = 2106
+	settingsIDBackupProfile     = 2107
+	settingsIDSaveSchedule      = 2108
+	settingsIDNavTransfers      = 2109
+	settingsIDRefreshTransfers  = 2110
+	settingsIDUpdateChannel     = 2111
+	settingsIDUpdateCheck       = 2112
+	settingsIDUpdateInstall     = 2113
+	settingsIDTrustCertificate  = 2114
+	settingsIDForgetCertificate = 2115
 
 	settingsWSGroup      = 0x00020000
 	settingsBSAutoRadio  = 0x00000009
@@ -57,6 +59,7 @@ const (
 	settingsSSIcon       = 0x00000003
 	settingsSTMSetIcon   = 0x0170
 	settingsWMKeyDown    = 0x0100
+	settingsENChange     = 0x0300
 	settingsVKTab        = 0x09
 	settingsVKShift      = 0x10
 	settingsVKControl    = 0x11
@@ -210,6 +213,9 @@ func (state *windowsSettingsUI) createLightControls(module windows.Handle) error
 	state.passwordEdit = edit(settingsIDPasswordEdit, "", 500, 228, 244, 30, settingsESPassword, settingsPageConnection)
 	static("password_hint", "password_hint", 224, 270, 520, 20, settingsPageConnection, settingsVisualCardMuted)
 	button("connect_button", settingsIDConnect, "connect_save", 224, 312, 220, 36, settingsPageConnection)
+	state.certificateTrustBtn = button("cert_trust_button", settingsIDTrustCertificate, "cert_pin_trust", 224, 374, 226, 34, settingsPageConnection)
+	state.certificateForgetBtn = button("cert_forget_button", settingsIDForgetCertificate, "cert_pin_forget", 466, 374, 226, 34, settingsPageConnection)
+	state.certificateStatus = staticText("", state.tr("cert_pin_none"), 224, 426, 680, 50, settingsPageConnection, settingsVisualCardMuted)
 
 	// Synchronization.
 	syncTitle := static("sync_title", "nav_sync", 224, 32, 340, 28, settingsPageSync, settingsVisualCard)
@@ -312,7 +318,8 @@ func (state *windowsSettingsUI) createLightControls(module windows.Handle) error
 		state.backupProfileCombo == 0 || state.statusLabel == 0 || state.agentLabel == 0 ||
 		state.languageCombo == 0 || state.overviewStorage == 0 ||
 		state.transferProgress == 0 || state.transferHistory == 0 || state.transferDetails == 0 ||
-		state.updateChannelCombo == 0 || state.updateCheckBtn == 0 || state.updateInstallBtn == 0 || state.updateStatusLabel == 0 {
+		state.updateChannelCombo == 0 || state.updateCheckBtn == 0 || state.updateInstallBtn == 0 || state.updateStatusLabel == 0 ||
+		state.certificateTrustBtn == 0 || state.certificateForgetBtn == 0 || state.certificateStatus == 0 {
 		return fmt.Errorf("create Windows client controls")
 	}
 

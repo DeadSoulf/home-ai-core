@@ -45,6 +45,8 @@ func (state *windowsSettingsUI) applyLanguageTexts() {
 		{"connection_hint", "connection_hint"},
 		{"server_label", "server"},
 		{"connect_button", "connect_save"},
+		{"cert_trust_button", "cert_pin_trust"},
+		{"cert_forget_button", "cert_pin_forget"},
 		{"user_label", "user"},
 		{"password_label", "password"},
 		{"password_hint", "password_hint"},
@@ -149,6 +151,7 @@ func (state *windowsSettingsUI) changeLanguage() {
 	state.refreshBackupProfiles(state.selectedProfileID)
 	state.refreshOverview()
 	state.refreshTransfers()
+	state.refreshCertificatePinStatus()
 	state.setStatus(state.tr("ready"))
 	notifyTrayLanguageChanged()
 }
