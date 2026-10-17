@@ -56,6 +56,12 @@ func (s *server) storagePurposes(
 		for _, record := range records {
 			response := storagePurposeResponseFor(record, nodes)
 			response.UsedBy = storageUsageForPurposeRecord(record, nodes, pools)
+			if s.modulePurposeInUse(r.Context(), record.Purpose) {
+				id := strings.TrimPrefix(record.Purpose, "module:")
+				response.UsedBy = append(response.UsedBy, storagePurposeUsageResponse{
+					Type: "module", ID: id, Name: id,
+				})
+			}
 			response.InUse = len(response.UsedBy) > 0
 			assignments = append(assignments, response)
 		}
@@ -113,6 +119,18 @@ func (s *server) storagePurposes(
 			return
 		}
 		usage := storageUsageForNode(node, pools)
+		currentPurposes, err := s.state.ListStoragePurposes(r.Context())
+		if err != nil {
+			writeAPIError(w, r, http.StatusServiceUnavailable, "storage_purposes_unavailable", err.Error(), nil)
+			return
+		}
+		currentPurpose := assignedStoragePurposeForNode(node.Path, node.UUID, currentPurposes)
+		if currentPurpose != purpose {
+			if err := s.ensureStorageDeviceNotUsedByModule(r.Context(), node.Path, node.UUID, currentPurposes); err != nil {
+				writeAPIError(w, r, http.StatusConflict, "storage_in_use", err.Error(), nil)
+				return
+			}
+		}
 		if len(usage) > 0 && purpose != state.StoragePurposeFiles {
 			writeAPIError(
 				w,
