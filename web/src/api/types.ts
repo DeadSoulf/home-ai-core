@@ -195,6 +195,33 @@ export type AIChatResponse = {
   approval_ids: string[];
 };
 
+export type NVRDiscoveryNetwork = {
+  id: string;
+  interface: string;
+  address: string;
+  cidr: string;
+  hosts: number;
+};
+
+export type NVRDiscoveredCamera = {
+  address: string;
+  vendor: string;
+  name?: string;
+  services: string[];
+  confidence: "detected" | "possible";
+  rtsp_port?: number;
+  http_port?: number;
+  sdk_port?: number;
+};
+
+export type NVRDiscoveryResult = {
+  devices: NVRDiscoveredCamera[];
+  network: NVRDiscoveryNetwork;
+  scanned_hosts: number;
+  duration_ms: number;
+
+};
+
 export type NVRStatus = {
   ok: boolean;
   service: string;
