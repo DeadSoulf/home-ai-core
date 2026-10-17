@@ -37,6 +37,7 @@ class Harness:
         self.system_delay=0; self.system_status=200; self.catalog_status=200; self.runtime_status=200; self.nav_status=200
         self.requests=[]; self.errors=[]; self.system_active=0; self.system_max=0; self.calls=0
         self.ai_providers=[]; self.ai_conversations=[]; self.ai_approvals=[]; self.ai_messages={}
+        self.ai_gpus=[]; self.ai_installed=['qwen3:0.6b']; self.ai_download_status='ready'
         self.overrides={}; self.unhandled=[]; self.offline=os.environ.get('UI_OFFLINE')=='1'
         for k,v in kw.items(): setattr(self,k,v)
     async def start(self,path='/modules',width=1440):
@@ -116,7 +117,29 @@ class Harness:
                 finally:self.system_active-=1
             elif path.startswith('/api/v1/ai/'):
                 sub=path[len('/api/v1/ai/'):]
-                if sub=='status' and method=='GET':
+                presets=[
+                    dict(name='qwen3:0.6b',size_gb=0.6,minimum_ram_gb=2,purpose='Базовый агент, CPU',recommended=True),
+                    dict(name='qwen3:1.7b',size_gb=1.5,minimum_ram_gb=4,purpose='Улучшенный чат',recommended=True),
+                    dict(name='qwen3:4b',size_gb=2.8,minimum_ram_gb=8,purpose='Сложные задачи',recommended=False),
+                ]
+                if sub=='hardware' and method=='GET':
+                    await respond(dict(
+                        checked_at='2026-10-17T22:00:00Z',policy='cpu_first_gpu_requires_explicit_approval',
+                        cpu=dict(model='Test CPU',logical_cpus=8,usage_percent=18),
+                        memory=dict(total_bytes=17179869184,available_bytes=8589934592),
+                        gpus=self.ai_gpus,
+                    ))
+                elif sub=='local/status' and method=='GET':
+                    await respond(dict(enabled=True,engine_state='ready',model_state=self.ai_download_status,
+                                       active_model='qwen3:0.6b',cpu_first=True,ram_bytes=17179869184,
+                                       recommended_models=presets))
+                elif sub=='local/models' and method=='GET':
+                    await respond(dict(enabled=True,installed=self.ai_installed,recommended_models=presets))
+                elif sub=='local/pull' and method=='POST':
+                    name=request.post_data_json['name']
+                    if name not in self.ai_installed:self.ai_installed.append(name)
+                    await respond(dict(queued=True,name=name),202)
+                elif sub=='status' and method=='GET':
                     await respond(dict(version='0.1.0',providers=len(self.ai_providers),
                                        approvals_pending=len([x for x in self.ai_approvals if x['status']=='pending']),
                                        core_actions_enabled=False))
@@ -459,6 +482,31 @@ async def suite(browser):
         assert await h.page.get_by_role('button',name='AI Agent',exact=True).count()==0
         await h.close()
     await check('UI-18: native AI chat, provider setup and manager-only navigation',native_ai_agent)
+
+    async def local_ai_hardware():
+        h=await Harness(browser,modules=[ai_module()]).start('/modules/ai.agent')
+        await h.page.get_by_role('button',name='Локальный AI',exact=True).click()
+        await expect(h.page.get_by_text('Встроенный Ollama',exact=True)).to_be_visible()
+        await expect(h.page.get_by_text('qwen3:0.6b',exact=True).first).to_be_visible()
+        await expect(h.page.get_by_text('GPU не обнаружены операционной системой.',exact=False)).to_be_visible()
+        h.ai_gpus=[
+            dict(model='GPU A',vendor='NVIDIA',pci_address='0000:01:00.0',driver='nvidia'),
+            dict(model='GPU B',vendor='NVIDIA',pci_address='0000:02:00.0',driver='nvidia'),
+        ]
+        await h.page.get_by_role('button',name='Проверить оборудование').click()
+        await expect(h.page.get_by_text('GPU A',exact=True)).to_be_visible()
+        await expect(h.page.get_by_text('GPU B',exact=True)).to_be_visible()
+        await expect(h.page.get_by_text('Новое оборудование:',exact=False)).to_be_visible()
+        await h.page.locator('.ai-gpu-device input').first.check()
+        await h.page.locator('.ai-gpu-device input').last.check()
+        await expect(h.page.get_by_text('Выбрано GPU:',exact=False)).to_contain_text('2')
+        assert await h.page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
+        h.page.once('dialog',lambda d: asyncio.create_task(d.accept()))
+        await h.page.locator('.ai-model-entry').filter(has_text='qwen3:1.7b').get_by_role('button',name='Загрузить').click()
+        assert any(p=='/api/v1/ai/local/pull' for _,p,_ in h.requests)
+        await expect(h.page.locator('.ai-model-entry').filter(has_text='qwen3:1.7b')).to_contain_text('Установлена')
+        await h.close()
+    await check('UI-19: bundled Ollama model selection and live multi-GPU hotplug',local_ai_hardware)
 
     async def responsive_pages():
         for path,kw in [('/users',{}),('/jobs',dict(jobs=[job()])),('/',dict(initialized=False))]:
