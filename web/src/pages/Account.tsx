@@ -1,14 +1,18 @@
 import type { Actor } from "../api/types";
 import { PasswordChange } from "../components/PasswordChange";
 import { Panel } from "../components/Panel";
+import { SectionGuide } from "../components/SectionGuide";
+import { useUI } from "../ui/useUI";
 import { useI18n } from "../i18n";
 import { PageHeading } from "./Dashboard";
 
 export function AccountPage({actor, onPasswordChanged}: {actor: Actor; onPasswordChanged: () => void}) {
   const {t} = useI18n();
+  const u = useUI();
   return (
     <div className="page">
       <PageHeading title={t("yourAccount")} subtitle={t("limitedHomeSubtitle")} />
+      <SectionGuide title={u("uxAccountGuide")} description={u("uxAccountGuideDescription")} />
       <Panel title={t("yourAccount")}>
         <dl className="details">
           <dt>{t("displayName")}</dt>
