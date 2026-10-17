@@ -33,15 +33,15 @@ const (
 )
 
 const (
-	settingsIDNavOverview   = 2101
-	settingsIDNavConnection = 2102
-	settingsIDNavSync       = 2103
-	settingsIDNavBackup     = 2104
-	settingsIDNavGeneral    = 2105
-	settingsIDOpenLocal     = 2106
-	settingsIDBackupProfile = 2107
-	settingsIDSaveSchedule  = 2108
-	settingsIDNavTransfers  = 2109
+	settingsIDNavOverview      = 2101
+	settingsIDNavConnection    = 2102
+	settingsIDNavSync          = 2103
+	settingsIDNavBackup        = 2104
+	settingsIDNavGeneral       = 2105
+	settingsIDOpenLocal        = 2106
+	settingsIDBackupProfile    = 2107
+	settingsIDSaveSchedule     = 2108
+	settingsIDNavTransfers     = 2109
 	settingsIDRefreshTransfers = 2110
 
 	settingsWSGroup      = 0x00020000
