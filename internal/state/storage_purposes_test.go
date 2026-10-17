@@ -67,3 +67,17 @@ func TestStoragePurposeRejectsInvalidPurpose(t *testing.T) {
 		t.Fatal("invalid storage purpose was accepted")
 	}
 }
+
+func TestModuleStoragePurposeValidation(t *testing.T) {
+	for _, value := range []string{"module:nvr.module", "module:ai.agent", "MODULE:REFERENCE.MODULE"} {
+		normalized, err := NormalizeStoragePurpose(value)
+		if err != nil || normalized == "" {
+			t.Fatalf("valid module storage purpose %q: %q %v", value, normalized, err)
+		}
+	}
+	for _, value := range []string{"module:", "module:../etc", "module:/tmp", "module:a..b", "module:a-", "system", "module:../../root"} {
+		if result, err := NormalizeStoragePurpose(value); err == nil {
+			t.Fatalf("unsafe storage purpose %q accepted as %q", value, result)
+		}
+	}
+}
