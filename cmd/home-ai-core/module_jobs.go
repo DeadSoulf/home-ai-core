@@ -46,30 +46,42 @@ func registerModuleJobs(service *jobs.Service, registry *modules.Registry) error
 			return nil, errors.New("upgrade manifest is missing")
 		}
 		manifest, err := modules.DecodeManifest(strings.NewReader(raw))
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		_ = reporter.Progress(ctx, 1200, "verifying official NVR manifest and existing data")
 		item, err := registry.UpgradeManifest(ctx, manifest)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		_ = reporter.Progress(ctx, 9500, "updated NVR passed health checks")
 		return map[string]any{
 			"module_id": item.Manifest.ID,
-			"version": item.Manifest.Version,
-			"status": item.Status,
+			"version":   item.Manifest.Version,
+			"status":    item.Status,
 		}, nil
-	}); err != nil { return err }
+	}); err != nil {
+		return err
+	}
 
 	if err := service.Register("module.storage.attach", func(ctx context.Context, job state.JobRecord, reporter jobs.Reporter) (map[string]any, error) {
 		id, _ := job.Input["module_id"].(string)
-		if id != "nvr.module" { return nil, errors.New("storage attach only supports NVR") }
+		if id != "nvr.module" {
+			return nil, errors.New("storage attach only supports NVR")
+		}
 		_ = reporter.Progress(ctx, 1000, "validating mounted NVR video storage")
 		item, err := registry.AttachNVRStorage(ctx)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		_ = reporter.Progress(ctx, 9500, "new NVR recording directory mounted and healthy")
 		return map[string]any{
 			"module_id": item.Manifest.ID,
-			"status": item.Status,
+			"status":    item.Status,
 		}, nil
-	}); err != nil { return err }
+	}); err != nil {
+		return err
+	}
 
 	if err := service.Register("module.control", func(ctx context.Context, job state.JobRecord, reporter jobs.Reporter) (map[string]any, error) {
 		moduleID, _ := job.Input["module_id"].(string)
