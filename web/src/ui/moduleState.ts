@@ -47,7 +47,7 @@ export function canCancelJob(job: Job) {
   return job.status === "queued" || job.status === "running" && ["module.install", "module.control", "module.remove"].includes(job.type);
 }
 export function jobTitle(job: Job): UIKey {
-  return ({"module.install": "moduleInstallJob", "module.control": "moduleControlJob", "module.remove": "moduleRemoveJob", "core.update.install": "updateJob"} as Record<string, UIKey>)[job.type] || "backgroundJob";
+  return ({"module.install": "moduleInstallJob", "module.upgrade": "moduleInstallJob", "module.storage.attach": "moduleControlJob", "module.control": "moduleControlJob", "module.remove": "moduleRemoveJob", "core.update.install": "updateJob"} as Record<string, UIKey>)[job.type] || "backgroundJob";
 }
 export function jobMessage(job: Job): UIKey {
   const known: Record<string, UIKey> = {
