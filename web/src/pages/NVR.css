@@ -34,3 +34,12 @@
   .nvr-page .nvr-discovery-toolbar { align-items: stretch; flex-direction: column; }
   .nvr-page .nvr-discovery-toolbar label { width: 100%; flex: 1 1 auto; }
 }
+
+
+.nvr-page .nvr-live-controls {display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 18px;}
+.nvr-page .nvr-live-grid {display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px;}
+.nvr-page .nvr-live-grid.nvr-live-single {grid-template-columns:minmax(0,1fr); max-width:950px;}
+.nvr-page .nvr-live-tile {min-width:0; border:1px solid var(--border,#d9e0e8); border-radius:12px; padding:12px;}
+.nvr-page .nvr-live-heading {display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:9px;}
+.nvr-page .nvr-live-tile video {width:100%; aspect-ratio:16 / 9; background:#121212; border-radius:9px;}
+@media (max-width:760px) {.nvr-page .nvr-live-grid {grid-template-columns:minmax(0,1fr);}}
