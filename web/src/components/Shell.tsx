@@ -4,7 +4,7 @@ import type { Actor, ModuleNavigationState } from "../api/types";
 import { useUI } from "../ui/useUI";
 import { COPYRIGHT_NOTICE } from "../branding";
 import { LanguageSwitch, useI18n } from "../i18n";
-import { hasPermission, visibleNavigation } from "../navigation";
+import { hasPermission, isModuleManagementRoute, visibleNavigation } from "../navigation";
 import { NavigationIcon } from "./NavigationIcon";
 import { navigationHint } from "../ui/experience";
 
@@ -29,7 +29,7 @@ export function Shell(props: {
   const route = props.path.split("#")[0];
   const isActivePath = (path: string) => {
     if (path === "/") return route === "/";
-    if (path === "/modules") return route === "/modules";
+    if (path === "/modules") return isModuleManagementRoute(route);
     return route === path || route.startsWith(path + "/");
   };
   const current = groups.flatMap((group) => group.items).find((item) => isActivePath(item.path));

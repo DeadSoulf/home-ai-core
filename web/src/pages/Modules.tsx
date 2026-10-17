@@ -6,14 +6,15 @@ import { EmptyState, ErrorState, LoadingState, Panel } from "../components/Panel
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { JobProgress } from "../components/JobProgress";
-import { SectionGuide } from "../components/SectionGuide";
+import type { ModuleSection } from "../navigation";
 import { useI18n } from "../i18n";
 import { useUI } from "../ui/useUI";
 import { activeJob, catalogState, jobTitle, runtimeMessage } from "../ui/moduleState";
 import { PageHeading, Status } from "./Dashboard";
 
-export function ModulesPage({revision, canManage, canReadJobs = false, onNavigate = () => {}}: {
-  revision: number; canManage: boolean; canReadJobs?: boolean; onNavigate?: (path: string) => void;
+export function ModulesPage({revision, section = "installed", canManage, canReadJobs = false, onSectionChange = () => {}, onNavigate = () => {}}: {
+  revision: number; section?: ModuleSection; canManage: boolean; canReadJobs?: boolean;
+  onSectionChange?: (section: ModuleSection) => void; onNavigate?: (path: string) => void;
 }) {
   const {t, date} = useI18n(); const u = useUI();
   const [manifestText, setManifestText] = useState("");
@@ -26,10 +27,12 @@ export function ModulesPage({revision, canManage, canReadJobs = false, onNavigat
   // Catalog outages never hide the installed registry or stop/remove controls.
   const load = useCallback(() => Promise.all([api.modules(), api.capabilities()]).then(([modules, capabilities]) => ({modules, capabilities})), []);
   const core = useResource(load, revision);
-  const loadCatalog = useCallback(() => api.moduleCatalog(), []);
+  // Each page loads only what it needs. Installed controls remain usable during catalog outages.
+  const loadCatalog = useCallback(() => section === "catalog" ? api.moduleCatalog() : Promise.resolve(undefined), [section]);
   const catalog = useResource(loadCatalog);
-  const loadRuntime = useCallback((signal: AbortSignal) => api.moduleRuntime(signal), []);
-  const runtime = useResource(loadRuntime, 0, 15000);
+  const loadRuntime = useCallback((signal: AbortSignal) =>
+    section === "catalog" || section === "settings" ? api.moduleRuntime(signal) : Promise.resolve(undefined), [section]);
+  const runtime = useResource(loadRuntime, 0, section === "settings" ? 15000 : 0);
   const loadOperations = useCallback((signal: AbortSignal) => canManage ? api.moduleOperations(signal) : Promise.resolve<Job[]>([]), [canManage]);
   const operations = useResource(loadOperations, revision, canManage ? 2000 : 0);
   const jobID = accepted?.id;
@@ -62,9 +65,14 @@ export function ModulesPage({revision, canManage, canReadJobs = false, onNavigat
   }
 
   async function run(action: () => Promise<Job>) {
-    if (!canManage || busy || mutation.current || core.error) return;
+    if (!canManage || busy || mutation.current || !core.data || core.error) return;
     mutation.current = true; setSending(true); setActionError(undefined);
-    try { setAccepted(await action()); operations.reload(); }
+    try {
+      const job = await action();
+      setAccepted(job);
+      operations.reload();
+      onSectionChange("operations");
+    }
     catch (error) {
       setActionError(error); setUncertain(true); // a lost response is not proof that nothing was queued
       operations.reload(); core.reload();
@@ -81,21 +89,25 @@ export function ModulesPage({revision, canManage, canReadJobs = false, onNavigat
     } catch { setManifestError(true); document.getElementById("module-manifest")?.focus(); }
   }
 
-  if (core.loading && !core.data) return <LoadingState />;
-  if (!core.data) return <ErrorState message={core.error} onRetry={core.reload} />;
-  const value = core.data;
+  const value = core.data ?? {modules: [], capabilities: []};
   const installed = new Map(value.modules.map((item) => [item.manifest.id, item]));
   const displayedJobs = [...active];
   if (lastJob && !displayedJobs.some((job) => job.id === lastJob.id)) displayedJobs.push(lastJob);
   return <div className="page modules-page">
-    <PageHeading title={t("modules")} subtitle={t("modulesSubtitleSimple")} />
-    <SectionGuide title={u("uxModulesGuide")} description={u("uxModulesGuideDescription")} />
-    <nav className="ux-section-jumps" aria-label={t("modules")}>
-      <button type="button" className="button secondary" onClick={() => document.getElementById("installed-modules")?.scrollIntoView({behavior: "smooth", block: "start"})}>{u("uxInstalledJump")}</button>
-      <button type="button" className="button secondary" onClick={() => document.getElementById("module-catalog")?.scrollIntoView({behavior: "smooth", block: "start"})}>{u("uxCatalogJump")}</button>
+    <PageHeading title={t("modules")} subtitle={u(section === "catalog" ? "moduleCatalogSubtitle" : section === "operations" ? "moduleOperationsSubtitle" : section === "settings" ? "moduleSettingsSubtitle" : "moduleInstalledSubtitle")} />
+    <nav className="ux-section-jumps module-section-tabs" aria-label={t("modules")}>
+      <button type="button" className={"button " + (section === "installed" ? "primary" : "secondary")}
+        aria-current={section === "installed" ? "page" : undefined} onClick={() => onSectionChange("installed")}>{u("uxInstalledJump")}</button>
+      <button type="button" className={"button " + (section === "catalog" ? "primary" : "secondary")}
+        aria-current={section === "catalog" ? "page" : undefined} onClick={() => onSectionChange("catalog")}>{u("uxCatalogJump")}</button>
+      <button type="button" className={"button " + (section === "operations" ? "primary" : "secondary")}
+        aria-current={section === "operations" ? "page" : undefined} onClick={() => onSectionChange("operations")}>{u("uxOperationsJump")}</button>
+      <button type="button" className={"button " + (section === "settings" ? "primary" : "secondary")}
+        aria-current={section === "settings" ? "page" : undefined} onClick={() => onSectionChange("settings")}>{u("uxModuleSettingsJump")}</button>
     </nav>
+    {core.loading && !core.data && <LoadingState />}
     {core.error && <ErrorState message={core.error} onRetry={core.reload} />}
-    <Panel title={t("dockerRuntime")} action={<button type="button" className="button secondary" disabled={runtime.loading} onClick={runtime.reload}>{u("checkRuntime")}</button>}>
+    {section === "settings" && <Panel title={t("dockerRuntime")} action={<button type="button" className="button secondary" disabled={runtime.loading} onClick={runtime.reload}>{u("checkRuntime")}</button>}>
       <div className="runtime-summary">
         <p role="status">{u(runtimeMessage(runtime.data))}</p>
         {runtime.loading && !runtime.data && <LoadingState />}
@@ -104,13 +116,13 @@ export function ModulesPage({revision, canManage, canReadJobs = false, onNavigat
         {(!runtime.data?.engine_ready || !runtime.data?.network_ready) && <p>{u("runtimeInstallHint")}</p>}
         {runtime.data?.error && <details className="technical-details"><summary>{u("details")}</summary><p>{runtime.data.error}</p></details>}
       </div>
-    </Panel>
+    </Panel>}
 
-    {canManage && !operations.data && !operations.error && <p role="status">{u("queueChecking")}</p>}
+    {section === "operations" && canManage && !operations.data && !operations.error && <p role="status">{u("queueChecking")}</p>}
     {monitoringFailed && <ErrorState message={u("operationMonitorFailed")} onRetry={() => void verifyStatus()} />}
     {uncertain && <div className="notice" role="status"><p>{u("operationUnknown")}</p><button type="button" className="button secondary" disabled={sending} onClick={() => void verifyStatus()}>{u("refresh")}</button></div>}
     {actionError !== undefined && <ErrorNotice error={actionError} />}
-    {displayedJobs.length > 0 && <Panel title={u("activeOperation")}>
+    {section === "operations" && (displayedJobs.length > 0 ? <Panel title={u("activeOperation")}>
       <div className="module-operations">
         {displayedJobs.map((job) => <article key={job.id} className="operation-card" data-job-id={job.id}>
           <h3>{u(jobTitle(job))}: {installed.get(job.input?.module_id || "")?.manifest.name || job.input?.module_id || job.result?.module_id || ""}</h3>
@@ -122,9 +134,9 @@ export function ModulesPage({revision, canManage, canReadJobs = false, onNavigat
           </div>
         </article>)}
       </div>
-    </Panel>}
+    </Panel> : <EmptyState>{u("moduleNoOperations")}</EmptyState>)}
 
-    <Panel id="installed-modules" title={t("moduleInstalledList")}>
+    {section === "installed" && core.data && <Panel id="installed-modules" title={t("moduleInstalledList")}>
       <p className="ux-panel-description">{u("uxModulesInstalledHint")}</p>
       <div className="card-grid">
         {value.modules.map((module) => <article className="module-card" key={module.manifest.id} data-module-id={module.manifest.id}>
@@ -133,15 +145,15 @@ export function ModulesPage({revision, canManage, canReadJobs = false, onNavigat
           {module.error && <ErrorNotice error={{message: module.error}} message={module.status === "registered" ? u("resumeHint") : u("jobFailed")} />}
           {canManage && <div className="module-actions">
             <div className="button-row">
-              {module.status === "registered" ? <button type="button" className="button primary" disabled={busy || Boolean(core.error)}
+              {module.status === "registered" ? <button type="button" className="button primary" disabled={busy || (!core.data || Boolean(core.error))}
                 onClick={() => void run(() => api.installModule(module.manifest))}>{u("retryInstall")}</button> : <>
-                <button type="button" className="button secondary" disabled={busy || Boolean(core.error)}
+                <button type="button" className="button secondary" disabled={busy || (!core.data || Boolean(core.error))}
                   onClick={() => void run(() => api.controlModule(module.manifest.id, module.status === "enabled" ? "disable" : "enable"))}>{t(module.status === "enabled" ? "moduleStop" : "moduleStart")}</button>
-                <button type="button" className="button secondary" disabled={busy || Boolean(core.error)}
+                <button type="button" className="button secondary" disabled={busy || (!core.data || Boolean(core.error))}
                   onClick={() => void run(() => api.controlModule(module.manifest.id, "restart"))}>{t("moduleRestart")}</button>
               </>}
             </div>
-            <div className="button-row destructive-actions"><button type="button" className="button danger" disabled={busy || Boolean(core.error)} onClick={() => setConfirmRemove(module)}>{t("moduleRemove")}</button></div>
+            <div className="button-row destructive-actions"><button type="button" className="button danger" disabled={busy || (!core.data || Boolean(core.error))} onClick={() => setConfirmRemove(module)}>{t("moduleRemove")}</button></div>
           </div>}
           <details className="technical-details"><summary>{u("details")}</summary>
             <dl className="details"><dt>ID</dt><dd className="mono">{module.manifest.id}</dd><dt>{t("version")}</dt><dd>{module.manifest.version}</dd>
@@ -151,9 +163,9 @@ export function ModulesPage({revision, canManage, canReadJobs = false, onNavigat
         </article>)}
         {value.modules.length === 0 && <EmptyState>{t("noModulesSimple")}</EmptyState>}
       </div>
-    </Panel>
+    </Panel>}
 
-    <Panel id="module-catalog" title={t("moduleCatalogAvailable")} action={<button type="button" className="button secondary" disabled={catalog.loading} onClick={catalog.reload}>{u("refresh")}</button>}>
+    {section === "catalog" && <Panel id="module-catalog" title={t("moduleCatalogAvailable")} action={<button type="button" className="button secondary" disabled={catalog.loading} onClick={catalog.reload}>{u("refresh")}</button>}>
       <p className="ux-panel-description">{u("uxModulesCatalogHint")}</p>
       {catalog.loading && !catalog.data && <LoadingState />}
       {catalog.error && <ErrorState message={catalog.error} onRetry={catalog.reload} />}
@@ -173,7 +185,7 @@ export function ModulesPage({revision, canManage, canReadJobs = false, onNavigat
               {hint && <p className="notice">{hint}</p>}
               {resumable && <p>{u("resumeHint")}</p>}
               {canManage && <div className="button-row"><button type="button" className="button primary"
-                disabled={busy || Boolean(core.error) || Boolean(existing && !resumable)}
+                disabled={busy || (!core.data || Boolean(core.error)) || Boolean(existing && !resumable)}
                 onClick={() => void run(() => resumable ? api.installModule(resumable.manifest) : api.installCatalogModule(manifest.id))}>
                 {resumable ? u("retryInstall") : existing ? t("moduleInstalled") : runtime.data?.network_ready ? t("moduleInstall") : u("installAndPrepare")}
               </button></div>}
@@ -182,18 +194,18 @@ export function ModulesPage({revision, canManage, canReadJobs = false, onNavigat
           {catalog.data.modules.length === 0 && <EmptyState>{t("moduleCatalogEmpty")}</EmptyState>}
         </div>
       </>}
-    </Panel>
+    </Panel>}
 
-    {busy && displayedJobs.some(activeJob) && <p role="status" className="muted">{u("busyHint")}</p>}
-    <details className="technical-details"><summary>{u("details")}</summary><Panel title={t("hostCapabilities")}><div className="tag-list">{value.capabilities.map((item) => <span key={item} className="tag">{item}</span>)}</div></Panel></details>
-    {canManage && <details className="technical-details developer-install"><summary>{u("developer")}</summary>
+    {section === "operations" && busy && displayedJobs.some(activeJob) && <p role="status" className="muted">{u("busyHint")}</p>}
+    {section === "settings" && <details className="technical-details"><summary>{u("details")}</summary><Panel title={t("hostCapabilities")}><div className="tag-list">{value.capabilities.map((item) => <span key={item} className="tag">{item}</span>)}</div></Panel></details>}
+    {section === "settings" && canManage && <details className="technical-details developer-install"><summary>{u("developer")}</summary>
       <Panel title={t("moduleInstallManifest")}><p id="manifest-hint">{u("manifestHint")}</p>
         <label htmlFor="module-manifest">{u("manifest")}</label>
         <textarea id="module-manifest" name="manifest" className="text-input mono" rows={12} value={manifestText}
           onChange={(event) => {setManifestText(event.target.value); setManifestError(false);}} placeholder={'{"schema_version":2,...}'}
           disabled={busy} spellCheck={false} aria-invalid={manifestError} aria-describedby={manifestError ? "manifest-hint manifest-error" : "manifest-hint"} />
         {manifestError && <div id="manifest-error" className="form-error" role="alert">{u("invalidJSON")}</div>}
-        <div className="button-row"><button type="button" className="button primary" disabled={busy || !manifestText.trim() || Boolean(core.error)} onClick={installManifest}>{t("moduleInstall")}</button></div>
+        <div className="button-row"><button type="button" className="button primary" disabled={busy || !manifestText.trim() || (!core.data || Boolean(core.error))} onClick={installManifest}>{t("moduleInstall")}</button></div>
       </Panel>
     </details>}
     {confirmRemove && <ConfirmDialog title={u("removeTitle")} confirmLabel={u("confirmRemove")} onCancel={() => setConfirmRemove(undefined)}

@@ -5,7 +5,7 @@ import { LoadingState } from "./components/Panel";
 import { useUI } from "./ui/useUI";
 import { ModulePage } from "./pages/Module";
 import { NVRPage } from "./pages/NVR";
-import { isModuleRoute } from "./navigation";
+import { isModuleRoute, isModuleManagementRoute, moduleSection, moduleSectionPath } from "./navigation";
 import type { Actor, ModuleNavigationState } from "./api/types";
 import { Shell } from "./components/Shell";
 import { useI18n } from "./i18n";
@@ -26,7 +26,7 @@ function currentPath(): string {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
   const known = ["/", "/files", "/files/storage", "/files/windows", "/system", "/modules", "/jobs", "/audit", "/users", "/account"];
   const moduleRoute = isModuleRoute(path);
-  if (!known.includes(path) && !moduleRoute) return "/";
+  if (!known.includes(path) && !isModuleManagementRoute(path) && !moduleRoute) return "/";
   return path + (path === "/system" || path === "/files" || path === "/jobs" ? window.location.hash : "");
 }
 
@@ -265,8 +265,14 @@ export default function App() {
         : accountPage;
       break;
     case "/modules":
+    case "/modules/installed":
+    case "/modules/catalog":
+    case "/modules/operations":
+    case "/modules/settings":
       page = has("modules.read")
-        ? <ModulesPage revision={revision} canManage={has("modules.manage")} canReadJobs={has("jobs.read")} onNavigate={navigate} />
+        ? <ModulesPage revision={revision} section={moduleSection(allowedPath)}
+            onSectionChange={(section) => navigate(moduleSectionPath(section))}
+            canManage={has("modules.manage")} canReadJobs={has("jobs.read")} onNavigate={navigate} />
         : accountPage;
       break;
     case "/jobs":

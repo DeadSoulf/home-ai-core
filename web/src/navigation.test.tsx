@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Actor } from "./api/types";
 import { Shell } from "./components/Shell";
 import { I18nProvider } from "./i18n";
-import { accessiblePath, fileSection, fileSectionPath, hasPermission, systemSection, visibleNavigation } from "./navigation";
+import { accessiblePath, fileSection, fileSectionPath, hasPermission, isModuleRoute, isModuleManagementRoute, moduleSection, moduleSectionPath, systemSection, visibleNavigation } from "./navigation";
 
 function actor(permissions: string[], roles = ["owner"]): Actor {
   return {type: "user", id: "usr-test", username: "reader", roles, permissions};
@@ -40,6 +40,23 @@ describe("navigation access", () => {
     expect(accessiblePath(actor(["files.manage"]), "/files/storage")).toBe("/");
     expect(accessiblePath(manager, "/files/unknown")).toBe("/files");
     expect(accessiblePath(manager, "/files#unknown")).toBe("/files");
+  });
+
+  it("uses separate, protected module-management pages without intercepting extension routes", () => {
+    const manager = actor(allReads);
+    for (const section of ["installed", "catalog", "operations", "settings"] as const) {
+      const route = moduleSectionPath(section);
+      expect(moduleSection(route)).toBe(section);
+      expect(isModuleManagementRoute(route)).toBe(true);
+      expect(isModuleRoute(route)).toBe(false);
+      expect(accessiblePath(manager, route)).toBe(route);
+      expect(accessiblePath(actor(["security.self.read"]), route)).toBe("/");
+    }
+    expect(moduleSection("/modules")).toBe("installed");
+    expect(accessiblePath(manager, "/modules")).toBe("/modules");
+    expect(isModuleRoute("/modules/nvr.module")).toBe(true);
+    expect(isModuleManagementRoute("/modules/nvr.module")).toBe(false);
+    expect(isModuleRoute("/modules/catalog")).toBe(false);
   });
 
   it("keeps existing URLs accessible for an actor with the corresponding read permissions", () => {
@@ -110,6 +127,14 @@ describe("navigation rendering", () => {
     expect(nav).toContain("Security");
     expect(nav.match(/aria-current="page"/g)).toHaveLength(1);
     expect(nav).toMatch(/<button\b[^>]*aria-current="page"[^>]*>[\s\S]*?<span>Security<\/span>/);
+  });
+
+  it("keeps Modules highlighted across its management pages", () => {
+    for (const path of ["/modules/installed", "/modules/catalog", "/modules/operations", "/modules/settings"]) {
+      const nav = renderNavigation(actor(allReads), path);
+      expect(nav.match(/aria-current="page"/g)).toHaveLength(1);
+    expect(nav).toMatch(/<button\b[^>]*aria-current="page"[^>]*>[\s\S]*?<span>Modules<\/span>/);
+    }
   });
 
   it("keeps Files highlighted on nested section routes", () => {

@@ -133,7 +133,7 @@ class Harness:
         if not target.is_file():target=DIST/'index.html'
         await route.fulfill(status=200,body=target.read_bytes(),content_type=mimetypes.guess_type(target.name)[0] or 'application/octet-stream')
     def posts(self, suffix):return [req for req in self.requests if req[1].endswith(suffix)]
-    async def ready(self): await expect(self.page.locator('.modules-page')).to_be_visible(); await expect(self.page.locator('[data-catalog-id]')).to_have_count(len(self.catalog))
+    async def ready(self): await expect(self.page.locator('.modules-page')).to_be_visible()
     async def close(self):
         assert not self.errors, self.errors
         await self.context.close()
@@ -214,15 +214,18 @@ async def suite(browser):
 
     async def no_docker():
         runtime=copy.deepcopy(RUNTIME); runtime.update(available=False,active=False,engine_ready=False,network_ready=False)
-        h=await Harness(browser,runtime=runtime).start('/modules'); await h.ready()
+        h=await Harness(browser,runtime=runtime).start('/modules/catalog'); await h.ready()
         button=h.page.locator('[data-catalog-id=\"demo.nvr\"] button')
         await expect(button).to_be_enabled(); await expect(button).to_contain_text('Подготовить Docker')
-        await button.click(); await expect(button).to_be_disabled()
+        await button.click()
         await expect(h.page.get_by_role('progressbar')).to_be_visible()
+        assert (await h.url()).endswith('/modules/operations')
         await expect(h.page.get_by_role('button',name='Открыть операцию')).to_be_visible()
         assert len(h.posts('/install'))==1
         h.jobs[0].update(status='succeeded',progress=10000); h.modules=[module()]
-        await expect(h.page.locator('[data-module-id=\"demo.nvr\"]')).to_be_visible(timeout=6500)
+        await h.page.get_by_role('button',name='Установленные модули',exact=True).click()
+        await expect(h.page.locator('[data-module-id="demo.nvr"]')).to_be_visible(timeout=6500)
+        await h.page.get_by_role('button',name='Операции модулей',exact=True).click()
         await h.page.get_by_role('button',name='Открыть операцию').click()
         await expect(h.page.locator('#job-job-test')).to_be_focused(); assert (await h.url()).endswith('/jobs#job=job-test')
         await h.screenshot('04-completed-job-linked'); await h.close()
@@ -231,13 +234,13 @@ async def suite(browser):
     async def versions():
         for candidate,label in [('1.1.0','Установлена более новая версия'),('1.3.0','безопасное обновление модулей пока не реализовано')]:
             manifest=copy.deepcopy(MANIFEST);manifest['version']=candidate
-            h=await Harness(browser,modules=[module()],catalog=[manifest]).start('/modules'); await h.ready()
+            h=await Harness(browser,modules=[module()],catalog=[manifest]).start('/modules/catalog'); await h.ready()
             card=h.page.locator('[data-catalog-id=\"demo.nvr\"]')
             await expect(card).to_contain_text(label); await expect(card.locator('button')).to_be_disabled()
             assert not h.requests
             await h.screenshot('05-catalog-'+candidate);await h.close()
         manifest=copy.deepcopy(MANIFEST);manifest['runtime']['docker']['image']='example.com/camera@sha256:'+'b'*64
-        h=await Harness(browser,modules=[module()],catalog=[manifest]).start('/modules');await h.ready()
+        h=await Harness(browser,modules=[module()],catalog=[manifest]).start('/modules/catalog');await h.ready()
         await expect(h.page.locator('[data-catalog-id=\"demo.nvr\"]')).to_contain_text('Манифест каталога отличается')
         await expect(h.page.locator('[data-catalog-id=\"demo.nvr\"] button')).to_be_disabled();await h.close()
     await check('UI-03: older/newer/same-version different digest do not offer unsafe update',versions)
@@ -287,7 +290,7 @@ async def suite(browser):
     await check('UI-09/11: specific job name, progress, cancellation and correct pending state',cancel)
 
     async def styles_permissions():
-        h=await Harness(browser,modules=[module()]).start('/modules');await h.ready()
+        h=await Harness(browser,modules=[module()]).start('/modules/settings');await h.ready()
         await h.page.get_by_text('Расширенные настройки: установка Manifest вручную',exact=True).click()
         textarea=h.page.get_by_role('textbox',name='JSON-манифест модуля',exact=True)
         await expect(textarea).to_be_visible();await textarea.fill('not json')
@@ -309,7 +312,7 @@ async def suite(browser):
         assert await h.page.locator('.developer-install').count()==0
         assert not h.requests;await h.close()
         actor=copy.deepcopy(ACTOR);actor['permissions']=['security.self.read','modules.read','modules.manage']
-        h=await Harness(browser,actor=actor).start('/modules');await h.ready()
+        h=await Harness(browser,actor=actor).start('/modules/catalog');await h.ready()
         await expect(h.page.locator('[data-catalog-id] button')).to_be_enabled();await h.page.locator('[data-catalog-id] button').click()
         await expect(h.page.get_by_role('progressbar')).to_be_visible();assert await h.page.get_by_role('button',name='Открыть операцию').count()==0
         assert not h.unhandled,h.unhandled;await h.close()
@@ -317,8 +320,9 @@ async def suite(browser):
 
     async def runtime():
         runtime=copy.deepcopy(RUNTIME);runtime.update(engine_ready=False,network_ready=False,version='',error='socket exists but engine is down')
-        h=await Harness(browser,runtime=runtime,catalog_status=503,modules=[module()]).start('/modules')
+        h=await Harness(browser,runtime=runtime,catalog_status=503,modules=[module()]).start('/modules/settings')
         await expect(h.page.get_by_text('Движок Docker не отвечает.',exact=True)).to_be_visible()
+        await h.page.get_by_role('button',name='Установленные модули',exact=True).click()
         await expect(h.page.locator('[data-module-id]')).to_be_visible()
         await expect(h.page.locator('[data-module-id] button.danger')).to_be_enabled()
         assert await h.page.get_by_text('Движок Docker и сеть модулей доступны.',exact=True).count()==0
@@ -326,8 +330,11 @@ async def suite(browser):
     await check('UI-14: host.docker is not readiness; catalog failure retains installed controls',runtime)
 
     async def degraded_monitor():
-        h=await Harness(browser,jobs=[job()]).start('/modules');await h.ready()
+        h=await Harness(browser,jobs=[job()]).start('/modules/catalog');await h.ready()
+        await expect(h.page.locator('[data-catalog-id] button')).to_be_disabled()
+        await h.page.get_by_role('button',name='Операции модулей',exact=True).click()
         await expect(h.page.get_by_role('progressbar')).to_be_visible()
+        await h.page.get_by_role('button',name='Каталог модулей',exact=True).click()
         await expect(h.page.locator('[data-catalog-id] button')).to_be_disabled()
         h.jobs=[]
         await expect(h.page.locator('[data-catalog-id] button')).to_be_enabled(timeout=6000)
@@ -342,7 +349,7 @@ async def suite(browser):
         h=await Harness(browser,modules=[module()]).start('/modules',390);await h.ready()
         await h.page.get_by_role('button',name='Меню',exact=True).click()
         await expect(h.page.locator('main')).to_have_attribute('inert','')
-        await expect(h.page.locator('nav button[aria-current=page]')).to_be_focused()
+        await expect(h.page.locator('#main-sidebar nav button[aria-current=page]')).to_be_focused()
         await h.page.keyboard.press('Escape')
         assert await h.page.locator('main[inert]').count()==0
         await expect(h.page.get_by_role('button',name='Меню',exact=True)).to_be_focused();await h.close()
@@ -351,6 +358,27 @@ async def suite(browser):
         h.nav_status=200;await h.page.get_by_role('button',name='Повторить',exact=True).click()
         await expect(h.page.locator('main h1')).to_have_text('Камеры');await h.close()
     await check('UI-05/13: preserved mobile focus/Escape and module-navigation retry',menu_and_routes)
+
+    async def module_sections():
+        h=await Harness(browser,modules=[module()]).start('/modules/catalog');await h.ready()
+        assert (await h.url()).endswith('/modules/catalog')
+        await expect(h.page.locator('[data-catalog-id]')).to_have_count(1)
+        assert await h.page.locator('[data-module-id]').count()==0
+        await h.page.get_by_role('button',name='Установленные модули',exact=True).click()
+        assert (await h.url()).endswith('/modules/installed')
+        await expect(h.page.locator('[data-module-id]')).to_have_count(1)
+        assert await h.page.locator('[data-catalog-id]').count()==0
+        await h.page.get_by_role('button',name='Операции модулей',exact=True).click()
+        assert (await h.url()).endswith('/modules/operations')
+        await expect(h.page.get_by_text('Активных операций с модулями нет.',exact=False)).to_be_visible()
+        assert await h.page.locator('[data-catalog-id], [data-module-id]').count()==0
+        await h.page.get_by_role('button',name='Настройки модулей',exact=True).click()
+        assert (await h.url()).endswith('/modules/settings')
+        await expect(h.page.get_by_text('Движок Docker и сеть модулей доступны.',exact=True)).to_be_visible()
+        await h.back()
+        assert (await h.url()).endswith('/modules/operations')
+        await h.close()
+    await check('UI-17: separate module pages, direct routes, isolated content and history',module_sections)
 
     async def responsive_pages():
         for path,kw in [('/users',{}),('/jobs',dict(jobs=[job()])),('/',dict(initialized=False))]:
