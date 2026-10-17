@@ -17,7 +17,7 @@ import (
 // The verified cached installer is a different executable from the old
 // running client. After it replaces the per-user install, it reopens the
 // actual installed binary, not the old preview/downloaded binary.
-func reopenWindowsClientSettings(executable, configPath, settingsPath string) error {
+func reopenWindowsClientSettings(executable, configPath, settingsPath string, changed bool) error {
 	if strings.TrimSpace(executable) == "" {
 		return fmt.Errorf("installed Windows client path is required")
 	}
@@ -28,7 +28,7 @@ func reopenWindowsClientSettings(executable, configPath, settingsPath string) er
 	if err := waitForWindowsSettingsWindowExit(20 * time.Second); err != nil {
 		return err
 	}
-	command := exec.Command(executable, windowsSettingsReopenArgs(configPath, settingsPath)...)
+	command := exec.Command(executable, windowsSettingsReopenArgs(configPath, settingsPath, changed)...)
 	command.SysProcAttr = &syscall.SysProcAttr{CreationFlags: settingsCreateNoWindow}
 	if err := command.Start(); err != nil {
 		return fmt.Errorf("reopen updated Home-AI Windows client: %w", err)
