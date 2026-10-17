@@ -173,7 +173,6 @@ func TestScanRejectsUnsafeCIDRBeforeNetworking(t *testing.T) {
 	}
 }
 
-
 func TestHTTPHeaderFingerprintDoesNotWaitForConnectionClose(t *testing.T) {
 	client, server := net.Pipe()
 	defer client.Close()
