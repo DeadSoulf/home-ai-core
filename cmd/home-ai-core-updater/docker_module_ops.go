@@ -57,11 +57,18 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 		if !imageDigestPattern.MatchString(strings.TrimSpace(request.Image)) {
 			return moduleContainerStatus{}, "", errors.New("module image must be an immutable @sha256 reference")
 		}
+	case "docker.module.upgrade":
+		if moduleID != "nvr.module" ||
+			!imageDigestPattern.MatchString(strings.TrimSpace(request.Image)) ||
+			!imageDigestPattern.MatchString(strings.TrimSpace(request.PreviousImage)) ||
+			!strings.HasPrefix(request.Image, "ghcr.io/deadsoulf/home-ai-core_dvr@sha256:") {
+			return moduleContainerStatus{}, "", errors.New("only verified immutable official NVR upgrades are supported")
+		}
 	case "docker.module.start", "docker.module.stop", "docker.module.restart", "docker.module.remove":
 	default:
 		return moduleContainerStatus{}, "", errors.New("unsupported Docker module operation")
 	}
-	if request.Operation == "docker.module.install" {
+	if request.Operation == "docker.module.install" || request.Operation == "docker.module.upgrade" {
 		if _, err := ensureDockerRuntime(ctx, serviceGID); err != nil {
 			return moduleContainerStatus{}, "", err
 		}
@@ -76,6 +83,10 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 	switch request.Operation {
 	case "docker.module.install":
 		return installDockerModule(ctx, moduleID, strings.TrimSpace(request.Image), serviceUID, serviceGID)
+	case "docker.module.upgrade":
+		return upgradeNVRDockerModule(ctx, strings.TrimSpace(request.PreviousImage),
+			strings.TrimSpace(request.Image), strings.TrimSpace(request.Mountpoint),
+			serviceUID, serviceGID)
 	case "docker.module.start":
 		return controlDockerModule(ctx, moduleID, "start")
 	case "docker.module.stop":
