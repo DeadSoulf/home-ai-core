@@ -94,7 +94,7 @@ func (s *server) nvrReady(w http.ResponseWriter, r *http.Request) bool {
 
 // No connection pooling, redirect-following, environmental proxy, forwarded
 // cookies, Authorization header, or client-selected destination.
-func (s *server) nvrRequest(ctx context.Context, method, endpoint string, payload []byte) (*http.Response, error) {
+func (s *server) nvrRequest(ctx context.Context, method, endpoint string, payload []byte, mediaRange ...string) (*http.Response, error) {
 	address, err := s.nvrAddress(ctx)
 	if err != nil {
 		return nil, err
@@ -110,6 +110,9 @@ func (s *server) nvrRequest(ctx context.Context, method, endpoint string, payloa
 	}
 	if method == http.MethodPost {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	if strings.HasPrefix(endpoint, "/output/video/") && len(mediaRange) != 0 {
+		req.Header.Set("Range", mediaRange[0])
 	}
 	transport := &http.Transport{
 		Proxy: nil, DisableKeepAlives: true,
@@ -182,7 +185,7 @@ func (s *server) nvrCameras(w http.ResponseWriter, r *http.Request, _ security.A
 
 func validNVROutputPath(value string) bool {
 	parts := strings.Split(value, "/")
-	if len(parts) != 3 || (parts[0] != "recordings" && parts[0] != "hls") {
+	if len(parts) != 3 || (parts[0] != "recordings" && parts[0] != "hls" && parts[0] != "video") {
 		return false
 	}
 	for _, part := range parts[1:] {
@@ -190,7 +193,7 @@ func validNVROutputPath(value string) bool {
 			return false
 		}
 	}
-	if parts[0] == "recordings" {
+	if parts[0] == "recordings" || parts[0] == "video" {
 		return strings.HasSuffix(parts[2], ".mp4")
 	}
 	return strings.HasSuffix(parts[2], ".m3u8") || strings.HasSuffix(parts[2], ".ts")
@@ -400,13 +403,13 @@ func (s *server) nvrOutput(w http.ResponseWriter, r *http.Request, _ security.Ac
 		s.nvrRecordingFile(w, r, path)
 		return
 	}
-	response, err := s.nvrRequest(r.Context(), http.MethodGet, "/output/"+path, nil)
+	response, err := s.nvrRequest(r.Context(), http.MethodGet, "/output/"+path, nil, r.Header.Get("Range"))
 	if err != nil {
 		writeAPIError(w, r, http.StatusBadGateway, "nvr_unavailable", "NVR media is unavailable", nil)
 		return
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
+	if response.StatusCode != http.StatusOK && response.StatusCode != http.StatusPartialContent {
 		writeAPIError(w, r, http.StatusBadGateway, "nvr_media_unavailable", "NVR media could not be read", nil)
 		return
 	}
@@ -421,10 +424,16 @@ func (s *server) nvrOutput(w http.ResponseWriter, r *http.Request, _ security.Ac
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "private, no-store")
 	w.Header().Set("Content-Disposition", "inline")
+	if strings.HasPrefix(path, "video/") {
+		w.Header().Set("Accept-Ranges", "bytes")
+		if value := response.Header.Get("Content-Range"); response.StatusCode == http.StatusPartialContent && value != "" {
+			w.Header().Set("Content-Range", value)
+		}
+	}
 	if count, err := strconv.ParseInt(response.Header.Get("Content-Length"), 10, 64); err == nil && count >= 0 {
 		w.Header().Set("Content-Length", fmt.Sprint(count))
 	}
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(response.StatusCode)
 	_, _ = io.Copy(w, response.Body)
 }
 
