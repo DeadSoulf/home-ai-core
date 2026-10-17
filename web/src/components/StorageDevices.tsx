@@ -662,7 +662,8 @@ export function StorageDevices({
                   value={partitionPurpose}
                   onChange={(event) => setPartitionPurpose(event.target.value as StoragePurpose)}
                 >
-                  <option value="files">{t("storagePurposeFiles")}</option>                </select>
+                  <option value="files">{t("storagePurposeFiles")}</option>
+                                  <option value="nvr">{t("storagePurposeNVR")}</option>                </select>
               </label>
             </div>
             <div className="storage-capacity-summary">
@@ -864,7 +865,7 @@ export function StorageDevices({
                         {node.label && <span className="storage-inline-label">{node.label}</span>}
                         {purposeAssignment && (
                           <span className="status-badge">
-                            {t("storagePurposeFiles")}
+                            {t(purposeAssignment.purpose === "nvr" ? "storagePurposeNVR" : "storagePurposeFiles")}
                           </span>
                         )}
                         {storageInUse && (
@@ -985,7 +986,8 @@ export function StorageDevices({
                               onChange={(event) => void changePurpose(node, event.target.value as "" | StoragePurpose)}
                             >
                               <option value="">{t("storagePurposeNone")}</option>
-                              <option value="files">{t("storagePurposeFiles")}</option>                            </select>
+                              <option value="files">{t("storagePurposeFiles")}</option>
+                                  <option value="nvr">{t("storagePurposeNVR")}</option>                            </select>
                           </label>
                         )}
                         {node.type === "part" && (
@@ -1066,7 +1068,8 @@ export function StorageDevices({
                                   onChange={(event) => void changePurpose(node, event.target.value as "" | StoragePurpose)}
                                 >
                                   <option value="">{t("storagePurposeNone")}</option>
-                                  <option value="files">{t("storagePurposeFiles")}</option>                                </select>
+                                  <option value="files">{t("storagePurposeFiles")}</option>
+                                  <option value="nvr">{t("storagePurposeNVR")}</option>                                </select>
                               </label>
                             )}
                           </div>
@@ -1130,7 +1133,8 @@ export function StorageDevices({
                                 value={partitionPurpose}
                                 onChange={(event) => setPartitionPurpose(event.target.value as StoragePurpose)}
                               >
-                                <option value="files">{t("storagePurposeFiles")}</option>                              </select>
+                                <option value="files">{t("storagePurposeFiles")}</option>
+                                  <option value="nvr">{t("storagePurposeNVR")}</option>                              </select>
                             </label>
                           </div>
                           <div className="storage-capacity-summary">
