@@ -62,6 +62,23 @@ func (s *server) moduleNavigation(
 		entry := navigationItem{ModuleID: item.Manifest.ID, Status: item.Status}
 		if item.Status == "enabled" {
 			entry.Items = append(entry.Items, item.Manifest.UI.Navigation...)
+			// Historical NVR manifests shipped without navigation. Existing
+			// installs remain immutable; expose the built-in route without
+			// forcing users to remove/reinstall the working container.
+			if item.Manifest.ID == "nvr.module" {
+				found := false
+				for _, nav := range entry.Items {
+					if nav.Route == "/modules/nvr.module" {
+						found = true
+						break
+					}
+				}
+				if !found {
+					entry.Items = append(entry.Items, modules.NavigationItem{
+						ID: "nvr", Title: "NVR", Route: "/modules/nvr.module", Icon: "video", Order: 20,
+					})
+				}
+			}
 		}
 		out = append(out, entry)
 	}
