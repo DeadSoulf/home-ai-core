@@ -27,10 +27,12 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
   // Catalog outages never hide the installed registry or stop/remove controls.
   const load = useCallback(() => Promise.all([api.modules(), api.capabilities()]).then(([modules, capabilities]) => ({modules, capabilities})), []);
   const core = useResource(load, revision);
-  const loadCatalog = useCallback(() => api.moduleCatalog(), []);
+  // Each page loads only what it needs. Installed controls remain usable during catalog outages.
+  const loadCatalog = useCallback(() => section === "catalog" ? api.moduleCatalog() : Promise.resolve(undefined), [section]);
   const catalog = useResource(loadCatalog);
-  const loadRuntime = useCallback((signal: AbortSignal) => api.moduleRuntime(signal), []);
-  const runtime = useResource(loadRuntime, 0, 15000);
+  const loadRuntime = useCallback((signal: AbortSignal) =>
+    section === "catalog" || section === "settings" ? api.moduleRuntime(signal) : Promise.resolve(undefined), [section]);
+  const runtime = useResource(loadRuntime, 0, section === "settings" ? 15000 : 0);
   const loadOperations = useCallback((signal: AbortSignal) => canManage ? api.moduleOperations(signal) : Promise.resolve<Job[]>([]), [canManage]);
   const operations = useResource(loadOperations, revision, canManage ? 2000 : 0);
   const jobID = accepted?.id;
@@ -63,7 +65,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
   }
 
   async function run(action: () => Promise<Job>) {
-    if (!canManage || busy || mutation.current || core.error) return;
+    if (!canManage || busy || mutation.current || !core.data || core.error) return;
     mutation.current = true; setSending(true); setActionError(undefined);
     try {
       const job = await action();
@@ -87,9 +89,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
     } catch { setManifestError(true); document.getElementById("module-manifest")?.focus(); }
   }
 
-  if (core.loading && !core.data) return <LoadingState />;
-  if (!core.data) return <ErrorState message={core.error} onRetry={core.reload} />;
-  const value = core.data;
+  const value = core.data ?? {modules: [], capabilities: []};
   const installed = new Map(value.modules.map((item) => [item.manifest.id, item]));
   const displayedJobs = [...active];
   if (lastJob && !displayedJobs.some((job) => job.id === lastJob.id)) displayedJobs.push(lastJob);
@@ -105,6 +105,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
       <button type="button" className={"button " + (section === "settings" ? "primary" : "secondary")}
         aria-current={section === "settings" ? "page" : undefined} onClick={() => onSectionChange("settings")}>{u("uxModuleSettingsJump")}</button>
     </nav>
+    {core.loading && !core.data && <LoadingState />}
     {core.error && <ErrorState message={core.error} onRetry={core.reload} />}
     {section === "settings" && <Panel title={t("dockerRuntime")} action={<button type="button" className="button secondary" disabled={runtime.loading} onClick={runtime.reload}>{u("checkRuntime")}</button>}>
       <div className="runtime-summary">
@@ -135,7 +136,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
       </div>
     </Panel> : <EmptyState>{u("moduleNoOperations")}</EmptyState>)}
 
-    {section === "installed" && <Panel id="installed-modules" title={t("moduleInstalledList")}>
+    {section === "installed" && core.data && <Panel id="installed-modules" title={t("moduleInstalledList")}>
       <p className="ux-panel-description">{u("uxModulesInstalledHint")}</p>
       <div className="card-grid">
         {value.modules.map((module) => <article className="module-card" key={module.manifest.id} data-module-id={module.manifest.id}>
@@ -144,15 +145,15 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
           {module.error && <ErrorNotice error={{message: module.error}} message={module.status === "registered" ? u("resumeHint") : u("jobFailed")} />}
           {canManage && <div className="module-actions">
             <div className="button-row">
-              {module.status === "registered" ? <button type="button" className="button primary" disabled={busy || Boolean(core.error)}
+              {module.status === "registered" ? <button type="button" className="button primary" disabled={busy || (!core.data || Boolean(core.error))}
                 onClick={() => void run(() => api.installModule(module.manifest))}>{u("retryInstall")}</button> : <>
-                <button type="button" className="button secondary" disabled={busy || Boolean(core.error)}
+                <button type="button" className="button secondary" disabled={busy || (!core.data || Boolean(core.error))}
                   onClick={() => void run(() => api.controlModule(module.manifest.id, module.status === "enabled" ? "disable" : "enable"))}>{t(module.status === "enabled" ? "moduleStop" : "moduleStart")}</button>
-                <button type="button" className="button secondary" disabled={busy || Boolean(core.error)}
+                <button type="button" className="button secondary" disabled={busy || (!core.data || Boolean(core.error))}
                   onClick={() => void run(() => api.controlModule(module.manifest.id, "restart"))}>{t("moduleRestart")}</button>
               </>}
             </div>
-            <div className="button-row destructive-actions"><button type="button" className="button danger" disabled={busy || Boolean(core.error)} onClick={() => setConfirmRemove(module)}>{t("moduleRemove")}</button></div>
+            <div className="button-row destructive-actions"><button type="button" className="button danger" disabled={busy || (!core.data || Boolean(core.error))} onClick={() => setConfirmRemove(module)}>{t("moduleRemove")}</button></div>
           </div>}
           <details className="technical-details"><summary>{u("details")}</summary>
             <dl className="details"><dt>ID</dt><dd className="mono">{module.manifest.id}</dd><dt>{t("version")}</dt><dd>{module.manifest.version}</dd>
@@ -184,7 +185,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
               {hint && <p className="notice">{hint}</p>}
               {resumable && <p>{u("resumeHint")}</p>}
               {canManage && <div className="button-row"><button type="button" className="button primary"
-                disabled={busy || Boolean(core.error) || Boolean(existing && !resumable)}
+                disabled={busy || (!core.data || Boolean(core.error)) || Boolean(existing && !resumable)}
                 onClick={() => void run(() => resumable ? api.installModule(resumable.manifest) : api.installCatalogModule(manifest.id))}>
                 {resumable ? u("retryInstall") : existing ? t("moduleInstalled") : runtime.data?.network_ready ? t("moduleInstall") : u("installAndPrepare")}
               </button></div>}
@@ -204,7 +205,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
           onChange={(event) => {setManifestText(event.target.value); setManifestError(false);}} placeholder={'{"schema_version":2,...}'}
           disabled={busy} spellCheck={false} aria-invalid={manifestError} aria-describedby={manifestError ? "manifest-hint manifest-error" : "manifest-hint"} />
         {manifestError && <div id="manifest-error" className="form-error" role="alert">{u("invalidJSON")}</div>}
-        <div className="button-row"><button type="button" className="button primary" disabled={busy || !manifestText.trim() || Boolean(core.error)} onClick={installManifest}>{t("moduleInstall")}</button></div>
+        <div className="button-row"><button type="button" className="button primary" disabled={busy || !manifestText.trim() || (!core.data || Boolean(core.error))} onClick={installManifest}>{t("moduleInstall")}</button></div>
       </Panel>
     </details>}
     {confirmRemove && <ConfirmDialog title={u("removeTitle")} confirmLabel={u("confirmRemove")} onCancel={() => setConfirmRemove(undefined)}
