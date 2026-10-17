@@ -5,6 +5,7 @@ import { describeFileError } from "../ui/fileErrors";
 import type { StoragePurposeAssignment } from "../api/types";
 import { FolderSettings } from "../components/FolderSettings";
 import { SectionGuide } from "../components/SectionGuide";
+import { StorageDevices } from "../components/StorageDevices";
 import { filesGuides } from "../ui/experience";
 import { useUI } from "../ui/useUI";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
@@ -63,6 +64,10 @@ export function FilesPage({
     };
   }, [canManage, canReadSystem, u]);
   const resource = useResource(load, revision);
+  const loadBlockDevices = useCallback(async () =>
+    section === "storage" && canReadSystem && canManageStorage
+      ? (await api.system()).system.block_tree : [], [section, canReadSystem, canManageStorage]);
+  const physicalStorage = useResource(loadBlockDevices, revision);
 
   const [settingsFolderID, setSettingsFolderID] = useState("");
   const [poolName, setPoolName] = useState("");
@@ -656,6 +661,15 @@ export function FilesPage({
           onClick={() => onSectionChange(item)}>{t(item === "folders" ? "fileFolders" : item === "storage" ? "fileStorageSettings" : "fileWindowsSettings")}</button>)}
       </nav>}
       <SectionGuide title={u(filesGuides[section].title)} description={u(filesGuides[section].description)} />
+      {section === "storage" && canManageStorage && canReadSystem && (
+        <Panel title="Диски для хранения файлов и модулей" className="wide">
+          <p className="muted">Создайте раздел на свободном диске и назначьте его разделу «Файлы» или установленному модулю, например NVR.
+            Создание раздела не форматирует и не подключает носитель автоматически.</p>
+          {physicalStorage.error && <ErrorState message={physicalStorage.error} onRetry={physicalStorage.reload} />}
+          <StorageDevices devices={physicalStorage.data || []} canManage={true} mode="tree"
+            onChanged={() => { physicalStorage.reload(); resource.reload(); }} />
+        </Panel>
+      )}
       {settingsFolderID && section === "folders" && <FolderSettings folderID={settingsFolderID} users={users}
         onClose={() => setSettingsFolderID("")} onSaved={() => resource.reload()}/>}
 
