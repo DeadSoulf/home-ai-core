@@ -102,9 +102,8 @@ describe("navigation rendering", () => {
 
   it("renders task groups in order and exposes one active page to assistive technology", () => {
     const nav = renderNavigation(actor(allReads), "/audit");
-    expect(nav.indexOf("Services")).toBeGreaterThan(-1);
-    expect(nav.indexOf("Server")).toBeGreaterThan(nav.indexOf("Services"));
-    expect(nav.indexOf("Management")).toBeGreaterThan(nav.indexOf("Server"));
+    const headings = [...nav.matchAll(/class="nav-group-label">([^<]+)<\/span>/g)].map((match) => match[1]);
+    expect(headings).toEqual(["Services", "Server", "Management"]);
     expect(nav).toContain("Home");
     expect(nav).toContain("System");
     expect(nav).toContain("Operations");
@@ -124,8 +123,11 @@ describe("navigation rendering", () => {
     expect(nav).toContain("Operations");
     expect(nav).toContain("Management");
     expect(nav).toContain("Home");
-    for (const label of ["Server", "Services", "System", "Updates", "Modules", "Security"]) {
-      expect(nav).not.toContain(label);
+    for (const label of ["Server", "Services"]) {
+      expect(nav).not.toContain('<span class="nav-group-label">' + label + "</span>");
+    }
+    for (const label of ["System", "Updates", "Modules", "Security"]) {
+      expect(nav).not.toContain("<span>" + label + "</span>");
     }
     expect(nav.match(/aria-current="page"/g)).toHaveLength(1);
   });
