@@ -1,6 +1,7 @@
 import { browserLocale, errorText } from "../ui/messages";
 import type {
   Actor,
+  AIStatus, AIProvider, AIConversation, AIMessage, AIApproval, AIChatResponse,
   AuditEntry,
   AuthResponse,
   Job,
@@ -182,6 +183,26 @@ async function postJSON<T>(path: string, body?: unknown, csrf = false): Promise<
 }
 
 export const api = {
+  aiStatus: (signal?: AbortSignal) => request<AIStatus>("/api/v1/ai/status", {signal}),
+  aiProviders: async () => (await request<{providers: AIProvider[]}>("/api/v1/ai/providers")).providers,
+  aiConversations: async () => (await request<{conversations: AIConversation[]}>("/api/v1/ai/conversations")).conversations,
+  aiMessages: async (id: string) =>
+    (await request<{messages: AIMessage[]}>(`/api/v1/ai/conversations/${encodeURIComponent(id)}/messages`)).messages,
+  aiChat: (providerId: string, message: string, conversationId?: string) =>
+    postJSON<AIChatResponse>("/api/v1/ai/chat", {
+      provider_id: providerId, message, ...(conversationId ? {conversation_id: conversationId} : {}),
+    }, true),
+  aiAddProvider: (input: {name: string; kind: AIProvider["kind"]; base_url: string; model: string; api_key: string}) =>
+    postJSON<{id: string}>("/api/v1/ai/providers", input, true),
+  aiDeleteProvider: (id: string) =>
+    request<{deleted: boolean}>(`/api/v1/ai/providers/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: {"X-CSRF-Token": getCSRFToken()},
+    }),
+  aiApprovals: async () => (await request<{approvals: AIApproval[]}>("/api/v1/ai/approvals")).approvals,
+  aiDecide: (id: string, decision: "approve" | "reject") =>
+    postJSON<{status: AIApproval["status"]; executed: boolean}>(
+      `/api/v1/ai/approvals/${encodeURIComponent(id)}/decision`, {decision}, true),
   setupStatus: (signal?: AbortSignal) => request<SetupStatus>("/api/v1/security/setup-status", {signal}),
 
   bootstrap: async (input: {
