@@ -34,3 +34,14 @@
   .nvr-page .nvr-discovery-toolbar { align-items: stretch; flex-direction: column; }
   .nvr-page .nvr-discovery-toolbar label { width: 100%; flex: 1 1 auto; }
 }
+
+
+.nvr-page .nvr-live-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; padding: 10px 0 18px; }
+.nvr-page .nvr-live-toolbar label { display: flex; flex-direction: column; flex: 1 1 220px; max-width: 400px; gap: 6px; }
+.nvr-page .nvr-live-toolbar select { width: 100%; padding: 9px; border-radius: 7px; }
+.nvr-page .nvr-live-player { background: #101218; padding: 12px; border-radius: 12px; }
+.nvr-page .nvr-live-player video { width: 100%; display: block; min-height: 220px; background: #090b10; }
+.nvr-page .nvr-live-player p { color: #e4e9ed; }
+.nvr-destructive-choice, .nvr-delete-confirm { display: flex; align-items: flex-start; gap: 9px; margin: 14px 0; }
+.nvr-delete-confirm { flex-direction: column; }
+.nvr-delete-confirm input { max-width: 320px; width: 100%; padding: 9px; }
