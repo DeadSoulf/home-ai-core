@@ -16,6 +16,21 @@ describe("Files API failure reporting", () => {
     expect(failure.rawMessage).toContain("permission denied");
     expect(failure.requestId).toBe("req-test-storage");
   });
+  it("explains a NAS pool mountpoint mismatch, keeping technical details available", () => {
+    for (const rawMessage of [
+      "NAS pool root must be the filesystem mount point itself",
+      "NAS pool root /mnt/home-ai-core/disk1 must be the filesystem mount point itself (current filesystem mount covering it: /)",
+      "NAS pool mount /mnt/home-ai-core/disk1 is present on the host but unavailable in the updater helper mount namespace",
+    ]) {
+      const error = new APIError(502, {error: {
+        code: "file_folder_prepare_failed", message: rawMessage,
+        request_id: "aca5e088eed8f01c96ed25e6",
+      }});
+      expect(describeFileError(error, "ru", "fallback")).toContain("Файлы → Хранилище");
+      expect(describeFileError(error, "en", "fallback")).toContain("Files → Storage");
+      expect(error.requestId).toBe("aca5e088eed8f01c96ed25e6");
+    }
+  });
   it("handles unrecognized HTTP 503 as a received server response", () => {
     const failure = new APIError(503, {error: {code: "unknown_file_error", message: "service unavailable"}});
     expect(describeFileError(failure, "ru", "fallback")).toContain("HTTP 503");
