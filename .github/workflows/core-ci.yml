@@ -66,6 +66,9 @@ jobs:
         with:
           go-version: '1.27.x'
           check-latest: false
+      - name: Embed Windows manifest for test binary
+        shell: bash
+        run: sh ./scripts/build-windows-client-resource.sh amd64
       - name: Test Windows copy engine, queue and CLI
         run: go test ./internal/windowsclient ./cmd/home-ai-windows-client
 
@@ -90,6 +93,9 @@ jobs:
         run: |
           go mod tidy
           git diff --exit-code -- go.mod go.sum
+
+      - name: Validate Windows resource manifest
+        run: python3 -m json.tool cmd/home-ai-windows-client/winres/winres.json >/dev/null
 
       - name: Go format check
         run: |
@@ -253,4 +259,5 @@ jobs:
 
       - name: Cross-build Windows file client
         run: |
+          sh ./scripts/build-windows-client-resource.sh amd64
           GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build             -trimpath             -o /tmp/home-ai-windows-client.exe             ./cmd/home-ai-windows-client
