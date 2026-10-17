@@ -43,9 +43,9 @@ const (
 	settingsIDSaveSchedule     = 2108
 	settingsIDNavTransfers     = 2109
 	settingsIDRefreshTransfers = 2110
-	settingsIDUpdateChannel = 2111
-	settingsIDUpdateCheck = 2112
-	settingsIDUpdateInstall = 2113
+	settingsIDUpdateChannel    = 2111
+	settingsIDUpdateCheck      = 2112
+	settingsIDUpdateInstall    = 2113
 
 	settingsWSGroup      = 0x00020000
 	settingsBSAutoRadio  = 0x00000009
