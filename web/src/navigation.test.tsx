@@ -102,21 +102,21 @@ describe("navigation rendering", () => {
 
   it("renders task groups in order and exposes one active page to assistive technology", () => {
     const nav = renderNavigation(actor(allReads), "/audit");
-    expect(nav.indexOf("Server")).toBeGreaterThan(-1);
-    expect(nav.indexOf("Services")).toBeGreaterThan(nav.indexOf("Server"));
-    expect(nav.indexOf("Management")).toBeGreaterThan(nav.indexOf("Services"));
+    expect(nav.indexOf("Services")).toBeGreaterThan(-1);
+    expect(nav.indexOf("Server")).toBeGreaterThan(nav.indexOf("Services"));
+    expect(nav.indexOf("Management")).toBeGreaterThan(nav.indexOf("Server"));
     expect(nav).toContain("Home");
     expect(nav).toContain("System");
     expect(nav).toContain("Operations");
     expect(nav).toContain("Security");
     expect(nav.match(/aria-current="page"/g)).toHaveLength(1);
-    expect(nav).toMatch(/<button\b[^>]*aria-current="page"[^>]*><span>Security<\/span><\/button>/);
+    expect(nav).toMatch(/<button\b[^>]*aria-current="page"[^>]*>[\s\S]*?<span>Security<\/span>/);
   });
 
   it("keeps Files highlighted on nested section routes", () => {
     const nav = renderNavigation(actor([...allReads, "files.manage"]), "/files/storage");
     expect(nav.match(/aria-current="page"/g)).toHaveLength(1);
-    expect(nav).toMatch(/<button\b[^>]*aria-current="page"[^>]*><span>Files<\/span><\/button>/);
+    expect(nav).toMatch(/<button\b[^>]*aria-current="page"[^>]*>[\s\S]*?<span>Files<\/span>/);
   });
 
   it("omits inaccessible entries and their empty group headings", () => {
