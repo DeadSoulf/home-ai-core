@@ -43,6 +43,9 @@ const (
 	settingsIDSaveSchedule     = 2108
 	settingsIDNavTransfers     = 2109
 	settingsIDRefreshTransfers = 2110
+	settingsIDUpdateChannel    = 2111
+	settingsIDUpdateCheck      = 2112
+	settingsIDUpdateInstall    = 2113
 
 	settingsWSGroup      = 0x00020000
 	settingsBSAutoRadio  = 0x00000009
@@ -181,7 +184,7 @@ func (state *windowsSettingsUI) createLightControls(module windows.Handle) error
 	for i := range state.overviewRecent {
 		state.overviewRecent[i] = staticText("", state.tr("recent_activity_empty"), 242, int32(384+i*46), 416, 38, settingsPageOverview, settingsVisualCardMuted)
 	}
-	static("overview_recent_hint", "recent_activity_hint", 242, 536, 360, 16, settingsPageOverview, settingsVisualCardMuted)
+	state.overviewRecentHint = static("overview_recent_hint", "recent_activity_hint", 242, 536, 410, 16, settingsPageOverview, settingsVisualCardMuted)
 
 	backupTitle := static("overview_backup_title", "backup_summary", 714, 348, 190, 18, settingsPageOverview, settingsVisualCardMuted)
 	state.setControlFont(backupTitle, state.visual.cardTitleFont)
@@ -285,6 +288,19 @@ func (state *windowsSettingsUI) createLightControls(module windows.Handle) error
 	static("general_background_title", "general_background_title", 224, 224, 260, 22, settingsPageGeneral, settingsVisualCard)
 	static("general_background_hint", "general_background_hint", 224, 254, 680, 64, settingsPageGeneral, settingsVisualCardMuted)
 
+	// Update controls use the existing signed-release metadata discovery path.
+	static("updates_title", "updates_title", 224, 358, 300, 24, settingsPageGeneral, settingsVisualCard)
+	static("updates_channel_label", "updates_channel", 224, 390, 220, 20, settingsPageGeneral, settingsVisualCardMuted)
+	state.updateChannelCombo = combo(settingsIDUpdateChannel, 224, 415, 210, 140, settingsPageGeneral)
+	state.comboAdd(state.updateChannelCombo, state.tr("updates_stable"))
+	state.comboAdd(state.updateChannelCombo, state.tr("updates_beta"))
+	procSettingsSendMessage.Call(uintptr(state.updateChannelCombo), settingsCBSetCurSel, 1, 0)
+	state.updateCheckBtn = button("updates_check_button", settingsIDUpdateCheck, "updates_check", 451, 415, 195, 36, settingsPageGeneral)
+	state.updateInstallBtn = button("updates_install_button", settingsIDUpdateInstall, "updates_install", 704, 415, 200, 36, settingsPageGeneral)
+	state.setControlEnabled(state.updateInstallBtn, false)
+	state.updateStatusLabel = staticText("", state.tr("update_not_checked"), 224, 475, 680, 36, settingsPageGeneral, settingsVisualCardMuted)
+	static("updates_security_hint", "updates_security_hint", 224, 519, 680, 32, settingsPageGeneral, settingsVisualMuted)
+
 	// Global status is hidden on Overview and visible on functional pages.
 	static("status_title", "status", 224, 560, 74, 20, -1, settingsVisualMuted)
 	state.statusLabel = state.createControl(module, "STATIC", state.tr("ready"), settingsWSChild|settingsWSVisible, 302, 560, 602, 20, 0, windows.Handle(font))
@@ -295,7 +311,8 @@ func (state *windowsSettingsUI) createLightControls(module windows.Handle) error
 		state.interval == 0 || state.conflict == 0 || state.profileList == 0 ||
 		state.backupProfileCombo == 0 || state.statusLabel == 0 || state.agentLabel == 0 ||
 		state.languageCombo == 0 || state.overviewStorage == 0 ||
-		state.transferProgress == 0 || state.transferHistory == 0 || state.transferDetails == 0 {
+		state.transferProgress == 0 || state.transferHistory == 0 || state.transferDetails == 0 ||
+		state.updateChannelCombo == 0 || state.updateCheckBtn == 0 || state.updateInstallBtn == 0 || state.updateStatusLabel == 0 {
 		return fmt.Errorf("create Windows client controls")
 	}
 
@@ -612,6 +629,38 @@ func (state *windowsSettingsUI) refreshOverview() {
 }
 
 func (state *windowsSettingsUI) refreshRecentActivity() {
+	events, historyErr := readTransferHistory(state.configPath, 200)
+	if historyErr == nil && len(events) > 0 {
+		copied, failed := 0, 0
+		now := time.Now()
+		for _, event := range events {
+			if !event.At.IsZero() && now.Sub(event.At) <= 24*time.Hour && now.After(event.At) {
+				if event.Status == "copied" {
+					copied++
+				} else if event.Status == "failed" {
+					failed++
+				}
+			}
+		}
+		state.setText(state.overviewRecentHint, state.trf("overview_activity_summary", copied, failed))
+		for i := range state.overviewRecent {
+			if i >= len(events) {
+				state.setText(state.overviewRecent[i], "")
+				continue
+			}
+			event := events[i]
+			name := filepath.Base(event.Path)
+			if name == "" || name == "." || name == string(filepath.Separator) {
+				name = event.ProfileID
+			}
+			label := state.trf("recent_activity_row",
+				safeActivityText(name, 42), transferStatusText(state, event.Status),
+				dashboardTime(event.At.Local(), state.language))
+			state.setText(state.overviewRecent[i], label)
+		}
+		return
+	}
+	state.setText(state.overviewRecentHint, state.tr("recent_activity_hint"))
 	profiles := append([]windowsclient.SyncProfile(nil), state.profiles...)
 	sort.SliceStable(profiles, func(i, j int) bool {
 		var left, right time.Time

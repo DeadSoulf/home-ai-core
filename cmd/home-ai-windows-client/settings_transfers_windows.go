@@ -91,6 +91,15 @@ func (state *windowsSettingsUI) refreshTransfers() {
 		if item.Path != "" {
 			details = append(details, item.Path)
 		}
+		if item.TotalBytes > 0 {
+			details = append(details, state.trf("transfer_bytes", dashboardBytes(item.UploadedBytes), dashboardBytes(item.TotalBytes)))
+		}
+		if item.Status == "running" && time.Since(item.At) <= 2*time.Minute && item.SpeedBytesPerSec > 0 {
+			details = append(details, state.trf("transfer_speed", dashboardBytes(item.SpeedBytesPerSec)))
+			if item.ETASeconds > 0 {
+				details = append(details, state.trf("transfer_remaining", time.Duration(item.ETASeconds)*time.Second))
+			}
+		}
 		if item.Error != "" {
 			details = append(details, item.Error)
 		}

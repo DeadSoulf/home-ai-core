@@ -53,3 +53,21 @@ The handoff remains unprivileged and scoped to the current Windows user.
 - background update checks or automatic unattended installation;
 - release channels beyond the repository's current release stream;
 - native installer/MSIX packaging and Windows uninstall registration.
+
+## Follow-up (2026-10-17) — native update controls and channels
+
+The GUI and tray expose explicit release discovery and manual installation.
+The CLI exposes `client check-update --channel stable|beta` and
+`client update --channel stable|beta`. The version field is embedded into
+release builds; the updater never installs an older or equal known version.
+
+Stable selects only published, non-prerelease numeric versions; Beta accepts
+both stable and prerelease versions. Existing clients default to Beta so their
+development release stream is not silently changed.
+
+A new authenticated trust chain has **not** been implemented here:
+SHA-256 alone is not publisher authentication and does not satisfy
+Authenticode validation. The GUI/tray display an explicit warning and require
+manual confirmation, with an update process log. Background polling,
+unattended installation, Authenticode validation and installer packaging remain
+deferred to tracked work items #193 and #194.

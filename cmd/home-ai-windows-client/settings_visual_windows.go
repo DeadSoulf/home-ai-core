@@ -305,7 +305,7 @@ func settingsButtonRoleForName(name string) settingsButtonRole {
 		return settingsButtonHeroPrimary
 	case "overview_open_button":
 		return settingsButtonHeroSecondary
-	case "connect_button", "save_button", "sync_button", "schedule_save_button", "agent_enable":
+	case "connect_button", "save_button", "sync_button", "schedule_save_button", "agent_enable", "updates_install_button":
 		return settingsButtonPrimary
 	default:
 		return settingsButtonSecondary
@@ -420,7 +420,7 @@ func (state *windowsSettingsUI) paintFunctionalCards(hdc windows.Handle, client 
 	case settingsPageBackup:
 		panels = [][4]int32{{218, 116, 928 + dx, 310}, {218, 319, 928 + dx, 472}}
 	case settingsPageGeneral:
-		panels = [][4]int32{{218, 115, 928 + dx, 204}, {218, 216, 928 + dx, 337}}
+		panels = [][4]int32{{218, 115, 928 + dx, 204}, {218, 216, 928 + dx, 337}, {218, 349, 928 + dx, 555}}
 	case settingsPageTransfers:
 		panels = [][4]int32{{218, 114, 928 + dx, 228}, {218, 247, 928 + dx, 575 + dy}}
 	}
