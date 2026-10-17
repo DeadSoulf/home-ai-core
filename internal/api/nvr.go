@@ -215,8 +215,11 @@ func (s *server) nvrRecordings(w http.ResponseWriter, r *http.Request, _ securit
 	writeJSON(w, http.StatusOK, map[string]any{"ok": upstream.OK, "recordings": rows})
 }
 
-func (s *server) nvrAddCamera(w http.ResponseWriter, r *http.Request, _ security.Actor, source authSource) {
-	if source == authCookie && !csrfForNVR(w, r) { return }
+func (s *server) nvrAddCamera(w http.ResponseWriter, r *http.Request, actor security.Actor, source authSource) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
 	if !s.nvrReady(w, r) { return }
 	var input struct {
 		Name       string `json:"name"`
@@ -259,12 +262,6 @@ func (s *server) nvrAddCamera(w http.ResponseWriter, r *http.Request, _ security
 	if !s.nvrJSON(w, r, http.MethodPost, "/api/nvr/cameras", data, &ignored) { return }
 	// Never echo a credential-containing RTSP URL back to the browser.
 	writeJSON(w, http.StatusCreated, map[string]any{"ok": true})
-}
-
-func csrfForNVR(w http.ResponseWriter, r *http.Request) bool {
-	// The caller validates against the authenticated actor in nvrControlCamera
-	// and nvrAddCamera. This shim is never used as an authorization decision.
-	return true
 }
 
 func (s *server) nvrControlCamera(w http.ResponseWriter, r *http.Request, actor security.Actor, source authSource) {
