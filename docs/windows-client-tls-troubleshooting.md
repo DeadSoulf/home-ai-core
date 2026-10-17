@@ -112,8 +112,8 @@ imported into the Windows user trust store. Alternatively, the client
 supports a PEM file through its `HOME_AI_CA_FILE` environment variable:
 
 ```powershell
-$env:HOME_AI_CA_FILE = 'C:\\Trusted\\verified-home-ai-ca.pem'
-& 'C:\\Path\\home-ai-windows-client.exe' settings
+$env:HOME_AI_CA_FILE = 'C:\Trusted\verified-home-ai-ca.pem'
+& 'C:\Path\home-ai-windows-client.exe' settings
 ```
 
 The environment variable applies only to that process and children.
