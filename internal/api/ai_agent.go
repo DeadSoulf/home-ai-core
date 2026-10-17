@@ -171,8 +171,7 @@ func (s *server) aiToken() (string, error) {
 		return "", errors.New("AI access token is invalid or too large")
 	}
 	token := strings.TrimSpace(string(data))
-	if len(token) < 24 || len(token) > 256 || strings.ContainsAny(token, "
-") {
+	if len(token) < 24 || len(token) > 256 || strings.ContainsAny(token, string([]byte{13, 10})) {
 		return "", errors.New("invalid AI access token")
 	}
 	return token, nil
