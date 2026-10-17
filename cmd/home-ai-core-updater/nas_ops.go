@@ -89,7 +89,7 @@ func inspectNASFolderUsage(ctx context.Context, request updaterhelper.Request) (
 		return 0, fmt.Errorf("inspect NAS pool mount: %s", strings.TrimSpace(string(mountOutput)))
 	}
 	if target := filepath.Clean(strings.TrimSpace(string(mountOutput))); target != root {
-		return 0, errors.New("NAS pool root must be the filesystem mount point itself")
+		return 0, nasMountTargetMismatch(root, target)
 	}
 
 	folder := filepath.Join(root, ".home-ai", relative)
@@ -155,7 +155,16 @@ func validateNASRoot(ctx context.Context, value string) (string, error) {
 	}
 	target := filepath.Clean(strings.TrimSpace(string(output)))
 	if target != root {
-		return "", errors.New("NAS pool root must be the filesystem mount point itself")
+		// Host mounts are created with nsenter, while this helper may run in
+		// its own mount namespace (e.g. systemd PrivateTmp). Check both views,
+		// but NEVER prepare folders if this namespace cannot see the mount:
+		// such writes would land on the underlying system filesystem.
+		hostOutput, hostErr := hostMountCommand(ctx, "/usr/bin/findmnt",
+			"-rn", "-T", root, "-o", "TARGET").CombinedOutput()
+		if hostErr == nil && filepath.Clean(strings.TrimSpace(string(hostOutput))) == root {
+			return "", fmt.Errorf("NAS pool mount %s is present on the host but unavailable in the updater helper mount namespace; no data was written. Check helper mount propagation and restart the helper only after verifying storage state", root)
+		}
+		return "", nasMountTargetMismatch(root, target)
 	}
 
 	var stat unix.Statfs_t
@@ -166,6 +175,13 @@ func validateNASRoot(ctx context.Context, value string) (string, error) {
 		return "", errors.New("NAS pool filesystem is read-only")
 	}
 	return root, nil
+}
+
+// nasMountTargetMismatch is diagnostic only. The exact mountpoint
+// requirement is not relaxed: a directory under '/' or a parent mount is
+// never accepted as NAS storage, even if it exists and is writable.
+func nasMountTargetMismatch(root, coveringTarget string) error {
+	return fmt.Errorf("NAS pool root %s must be the filesystem mount point itself (current filesystem mount covering it: %s); verify the original data device is mounted at the saved pool root before retrying", root, coveringTarget)
 }
 
 func validateNASRelativePath(value string) (string, error) {
