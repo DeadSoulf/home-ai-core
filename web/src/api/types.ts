@@ -155,6 +155,49 @@ export type SystemResponse = {
 
 // AI Agent module responses are obtained through the Core-authenticated gateway.
 // The module's bearer token is NEVER exposed to the browser.
+export type AILocalModel = {
+  name: string;
+  size_gb: number;
+  minimum_ram_gb: number;
+  purpose: string;
+  recommended: boolean;
+};
+
+export type AILocalStatus = {
+  enabled: boolean;
+  engine_state: "starting" | "ready" | "error" | "disabled";
+  model_state?: "waiting" | "downloading" | "ready" | "error" | "disabled";
+  active_model?: string;
+  download_status?: string;
+  download_percent?: number | null;
+  error?: string;
+  cpu_first?: boolean;
+  ram_bytes?: number;
+  recommended_models?: AILocalModel[];
+};
+
+export type AILocalModels = {
+  enabled: boolean;
+  installed: string[];
+  recommended_models: AILocalModel[];
+};
+
+export type AIHardware = {
+  checked_at: string;
+  policy: string;
+  cpu: {model?: string; logical_cpus: number; usage_percent: number};
+  memory: {total_bytes: number; available_bytes: number};
+  gpus: Array<{
+    pci_address?: string;
+    card?: string;
+    vendor?: string;
+    vendor_id?: string;
+    model?: string;
+    driver?: string;
+    utilization_percent?: number;
+  }>;
+};
+
 export type AIStatus = {
   version: string;
   providers: number;
