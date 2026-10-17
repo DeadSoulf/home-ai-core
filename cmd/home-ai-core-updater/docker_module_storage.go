@@ -110,7 +110,7 @@ func attachNVRRecordingStorage(ctx context.Context, request updaterhelper.Reques
 	if request.ModuleID != "nvr.module" {
 		return moduleContainerStatus{}, "", errors.New("unsupported storage attachment target")
 	}
-	if runtime := inspectDockerRuntime(ctx); !runtime.EngineReady() {
+	if runtime := inspectDockerRuntime(ctx); !runtime.Active || !runtime.NetworkReady {
 		return moduleContainerStatus{}, "", fmt.Errorf("Docker engine is unavailable: %s", runtime.Error)
 	}
 	source, marker, err := validateNVRRecordingSource(ctx, request.Device, request.Mountpoint)
