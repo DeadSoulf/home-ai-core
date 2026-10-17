@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, APIError } from "../api/client";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { describeFileError } from "../ui/fileErrors";
-import type { StoragePurposeAssignment } from "../api/types";
+import type { FilePool, StoragePurposeAssignment } from "../api/types";
+import { filePoolMountStatus } from "../ui/filePoolMount";
 import { FolderSettings } from "../components/FolderSettings";
 import { SectionGuide } from "../components/SectionGuide";
 import { filesGuides } from "../ui/experience";
@@ -247,6 +248,16 @@ export function FilesPage({
     if (folderKind === "private" && !ownerUserID) {
       reportFormError(t("fileOwnerRequired"));
       return;
+    }
+    // Read-only inventory is advisory. Do not send a write request when the
+    // selected drive is explicitly reported absent or mounted elsewhere.
+    const selectedPool = resource.data?.pools.find((pool) => pool.id === folderPoolID);
+    if (selectedPool && canReadSystem && !resource.data?.loadErrors?.storage) {
+      const mountStatus = filePoolMountStatus(selectedPool, resource.data?.storagePurposes || []);
+      if (mountStatus === "unmounted" || mountStatus === "missing") {
+        reportFormError(u("filePoolMountUnavailable"));
+        return;
+      }
     }
     setBusy("folder");
     reportFormError("");
@@ -629,6 +640,12 @@ export function FilesPage({
   const userName = new Map(users.map((user) => [user.id, user.display_name || user.username]));
   const loadErrors = resource.data?.loadErrors;
   const canShowStorageInventory = canReadSystem && !loadErrors?.storage;
+  const poolMountStateFor = (pool: FilePool) =>
+    canShowStorageInventory ? filePoolMountStatus(pool, fileStorage) : "unknown";
+  const unavailablePoolIDs = new Set(pools.filter((pool) => {
+    const status = poolMountStateFor(pool);
+    return status === "unmounted" || status === "missing";
+  }).map((pool) => pool.id));
 
   return (
     <div className="page">
@@ -1147,16 +1164,19 @@ export function FilesPage({
               </thead>
               <tbody>
                 {pools.map((pool) => {
-                  const stateLabel =
-                    pool.capacity_state === "reserve"
+                  const mountUnavailable = unavailablePoolIDs.has(pool.id);
+                  const stateLabel = mountUnavailable
+                    ? u("filePoolMountUnavailable")
+                    : pool.capacity_state === "reserve"
                       ? t("filePoolCapacityReserve")
                       : pool.capacity_state === "warning"
                         ? t("filePoolCapacityWarning")
                         : pool.capacity_state === "ok"
                           ? t("filePoolCapacityOK")
                           : t("filePoolCapacityUnknown");
-                  const stateClass =
-                    pool.capacity_state === "reserve"
+                  const stateClass = mountUnavailable
+                    ? "status-badge status-failed"
+                    : pool.capacity_state === "reserve"
                       ? "status-badge status-failed"
                       : pool.capacity_state === "ok"
                         ? "status-badge status-success"
@@ -1166,6 +1186,7 @@ export function FilesPage({
                       <td>
                         <strong>{pool.name}</strong>
                         <div className="muted small mono">{pool.root_path}</div>
+                        {mountUnavailable && <div className="muted small">{u("filePoolMountRepairHint")}</div>}
                       </td>
                       <td>
                         {pool.capacity_known
@@ -1355,8 +1376,8 @@ export function FilesPage({
                 >
                   <option value="">{t("fileChoosePool")}</option>
                   {pools.map((pool) => (
-                    <option key={pool.id} value={pool.id}>
-                      {pool.name}
+                    <option key={pool.id} value={pool.id} disabled={unavailablePoolIDs.has(pool.id)}>
+                      {pool.name}{unavailablePoolIDs.has(pool.id) ? " — " + u("filePoolMountUnavailable") : ""}
                     </option>
                   ))}
                 </select>
@@ -1397,13 +1418,16 @@ export function FilesPage({
                   </select>
                 </label>
               )}
+              {unavailablePoolIDs.has(folderPoolID) && (
+                <div className="notice" role="alert">{u("filePoolMountRepairHint")}</div>
+              )}
               <p className="muted small">
                 {folderKind === "private" ? t("filePrivatePermissionNotice") : t("fileSharedPermissionNotice")}
               </p>
               <button
                 className="button primary"
                 type="submit"
-                disabled={busy !== "" || pools.length === 0}
+                disabled={busy !== "" || pools.length === 0 || unavailablePoolIDs.has(folderPoolID)}
               >
                 {busy === "folder" ? t("working") : t("fileCreateFolder")}
               </button>
