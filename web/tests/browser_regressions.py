@@ -20,6 +20,12 @@ RUNTIME = dict(available=True,active=True,engine_ready=True,network_ready=True,v
 def module(status='enabled',version='1.2.0'):
     manifest = copy.deepcopy(MANIFEST); manifest['version'] = version
     return dict(manifest=manifest,status=status)
+def ai_module(status='enabled'):
+    manifest=copy.deepcopy(MANIFEST)
+    manifest.update(id='ai.agent', name='AI Agent')
+    manifest['ui']={'navigation':[dict(id='ai.agent',title='AI Agent',route='/modules/ai.agent')]}
+    return dict(manifest=manifest,status=status)
+
 def job(status='running',typ='module.install',id='job-test'):
     return dict(id=id,node_id='node-test',type=typ,status=status,progress=1500,created_at='2026-10-14T00:00:00Z',message='pulling and creating module container',input=dict(module_id='demo.nvr'))
 
@@ -30,6 +36,7 @@ class Harness:
         self.setup_status=200; self.me_status=200; self.logout_status=204; self.login_status=200
         self.system_delay=0; self.system_status=200; self.catalog_status=200; self.runtime_status=200; self.nav_status=200
         self.requests=[]; self.errors=[]; self.system_active=0; self.system_max=0; self.calls=0
+        self.ai_providers=[]; self.ai_conversations=[]; self.ai_approvals=[]; self.ai_messages={}
         self.overrides={}; self.unhandled=[]; self.offline=os.environ.get('UI_OFFLINE')=='1'
         for k,v in kw.items(): setattr(self,k,v)
     async def start(self,path='/modules',width=1440):
@@ -107,6 +114,38 @@ class Harness:
                 self.system_active+=1; self.system_max=max(self.system_max,self.system_active); self.calls+=1
                 try: await asyncio.sleep(self.system_delay); await respond(SYSTEM,self.system_status)
                 finally:self.system_active-=1
+            elif path.startswith('/api/v1/ai/'):
+                sub=path[len('/api/v1/ai/'):]
+                if sub=='status' and method=='GET':
+                    await respond(dict(version='0.1.0',providers=len(self.ai_providers),
+                                       approvals_pending=len([x for x in self.ai_approvals if x['status']=='pending']),
+                                       core_actions_enabled=False))
+                elif sub=='providers' and method=='GET':await respond(dict(providers=self.ai_providers))
+                elif sub=='providers' and method=='POST':
+                    p=request.post_data_json.copy();p['id']='a'*32;p.pop('api_key',None);self.ai_providers.append(p)
+                    await respond(dict(id=p['id']),201)
+                elif sub=='conversations' and method=='GET':await respond(dict(conversations=self.ai_conversations))
+                elif sub=='approvals' and method=='GET':await respond(dict(approvals=self.ai_approvals))
+                elif sub=='chat' and method=='POST':
+                    cid=(request.post_data_json or {}).get('conversation_id') or 'b'*32
+                    if not any(c['id']==cid for c in self.ai_conversations):
+                        self.ai_conversations.append(dict(id=cid,title='Тестовый диалог',updated_at=1,created_at=1))
+                    self.ai_messages.setdefault(cid,[]).extend([
+                        dict(role='user',content=request.post_data_json['message']),
+                        dict(role='assistant',content='Ответ локального агента'),
+                    ])
+                    await respond(dict(conversation_id=cid,reply='Ответ локального агента',approval_ids=[]))
+                elif sub.endswith('/messages') and method=='GET':
+                    cid=sub.split('/')[1];await respond(dict(messages=self.ai_messages.get(cid,[])))
+                elif sub.startswith('approvals/') and sub.endswith('/decision') and method=='POST':
+                    target=sub.split('/')[1]
+                    for item in self.ai_approvals:
+                        if item['id']==target:item['status']='approved_not_executed' if request.post_data_json['decision']=='approve' else 'rejected'
+                    await respond(dict(status='approved_not_executed',executed=False))
+                elif sub.startswith('providers/') and method=='DELETE':
+                    self.ai_providers=[p for p in self.ai_providers if p['id']!=sub.split('/')[1]]
+                    await respond(dict(deleted=True))
+                else:self.unhandled.append((method,path));await respond(None,404)
             elif path=='/api/v1/modules': await respond(dict(modules=self.modules))
             elif path=='/api/v1/modules/navigation': await respond(dict(modules=[dict(module_id=m['manifest']['id'],status=m['status'],items=m['manifest'].get('ui',{}).get('navigation',[])) for m in self.modules]),self.nav_status)
             elif path=='/api/v1/modules/capabilities': await respond(dict(capabilities=['host.linux']+(['host.docker'] if self.runtime.get('available') else [])))
@@ -379,6 +418,30 @@ async def suite(browser):
         assert (await h.url()).endswith('/modules/operations')
         await h.close()
     await check('UI-17: separate module pages, direct routes, isolated content and history',module_sections)
+
+    async def native_ai_agent():
+        h=await Harness(browser,modules=[ai_module()]).start('/modules/ai.agent')
+        await expect(h.page.locator('main h1')).to_have_text('AI Agent')
+        await expect(h.page.get_by_text('Интерфейс модуля ещё не подключён')).to_have_count(0)
+        await expect(h.page.get_by_text('Провайдер не подключён.',exact=False)).to_be_visible()
+        await h.page.get_by_role('button',name='AI-провайдеры',exact=True).click()
+        section=h.page.locator('section[aria-label="Настройки AI-провайдеров"]')
+        await section.get_by_role('textbox',name='Название').fill('Локальная модель')
+        await section.get_by_role('textbox',name='URL API').fill('http://192.168.1.20:11434')
+        await section.get_by_role('textbox',name='Модель').fill('qwen3:8b')
+        await section.get_by_role('button',name='Сохранить провайдера').click()
+        await h.page.locator('section[aria-label="Чат с AI"]').get_by_role('textbox',name='Сообщение агенту').fill('Как дела?')
+        await h.page.get_by_role('button',name='Отправить',exact=True).click()
+        await expect(h.page.get_by_text('Ответ локального агента')).to_be_visible()
+        assert any(req[1]=='/api/v1/ai/chat' for req in h.requests)
+        await h.close()
+
+        reader=copy.deepcopy(ACTOR);reader['permissions']=['security.self.read','modules.read']
+        h=await Harness(browser,actor=reader,modules=[ai_module()]).start('/modules')
+        await h.ready()
+        assert await h.page.get_by_role('button',name='AI Agent',exact=True).count()==0
+        await h.close()
+    await check('UI-18: native AI chat, provider setup and manager-only navigation',native_ai_agent)
 
     async def responsive_pages():
         for path,kw in [('/users',{}),('/jobs',dict(jobs=[job()])),('/',dict(initialized=False))]:
