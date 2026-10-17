@@ -79,6 +79,10 @@ func (s *server) nvrAddress(ctx context.Context) (string, error) {
 }
 
 func (s *server) nvrReady(w http.ResponseWriter, r *http.Request) bool {
+	if s.modules == nil {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_not_running", "NVR module service is unavailable", nil)
+		return false
+	}
 	item, err := s.modules.Get(r.Context(), "nvr.module")
 	if err != nil || item.Status != "enabled" {
 		writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_not_running",
@@ -256,6 +260,11 @@ func (s *server) nvrAddCamera(w http.ResponseWriter, r *http.Request, actor secu
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&input); err != nil {
 		writeAPIError(w, r, http.StatusBadRequest, "invalid_camera", "Invalid camera configuration", nil)
+		return
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_camera", "Camera configuration must contain exactly one JSON object", nil)
 		return
 	}
 	if len(input.Name) == 0 || len(input.Name) > 128 ||
