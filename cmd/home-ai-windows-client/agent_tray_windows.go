@@ -117,6 +117,7 @@ type windowsAgentTray struct {
 	popupStatus   windows.Handle
 	popupSubtitle windows.Handle
 	popupRows     [3]windows.Handle
+	trayProfileIDs []string
 
 	statusMu    sync.Mutex
 	statusText  string
@@ -423,6 +424,7 @@ func (state *windowsAgentTray) showMenu() {
 	appendTrayMenu(menu, mfString|mfGrayed, 0, summary)
 	appendTrayMenu(menu, mfSeparator, 0, "")
 	appendTrayMenu(menu, mfString, traySyncNow, textForLanguage(language, "sync_now"))
+	state.appendProfileMenu(menu, language)
 	if primaryLocalFolderForConfig(state.configPath) != "" {
 		appendTrayMenu(menu, mfString, trayOpenFolder, textForLanguage(language, "open_home_folder"))
 	}
