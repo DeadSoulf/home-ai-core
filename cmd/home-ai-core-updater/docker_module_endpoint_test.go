@@ -10,7 +10,9 @@ import (
 )
 
 func TestInspectNVRModuleAddressChecksManagedIdentityAndNetwork(t *testing.T) {
-	if runtime.GOOS == "windows" { t.Skip("POSIX Docker stub") }
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX Docker stub")
+	}
 	dir := t.TempDir()
 	dockerPath := filepath.Join(dir, "docker")
 	write := func(managed, networkID, address, running string) {
@@ -24,12 +26,16 @@ case "$1" in
  *) exit 2;;
 esac
 `
-		if err := os.WriteFile(dockerPath, []byte(body), 0o755); err != nil { t.Fatal(err) }
+		if err := os.WriteFile(dockerPath, []byte(body), 0o755); err != nil {
+			t.Fatal(err)
+		}
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	write("true", "network-id", "172.20.0.4", "true")
 	address, err := inspectNVRModuleAddress(context.Background())
-	if err != nil || address != "172.20.0.4" { t.Fatalf("valid endpoint: %q %v", address, err) }
+	if err != nil || address != "172.20.0.4" {
+		t.Fatalf("valid endpoint: %q %v", address, err)
+	}
 	for _, tc := range []struct{ managed, networkID, address, running string }{
 		{"false", "network-id", "172.20.0.4", "true"},
 		{"true", "untrusted-id", "172.20.0.4", "true"},
