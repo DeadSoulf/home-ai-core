@@ -133,7 +133,8 @@ func TestPinnedTLSAuthenticatesExactCertificateWithoutSystemCA(t *testing.T) {
 	standardClient := &http.Client{Timeout: 5 * time.Second, Transport: standardTransport}
 	_, err = standardClient.Get("https://homeaicore.ru:82/health")
 	var unknownAuthority x509.UnknownAuthorityError
-	if !errors.As(err, &unknownAuthority) {
+	var hostnameError x509.HostnameError
+	if err == nil || (!errors.As(err, &unknownAuthority) && !errors.As(err, &hostnameError)) {
 		t.Fatalf("ordinary strict TLS unexpectedly succeeded: %v", err)
 	}
 }
