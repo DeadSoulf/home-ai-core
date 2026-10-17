@@ -504,7 +504,7 @@ async def suite(browser):
         await expect(h.page.get_by_text('Новое оборудование:',exact=False)).to_be_visible()
         await h.page.locator('.ai-gpu-device input').first.check()
         await h.page.locator('.ai-gpu-device input').last.check()
-        await expect(h.page.get_by_text('Выбрано GPU:',exact=False)).to_contain_text('2')
+        await expect(h.page.locator('.ai-gpu-choice')).to_contain_text('Выбрано: 2 из 2')
         assert await h.page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
         assert h.ai_assigned==[], 'GPU must not auto-allocate after hot plug'
         h.page.once('dialog',lambda d: asyncio.create_task(d.accept()))
