@@ -644,6 +644,10 @@ export const api = {
     (await request<{networks: NVRDiscoveryNetwork[]}>("/api/v1/nvr/discovery/networks", {signal})).networks,
   nvrDiscover: (networkID: string): Promise<NVRDiscoveryResult> =>
     postJSON<NVRDiscoveryResult>("/api/v1/nvr/discovery/search", {network_id: networkID}, true),
+  nvrStorageStatus: async () =>
+    request<{attached: boolean; path: string}>("/api/v1/nvr/storage"),
+  nvrStorageAttach: (device: string) =>
+    postJSON<{attached: boolean; path: string}>("/api/v1/nvr/storage/attach", {device}, true),
   nvrStatus: (signal?: AbortSignal) => request<NVRStatus>("/api/v1/nvr/status", {signal}),
   nvrCameras: async (signal?: AbortSignal) =>
     (await request<{ok: boolean; cameras: NVRCamera[]}>("/api/v1/nvr/cameras", {signal})).cameras,
