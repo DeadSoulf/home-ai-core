@@ -17,7 +17,7 @@ import (
 
 type server struct {
 	moduleSubmitMu sync.Mutex
-	nvrStorageMu  sync.Mutex
+	nvrStorageMu   sync.Mutex
 	nvrEndpoint    func(context.Context) (string, error)
 	nvrTransport   http.RoundTripper
 	nvrDataRoot    string
