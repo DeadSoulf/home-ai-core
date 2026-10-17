@@ -6,7 +6,7 @@ import (
 	"errors"
 )
 
-func reopenWindowsClientSettings(executable, configPath, settingsPath string) error {
+func reopenWindowsClientSettings(executable, configPath, settingsPath string, changed bool) error {
 	return errors.New("reopening Windows settings is only supported on Windows")
 }
 
