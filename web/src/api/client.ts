@@ -5,7 +5,7 @@ import type {
   AuthResponse,
   Job,
   RealtimeEvent,
-  RegisteredModule, ModuleNavigationState,
+  RegisteredModule, ModuleNavigationState, NVRStatus, NVRCamera, NVRRecording,
   SetupStatus,
   SystemResponse,
   UpdateStatus,
