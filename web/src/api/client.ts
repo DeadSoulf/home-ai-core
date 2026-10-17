@@ -6,6 +6,7 @@ import type {
   Job,
   RealtimeEvent,
   RegisteredModule, ModuleNavigationState, NVRStatus, NVRCamera, NVRRecording,
+  NVRDiscoveryNetwork, NVRDiscoveryResult,
   SetupStatus,
   SystemResponse,
   UpdateStatus,
