@@ -1,19 +1,60 @@
-import {useCallback, useEffect, useState, type FormEvent} from "react";
+import {useCallback, useEffect, useRef, useState, type FormEvent} from "react";
+import Hls from "hls.js";
 import {api} from "../api/client";
 import type {NVRCamera, NVRRecording, NVRStatus, NVRDiscoveryNetwork, NVRDiscoveredCamera} from "../api/types";
 import {Panel} from "../components/Panel";
+import {ConfirmDialog} from "../components/ConfirmDialog";
 import {PageHeading} from "./Dashboard";
 import "./NVR.css";
 
-type NVRTab = "cameras" | "discovery" | "archive";
+type NVRTab = "live" | "cameras" | "discovery" | "archive";
 
 const localDate = (seconds: number) => new Date(seconds * 1000).toLocaleString();
 const bytes = (value: number) => value >= 1024 ** 3
   ? (value / (1024 ** 3)).toFixed(1) + " ГБ"
   : (value / (1024 ** 2)).toFixed(1) + " МБ";
 
+function HLSVideo({playlist}: {playlist: string}) {
+  const element = useRef<HTMLVideoElement>(null);
+  const [playbackError, setPlaybackError] = useState("");
+  useEffect(() => {
+    const video = element.current;
+    if (!video) return;
+    let hls: Hls | undefined;
+    let stopped = false;
+    setPlaybackError("");
+    if (Hls.isSupported()) {
+      hls = new Hls({maxBufferLength: 12, backBufferLength: 10});
+      hls.loadSource(playlist);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        if (!stopped) void video.play().catch(() => {});
+      });
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal && !stopped) setPlaybackError("Ошибка видеопотока. Проверьте камеру и сеть.");
+      });
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = playlist;
+      void video.play().catch(() => {});
+    } else {
+      setPlaybackError("Этот браузер не поддерживает воспроизведение HLS.");
+    }
+    return () => {
+      stopped = true;
+      hls?.destroy();
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+    };
+  }, [playlist]);
+  return <div className="nvr-live-player">
+    <video ref={element} controls autoPlay muted playsInline aria-label="Видеопоток камеры в реальном времени" />
+    {playbackError && <p role="alert" className="nvr-notice-error">{playbackError}</p>}
+  </div>;
+}
+
 export function NVRPage({canManage}: {canManage: boolean}) {
-  const [tab, setTab] = useState<NVRTab>("cameras");
+  const [tab, setTab] = useState<NVRTab>("live");
   const [status, setStatus] = useState<NVRStatus>();
   const [cameras, setCameras] = useState<NVRCamera[]>([]);
   const [recordings, setRecordings] = useState<NVRRecording[]>([]);
@@ -31,6 +72,13 @@ export function NVRPage({canManage}: {canManage: boolean}) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [channel, setChannel] = useState(1);
+  const [previewCamera, setPreviewCamera] = useState<NVRCamera>();
+  const [previewURL, setPreviewURL] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<NVRCamera>();
+  const previewRef = useRef<string | undefined>();
+  useEffect(() => () => {
+    if (previewRef.current) void api.nvrStopLive(previewRef.current).catch(() => {});
+  }, []);
   const [networks, setNetworks] = useState<NVRDiscoveryNetwork[]>([]);
   const [selectedNetwork, setSelectedNetwork] = useState("");
   const [discovered, setDiscovered] = useState<NVRDiscoveredCamera[]>([]);
@@ -117,6 +165,48 @@ export function NVRPage({canManage}: {canManage: boolean}) {
     return () => controller.abort();
   }, [tab, canManage]);
 
+  async function openPreview(camera: NVRCamera) {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      if (previewRef.current && previewRef.current !== camera.id) {
+        await api.nvrStopLive(previewRef.current);
+      }
+      previewRef.current = undefined;
+      setPreviewURL("");
+      const result = await api.nvrStartLive(camera.id);
+      if (!result.ok || !result.playlist_url) throw new Error("Видеопоток недоступен");
+      previewRef.current = camera.id;
+      setPreviewCamera(camera);
+      setPreviewURL(result.playlist_url);
+    } catch (err) {
+      setPreviewCamera(undefined);
+      setError(err instanceof Error ? err.message : "Не удалось открыть поток");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function closePreview() {
+    const id = previewRef.current;
+    previewRef.current = undefined;
+    setPreviewURL("");
+    setPreviewCamera(undefined);
+    if (id) {
+      try { await api.nvrStopLive(id); }
+      catch { /* a timed-out stop is safe to retry via the module UI */ }
+    }
+  }
+
+  async function removeCamera() {
+    const camera = deleteTarget;
+    if (!camera || busy) return;
+    setDeleteTarget(undefined);
+    if (previewRef.current === camera.id) await closePreview();
+    await act(() => api.nvrDeleteCamera(camera.id), "Камера удалена. Все существующие записи сохранены.");
+  }
+
   async function searchForCameras() {
     if (!selectedNetwork || scanning || !canManage) return;
     setScanning(true);
@@ -158,6 +248,8 @@ export function NVRPage({canManage}: {canManage: boolean}) {
   return <div className="page nvr-page">
     <PageHeading title="NVR · Видеонаблюдение" subtitle="Камеры, запись и архив — внутри HOME AI Core" />
     <div className="button-row">
+      <button type="button" className={"button " + (tab === "live" ? "primary" : "secondary")}
+        onClick={() => setTab("live")}>В реальном времени</button>
       <button type="button" className={"button " + (tab === "cameras" ? "primary" : "secondary")}
         onClick={() => setTab("cameras")}>Камеры</button>
       {canManage && <button type="button" className={"button " + (tab === "discovery" ? "primary" : "secondary")}
@@ -178,6 +270,27 @@ export function NVRPage({canManage}: {canManage: boolean}) {
       <div className="nvr-stat"><small>Файлы архива</small><strong>{status.recordings}</strong></div>
       <div className="nvr-stat"><small>Занято на диске</small><strong>{bytes(status.storage_bytes)}</strong></div>
     </div>}
+
+    {tab === "live" && <Panel title="Живой просмотр камер">
+      {cameras.length === 0 && <p className="muted">Сначала добавьте камеру на вкладке «Камеры».</p>}
+      <div className="nvr-preview-grid">
+        {cameras.map((camera) => <button key={camera.id} type="button"
+          className={"nvr-preview-tile" + (previewCamera?.id === camera.id ? " active" : "")}
+          disabled={busy || !camera.enabled} onClick={() => void openPreview(camera)}>
+          <span className="nvr-preview-icon">◉</span>
+          <strong>{camera.name}</strong>
+          <small>{camera.recording ? "● Запись активна" : camera.enabled ? "Камера доступна для просмотра" : "Камера выключена"}</small>
+        </button>)}
+      </div>
+      {previewCamera && previewURL && <div className="nvr-preview-active">
+        <div className="button-row">
+          <strong>{previewCamera.name} · LIVE</strong>
+          <button className="button secondary" type="button" onClick={() => void closePreview()}>Закрыть просмотр</button>
+        </div>
+        <HLSVideo key={previewCamera.id + previewURL} playlist={previewURL} />
+      </div>}
+      <p className="muted small">Поток HLS передаётся через защищённый интерфейс HOME AI Core. Логины камер не передаются в браузер.</p>
+    </Panel>}
 
     {tab === "cameras" && <Panel title="Подключённые камеры">
       <div className="button-row">
@@ -216,6 +329,8 @@ export function NVRPage({canManage}: {canManage: boolean}) {
             </span></p>
           </div>
           {canManage && <div className="button-row">
+            <button type="button" className="button danger" disabled={busy}
+              onClick={() => setDeleteTarget(camera)}>Удалить камеру</button>
             {camera.enabled && <button type="button" className="button secondary" disabled={busy} onClick={() => {
               void act(() => api.nvrControlCamera(camera.id, camera.recording ? "stop" : "start"), "Команда выполнена");
             }}>{camera.recording ? "Остановить" : "Запустить"}</button>}
@@ -314,6 +429,12 @@ export function NVRPage({canManage}: {canManage: boolean}) {
         </article>)}
       </div>
     </Panel>}
+    {deleteTarget && <ConfirmDialog title="Удалить камеру?" confirmLabel="Удалить камеру"
+      onCancel={() => setDeleteTarget(undefined)}
+      onConfirm={() => { void removeCamera(); }}>
+      <p><strong>{deleteTarget.name}</strong></p>
+      <p>Камера будет отключена и удалена из списка. Ранее записанное видео, архив и индекс записей сохранятся.</p>
+    </ConfirmDialog>}
     <p className="muted small">Доступ к NVR защищён сессией HOME AI Core. Порт контейнера не опубликован наружу.</p>
   </div>;
 }
