@@ -476,10 +476,10 @@ export type NetworkProfileStatus = {
   profiles: NetworkProfile[];
 };
 
-export type StoragePurpose = "files";
+export type StoragePurpose = "files" | "nvr";
 
 export type StoragePurposeUsage = {
-  type: "file_pool";
+  type: "file_pool" | "nvr_recordings";
   id: string;
   name: string;
   root_path?: string;
