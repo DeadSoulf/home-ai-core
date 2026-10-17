@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -136,8 +135,4 @@ func (state *windowsSettingsUI) forgetServerCertificate() {
 	state.refreshCertificatePinStatus()
 	state.setStatus(state.tr("cert_pin_forgotten"))
 	state.refreshOverview()
-}
-
-func (state *windowsSettingsUI) certificateProbeDebug() string {
-	return fmt.Sprintf("server=%s pending=%t", state.text(state.serverEdit), state.certificateProbeBusy)
 }
