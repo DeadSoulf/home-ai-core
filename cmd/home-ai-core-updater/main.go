@@ -226,6 +226,45 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		})
 		return
 	}
+	if request.Operation == "docker.nvr.storage.status" {
+		if request.ModuleID != "nvr.module" {
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: "unsupported module"})
+			return
+		}
+		ctx, cancel := context.WithTimeout(parent, 10*time.Second)
+		defer cancel()
+		mounted, source := nvrVideoStorageMounted(ctx, request.FilesystemUUID)
+		if !mounted {
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{OK: true, Message: "NVR video storage is not activated"})
+			return
+		}
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+			OK: true, ModuleStorageMount: source,
+			Message: "NVR recordings are stored on the selected disk",
+		})
+		return
+	}
+	if request.Operation == "docker.nvr.storage.activate" {
+		if request.ModuleID != "nvr.module" || request.Confirm != nvrStorageConfirm {
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: "NVR migration confirmation required"})
+			return
+		}
+		_ = conn.SetDeadline(time.Now().Add(31*time.Minute))
+		ctx, cancel := context.WithTimeout(parent, 30*time.Minute)
+		defer cancel()
+		go func() { var extra [1]byte; _, _ = conn.Read(extra[:]); cancel() }()
+		mount, err := activateNVRVideoStorage(ctx, request, uid, gid)
+		if err != nil {
+			logger.Error("NVR storage migration failed", "error", err)
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})
+			return
+		}
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+			OK: true, ModuleStorageMount: mount,
+			Message: "NVR video storage migrated, mounted and verified",
+		})
+		return
+	}
 	if request.Operation == "docker.module.endpoint" {
 		// Read-only, fixed-module discovery. No endpoint or URL is taken from
 		// the client and no Docker socket is exposed to Core.
