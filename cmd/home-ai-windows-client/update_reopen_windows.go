@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -20,6 +21,13 @@ func reopenWindowsClientSettings(executable, configPath, settingsPath string) er
 	if strings.TrimSpace(executable) == "" {
 		return fmt.Errorf("installed Windows client path is required")
 	}
+	// Important when the old GUI was launched from a preview outside the
+	// installed path: copying the executable may succeed before the old GUI
+	// has actually closed. Starting the new settings too early would focus
+	// the old window and leave the user with no UI after it exits.
+	if err := waitForWindowsSettingsWindowExit(20 * time.Second); err != nil {
+		return err
+	}
 	command := exec.Command(executable, windowsSettingsReopenArgs(configPath, settingsPath)...)
 	command.SysProcAttr = &syscall.SysProcAttr{CreationFlags: settingsCreateNoWindow}
 	if err := command.Start(); err != nil {
@@ -29,6 +37,24 @@ func reopenWindowsClientSettings(executable, configPath, settingsPath string) er
 		return fmt.Errorf("release updated Home-AI Windows client process: %w", err)
 	}
 	return nil
+}
+
+func waitForWindowsSettingsWindowExit(timeout time.Duration) error {
+	className, err := windows.UTF16PtrFromString(settingsWindowClass)
+	if err != nil {
+		return err
+	}
+	deadline := time.Now().Add(timeout)
+	for {
+		hwnd, _, _ := procSettingsFindWindow.Call(uintptr(unsafe.Pointer(className)), 0)
+		if hwnd == 0 {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("previous Home-AI settings window did not close; close it before reopening the updated client")
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }
 
 func notifyWindowsClientUpdateFailure(err error) {
