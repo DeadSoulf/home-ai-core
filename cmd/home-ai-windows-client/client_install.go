@@ -9,15 +9,16 @@ import (
 	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/windowsclient"
+	"github.com/DeadSoulf/home-ai-core/internal/version"
 )
 
 func runClient(args []string) error {
 	if len(args) == 0 {
-		return errors.New("client requires install, status or update")
+		return errors.New("client requires install, status, check-update or update")
 	}
 	command := args[0]
 	switch command {
-	case "install", "status", "update":
+	case "install", "status", "check-update", "update":
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -26,6 +27,10 @@ func runClient(args []string) error {
 	}
 	fs := flag.NewFlagSet("client "+command, flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
+	var channel string
+	if command == "check-update" || command == "update" {
+		fs.StringVar(&channel, "channel", windowsclient.ReleaseChannelBeta, "release channel: stable or beta")
+	}
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -61,12 +66,30 @@ func runClient(args []string) error {
 			fmt.Printf("Home-AI Windows client is already current: %s\n", result.Path)
 		}
 		return nil
-	case "update":
+	case "check-update", "update":
+		var channelErr error
+		channel, channelErr = windowsclient.NormalizeReleaseChannel(channel)
+		if channelErr != nil {
+			return channelErr
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 		defer cancel()
-		release, err := windowsclient.DiscoverLatestWindowsClientRelease(ctx, nil)
+		release, err := windowsclient.DiscoverWindowsClientRelease(ctx, nil, channel)
 		if err != nil {
 			return fmt.Errorf("discover latest Home-AI Windows client release: %w", err)
+		}
+		if command == "check-update" {
+			fmt.Printf("Current version: %s\n%s channel latest: %s\n", version.Version, channel, release.Version)
+			if windowsclient.CompareWindowsClientVersions(release.Version, version.Version) > 0 {
+				fmt.Println("A newer version is available. Run client update --channel " + channel + " to install.")
+			} else {
+				fmt.Println("No newer release in the selected channel.")
+			}
+			return nil
+		}
+		if windowsclient.CompareWindowsClientVersions(release.Version, version.Version) <= 0 {
+			fmt.Printf("No newer %s client release (current: %s, newest: %s).\n", channel, version.Version, release.Version)
+			return nil
 		}
 		path, digest, err := windowsclient.DownloadWindowsClientRelease(ctx, nil, release)
 		if err != nil {
