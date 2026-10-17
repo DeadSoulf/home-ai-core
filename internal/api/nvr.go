@@ -13,12 +13,15 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/modules"
+	"github.com/DeadSoulf/home-ai-core/internal/state"
+	"github.com/DeadSoulf/home-ai-core/internal/systeminfo"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 )
 
@@ -371,30 +374,58 @@ func (s *server) nvrOutput(w http.ResponseWriter, r *http.Request, _ security.Ac
 }
 
 func (s *server) nvrRecordingFile(w http.ResponseWriter, r *http.Request, relativePath string) {
-	dataRoot := s.nvrDataRoot
-	if dataRoot == "" {
-		dataRoot = "/var/lib/home-ai-modules/nvr.module"
+	roots := []struct{ directory, relative string }{{
+		directory: "/var/lib/home-ai-modules/nvr.module", relative: relativePath,
+	}}
+	if s.nvrDataRoot != "" {
+		roots[0].directory = s.nvrDataRoot
+	} else if s.state != nil {
+		// A separate recording disk is bound under /data/recordings for new
+		// NVR installations. Old files remain in the original module data
+		// directory and are still available from the archive.
+		if records, err := s.state.ListStoragePurposes(r.Context()); err == nil {
+			nodes := systeminfo.Collect(s.nodeID).BlockTree
+			for _, record := range records {
+				if record.Purpose != state.StoragePurposeNVR {
+					continue
+				}
+				if node, found := blockNodeForStoragePurpose(nodes, record); found {
+					mount := filepath.Join("/mnt/home-ai-core", filepath.Base(node.Path))
+					if slices.Contains(node.Mountpoints, mount) {
+						roots = append([]struct{ directory, relative string }{{
+							directory: filepath.Join(mount, "home-ai-nvr", "recordings"),
+							relative: strings.TrimPrefix(relativePath, "recordings/"),
+						}}, roots...)
+					}
+				}
+				break
+			}
+		}
 	}
-	root, err := os.OpenRoot(dataRoot)
-	if err != nil {
-		writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_media_unavailable", "NVR recording storage is unavailable", nil)
+	for _, candidate := range roots {
+		root, err := os.OpenRoot(candidate.directory)
+		if err != nil {
+			continue
+		}
+		file, err := root.Open(candidate.relative)
+		if err != nil {
+			_ = root.Close()
+			continue
+		}
+		info, err := file.Stat()
+		if err != nil || !info.Mode().IsRegular() {
+			_ = file.Close()
+			_ = root.Close()
+			continue
+		}
+		w.Header().Set("Content-Type", "video/mp4")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Cache-Control", "private, no-store")
+		w.Header().Set("Content-Disposition", "inline")
+		http.ServeContent(w, r, filepath.Base(relativePath), info.ModTime(), file)
+		_ = file.Close()
+		_ = root.Close()
 		return
 	}
-	defer root.Close()
-	file, err := root.Open(relativePath)
-	if err != nil {
-		writeAPIError(w, r, http.StatusNotFound, "nvr_media_unavailable", "Recording not found", nil)
-		return
-	}
-	defer file.Close()
-	info, err := file.Stat()
-	if err != nil || !info.Mode().IsRegular() {
-		writeAPIError(w, r, http.StatusNotFound, "nvr_media_unavailable", "Recording not found", nil)
-		return
-	}
-	w.Header().Set("Content-Type", "video/mp4")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("Cache-Control", "private, no-store")
-	w.Header().Set("Content-Disposition", "inline")
-	http.ServeContent(w, r, filepath.Base(relativePath), info.ModTime(), file)
+	writeAPIError(w, r, http.StatusNotFound, "nvr_media_unavailable", "Recording not found", nil)
 }
