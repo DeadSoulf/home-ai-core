@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useRef, useState} from "react";
 import {api} from "../api/client";
-import type {AIHardware, AILocalModels, AILocalStatus} from "../api/types";
+import type {AIHardware, AILocalModels, AILocalStatus, AIGPUAssignment} from "../api/types";
 import {Panel} from "../components/Panel";
 
 const gib = (bytes: number | undefined) => bytes ? (bytes / (1024 ** 3)).toFixed(1) + " ГБ" : "Не определено";
@@ -14,6 +14,9 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat}: {
   const [hardware, setHardware] = useState<AIHardware>();
   const [local, setLocal] = useState<AILocalStatus>();
   const [models, setModels] = useState<AILocalModels>();
+  const [assignment, setAssignment] = useState<AIGPUAssignment>();
+  const [gpuNotice, setGpuNotice] = useState("");
+  const seenAssignment = useRef<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -27,8 +30,8 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat}: {
   const refresh = useCallback(async () => {
     // Existing 0.1.0 AI images do not yet implement /api/local/*.
     // Hardware must remain visible even if Ollama is unavailable.
-    const [resource, engine, catalog] = await Promise.allSettled([
-      api.aiHardware(), api.aiLocalStatus(), api.aiLocalModels(),
+    const [resource, engine, catalog, allocation] = await Promise.allSettled([
+      api.aiHardware(), api.aiLocalStatus(), api.aiLocalModels(), api.aiGPUAssignment(),
     ]);
     if (resource.status === "fulfilled") {
       const inventory = resource.value;
@@ -53,6 +56,14 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat}: {
       previousReady.current = ready;
     }
     if (catalog.status === "fulfilled") setModels(catalog.value);
+    if (allocation.status === "fulfilled") {
+      setAssignment(allocation.value);
+      const fingerprint = [...allocation.value.assigned_gpu_pci].sort().join(",");
+      if (seenAssignment.current !== fingerprint) {
+        seenAssignment.current = fingerprint;
+        setSelected(allocation.value.assigned_gpu_pci);
+      }
+    }
     if (resource.status === "rejected") setError("Не удалось получить ресурсы сервера");
     else if (engine.status === "rejected") setError("Для встроенного Ollama требуется обновление AI-модуля");
     else setError("");
@@ -82,6 +93,34 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat}: {
       await refresh();
     } catch (reason) {setError(modelText(reason));}
     finally {setBusy(false);}
+  }
+
+  async function applyGPU() {
+    if (busy || !assignment) return;
+    const chosen = selected.filter((id) => hardware?.gpus.some((gpu) =>
+      gpu.pci_address === id && ((gpu.vendor_id || "").toLowerCase() === "0x10de" ||
+        (gpu.vendor || "").toLowerCase().includes("nvidia")) && gpu.driver === "nvidia"));
+    if (chosen.length !== selected.length) {
+      setError("Для использования доступны только GPU NVIDIA с работающим драйвером.");
+      return;
+    }
+    if (!window.confirm("Изменить набор GPU для Ollama? AI Agent кратковременно перезапустится. " +
+      "Текущие сообщения могут быть прерваны; данные и загруженные модели сохраняются.")) return;
+    setBusy(true);
+    setError("");
+    setGpuNotice("");
+    try {
+      const result = await api.aiApplyGPU(chosen);
+      setAssignment(result);
+      seenAssignment.current = [...result.assigned_gpu_pci].sort().join(",");
+      setGpuNotice(result.mode === "cpu" ? "Возврат к CPU подтверждён." :
+        "GPU назначены контейнеру: " + result.assigned_gpu_pci.length + ". Проверьте ускорение на своей модели.");
+    } catch (reason) {
+      setError("Операция не подтверждена. Проверьте текущий режим перед повтором. " + modelText(reason));
+    } finally {
+      setBusy(false);
+      void refresh();
+    }
   }
 
   const recommended = models?.recommended_models || local?.recommended_models || [];
@@ -134,6 +173,7 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat}: {
     </Panel>
 
     <Panel title="Ресурсы сервера и видеокарты">
+      {gpuNotice && <p className="ai-notice" role="status">{gpuNotice}</p>}
       <div className="button-row">
         <button type="button" className="button secondary" onClick={() => {void refresh();}}>
           Проверить оборудование
@@ -149,28 +189,41 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat}: {
       {!!gpus.length && <div className="ai-gpu-list">
         {gpus.map((gpu, index) => {
           const id = gpu.pci_address || gpu.model || String(index);
+          const eligible = ((gpu.vendor_id || "").toLowerCase() === "0x10de" ||
+            (gpu.vendor || "").toLowerCase().includes("nvidia")) && gpu.driver === "nvidia";
           return <label key={id} className="ai-gpu-device">
-            <input type="checkbox" checked={selected.includes(id)} onChange={(event) => {
+            <input type="checkbox" checked={selected.includes(id)} disabled={!eligible || busy || !assignment}
+              onChange={(event) => {
               setSelected((current) => event.target.checked
                 ? [...current, id] : current.filter((v) => v !== id));
             }}/>
             <span><strong>{gpu.model || gpu.vendor || "GPU"}</strong>
               <small>{gpu.vendor || "Производитель не определён"}
                 {gpu.pci_address ? " · PCI " + gpu.pci_address : ""}
-                {gpu.driver ? " · драйвер " + gpu.driver : " · драйвер не определён"}</small></span>
+                {gpu.driver ? " · драйвер " + gpu.driver : " · драйвер не определён"}
+                {!eligible ? " · ускорение ещё не поддерживается" : ""}</small></span>
           </label>;
         })}
       </div>}
-      {gpus.length > 0 && <p className="ai-gpu-choice">
-        Выбрано GPU: <strong>{selected.length}</strong> из {gpus.length}.
-        Встроенный Ollama сейчас запускается в режиме CPU. Сами отметки не подключают
-        устройства к Docker-контейнеру.
-      </p>}
-      <p className="muted">Список обновляется каждые 10 секунд: новая PCI-видеокарта появится после
-        её обнаружения ОС. Для ускорения через NVIDIA нужен рабочий драйвер,
-        NVIDIA Container Toolkit и отдельное подтверждённое назначение устройств;
-        простое обнаружение ещё не означает возможность GPU-вычислений.
-        Подключение нескольких GPU будет выполняться через защищённый runtime ядра.</p>
+      {assignment ? <p className="ai-gpu-choice" role="status">
+        Текущий режим: <strong>{assignment.mode === "cpu" ? "CPU" : "NVIDIA GPU"}</strong>,
+        назначено карт: <strong>{assignment.assigned_gpu_pci.length}</strong>.
+        Выбрано: <strong>{selected.length}</strong> из {gpus.length}.
+      </p> : <p className="muted">Назначение GPU недоступно: требуется новый привилегированный helper.
+        Видеокарты обнаружены, но их использование пока не подтверждено.</p>}
+      {assignment && <div className="button-row">
+        <button type="button" className="button primary" disabled={busy || 
+          [...selected].sort().join(",") === [...assignment.assigned_gpu_pci].sort().join(",")}
+          onClick={() => {void applyGPU();}}>
+          {selected.length ? "Применить выбранные GPU" : "Переключить на CPU"}
+        </button>
+      </div>}
+      <p className="muted">Список оборудования проверяется каждые 10 секунд.
+        Для GPU нужны совместимый драйвер и NVIDIA Container Toolkit. Можно назначить
+        несколько NVIDIA GPU одновременно; Ollama решает, как распределять загрузку.
+        Устройства AMD/Intel отображаются, но их выдача контейнеру пока не реализована.
+        При неудаче нового контейнера Core пытается восстановить прежний режим.
+        До явного подтверждения новые GPU автоматически не подключаются.</p>
     </Panel>
   </div>;
 }
