@@ -7,6 +7,14 @@ import { errorText, uiText, type UILocale } from "./messages";
  */
 export function describeFileError(reason: unknown, locale: UILocale, fallback: string): string {
   if (reason instanceof APIError) {
+    // Missing/moved NAS mounts are not generic permission failures. Give
+    // administrators the exact remediation while retaining request ID and
+    // unmodified backend diagnostics in ErrorNotice.
+    if ((reason.code === "file_folder_prepare_failed" || reason.code === "file_pool_prepare_failed") &&
+        (reason.rawMessage.includes("must be the filesystem mount point itself") ||
+         reason.rawMessage.includes("updater helper mount namespace"))) {
+      return uiText("filePoolMountRepairHint", locale);
+    }
     const summary = errorText(reason, locale);
     if (reason.status >= 500 && summary === uiText("unavailable", locale)) {
       return uiText("fileApiResponseFailed", locale).replace("{status}", String(reason.status));
