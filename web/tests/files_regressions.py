@@ -141,6 +141,19 @@ class FilesHarness(Harness):
             folder_id = parts[0]
             kind = "/".join(parts[1:])
             tree = self.entries.setdefault(folder_id, {"": []})
+            if kind == "" and method == "DELETE":
+                folder = next((f for f in self.folders if f["id"] == folder_id), None)
+                if not folder:
+                    return await respond({"error": {"code": "file_folder_not_found", "message": "folder missing"}}, 404)
+                if payload.get("confirm_name") != folder["name"]:
+                    return await respond({"error": {"code": "file_folder_confirmation_mismatch", "message": "confirmation mismatch"}}, 409)
+                if folder.get("hard_quota_bytes", 0):
+                    return await respond({"error": {"code": "file_folder_hard_quota_active", "message": "hard quota must be disabled"}}, 409)
+                if any(tree.values()) or self.trash.get(folder_id) or self.uploads.get(folder_id):
+                    return await respond({"error": {"code": "file_folder_not_empty", "message": "folder contains files, uploads or trash"}}, 409)
+                self.folders = [f for f in self.folders if f["id"] != folder_id]
+                del self.entries[folder_id]
+                return await respond({"warning": ""})
             if kind == "settings":
                 if method == "GET": return await respond({"folder": next(f for f in self.folders if f["id"]==folder_id), "access": []})
                 if method == "PUT":
@@ -450,6 +463,58 @@ async def run_suite(browser):
         assert not h.unhandled,h.unhandled
         await h.close()
 
+    async def delete_empty_logical_folder():
+        h=FilesHarness(browser)
+        h.entries["fld-test"]={"": []}
+        await h.start("/files")
+        button=h.page.locator(".ux-folder-card button.danger")
+        await expect(button).to_be_visible()
+        h.page.once("dialog",lambda dialog: asyncio.create_task(dialog.accept("wrong-name")))
+        await button.click()
+        await expect(h.page.locator(".ux-folder-card")).to_have_count(1)
+        assert not [r for r in h.requests if r[0]=="DELETE" and r[1].endswith("/fld-test")]
+        h.page.once("dialog",lambda dialog: asyncio.create_task(dialog.accept("Документы")))
+        await button.click()
+        await expect(h.page.locator(".ux-folder-card")).to_have_count(0)
+        requests=[r for r in h.requests if r[0]=="DELETE" and r[1].endswith("/fld-test")]
+        assert len(requests)==1 and requests[0][2]=={"confirm_name":"Документы"},requests
+        assert not h.unhandled,h.unhandled
+        await h.close()
+
+    async def delete_nonempty_is_blocked():
+        h=await FilesHarness(browser).start("/files")
+        h.page.once("dialog",lambda dialog: asyncio.create_task(dialog.accept("Документы")))
+        await h.page.locator(".ux-folder-card button.danger").click()
+        await expect(h.page.locator(".ux-folder-card")).to_have_count(1)
+        await expect(h.page.locator(".error-notice")).to_contain_text("Папка не пуста")
+        assert "fld-test" in h.entries
+        assert not h.unhandled,h.unhandled
+        await h.close()
+
+    async def delete_folder_requires_admin():
+        h=FilesHarness(browser)
+        h.actor["permissions"]=["security.self.read","files.read","files.write"]
+        await h.start("/files")
+        await expect(h.page.locator(".ux-folder-card button.danger")).to_have_count(0)
+        assert not [r for r in h.requests if r[0]=="DELETE"]
+        await h.close()
+
+    async def delete_with_pending_upload_or_trash_blocked():
+        for which in ("upload","trash"):
+            h=FilesHarness(browser)
+            h.entries["fld-test"]={"": []}
+            if which=="upload":
+                h.uploads["fld-test"]=[{"id":"upload-pending"}]
+            else:
+                h.trash["fld-test"]=[{"id":"trash-pending"}]
+            await h.start("/files")
+            h.page.once("dialog",lambda dialog: asyncio.create_task(dialog.accept("Документы")))
+            await h.page.locator(".ux-folder-card button.danger").click()
+            await expect(h.page.locator(".ux-folder-card")).to_have_count(1)
+            await expect(h.page.locator(".error-notice")).to_contain_text("Папка не пуста")
+            assert h.folders,which
+            await h.close()
+
     scenarios=[
         ("FILES-01: list/open/nested navigation",basic_folders),
         ("FILES-02: mkdir/move/delete/trash listing",directories_and_move),
@@ -466,6 +531,10 @@ async def run_suite(browser):
         ("FILES-13: failed storage API shows actionable cause and request ID",backend_storage_error),
         ("FILES-14: folder settings failure exposes API details",failed_folder_settings),
         ("FILES-15: unknown HTTP 502 is not falsely called offline",unknown_file_http_error),
+        ("FILES-16: delete only a confirmed empty logical folder",delete_empty_logical_folder),
+        ("FILES-17: delete refuses a folder with user files",delete_nonempty_is_blocked),
+        ("FILES-18: non-managers cannot delete logical folders",delete_folder_requires_admin),
+        ("FILES-19: unfinished uploads and trash prevent deletion",delete_with_pending_upload_or_trash_blocked),
     ]
     failures=[]
     for name, fn in scenarios:

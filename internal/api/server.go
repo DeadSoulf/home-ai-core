@@ -126,6 +126,7 @@ func New(
 	s.mux.HandleFunc("POST /api/v1/files/smb/operation", s.requireAuth("files.manage", s.smbOperation))
 	s.mux.HandleFunc("GET /api/v1/files/folders", s.requireAuth("security.self.read", s.fileFolders))
 	s.mux.HandleFunc("POST /api/v1/files/folders", s.requireAuth("files.manage", s.fileFolders))
+	s.mux.HandleFunc("DELETE /api/v1/files/folders/{folderID}", s.requireAuth("files.manage", s.fileFolderDelete))
 	s.mux.HandleFunc("GET /api/v1/files/folders/{folderID}/entries", s.requireAuth("security.self.read", s.fileFolderEntries))
 	s.mux.HandleFunc("POST /api/v1/files/folders/{folderID}/directories", s.requireAuth("security.self.read", s.fileFolderDirectory))
 	s.mux.HandleFunc("GET /api/v1/files/folders/{folderID}/uploads", s.requireAuth("security.self.read", s.fileFolderUploads))

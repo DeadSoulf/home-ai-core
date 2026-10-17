@@ -382,6 +382,16 @@ export const api = {
     return {...result.folder, warning: result.warning};
   },
 
+  deleteFileFolder: async (folderId: string, confirmationName: string) => {
+    const headers = new Headers({"Content-Type": "application/json"});
+    const token = getCSRFToken();
+    if (token) headers.set("X-CSRF-Token", token);
+    return request<{warning?: string}>(
+      "/api/v1/files/folders/" + encodeURIComponent(folderId),
+      {method: "DELETE", headers, body: JSON.stringify({confirm_name: confirmationName})},
+    );
+  },
+
   fileEntries: async (folderId: string, path = "") => {
     const query = new URLSearchParams();
     if (path) query.set("path", path);

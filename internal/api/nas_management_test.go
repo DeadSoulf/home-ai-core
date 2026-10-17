@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"encoding/json"
 	"github.com/DeadSoulf/home-ai-core/internal/filedata"
 	"github.com/DeadSoulf/home-ai-core/internal/realtime"
@@ -64,6 +65,98 @@ func quotaRequest(handler http.Handler, method, path, body string) *httptest.Res
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	return rec
+}
+
+
+func TestDeleteEmptyLogicalFolderAndItsGrants(t *testing.T) {
+	handler, store, folder := quotaFixture(t)
+	root, err := filedata.FolderRoot(folder.PoolRoot, folder.RelativePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := quotaRequest(handler, http.MethodDelete, "/api/v1/files/folders/"+folder.ID, "{\"confirm_name\":\"Personal\"}")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("delete empty folder: %d %s", rec.Code, rec.Body)
+	}
+	if _, err := os.Lstat(root); !os.IsNotExist(err) {
+		t.Fatalf("empty physical folder remains: %v", err)
+	}
+	if _, err := store.NASFolder(context.Background(), folder.ID); !errors.Is(err, state.ErrNASFolderNotFound) {
+		t.Fatalf("deleted folder metadata remains: %v", err)
+	}
+	grants, err := store.NASFolderAccess(context.Background(), folder.ID)
+	if err != nil || len(grants) != 0 {
+		t.Fatalf("stale permission grants after delete: %#v, %v", grants, err)
+	}
+}
+
+func TestDeleteLogicalFolderRejectsNonEmptyAndWrongName(t *testing.T) {
+	handler, store, folder := quotaFixture(t)
+	root, err := filedata.FolderRoot(folder.PoolRoot, folder.RelativePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(root, "important.txt")
+	if err := os.WriteFile(target, []byte("preserve user data"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	url := "/api/v1/files/folders/" + folder.ID
+	for _, tc := range []struct {body, code string}{
+		{"{\"confirm_name\":\"incorrect\"}", "file_folder_confirmation_mismatch"},
+		{"{\"confirm_name\":\"Personal\"}", "file_folder_not_empty"},
+	} {
+		rec := quotaRequest(handler, http.MethodDelete, url, tc.body)
+		if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), tc.code) {
+			t.Fatalf("guard %q: %d %s", tc.code, rec.Code, rec.Body)
+		}
+	}
+	if _, err := store.NASFolder(context.Background(), folder.ID); err != nil {
+		t.Fatalf("rejected delete removed folder metadata: %v", err)
+	}
+	if data, err := os.ReadFile(target); err != nil || string(data) != "preserve user data" {
+		t.Fatalf("rejected delete altered user file: %q %v", data, err)
+	}
+}
+
+func TestDeleteLogicalFolderRejectsHardQuota(t *testing.T) {
+	handler, store, folder := quotaFixture(t)
+	if err := store.UpdateNASFolderManagement(context.Background(), folder.ID, folder.Name,
+		2<<20, 2<<20, nil, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	rec := quotaRequest(handler, http.MethodDelete, "/api/v1/files/folders/"+folder.ID,
+		"{\"confirm_name\":\"Personal\"}")
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "file_folder_hard_quota_active") {
+		t.Fatalf("active hard quota should block delete: %d %s", rec.Code, rec.Body)
+	}
+	if _, err := store.NASFolder(context.Background(), folder.ID); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDeleteLogicalFolderRequiresFilesManage(t *testing.T) {
+	_, store, folder := quotaFixture(t)
+	sec := defaultFakeSecurity()
+	limited := make([]string, 0, len(sec.actor.Permissions))
+	for _, name := range sec.actor.Permissions {
+		if name != "files.manage" {
+			limited = append(limited, name)
+		}
+	}
+	sec.actor.Permissions = limited
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	handler := New("test", logger, store, sec, nil, nil, nil, nil, realtime.New("test", logger))
+	rec := quotaRequest(handler, http.MethodDelete,
+		"/api/v1/files/folders/"+folder.ID, "{\"confirm_name\":\"Personal\"}")
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("non-manager delete: %d %s", rec.Code, rec.Body)
+	}
+	if _, err := store.NASFolder(context.Background(), folder.ID); err != nil {
+		t.Fatalf("unauthorized delete altered metadata: %v", err)
+	}
+	if _, err := filedata.FolderRoot(folder.PoolRoot, folder.RelativePath); err != nil {
+		t.Fatalf("unauthorized delete altered folder path: %v", err)
+	}
 }
 
 func TestFolderSettingsKeepPathsOwnerAndUnrelatedPermissions(t *testing.T) {

@@ -264,6 +264,39 @@ export function FilesPage({
     }
   }
 
+  async function deleteLogicalFolder(folder: {id: string; name: string}) {
+    if (!canManage || busy !== "") return;
+    const confirmation = window.prompt(
+      u("fileDeleteFolderPrompt").replace("{name}", folder.name),
+    );
+    if (confirmation === null) return;
+    if (confirmation !== folder.name) {
+      reportFormError(u("fileDeleteFolderMismatch"));
+      return;
+    }
+    setBusy("folder-delete-" + folder.id);
+    reportFormError("");
+    setNotice("");
+    try {
+      const result = await api.deleteFileFolder(folder.id, confirmation);
+      if (selectedFolderID === folder.id) {
+        setSelectedFolderID("");
+        setCurrentPath("");
+        setEntries([]);
+        setTrashVisible(false);
+        setTrashEntries([]);
+        reportBrowserError("");
+      }
+      if (settingsFolderID === folder.id) setSettingsFolderID("");
+      setNotice(result.warning || u("fileDeleteFolderDone"));
+      resource.reload();
+    } catch (reason) {
+      reportFormError(describeFileError(reason, locale, t("requestFailed")), reason);
+    } finally {
+      setBusy("");
+    }
+  }
+
   const selectedFolder = resource.data?.folders.find((folder) => folder.id === selectedFolderID);
 
   const loadEntries = useCallback(async (folderID: string, path: string) => {
@@ -599,6 +632,9 @@ export function FilesPage({
                 </button>
                 {canManage && <button className="button secondary" type="button"
                   onClick={() => setSettingsFolderID(folder.id)}>{t("fileFolderSettings")}</button>}
+                {canManage && <button className="button danger" type="button"
+                  disabled={busy !== ""}
+                  onClick={() => void deleteLogicalFolder(folder)}>{u("fileDeleteFolder")}</button>}
               </div>
             </article>
           ))}

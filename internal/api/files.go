@@ -265,6 +265,95 @@ func (s *server) fileFolders(
 
 const maxFileUploadBytes int64 = 512 << 20
 
+// fileFolderDelete removes only an empty logical folder. This revokes the
+// folder resource and its user grants. It never recursively deletes user data.
+func (s *server) fileFolderDelete(
+	w http.ResponseWriter,
+	r *http.Request,
+	actor security.Actor,
+	source authSource,
+) {
+	fileMutationMu.Lock()
+	defer fileMutationMu.Unlock()
+	currentActor, authorized := s.refreshMutationActor(w, r, "files.manage")
+	if !authorized {
+		return
+	}
+	actor = currentActor
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	var input struct {
+		ConfirmName string `json:"confirm_name"`
+	}
+	if err := decodeJSON(w, r, &input); err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_file_folder_delete", err.Error(), nil)
+		return
+	}
+	folder, root, ok := s.authorizedFileFolder(w, r, actor, true)
+	if !ok {
+		return
+	}
+	if input.ConfirmName != folder.Name {
+		writeAPIError(w, r, http.StatusConflict, "file_folder_confirmation_mismatch", "folder name does not match the confirmation", nil)
+		return
+	}
+	if folder.HardQuotaBytes > 0 {
+		writeAPIError(w, r, http.StatusConflict, "file_folder_hard_quota_active", "disable SMB hard quota enforcement in folder settings before deleting the folder", nil)
+		return
+	}
+	if err := filedata.CheckEmptyLogicalFolder(root); err != nil {
+		s.writeEmptyFolderDeleteError(w, r, err)
+		return
+	}
+	active, err := s.beginSMBAccessChange(r)
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadGateway, "smb_access_suspend_failed", err.Error(), nil)
+		return
+	}
+	if err := filedata.RemoveEmptyLogicalFolder(root); err != nil {
+		warning := s.finishSMBAccessChange(r, active)
+		if warning != "" {
+			s.logger.Warn("restore SMB after failed empty folder deletion", "folder_id", folder.ID, "warning", warning)
+		}
+		s.writeEmptyFolderDeleteError(w, r, err)
+		return
+	}
+	if err := s.state.DeleteNASFolder(r.Context(), folder.ID); err != nil {
+		// Keep metadata and physical folder in sync if committing the
+		// deletion fails. The former directory was verified empty.
+		restoreErr := os.Mkdir(root, 0o750)
+		if restoreErr != nil {
+			s.logger.Error("cannot restore empty NAS directory after metadata deletion failed",
+				"folder_id", folder.ID, "error", restoreErr)
+		} else {
+			warning := s.finishSMBAccessChange(r, active)
+			if warning != "" {
+				s.logger.Warn("restore SMB after failed folder metadata deletion", "folder_id", folder.ID, "warning", warning)
+			}
+		}
+		writeAPIError(w, r, http.StatusInternalServerError, "file_folder_delete_failed", "folder metadata could not be deleted; inspect folder state before retrying", nil)
+		return
+	}
+	warning := s.finishSMBAccessChange(r, active)
+	s.security.RecordAudit(
+		r.Context(), s.securityRequestContext(r), actor,
+		"files.folder.delete", "file_folder", folder.ID, "success",
+		map[string]any{"name": folder.Name, "pool_id": folder.PoolID, "kind": folder.Kind},
+	)
+	s.realtime.Publish("files.folder.deleted", map[string]any{"folder_id": folder.ID}, requestIDFromContext(r.Context()))
+	writeJSON(w, http.StatusOK, map[string]any{"warning": warning})
+}
+
+func (s *server) writeEmptyFolderDeleteError(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, filedata.ErrLogicalFolderNotEmpty) {
+		writeAPIError(w, r, http.StatusConflict, "file_folder_not_empty", "folder contains files, directories, unfinished uploads or trash; empty it before deletion", nil)
+		return
+	}
+	writeAPIError(w, r, http.StatusBadGateway, "file_folder_storage_unavailable", err.Error(), nil)
+}
+
 func (s *server) fileFolderEntries(
 	w http.ResponseWriter,
 	r *http.Request,
