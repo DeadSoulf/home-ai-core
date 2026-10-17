@@ -34,3 +34,25 @@
   .nvr-page .nvr-discovery-toolbar { align-items: stretch; flex-direction: column; }
   .nvr-page .nvr-discovery-toolbar label { width: 100%; flex: 1 1 auto; }
 }
+
+
+/* NVR live preview / dedicated video storage */
+.nvr-page .nvr-live-layout { display: grid; grid-template-columns: minmax(170px, 240px) minmax(0, 1fr); gap: 16px; margin: 16px 0; }
+.nvr-page .nvr-live-camera-list { display: grid; align-content: start; gap: 7px; max-height: 500px; overflow-y: auto; }
+.nvr-page .nvr-live-camera { text-align: left; display: flex; flex-direction: column; gap: 4px; background: transparent; color: inherit; border: 1px solid var(--border, #d9e0e8); border-radius: 8px; padding: 12px; cursor: pointer; }
+.nvr-page .nvr-live-camera.selected { border-color: var(--primary, #3974b8); background: var(--surface-raised, transparent); }
+.nvr-page .nvr-live-camera:disabled { opacity: .6; cursor: not-allowed; }
+.nvr-page .nvr-live-camera small { opacity: .7; }
+.nvr-page .nvr-live-workspace { min-width: 0; }
+.nvr-page .nvr-live-video { background: #101820; min-height: 260px; border-radius: 10px; overflow: hidden; aspect-ratio: 16 / 9; display: grid; place-items: center; }
+.nvr-page .nvr-live-video video { width: 100%; height: 100%; max-height: 65vh; object-fit: contain; }
+.nvr-page .nvr-live-placeholder { color: #c8d5e1; padding: 20px; text-align: center; }
+.nvr-page .nvr-live-toolbar { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.nvr-page .nvr-storage-selector { max-width: 690px; margin: 18px 0 12px; }
+.nvr-page .nvr-storage-selector label { display: flex; flex-direction: column; gap: 6px; }
+.nvr-page .nvr-storage-selector select { min-width: 0; max-width: 100%; width: 100%; padding: 9px; border-radius: 8px; }
+.nvr-page .nvr-storage-status { padding: 15px; border: 1px solid var(--border, #d9e0e8); border-radius: 10px; margin-top: 16px; }
+.nvr-page .nvr-delete-archive { display: flex; align-items: center; gap: 9px; margin: 12px 0; }
+.nvr-page .nvr-delete-confirmation { display: grid; gap: 8px; margin: 12px 0; }
+.nvr-page .nvr-delete-confirmation input { width: 100%; padding: 8px; border-radius: 7px; }
+@media (max-width: 760px) { .nvr-page .nvr-live-layout { grid-template-columns: 1fr; } .nvr-page .nvr-live-video { min-height: 210px; } }
