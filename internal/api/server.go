@@ -112,6 +112,7 @@ func New(
 	// The AI provider store currently has no per-user namespaces. Until it does,
 	// all chat, provider and approval routes are restricted to module managers.
 	// The browser never receives the container's access-token or a host port.
+	s.mux.HandleFunc("GET /api/v1/ai/hardware", s.requireAuth("modules.manage", s.aiHardware))
 	s.mux.HandleFunc("/api/v1/ai/", s.requireAuth("modules.manage", s.aiGateway))
 	// The NVR UI is native to Core. It never embeds the unauthenticated
 	// module web console or makes the Docker container publicly reachable.
