@@ -118,8 +118,8 @@ func (r *Registry) AttachNVRStorage(ctx context.Context) (Registered, error) {
 	if record.Status != "enabled" {
 		return Registered{}, errors.New("NVR must be enabled to attach video storage")
 	}
-	version, err := parseVersion(manifest.Version)
-	if err != nil || compareVersion(version, version{major: 1, minor: 1, patch: 3}) < 0 {
+	installedVersion, err := parseVersion(manifest.Version)
+	if err != nil || compareVersion(installedVersion, version{major: 1, minor: 1, patch: 3}) < 0 {
 		return Registered{}, errors.New("dedicated video storage requires NVR 1.1.3 or later")
 	}
 	mount, err := r.resolveNVRVideoMount(ctx)
