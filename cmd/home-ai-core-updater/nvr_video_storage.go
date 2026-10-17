@@ -238,6 +238,11 @@ func activateNVRVideoStorage(ctx context.Context, req updaterhelper.Request, uid
 	if req.ModuleID != "nvr.module" || req.Confirm != nvrStorageConfirm {
 		return "", errors.New("explicit NVR migration confirmation is required")
 	}
+	if config, exists, err := readNVRVideoMountConfig(); err != nil {
+		return "", err
+	} else if exists && (config.Mountpoint != req.Mountpoint || config.UUID != req.FilesystemUUID) {
+		return "", errors.New("NVR already has a different trusted video disk assignment")
+	}
 	if err := safeNVRDiskMount(ctx, req.Mountpoint, req.FilesystemUUID); err != nil {
 		return "", err
 	}
@@ -263,6 +268,20 @@ func activateNVRVideoStorage(ctx context.Context, req updaterhelper.Request, uid
 		}
 		return "", errors.New("NVR is already attached to another video disk")
 	}
+	source := filepath.Join(moduleDataRoot, "nvr.module", "recordings")
+	bytesRemaining, err := estimateNVRStorageTransfer(ctx, source, destination)
+	if err != nil {
+		return "", err
+	}
+	free, err := nvrDiskFreeBytes(destination)
+	if err != nil {
+		return "", fmt.Errorf("inspect NVR video disk capacity: %w", err)
+	}
+	// Leave breathing room for the video writer after migration.
+	reserve := uint64(256 << 20)
+	if bytesRemaining > 0 && (free < bytesRemaining || free-bytesRemaining < reserve) {
+		return "", fmt.Errorf("insufficient space on selected NVR disk: need %d bytes plus %d bytes reserve", bytesRemaining, reserve)
+	}
 	oldName := moduleContainerName("nvr.module")
 	output, err := exec.CommandContext(ctx, docker, "inspect", nvrStorageBackupContainer).CombinedOutput()
 	if err == nil || !strings.Contains(strings.ToLower(string(output)), "no such") {
@@ -281,7 +300,6 @@ func activateNVRVideoStorage(ctx context.Context, req updaterhelper.Request, uid
 			_ = nvrDockerCommand(rollback, docker, "start", oldName)
 		}
 	}()
-	source := filepath.Join(moduleDataRoot, "nvr.module", "recordings")
 	if err := copyNVRRecordings(ctx, source, destination, uid, gid); err != nil {
 		return "", fmt.Errorf("copy NVR recordings without deleting originals: %w", err)
 	}
@@ -352,9 +370,10 @@ func activateNVRVideoStorage(ctx context.Context, req updaterhelper.Request, uid
 	// migration backup, retained until the operator verifies recordings.
 	cleanup, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if err := nvrDockerCommand(cleanup, docker, "rm", "-f", nvrStorageBackupContainer); err != nil {
-		return destination, fmt.Errorf("NVR active on new disk but previous container cleanup failed: %w", err)
-	}
+	// A cleanup failure is not an activation failure: the old, stopped
+	// container can be manually cleaned up, while the selected disk must
+	// still be persisted as in use and protected from formatting.
+	_ = nvrDockerCommand(cleanup, docker, "rm", "-f", nvrStorageBackupContainer)
 	return destination, nil
 }
 
@@ -486,4 +505,54 @@ func equalNVRFileContents(a, b string) (bool, error) {
 		return false, err
 	}
 	return bytes.Equal(leftHash.Sum(nil), rightHash.Sum(nil)), nil
+}
+
+func estimateNVRStorageTransfer(ctx context.Context, source, destination string) (uint64, error) {
+	if _, err := os.Lstat(source); errors.Is(err, os.ErrNotExist) {
+		return 0, nil
+	} else if err != nil {
+		return 0, err
+	}
+	var total uint64
+	err := filepath.WalkDir(source, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil || !info.Mode().IsRegular() || entry.Type()&os.ModeSymlink != 0 {
+			return errors.New("NVR archive contains nonregular files")
+		}
+		relative, err := filepath.Rel(source, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(destination, relative)
+		if existing, err := os.Lstat(target); err == nil {
+			if !existing.Mode().IsRegular() || existing.Size() != info.Size() {
+				return errors.New("NVR destination contains conflicting archive files")
+			}
+			equal, err := equalNVRFileContents(path, target)
+			if err != nil {
+				return err
+			}
+			if !equal {
+				return errors.New("NVR destination contains conflicting archive bytes")
+			}
+			return nil
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		if uint64(info.Size()) > ^uint64(0)-total {
+			return errors.New("NVR archive capacity estimate overflow")
+		}
+		total += uint64(info.Size())
+		return nil
+	})
+	return total, err
 }
