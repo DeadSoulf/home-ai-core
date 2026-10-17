@@ -206,7 +206,7 @@ func settingsReflowRect(r settingsLayoutRect, page int, dx, dy int32) settingsLa
 			}
 		} else if page == settingsPageBackup && r.x == 224 && r.y >= 198 && r.y <= 260 && r.w <= 240 {
 			r.w += dx / 2
-		} else if r.w >= 350 {
+		} else if r.w >= 350 && page >= 0 {
 			r.w += dx
 		}
 	}
