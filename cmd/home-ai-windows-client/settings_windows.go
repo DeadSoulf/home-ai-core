@@ -36,7 +36,8 @@ const (
 	settingsWMConnected       = settingsWMApp + 201
 	settingsWMSyncDone        = settingsWMApp + 202
 	settingsWMAgentDone       = settingsWMApp + 203
-	settingsWMUpdateCheckDone = settingsWMApp + 204
+	settingsWMUpdateCheckDone  = settingsWMApp + 204
+	settingsWMUpdateInstallDone = settingsWMApp + 206
 
 	settingsWSOverlappedWindow = 0x00CF0000
 	settingsWSVisible          = 0x10000000
@@ -188,7 +189,10 @@ type windowsSettingsUI struct {
 	updateInstallBtn     windows.Handle
 	updateStatusLabel    windows.Handle
 	updateBusy           bool
+	updateInstalling     bool
+	updateWasInstalled   bool
 	updateAvailable      bool
+	updateRelease        windowsclient.WindowsClientRelease
 	updateLatestVersion  string
 	updateCheckedChannel string
 	updateError          string
@@ -231,6 +235,7 @@ type windowsSettingsUI struct {
 	syncResult    *settingsAsyncResult
 	agentResult   *settingsAsyncResult
 	updateResult  *settingsUpdateCheckResult
+	updateInstallResult *settingsUpdateInstallResult
 }
 
 var (
@@ -301,6 +306,8 @@ func runSettingsUI(args []string) error {
 	fs := flag.NewFlagSet("settings", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	var configPath, settingsPath string
+	var updated bool
+	fs.StringVar(&updated, "updated", false, "show update success after relaunch")
 	fs.StringVar(&configPath, "config", "", "sync profile file")
 	fs.StringVar(&settingsPath, "settings", "", "Windows client settings file")
 	if err := fs.Parse(args); err != nil {
@@ -380,6 +387,7 @@ func runSettingsUI(args []string) error {
 		buttonRoles:  make(map[windows.Handle]settingsButtonRole),
 		windowIcon:   windows.Handle(icon),
 		dpi:          settingsSystemDPI(),
+		updateWasInstalled: updated,
 		controlRects: make(map[windows.Handle]settingsLayoutRect),
 		controlFonts: make(map[windows.Handle]windows.Handle),
 	}
@@ -429,6 +437,11 @@ func runSettingsUI(args []string) error {
 	state.applyLanguageTexts()
 	state.loadInitial()
 	state.loadUpdateChannel()
+	if updated {
+		state.showPage(settingsPageGeneral)
+		state.setStatus(state.tr("update_completed_short"))
+		state.renderUpdateStatus()
+	}
 	state.layoutControls()
 	procSettingsSetTimer.Call(hwnd, settingsTransferTimerID, 1500, 0)
 	procSettingsShowWindow.Call(hwnd, settingsSWShow)
@@ -553,6 +566,11 @@ func settingsWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) ui
 	case settingsWMUpdateCheckDone:
 		if state != nil {
 			state.finishUpdateCheck()
+			return 0
+		}
+	case settingsWMUpdateInstallDone:
+		if state != nil {
+			state.finishUpdateInstallation()
 			return 0
 		}
 	case settingsWMClose:
