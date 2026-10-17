@@ -272,6 +272,9 @@ func executeSyncProfiles(
 			return len(selected), err
 		}
 		fmt.Printf("Sync %s: %s -> %s\n", profile.ID, profile.Source, profile.Destination)
+		activity := transferActivity{ProfileID: profile.ID, Path: profile.Destination, Status: "running"}
+		_ = saveTransferProgress(configPath, activity)
+		lastProgressWrite := time.Time{}
 		client, runErr := authenticatedClient(ctx, authFlags{
 			server:   profile.ServerURL,
 			username: profile.Username,
@@ -283,21 +286,52 @@ func executeSyncProfiles(
 				Upload: windowsclient.UploadOptions{
 					Retries:      retries,
 					RestartStale: restartStale,
+					Progress: func(progress windowsclient.Progress) {
+						now := time.Now()
+						if now.Sub(lastProgressWrite) < 500*time.Millisecond &&
+							progress.UploadedBytes < progress.TotalBytes {
+							return
+						}
+						lastProgressWrite = now
+						activity.Path = progress.Path
+						activity.UploadedBytes = progress.UploadedBytes
+						activity.TotalBytes = progress.TotalBytes
+						_ = saveTransferProgress(configPath, activity)
+					},
 				},
 				Progress: func(progress windowsclient.SyncProgress) {
-					if progress.Status == "unchanged" {
-						return
+					activity.Path = progress.Path
+					activity.ItemsTotal = progress.Total
+					activity.ItemsDone = progress.Index
+					activity.UploadedBytes = 0
+					activity.TotalBytes = 0
+					_ = saveTransferProgress(configPath, activity)
+					if progress.Status == "copied" || progress.Status == "skipped" ||
+						progress.Status == "unchanged" {
+						_ = appendTransferHistory(configPath, transferActivity{
+							ProfileID: profile.ID, Path: progress.Path,
+							Status: progress.Status, ItemsDone: progress.Index, ItemsTotal: progress.Total,
+						})
 					}
-					fmt.Printf(
-						"  [%d/%d] %s: %s\n",
-						progress.Index,
-						progress.Total,
-						progress.Path,
-						progress.Status,
-					)
+					if progress.Status != "unchanged" {
+						fmt.Printf(
+							"  [%d/%d] %s: %s\n",
+							progress.Index,
+							progress.Total,
+							progress.Path,
+							progress.Status,
+						)
+					}
 				},
 			})
 		}
+		activity.Status = "completed"
+		if runErr != nil {
+			activity.Status = "failed"
+			activity.Error = runErr.Error()
+			_ = appendTransferHistory(configPath, activity)
+		}
+		_ = saveTransferProgress(configPath, activity)
 		recordErr := windowsclient.RecordSyncProfileResult(configPath, profile.ID, time.Now().UTC(), runErr)
 		if runErr == nil {
 			fmt.Printf(
