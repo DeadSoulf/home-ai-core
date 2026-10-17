@@ -124,7 +124,7 @@ func TestInspectLogicalFolderForDeletionRevealsHiddenBlockers(t *testing.T) {
 		}, paths: []string{filepath.Join(trashDirName, "items"), filepath.Join(trashDirName, "meta")}, items: 1, metadata: 1},
 		{name: "unknown orphan in trash", files: []string{
 			filepath.Join(trashDirName, "orphan.tmp"),
-		}, other: 1},
+		}, other: 2},
 		{name: "incomplete trash scaffold", paths: []string{
 			filepath.Join(trashDirName, "items"),
 		}, other: 1},
