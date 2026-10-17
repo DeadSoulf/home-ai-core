@@ -218,22 +218,41 @@ func nvrRegistrySourceFallbackAllowed(err error) bool {
 }
 
 func buildPinnedNVRImage(ctx context.Context, dockerPath string) (string, error) {
+	// The updater runs as root inside a hardened systemd unit (ProtectHome).
+	// Docker/Buildx must never attempt to write /root/.docker. Give both CLI
+	// calls an isolated, writable, temporary HOME and DOCKER_CONFIG instead
+	// of relaxing systemd protections or persisting registry credentials.
+	cliHome, err := os.MkdirTemp("", "home-ai-nvr-docker-*")
+	if err != nil {
+		return "", fmt.Errorf("create temporary NVR Docker home: %w", err)
+	}
+	defer os.RemoveAll(cliHome)
+	dockerConfig := filepath.Join(cliHome, ".docker")
+	if err := os.Mkdir(dockerConfig, 0o700); err != nil {
+		return "", fmt.Errorf("create temporary NVR Docker config: %w", err)
+	}
+	dockerEnv := append(os.Environ(), "HOME="+cliHome, "DOCKER_CONFIG="+dockerConfig)
+
 	// Docker's remote Git context is pinned to a full 40-digit commit SHA.
 	// No shell is invoked, mutable refs are not used, and the resulting
 	// container uses the local content-addressed ID rather than a tag.
-	output, err := exec.CommandContext(
+	build := exec.CommandContext(
 		ctx, dockerPath, "build",
 		"--tag", nvrPinnedLocalTag,
 		"--label", "org.opencontainers.image.source="+nvrPinnedRepository,
 		"--label", "org.opencontainers.image.revision="+nvrPinnedRevision,
 		nvrPinnedBuildContext,
-	).CombinedOutput()
+	)
+	build.Env = dockerEnv
+	output, err := build.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("build trusted NVR source: %s", commandError(output, err))
 	}
-	output, err = exec.CommandContext(
+	inspect := exec.CommandContext(
 		ctx, dockerPath, "image", "inspect", "--format", "{{.Id}}", nvrPinnedLocalTag,
-	).CombinedOutput()
+	)
+	inspect.Env = dockerEnv
+	output, err = inspect.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("inspect locally built NVR image: %s", commandError(output, err))
 	}

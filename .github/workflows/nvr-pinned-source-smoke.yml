@@ -23,6 +23,13 @@ jobs:
           DOCKER_BUILDKIT: "1"
         run: |
           set -euo pipefail
+          # Match the hardened systemd helper: Docker/Buildx cannot write
+          # /root/.docker. Isolate both HOME and DOCKER_CONFIG in /tmp.
+          docker_home="$(mktemp -d)"
+          trap 'rm -rf "$docker_home"' EXIT
+          mkdir -m 700 "$docker_home/.docker"
+          export HOME="$docker_home"
+          export DOCKER_CONFIG="$docker_home/.docker"
           # Identical build context to the limited helper recovery path.
           docker build \
             --tag home-ai-core-nvr-pinned-smoke:1.1.1 \
