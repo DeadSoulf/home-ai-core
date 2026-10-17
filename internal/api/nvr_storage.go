@@ -97,10 +97,14 @@ func (s *server) nvrVideoStorage(w http.ResponseWriter, r *http.Request, _ secur
 	for i := range candidates {
 		candidates[i].Active = assigned && candidates[i].FilesystemUUID == active.FilesystemUUID && verified
 	}
+	var activeRecord *state.NVRVideoStorage
+	if assigned {
+		activeRecord = &active
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"devices":  candidates,
 		"assigned": assigned, "verified": verified,
-		"active": active,
+		"active": activeRecord,
 	})
 }
 
