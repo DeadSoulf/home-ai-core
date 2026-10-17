@@ -167,3 +167,19 @@ func TestAIRequestAndResponseSizes(t *testing.T) {
 		t.Fatalf("oversized response accepted: %d", w.Code)
 	}
 }
+
+// The hardware inventory does not call the module or expose host routes.
+func TestAIHardwareInventoryRequiresModuleManager(t *testing.T) {
+	sec := defaultFakeSecurity()
+	sec.actor.Permissions = []string{"modules.read", "security.self.read"}
+	route := uiAPI(sec, &uiJobService{}, uiModuleService{fakeModules: aiTestService(true)})
+	if got := uiRequest(route, "GET", "/api/v1/ai/hardware", ""); got.Code != http.StatusForbidden {
+		t.Fatalf("read-only user accessed GPU inventory: %d", got.Code)
+	}
+	sec.actor.Permissions = append(sec.actor.Permissions, "modules.manage")
+	route = uiAPI(sec, &uiJobService{}, uiModuleService{fakeModules: aiTestService(true)})
+	res := uiRequest(route, "GET", "/api/v1/ai/hardware", "")
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "\"gpus\"") {
+		t.Fatalf("manager cannot inspect GPU inventory: %d %s", res.Code, res.Body.String())
+	}
+}
