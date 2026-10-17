@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/DeadSoulf/home-ai-core/internal/modules"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
 )
@@ -92,4 +91,3 @@ func (s *server) ensureStorageDeviceNotUsedByModule(ctx context.Context, device,
 	return nil
 }
 
-var _ = modules.ErrModuleNotFound
