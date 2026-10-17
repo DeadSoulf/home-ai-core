@@ -58,7 +58,7 @@ export function NVRPage({canManage}: {canManage: boolean}) {
   }, [reload]);
 
   const act = async (task: () => Promise<unknown>, success: string) => {
-    if (busy) return;
+    if (busy) return false;
     setBusy(true);
     setError("");
     setMessage("");
@@ -66,14 +66,16 @@ export function NVRPage({canManage}: {canManage: boolean}) {
       await task();
       await reload();
       setMessage(success);
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Операция NVR завершилась ошибкой");
+      return false;
     } finally { setBusy(false); }
   };
 
   async function createCamera(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await act(() => api.nvrAddCamera({
+    const saved = await act(() => api.nvrAddCamera({
       name: name.trim(), source_type: sourceType,
       ...(sourceType === "rtsp"
         ? {rtsp_url: address.trim()}
@@ -81,9 +83,11 @@ export function NVRPage({canManage}: {canManage: boolean}) {
     }), "Камера добавлена");
     // Clear credentials even if the server rejected the camera.
     setPassword("");
-    setAdding(false);
-    setName("");
-    setAddress("");
+    if (saved) {
+      setAdding(false);
+      setName("");
+      setAddress("");
+    }
   }
 
   const archiveSelected = selected && recordings.some((item) => item.id === selected.id) ? selected : undefined;
