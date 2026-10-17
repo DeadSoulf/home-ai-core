@@ -68,7 +68,7 @@ The same visual language (headers, outlined content groups, blue primary
 actions and consistent spacing) is extended to Connection, Synchronization,
 Backups, Settings and the new Transfers page.
 
-The sync engine and persistent queue report their actual file progress and
+The sync engine, direct copy/upload commands and persistent queue report their actual file progress and
 terminal per-file events to local, bounded activity files alongside the selected
 sync-profile configuration. The GUI reads these files without starting a
 second sync engine. No secrets are persisted; paths and error summaries are
