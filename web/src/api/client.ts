@@ -655,6 +655,16 @@ export const api = {
     name: string; source_type: "hikvision" | "rtsp"; ip?: string; port?: number;
     username?: string; password?: string; channel?: number; rtsp_url?: string;
   }) => postJSON<{ok: boolean}>("/api/v1/nvr/cameras", camera, true),
+  nvrDeleteCamera: (id: string) => {
+    const headers = new Headers();
+    const token = getCSRFToken();
+    if (token) headers.set("X-CSRF-Token", token);
+    return request<{ok: boolean; deleted: boolean; recordings_preserved: boolean}>(
+      `/api/v1/nvr/cameras/${encodeURIComponent(id)}`, {method: "DELETE", headers});
+  },
+  nvrLiveCamera: (id: string, action: "start" | "stop") =>
+    postJSON<{ok: boolean; playlist_url: string; stopped?: boolean}>(
+      `/api/v1/nvr/cameras/${encodeURIComponent(id)}/live/${action}`, {}, true),
   nvrControlCamera: (id: string, action: "start" | "stop" | "restart") =>
     postJSON<{ok: boolean}>(`/api/v1/nvr/cameras/${encodeURIComponent(id)}/${action}`, {}, true),
 
