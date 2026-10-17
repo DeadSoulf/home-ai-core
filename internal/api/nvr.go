@@ -335,14 +335,16 @@ func (s *server) nvrLive(w http.ResponseWriter, r *http.Request, actor security.
 		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
 		return
 	}
-	if !s.nvrReady(w, r) { return }
+	if !s.nvrReady(w, r) {
+		return
+	}
 	id, action := r.PathValue("cameraID"), r.PathValue("action")
 	if !nvrSafeSegment.MatchString(id) || id == ".." || (action != "start" && action != "stop") {
 		writeAPIError(w, r, http.StatusBadRequest, "invalid_camera_operation", "Unsupported live preview operation", nil)
 		return
 	}
 	var upstream struct {
-		OK bool `json:"ok"`
+		OK  bool   `json:"ok"`
 		Key string `json:"key"`
 	}
 	if !s.nvrJSON(w, r, http.MethodPost, "/api/nvr/live/"+id+"/"+action, []byte("{}"), &upstream) {
@@ -352,7 +354,7 @@ func (s *server) nvrLive(w http.ResponseWriter, r *http.Request, actor security.
 	if action == "start" && upstream.OK {
 		// The stream key is derived locally, not trusted from the upstream.
 		// This avoids arbitrary file URLs or escapes in the response.
-		result["playlist_url"] = "/api/v1/nvr/output/hls/camera_"+id+"/index.m3u8"
+		result["playlist_url"] = "/api/v1/nvr/output/hls/camera_" + id + "/index.m3u8"
 	}
 	writeJSON(w, http.StatusOK, result)
 }
@@ -362,7 +364,9 @@ func (s *server) nvrDeleteCamera(w http.ResponseWriter, r *http.Request, actor s
 		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
 		return
 	}
-	if !s.nvrReady(w, r) { return }
+	if !s.nvrReady(w, r) {
+		return
+	}
 	id := r.PathValue("cameraID")
 	if !nvrSafeSegment.MatchString(id) || id == ".." {
 		writeAPIError(w, r, http.StatusBadRequest, "invalid_camera_id", "Invalid camera ID", nil)
@@ -371,7 +375,7 @@ func (s *server) nvrDeleteCamera(w http.ResponseWriter, r *http.Request, actor s
 	// Retain the recording files and index. A separate, deliberately
 	// destructive workflow must be implemented before deletion of archives.
 	var upstream struct {
-		OK bool `json:"ok"`
+		OK      bool `json:"ok"`
 		Deleted bool `json:"deleted"`
 	}
 	if !s.nvrJSON(w, r, http.MethodDelete, "/api/nvr/cameras/"+id, nil, &upstream) {
