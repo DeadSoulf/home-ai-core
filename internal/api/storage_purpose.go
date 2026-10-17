@@ -100,7 +100,7 @@ func (s *server) storagePurposes(
 		purpose := ""
 		if input.Purpose != "" && input.Purpose != "none" {
 			var err error
-			purpose, err = state.NormalizeStoragePurpose(input.Purpose)
+			purpose, err = s.validateAssignedModulePurpose(r.Context(), input.Purpose)
 			if err != nil {
 				writeAPIError(w, r, http.StatusBadRequest, "invalid_storage_purpose", err.Error(), nil)
 				return
