@@ -197,6 +197,9 @@ func trayPopupWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) u
 }
 
 func (state *windowsAgentTray) handleTrayCommand(id uint16) {
+	if state.toggleTrayProfile(id) {
+		return
+	}
 	switch id {
 	case traySyncNow:
 		select {
