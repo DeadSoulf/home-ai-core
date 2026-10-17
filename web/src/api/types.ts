@@ -182,6 +182,11 @@ export type AILocalModels = {
   recommended_models: AILocalModel[];
 };
 
+export type AIGPUAssignment = {
+  assigned_gpu_pci: string[];
+  mode: "cpu" | "nvidia";
+};
+
 export type AIHardware = {
   checked_at: string;
   policy: string;

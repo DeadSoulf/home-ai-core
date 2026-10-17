@@ -23,6 +23,8 @@ type server struct {
 	aiEndpoint     func(context.Context) (string, error)
 	aiTransport    http.RoundTripper
 	aiDataRoot     string
+	aiGPUStatus    func(context.Context) ([]string, error)
+	aiGPUApplyFunc func(context.Context, []string) ([]string, error)
 	nvrScanMu      sync.Mutex
 	nvrLastScan    time.Time
 	nvrNetworks    func() ([]nvrdiscovery.Network, error)
@@ -113,6 +115,8 @@ func New(
 	// all chat, provider and approval routes are restricted to module managers.
 	// The browser never receives the container's access-token or a host port.
 	s.mux.HandleFunc("GET /api/v1/ai/hardware", s.requireAuth("modules.manage", s.aiHardware))
+	s.mux.HandleFunc("GET /api/v1/ai/gpu/assignment", s.requireAuth("modules.manage", s.aiGPUAssignment))
+	s.mux.HandleFunc("POST /api/v1/ai/gpu/assignment", s.requireAuth("modules.manage", s.aiGPUApply))
 	s.mux.HandleFunc("/api/v1/ai/", s.requireAuth("modules.manage", s.aiGateway))
 	// The NVR UI is native to Core. It never embeds the unauthenticated
 	// module web console or makes the Docker container publicly reachable.
