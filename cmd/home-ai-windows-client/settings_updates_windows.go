@@ -66,6 +66,7 @@ func (state *windowsSettingsUI) changeUpdateChannel() {
 	state.updateCheckedChannel = ""
 	state.updateError = ""
 	state.updateWasInstalled = false
+	state.updateWasCurrent = false
 	state.setControlEnabled(state.updateInstallBtn, false)
 	state.renderUpdateStatus()
 }
@@ -84,6 +85,8 @@ func (state *windowsSettingsUI) renderUpdateStatus() {
 		label = state.tr("update_install_failed") + ": " + safeActivityText(state.updateError, 120)
 	case state.updateWasInstalled:
 		label = state.trf("update_completed", version.Version)
+	case state.updateWasCurrent:
+		label = state.trf("update_already_current", version.Version)
 	case state.updateLatestVersion != "" && state.updateCheckedChannel == state.selectedUpdateChannel():
 		if state.updateAvailable {
 			label = state.trf("update_available", version.Version, state.updateLatestVersion)
@@ -103,6 +106,7 @@ func (state *windowsSettingsUI) beginUpdateCheck() {
 	state.updateError = ""
 	state.updateAvailable = false
 	state.updateWasInstalled = false
+	state.updateWasCurrent = false
 	state.updateRelease = windowsclient.WindowsClientRelease{}
 	state.updateLatestVersion = ""
 	state.updateCheckedChannel = ""
