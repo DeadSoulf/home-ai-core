@@ -3,6 +3,7 @@ package nvrdiscovery
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -116,7 +117,7 @@ func Scan(ctx context.Context, selected Network) ([]Device, error) {
 			if device.RTSPPort == 0 || item.Port == 554 {
 				device.RTSPPort = item.Port
 			}
-		case item.Service == "HTTP" && item.Port > 0:
+		case (item.Service == "HTTP" || item.Service == "HTTPS") && item.Port > 0:
 			device.HTTPPort = item.Port
 		case strings.HasPrefix(item.Service, "SDK") && item.Port > 0:
 			device.SDKPort = item.Port
@@ -176,7 +177,7 @@ sendHosts:
 }
 
 func probeHost(ctx context.Context, host string, results chan<- signal) {
-	for _, port := range []int{554, 8554, 8000, 37777, 34567, 80} {
+	for _, port := range []int{554, 8554, 8000, 37777, 34567, 80, 443} {
 		if ctx.Err() != nil {
 			return
 		}
@@ -198,10 +199,25 @@ func probeHost(ctx context.Context, host string, results chan<- signal) {
 		case 34567:
 			emit(ctx, results, signal{IP: host, Service: "SDK 34567 (XM-совместимый)", Port: port})
 		case 80:
-			result := probeHTTP(conn, host)
+			result := probeHTTP(conn, host, 80)
 			if result.Service != "" {
 				result.IP = host
 				emit(ctx, results, result)
+			}
+		case 443:
+			// A local camera can have a self-signed certificate. This
+			// handshake only fingerprints an anonymous service; it never
+			// transmits credentials or treats TLS as authenticated.
+			tlsConn := tls.Client(conn, &tls.Config{
+				InsecureSkipVerify: true, // probe-only; never for login, video or credentials
+				MinVersion: tls.VersionTLS12,
+			})
+			if tlsConn.HandshakeContext(ctx) == nil {
+				result := probeHTTP(tlsConn, host, 443)
+				if result.Service != "" {
+					result.IP = host
+					emit(ctx, results, result)
+				}
 			}
 		}
 		_ = conn.Close()
@@ -240,15 +256,25 @@ func probeRTSP(conn net.Conn, host string, port int) signal {
 	return signal{Service: "RTSP", Port: port, Vendor: vendorFromText(header), Confirmed: true}
 }
 
-func probeHTTP(conn net.Conn, host string) signal {
+func probeHTTP(conn net.Conn, host string, port int) signal {
 	if _, err := fmt.Fprintf(conn, "HEAD / HTTP/1.1\r\nHost: %s\r\nUser-Agent: HOME-AI-Core-Discovery\r\nConnection: close\r\n\r\n", host); err != nil {
 		return signal{}
 	}
-	data, err := io.ReadAll(io.LimitReader(conn, 1400))
-	if err != nil || !strings.HasPrefix(string(data), "HTTP/") {
+	// HEAD endpoints are allowed to keep their TCP connections alive. Read
+	// response headers, not the whole response body or until connection close.
+	reader := bufio.NewReader(io.LimitReader(conn, 1400))
+	first, err := reader.ReadString('\n')
+	if err != nil || !strings.HasPrefix(first, "HTTP/") {
 		return signal{}
 	}
-	banner := string(data)
+	banner := first
+	for i := 0; i < 24; i++ {
+		line, err := reader.ReadString('\n')
+		banner += line
+		if err != nil || strings.TrimSpace(line) == "" {
+			break
+		}
+	}
 	vendor := vendorFromText(banner)
 	cameraWords := strings.Contains(strings.ToLower(banner), "ip camera") ||
 		strings.Contains(strings.ToLower(banner), "network camera") ||
@@ -256,5 +282,9 @@ func probeHTTP(conn net.Conn, host string) signal {
 	if vendor == "" && !cameraWords {
 		return signal{}
 	}
-	return signal{Service: "HTTP", Port: 80, Vendor: vendor, Confirmed: vendor != "" || cameraWords}
+	service := "HTTP"
+	if port == 443 {
+		service = "HTTPS"
+	}
+	return signal{Service: service, Port: port, Vendor: vendor, Confirmed: vendor != "" || cameraWords}
 }
