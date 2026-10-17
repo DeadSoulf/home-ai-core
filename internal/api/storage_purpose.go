@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -56,6 +57,11 @@ func (s *server) storagePurposes(
 		for _, record := range records {
 			response := storagePurposeResponseFor(record, nodes)
 			response.UsedBy = storageUsageForPurposeRecord(record, nodes, pools)
+			if record.Purpose == state.StoragePurposeNVR && s.nvrModuleEnabled(r.Context()) {
+				response.UsedBy = append(response.UsedBy, storagePurposeUsageResponse{
+					Type: "nvr_recordings", ID: "nvr.module", Name: "NVR video archive",
+				})
+			}
 			response.InUse = len(response.UsedBy) > 0
 			assignments = append(assignments, response)
 		}
@@ -113,6 +119,26 @@ func (s *server) storagePurposes(
 			return
 		}
 		usage := storageUsageForNode(node, pools)
+		assigned, err := s.state.ListStoragePurposes(r.Context())
+		if err != nil {
+			writeAPIError(w, r, http.StatusInternalServerError, "storage_purposes_unavailable", err.Error(), nil)
+			return
+		}
+		for _, record := range assigned {
+			sameDevice := record.DevicePath == node.Path ||
+				(record.FilesystemUUID != "" && record.FilesystemUUID == node.UUID)
+			if record.Purpose == state.StoragePurposeNVR && s.nvrModuleEnabled(r.Context()) &&
+				sameDevice && purpose != state.StoragePurposeNVR {
+				writeAPIError(w, r, http.StatusConflict, "nvr_storage_in_use",
+					"NVR storage cannot be reassigned while NVR is enabled", nil)
+				return
+			}
+			if purpose == state.StoragePurposeNVR && !sameDevice && record.Purpose == state.StoragePurposeNVR {
+				writeAPIError(w, r, http.StatusConflict, "nvr_storage_already_selected",
+					"Only one NVR recording disk can be selected", nil)
+				return
+			}
+		}
 		if len(usage) > 0 && purpose != state.StoragePurposeFiles {
 			writeAPIError(
 				w,
@@ -125,6 +151,11 @@ func (s *server) storagePurposes(
 			return
 		}
 
+		if purpose == state.StoragePurposeNVR && len(usage) > 0 {
+			writeAPIError(w, r, http.StatusConflict, "storage_in_use",
+				"A disk used by a file pool cannot also be assigned to NVR", nil)
+			return
+		}
 		if purpose == "" {
 			if err := s.state.ClearStoragePurpose(r.Context(), node.Path, node.UUID); err != nil {
 				writeAPIError(w, r, http.StatusInternalServerError, "storage_purpose_clear_failed", err.Error(), nil)
@@ -371,4 +402,12 @@ func pathUsesStorageMount(rootPath, mountpoint string) bool {
 		return false
 	}
 	return relative == "." || (relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)))
+}
+
+func (s *server) nvrModuleEnabled(ctx context.Context) bool {
+	if s.modules == nil {
+		return false
+	}
+	item, err := s.modules.Get(ctx, "nvr.module")
+	return err == nil && item.Status == "enabled"
 }
