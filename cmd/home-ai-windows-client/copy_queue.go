@@ -87,6 +87,7 @@ func runCopy(args []string) error {
 		options := windowsclient.UploadOptions{Retries: flags.retries, RestartStale: flags.restartStale}
 		printProgress := printTransferProgress()
 		lastActivityWrite := time.Time{}
+		var rate transferRate
 		options.Progress = func(progress windowsclient.Progress) {
 			printProgress(progress)
 			if activityErr != nil || (time.Since(lastActivityWrite) < 500*time.Millisecond &&
@@ -95,6 +96,7 @@ func runCopy(args []string) error {
 			}
 			activity.UploadedBytes = progress.UploadedBytes
 			activity.TotalBytes = progress.TotalBytes
+			activity.SpeedBytesPerSec, activity.ETASeconds = rate.observe(time.Now(), progress.UploadedBytes, progress.TotalBytes)
 			lastActivityWrite = time.Now()
 			_ = saveTransferProgress(activityConfig, activity)
 		}
@@ -108,6 +110,8 @@ func runCopy(args []string) error {
 			return fmt.Errorf("copy %s: %w", transfer.Destination, err)
 		}
 		activity.ItemsDone = index + 1
+		activity.SpeedBytesPerSec = 0
+		activity.ETASeconds = 0
 		activity.Status = "copied"
 		if activityErr == nil {
 			_ = appendTransferHistory(activityConfig, activity)
@@ -263,6 +267,8 @@ func runQueue(args []string) error {
 		activityConfig, activityErr := defaultSyncConfigPath()
 		lastUpdate := time.Time{}
 		var lastActivity transferActivity
+		var rate transferRate
+		lastTransferID := ""
 		err = queue.Run(ctx, client, windowsclient.UploadOptions{Retries: retries}, func(progress windowsclient.QueueProgress) {
 			percent := 100
 			if progress.TotalBytes > 0 {
@@ -280,10 +286,16 @@ func runQueue(args []string) error {
 			if status == windowsclient.QueueCompleted {
 				status = "copied"
 			}
+			if progress.TransferID != lastTransferID {
+				rate = transferRate{}
+				lastTransferID = progress.TransferID
+			}
+			speed, eta := rate.observe(time.Now(), progress.UploadedBytes, progress.TotalBytes)
 			lastActivity = transferActivity{
 				ProfileID: "queue:" + progress.JobID, Path: progress.Path,
 				Status: status, UploadedBytes: progress.UploadedBytes, TotalBytes: progress.TotalBytes,
 				ItemsDone: progress.CompletedTransfers, ItemsTotal: progress.TotalTransfers,
+				SpeedBytesPerSec: speed, ETASeconds: eta,
 			}
 			if progress.Status != windowsclient.QueueRunning || time.Since(lastUpdate) >= 500*time.Millisecond {
 				_ = saveTransferProgress(activityConfig, lastActivity)
@@ -301,6 +313,8 @@ func runQueue(args []string) error {
 			} else {
 				lastActivity.Status = "completed"
 			}
+			lastActivity.SpeedBytesPerSec = 0
+			lastActivity.ETASeconds = 0
 			_ = saveTransferProgress(activityConfig, lastActivity)
 		}
 		if err != nil {
