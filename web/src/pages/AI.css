@@ -44,3 +44,33 @@
 }
 .ai-page .ai-provider-form button{justify-self:start}
 @media(max-width:640px){.ai-page .ai-controls{display:grid;grid-template-columns:minmax(0,1fr)}.ai-page .ai-controls button{justify-self:start}.ai-page .ai-message{max-width:100%}.ai-page .ai-provider{align-items:flex-start}.ai-page .ai-note .button{margin:10px 0 0}}
+
+/* Local Ollama setup, model download and live hardware overview. */
+.ai-local-page{display:grid;gap:16px;min-width:0}
+.ai-local-page .panel{min-width:0}
+.ai-local-status,.ai-hardware-facts{display:flex;flex-wrap:wrap;gap:12px 24px;margin:10px 0 16px}
+.ai-local-status span,.ai-hardware-facts span{font-size:13px;overflow-wrap:anywhere}
+.ai-local-page .muted{line-height:1.5}
+.ai-model-progress{display:grid;gap:8px;margin:12px 0}
+.ai-model-progress p{margin:0}
+.ai-model-progress progress{width:min(100%,520px);height:12px;accent-color:#5c85ff}
+.ai-model-progress small{color:#9dacbf}
+.ai-model-list{display:grid;gap:10px}
+.ai-model-entry{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;border:1px solid #303a49;border-radius:10px;padding:12px}
+.ai-model-entry>div{display:grid;gap:4px;min-width:0}
+.ai-model-entry strong{font-size:14px}
+.ai-model-entry span{font-size:12px;color:#aebbd0}
+.ai-model-entry small{font-size:11px;color:#7c90aa}
+.ai-gpu-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:10px;margin:12px 0}
+.ai-gpu-device{display:flex;align-items:flex-start;gap:10px;border:1px solid #344455;background:#111923;padding:14px;border-radius:11px;min-width:0;cursor:pointer}
+.ai-gpu-device input{margin-top:4px;flex:0 0 auto;width:18px;height:18px;accent-color:#5c85ff}
+.ai-gpu-device span{display:grid;gap:7px;min-width:0;overflow-wrap:anywhere}
+.ai-gpu-device strong{font-size:13px}
+.ai-gpu-device small{font-size:11px;color:#99a9bf}
+.ai-gpu-choice{font-size:13px;margin:16px 0;line-height:1.5}
+.ai-page .ai-notice .button{margin-left:12px}
+@media(max-width:640px){
+  .ai-page .ai-notice .button{margin:10px 0 0}
+  .ai-model-entry .button{width:100%}
+  .ai-hardware-facts,.ai-local-status{display:grid;gap:8px}
+}

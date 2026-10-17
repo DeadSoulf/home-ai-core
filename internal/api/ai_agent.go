@@ -39,7 +39,8 @@ func (s *server) aiGateway(w http.ResponseWriter, r *http.Request, actor securit
 	parts := strings.Split(subpath, "/")
 	switch {
 	case method == http.MethodGet && (subpath == "status" || subpath == "providers" ||
-		subpath == "conversations" || subpath == "approvals"):
+		subpath == "conversations" || subpath == "approvals" ||
+		subpath == "local/status" || subpath == "local/models"):
 		path = "/api/" + subpath
 	case method == http.MethodGet && len(parts) == 3 &&
 		parts[0] == "conversations" && parts[2] == "messages" && aiObjectID.MatchString(parts[1]):
@@ -48,6 +49,8 @@ func (s *server) aiGateway(w http.ResponseWriter, r *http.Request, actor securit
 		path, auditAction = "/api/providers", "ai.provider.create"
 	case method == http.MethodPost && subpath == "chat":
 		path, auditAction = "/api/chat", "ai.chat.send"
+	case method == http.MethodPost && subpath == "local/pull":
+		path, auditAction = "/api/local/pull", "ai.local.model.pull"
 	case method == http.MethodDelete && len(parts) == 2 &&
 		parts[0] == "providers" && aiObjectID.MatchString(parts[1]):
 		path, auditAction = "/api/providers/"+parts[1], "ai.provider.delete"
