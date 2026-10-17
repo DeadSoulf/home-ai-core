@@ -146,6 +146,29 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 		"--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
 		"--mount", "type=bind,src=" + dataDir + ",dst=/data",
 	}
+	// Reinstalling/updating an NVR must reattach its trusted video disk.
+	// Never fall back to the old system-disk recordings directory when the
+	// selected removable filesystem is offline.
+	if moduleID == "nvr.module" {
+		config, configured, err := readNVRVideoMountConfig()
+		if err != nil {
+			return moduleContainerStatus{}, "", fmt.Errorf("read NVR video mount configuration: %w", err)
+		}
+		if configured {
+			if err := safeNVRDiskMount(ctx, config.Mountpoint, config.UUID); err != nil {
+				return moduleContainerStatus{}, "", fmt.Errorf("NVR video disk is offline: %w", err)
+			}
+			videoDir := filepath.Join(config.Mountpoint, nvrVideoDirectory, "recordings")
+			info, err := os.Lstat(videoDir)
+			if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+				return moduleContainerStatus{}, "", errors.New("trusted NVR recording directory is unavailable")
+			}
+			args = append(args,
+				"--label", "home-ai.nvr.video-storage="+config.UUID,
+				"--mount", "type=bind,src="+videoDir+",dst=/data/recordings",
+			)
+		}
+	}
 	if fromPinnedSource {
 		args = append(args,
 			"--label", "home-ai.module.requested-image="+image,
