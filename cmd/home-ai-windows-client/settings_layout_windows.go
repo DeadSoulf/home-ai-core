@@ -253,3 +253,44 @@ func (state *windowsSettingsUI) handleDPIChange(hwnd, wParam, lParam uintptr) {
 	}
 	state.layoutControls()
 }
+
+func (state *windowsSettingsUI) rebuildDpiFonts() {
+	v := &state.visual
+	old := [7]windows.Handle{v.bodyFont, v.brandFont, v.titleFont, v.headlineFont,
+		v.subtitleFont, v.cardTitleFont, v.cardValueFont}
+	next := [7]windows.Handle{
+		createSettingsFont(state.scale(-12), settingsFWNormal),
+		createSettingsFont(state.scale(-20), settingsFWBold),
+		createSettingsFont(state.scale(-22), settingsFWBold),
+		createSettingsFont(state.scale(-20), settingsFWBold),
+		createSettingsFont(state.scale(-11), settingsFWNormal),
+		createSettingsFont(state.scale(-10), settingsFWSemibold),
+		createSettingsFont(state.scale(-15), settingsFWBold),
+	}
+	for _, handle := range next {
+		if handle == 0 {
+			for _, created := range next {
+				if created != 0 {
+					procSettingsDeleteObject.Call(uintptr(created))
+				}
+			}
+			return
+		}
+	}
+	for hwnd, font := range state.controlFonts {
+		for i, oldFont := range old {
+			if font == oldFont {
+				procSettingsSendMessage.Call(uintptr(hwnd), settingsWMSetFont, uintptr(next[i]), 1)
+				state.controlFonts[hwnd] = next[i]
+				break
+			}
+		}
+	}
+	v.bodyFont, v.brandFont, v.titleFont, v.headlineFont = next[0], next[1], next[2], next[3]
+	v.subtitleFont, v.cardTitleFont, v.cardValueFont = next[4], next[5], next[6]
+	for _, handle := range old {
+		if handle != 0 {
+			procSettingsDeleteObject.Call(uintptr(handle))
+		}
+	}
+}
