@@ -105,6 +105,7 @@ func New(
 	s.mux.HandleFunc("GET /api/v1/modules/operations/{jobID}", s.requireAuth("modules.manage", s.moduleOperation))
 	s.mux.HandleFunc("GET /api/v1/modules/catalog", s.requireAuth("modules.read", s.moduleCatalog))
 	s.mux.HandleFunc("POST /api/v1/modules/catalog/{moduleID}/install", s.requireAuth("modules.manage", s.moduleCatalogInstall))
+	s.mux.HandleFunc("POST /api/v1/modules/catalog/{moduleID}/upgrade", s.requireAuth("modules.manage", s.moduleCatalogUpgrade))
 	s.mux.HandleFunc("POST /api/v1/modules/install", s.requireAuth("modules.manage", s.moduleInstall))
 	s.mux.HandleFunc("GET /api/v1/modules/navigation", s.requireAuth("", s.moduleNavigation))
 	// The NVR UI is native to Core. It never embeds the unauthenticated
