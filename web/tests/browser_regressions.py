@@ -426,11 +426,28 @@ async def suite(browser):
         await expect(h.page.get_by_text('Провайдер не подключён.',exact=False)).to_be_visible()
         await h.page.get_by_role('button',name='AI-провайдеры',exact=True).click()
         section=h.page.locator('section[aria-label="Настройки AI-провайдеров"]')
+        # Regression: formerly the shared .text-input min-height:12rem made every
+        # one-line input/select ~192 CSS pixels tall, obscuring the entire form.
+        for width in [320, 390, 768, 1440]:
+            await h.page.set_viewport_size(dict(width=width,height=900))
+            metrics=await section.locator('.ai-provider-form .text-input').evaluate_all("""els => els.map(el => ({
+                tag:el.tagName, height:el.getBoundingClientRect().height,
+                minHeight:getComputedStyle(el).minHeight, resize:getComputedStyle(el).resize
+            }))""")
+            assert len(metrics)==5, metrics
+            assert all(40 <= item['height'] <= 52 for item in metrics), (width,metrics)
+            assert all(item['resize']=='none' for item in metrics), (width,metrics)
+            assert await h.page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), width
         await section.get_by_role('textbox',name='Название').fill('Локальная модель')
         await section.get_by_role('textbox',name='URL API').fill('http://192.168.1.20:11434')
         await section.get_by_role('textbox',name='Модель').fill('qwen3:8b')
         await section.get_by_role('button',name='Сохранить провайдера').click()
-        await h.page.locator('section[aria-label="Чат с AI"]').get_by_role('textbox',name='Сообщение агенту').fill('Как дела?')
+        chat=h.page.locator('section[aria-label="Чат с AI"]')
+        for el in await chat.locator('.ai-controls select.text-input').all():
+            assert 40 <= await el.evaluate('(el)=>el.getBoundingClientRect().height') <= 52
+        compose_height=await chat.locator('textarea.text-input').evaluate('(el)=>el.getBoundingClientRect().height')
+        assert 80 <= compose_height <= 220, compose_height
+        await chat.get_by_role('textbox',name='Сообщение агенту').fill('Как дела?')
         await h.page.get_by_role('button',name='Отправить',exact=True).click()
         await expect(h.page.get_by_text('Ответ локального агента')).to_be_visible()
         assert any(req[1]=='/api/v1/ai/chat' for req in h.requests)
