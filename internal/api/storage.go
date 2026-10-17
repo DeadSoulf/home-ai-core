@@ -64,6 +64,27 @@ func (s *server) storageOperation(
 			writeAPIError(w, r, http.StatusBadRequest, "invalid_storage_purpose", err.Error(), nil)
 			return
 		}
+		if moduleID, isModule := state.StoragePurposeModuleID(input.Purpose); isModule {
+			if s.modules == nil {
+				writeAPIError(w, r, http.StatusServiceUnavailable, "module_registry_unavailable", "Module registry is unavailable", nil)
+				return
+			}
+			if _, err := s.modules.Get(r.Context(), moduleID); err != nil {
+				writeAPIError(w, r, http.StatusBadRequest, "invalid_storage_module", "Storage can only be assigned to installed modules", nil)
+				return
+			}
+			reserved, err := s.state.ListStoragePurposes(r.Context())
+			if err != nil {
+				writeAPIError(w, r, http.StatusInternalServerError, "storage_usage_unavailable", "Storage assignments are unavailable", nil)
+				return
+			}
+			for _, record := range reserved {
+				if record.Purpose == input.Purpose {
+					writeAPIError(w, r, http.StatusConflict, "storage_module_assignment_exists", "Module already has a reserved disk", nil)
+					return
+				}
+			}
+		}
 	}
 
 	var beforeTree []systeminfo.BlockNode
@@ -72,8 +93,14 @@ func (s *server) storageOperation(
 	case "unmount", "partition.create", "partition.delete", "partition.delete_all", "format", "preflight":
 		beforeTree = systeminfo.Collect(s.nodeID).BlockTree
 	}
-	if input.Operation == "format" {
-		beforePurposes, _ = s.state.ListStoragePurposes(r.Context())
+	if input.Operation == "format" || input.Operation == "unmount" ||
+		input.Operation == "partition.delete" || input.Operation == "partition.delete_all" {
+		var err error
+		beforePurposes, err = s.state.ListStoragePurposes(r.Context())
+		if err != nil {
+			writeAPIError(w, r, http.StatusInternalServerError, "storage_usage_unavailable", "Storage assignments are unavailable", nil)
+			return
+		}
 	}
 
 	switch input.Operation {
@@ -86,6 +113,12 @@ func (s *server) storageOperation(
 				return
 			}
 			usage := storageUsageForNode(node, pools)
+			for _, assigned := range beforePurposes {
+				if moduleID, yes := state.StoragePurposeModuleID(assigned.Purpose); yes &&
+					storagePurposeUsesNode(node, assigned) {
+					usage = append(usage, storagePurposeUsageResponse{Type: "module", ID: moduleID, Name: moduleID})
+				}
+			}
 			if len(usage) > 0 {
 				writeAPIError(
 					w,
@@ -252,4 +285,19 @@ func storageExecutionMode(operation string, dryRun bool) (string, bool) {
 		return "partition.delete_all", true
 	}
 	return operation, dryRun
+}
+
+func storagePurposeUsesNode(node systeminfo.BlockNode, purpose state.StoragePurposeRecord) bool {
+	if purpose.DevicePath != "" && node.Path == purpose.DevicePath {
+		return true
+	}
+	if purpose.FilesystemUUID != "" && node.UUID == purpose.FilesystemUUID {
+		return true
+	}
+	for _, child := range node.Children {
+		if storagePurposeUsesNode(child, purpose) {
+			return true
+		}
+	}
+	return false
 }
