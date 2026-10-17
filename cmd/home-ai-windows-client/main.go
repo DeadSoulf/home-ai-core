@@ -184,11 +184,24 @@ func runUpload(args []string) error {
 	}
 
 	var lastPercent = -1
+	activityConfig, activityConfigErr := defaultSyncConfigPath()
+	activity := transferActivity{ProfileID: "upload", Path: destination, Status: "running"}
+	lastActivityWrite := time.Time{}
+	if activityConfigErr == nil {
+		_ = saveTransferProgress(activityConfig, activity)
+	}
 	result, err := client.UploadFile(ctx, folderID, source, windowsclient.UploadOptions{
 		Destination:  destination,
 		Retries:      retries,
 		RestartStale: restartStale,
 		Progress: func(progress windowsclient.Progress) {
+			if activityConfigErr == nil && (time.Since(lastActivityWrite) >= 500*time.Millisecond || progress.UploadedBytes >= progress.TotalBytes) {
+				activity.Path = progress.Path
+				activity.UploadedBytes = progress.UploadedBytes
+				activity.TotalBytes = progress.TotalBytes
+				_ = saveTransferProgress(activityConfig, activity)
+				lastActivityWrite = time.Now()
+			}
 			percent := 100
 			if progress.TotalBytes > 0 {
 				percent = int((progress.UploadedBytes * 100) / progress.TotalBytes)
@@ -208,7 +221,22 @@ func runUpload(args []string) error {
 		},
 	})
 	if err != nil {
+		if activityConfigErr == nil {
+			activity.Status = "failed"
+			activity.Error = err.Error()
+			_ = saveTransferProgress(activityConfig, activity)
+			_ = appendTransferHistory(activityConfig, activity)
+		}
 		return err
+	}
+	if activityConfigErr == nil {
+		activity.Status = "completed"
+		activity.Path = result.Path
+		activity.UploadedBytes = result.SizeBytes
+		activity.TotalBytes = result.SizeBytes
+		_ = saveTransferProgress(activityConfig, activity)
+		activity.Status = "copied"
+		_ = appendTransferHistory(activityConfig, activity)
 	}
 
 	fmt.Printf("Uploaded: %s\n", result.Path)

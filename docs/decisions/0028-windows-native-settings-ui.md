@@ -55,3 +55,27 @@ The application remains a per-user client with no administrator or LocalSystem r
 - richer transfer progress/history inside the GUI;
 - localization and visual polish beyond the first native settings surface;
 - device-bound/passwordless enrollment.
+
+## Follow-up implementation (2026-10-17)
+
+The original Figma compact geometry is the 96-DPI minimum, not a fixed
+layout. The native settings UI now declares Per-Monitor DPI Awareness v2 and
+Microsoft Windows Common Controls v6 in the executable's **embedded** manifest.
+It recreates Segoe UI fonts and reflows Win32 controls on `WM_DPICHANGED` and
+`WM_SIZE`; the sidebar remains fixed and form fields and activity lists grow.
+
+The same visual language (headers, outlined content groups, blue primary
+actions and consistent spacing) is extended to Connection, Synchronization,
+Backups, Settings and the new Transfers page.
+
+The sync engine, direct copy/upload commands and persistent queue report their actual file progress and
+terminal per-file events to local, bounded activity files alongside the selected
+sync-profile configuration. The GUI reads these files without starting a
+second sync engine. No secrets are persisted; paths and error summaries are
+stored. The live display is a snapshot of the active file (or last result), not
+an aggregate byte ETA across all profiles.
+
+The original **richer transfer progress/history** and **visual polish**
+deferred items are partially implemented by this follow-up. Advanced filters,
+per-profile charts, pruning controls, background release polling and
+bidirectional sync remain outside this ADR.
