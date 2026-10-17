@@ -16,10 +16,10 @@ const (
 )
 
 type ClientSettings struct {
-	Version   int    `json:"version"`
-	ServerURL string `json:"server_url,omitempty"`
-	Username  string `json:"username,omitempty"`
-	Language  string `json:"language,omitempty"`
+	Version       int    `json:"version"`
+	ServerURL     string `json:"server_url,omitempty"`
+	Username      string `json:"username,omitempty"`
+	Language      string `json:"language,omitempty"`
 	UpdateChannel string `json:"update_channel,omitempty"`
 }
 
