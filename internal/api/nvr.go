@@ -325,6 +325,64 @@ func (s *server) nvrControlCamera(w http.ResponseWriter, r *http.Request, actor 
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
+// Only the module ID from the authenticated route is used as an upstream
+// path segment. The NVR resolves the configured camera credentials internally.
+func (s *server) nvrLive(w http.ResponseWriter, r *http.Request, actor security.Actor, source authSource) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	if !s.nvrReady(w, r) { return }
+	id, action := r.PathValue("cameraID"), r.PathValue("action")
+	if !nvrSafeSegment.MatchString(id) || id == ".." || (action != "start" && action != "stop") {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_camera_operation", "Unsupported live preview operation", nil)
+		return
+	}
+	var upstream struct {
+		OK bool `json:"ok"`
+		Key string `json:"key"`
+	}
+	if !s.nvrJSON(w, r, http.MethodPost, "/api/nvr/live/"+id+"/"+action, []byte("{}"), &upstream) {
+		return
+	}
+	result := map[string]any{"ok": upstream.OK}
+	if action == "start" && upstream.OK {
+		// The stream key is derived locally, not trusted from the upstream.
+		// This avoids arbitrary file URLs or escapes in the response.
+		result["playlist_url"] = "/api/v1/nvr/output/hls/camera_"+id+"/index.m3u8"
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *server) nvrDeleteCamera(w http.ResponseWriter, r *http.Request, actor security.Actor, source authSource) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	if !s.nvrReady(w, r) { return }
+	id := r.PathValue("cameraID")
+	if !nvrSafeSegment.MatchString(id) || id == ".." {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_camera_id", "Invalid camera ID", nil)
+		return
+	}
+	// Retain the recording files and index. A separate, deliberately
+	// destructive workflow must be implemented before deletion of archives.
+	var upstream struct {
+		OK bool `json:"ok"`
+		Deleted bool `json:"deleted"`
+	}
+	if !s.nvrJSON(w, r, http.MethodDelete, "/api/nvr/cameras/"+id, nil, &upstream) {
+		return
+	}
+	if !upstream.Deleted {
+		writeAPIError(w, r, http.StatusNotFound, "nvr_camera_not_found", "Camera not found", nil)
+		return
+	}
+	s.security.RecordAudit(r.Context(), s.securityRequestContext(r), actor, "nvr.camera.remove", "nvr.camera", id, "success",
+		map[string]any{"recordings_preserved": true})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "recordings_preserved": true})
+}
+
 func (s *server) nvrOutput(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
 	if !s.nvrReady(w, r) {
 		return
