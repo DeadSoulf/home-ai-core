@@ -91,7 +91,7 @@ export function NVRPage({canManage}: {canManage: boolean}) {
     });
     return () => { active = false; };
   }, [tab, canManage]);
-  const previewRef = useRef<string | undefined>();
+  const previewRef = useRef<string | undefined>(undefined);
   useEffect(() => () => {
     if (previewRef.current) void api.nvrStopLive(previewRef.current).catch(() => {});
   }, []);
