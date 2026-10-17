@@ -2,6 +2,7 @@ import { browserLocale, errorText } from "../ui/messages";
 import type {
   Actor,
   AIStatus, AIProvider, AIConversation, AIMessage, AIApproval, AIChatResponse,
+  AILocalStatus, AILocalModels, AIHardware,
   AuditEntry,
   AuthResponse,
   Job,
@@ -185,6 +186,10 @@ async function postJSON<T>(path: string, body?: unknown, csrf = false): Promise<
 
 export const api = {
   aiStatus: (signal?: AbortSignal) => request<AIStatus>("/api/v1/ai/status", {signal}),
+  aiHardware: (signal?: AbortSignal) => request<AIHardware>("/api/v1/ai/hardware", {signal}),
+  aiLocalStatus: (signal?: AbortSignal) => request<AILocalStatus>("/api/v1/ai/local/status", {signal}),
+  aiLocalModels: (signal?: AbortSignal) => request<AILocalModels>("/api/v1/ai/local/models", {signal}),
+  aiPullLocalModel: (name: string) => postJSON<{queued: boolean; name: string}>("/api/v1/ai/local/pull", {name}, true),
   aiProviders: async () => (await request<{providers: AIProvider[]}>("/api/v1/ai/providers")).providers,
   aiConversations: async () => (await request<{conversations: AIConversation[]}>("/api/v1/ai/conversations")).conversations,
   aiMessages: async (id: string) =>
