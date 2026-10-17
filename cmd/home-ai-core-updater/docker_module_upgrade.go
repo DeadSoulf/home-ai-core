@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -181,8 +182,11 @@ func markerAwareNVRVersion(version string) bool {
 	if !strings.HasPrefix(version, "1.") { return false }
 	parts := strings.Split(version, ".")
 	if len(parts)!=3 { return false }
-	// Current release has marker support starting at 1.1.3.
-	return parts[1] != "0" && (parts[1] != "1" || parts[2] >= "3")
+	minor, err := strconv.Atoi(parts[1])
+	if err != nil || minor < 0 { return false }
+	patch, err := strconv.Atoi(parts[2])
+	if err != nil || patch < 0 { return false }
+	return minor > 1 || minor == 1 && patch >= 3
 }
 func waitModuleUpgradeHealthy(ctx context.Context, dockerPath, name string) error {
 	timeout := time.NewTimer(70*time.Second)
