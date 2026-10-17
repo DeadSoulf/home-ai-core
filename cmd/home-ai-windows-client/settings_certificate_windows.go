@@ -73,6 +73,14 @@ func (state *windowsSettingsUI) beginTrustServerCertificate() {
 	}()
 }
 
+func certificateFingerprintForDisplay(raw string) string {
+	var bytes []string
+	for i := 0; i+2 <= len(raw); i += 2 {
+		bytes = append(bytes, strings.ToUpper(raw[i:i+2]))
+	}
+	return strings.Join(bytes, ":")
+}
+
 func (state *windowsSettingsUI) finishTrustServerCertificate() {
 	state.asyncMu.Lock()
 	result := state.certificateProbe
@@ -95,7 +103,7 @@ func (state *windowsSettingsUI) finishTrustServerCertificate() {
 		return
 	}
 	message := state.trf("cert_pin_confirmation", result.server,
-		strings.ToUpper(result.info.SHA256),
+		certificateFingerprintForDisplay(result.info.SHA256),
 		result.info.Subject,
 		result.info.Issuer,
 		result.info.NotAfter.Local().Format("2006-01-02 15:04"))
