@@ -163,3 +163,48 @@ func (s *server) moduleCatalogInstall(
 	)
 	writeJSON(w, http.StatusAccepted, map[string]any{"job": job})
 }
+
+func (s *server) moduleCatalogUpgrade(
+	w http.ResponseWriter, r *http.Request, actor security.Actor, source authSource,
+) {
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	id := strings.TrimSpace(r.PathValue("moduleID"))
+	if id == "" { s.notFound(w,r); return }
+	installed, err := s.modules.Get(r.Context(), id)
+	if err != nil || installed.Status != "enabled" {
+		writeAPIError(w, r, http.StatusConflict, "module_not_ready", "installed module must be enabled for upgrade", nil)
+		return
+	}
+	catalog, err := loadOfficialModuleCatalog(r)
+	if err != nil {
+		writeAPIError(w,r,http.StatusServiceUnavailable,"module_catalog_unavailable",err.Error(),nil)
+		return
+	}
+	var candidate *modules.Manifest
+	for i := range catalog.Modules {
+		if catalog.Modules[i].ID == id { candidate = &catalog.Modules[i]; break }
+	}
+	if candidate == nil {
+		writeAPIError(w,r,http.StatusNotFound,"module_not_in_catalog","module not in official catalog",nil)
+		return
+	}
+	raw, err := json.Marshal(candidate)
+	if err != nil {
+		writeAPIError(w,r,http.StatusInternalServerError,"module_job_failed","invalid catalog upgrade",nil)
+		return
+	}
+	meta := metadataFromContext(r.Context())
+	job, err := s.submitModuleJob(r.Context(),state.JobRecord{
+		Type: "module.upgrade", ActorType: actor.Type, ActorID: actor.ID,
+		RequestID: meta.RequestID, CorrelationID: meta.CorrelationID,
+		Input: map[string]any{"module_id": id, "manifest_json": string(raw)},
+	})
+	if err != nil { writeModuleSubmitError(w,r,err); return }
+	s.security.RecordAudit(r.Context(),s.securityRequestContext(r),actor,
+		"modules.catalog.upgrade.queued","module",id,"success",
+		map[string]any{"version":candidate.Version,"job_id":job.ID})
+	writeJSON(w,http.StatusAccepted,map[string]any{"job":job})
+}
