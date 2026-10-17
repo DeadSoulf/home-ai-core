@@ -70,6 +70,7 @@ class FilesHarness(Harness):
         self.operations = []
         self.next_id = 1
         self.api_status = {}
+        self.api_errors = {}
         for key, value in kwargs.items():
             setattr(self, key, value)
 
@@ -88,6 +89,9 @@ class FilesHarness(Harness):
         async def respond(body=None, status=200):
             await route.fulfill(status=status, content_type="application/json",
                 body=jsonresponse(body if body is not None else {"error": {"code": "test_failure", "message": "isolated fixture error"}}))
+        if path in self.api_errors:
+            status, code, message, request_id = self.api_errors[path]
+            return await respond({"error": {"code": code, "message": message, "request_id": request_id}}, status)
         if path in self.api_status:
             return await respond(status=self.api_status[path])
 
@@ -396,6 +400,56 @@ async def run_suite(browser):
         assert not any(x[1]=="/api/v1/storage/operation" for x in h.requests)
         await h.close()
 
+    async def backend_storage_error():
+        h=FilesHarness(browser)
+        path="/api/v1/files/folders/fld-test/entries"
+        h.api_errors[path]=(502,"file_folder_storage_unavailable",
+                            "inspect logical folder root: permission denied","req-storage-502")
+        await h.start("/files")
+        await h.page.locator(".ux-folder-card button.primary").click()
+        alert=h.page.locator(".error-notice")
+        await expect(alert).to_contain_text("Хранилище папки недоступно")
+        await expect(alert).not_to_contain_text("Сервер недоступен")
+        await alert.locator("summary").click()
+        await expect(alert).to_contain_text("HTTP 502")
+        await expect(alert).to_contain_text("file_folder_storage_unavailable")
+        await expect(alert).to_contain_text("req-storage-502")
+        await expect(alert).to_contain_text("permission denied")
+        assert not h.unhandled,h.unhandled
+        await h.close()
+
+    async def failed_folder_settings():
+        h=FilesHarness(browser)
+        path="/api/v1/files/folders/fld-test/settings"
+        h.api_errors[path]=(503,"file_management_unavailable",
+                            "folder management unavailable","req-settings-503")
+        await h.start("/files")
+        await h.page.locator(".ux-folder-card button.secondary").click()
+        panel=h.page.locator("section.panel").filter(has_text="Настройки папки")
+        await expect(panel.locator(".error-notice")).to_contain_text("Недоступны данные папок")
+        await panel.locator(".error-notice summary").click()
+        await expect(panel.locator(".error-notice")).to_contain_text("HTTP 503")
+        await expect(panel.locator(".error-notice")).to_contain_text("req-settings-503")
+        assert not h.unhandled,h.unhandled
+        await h.close()
+
+    async def unknown_file_http_error():
+        h=FilesHarness(browser)
+        path="/api/v1/files/folders/fld-test/directories"
+        h.api_errors[path]=(502,"unmapped_files_failure","synthetic unknown error","req-unknown-502")
+        await h.start("/files")
+        await h.page.locator(".ux-folder-card button.primary").click()
+        form=h.page.locator(".file-browser-actions form")
+        await form.locator("input").fill("NewDirectory")
+        await form.locator("button").click()
+        alert=h.page.locator(".error-notice")
+        await expect(alert).to_contain_text("Core ответил ошибкой HTTP 502")
+        await alert.locator("summary").click()
+        await expect(alert).to_contain_text("unmapped_files_failure")
+        await expect(alert).to_contain_text("req-unknown-502")
+        assert not h.unhandled,h.unhandled
+        await h.close()
+
     scenarios=[
         ("FILES-01: list/open/nested navigation",basic_folders),
         ("FILES-02: mkdir/move/delete/trash listing",directories_and_move),
@@ -409,6 +463,9 @@ async def run_suite(browser):
         ("FILES-10: SMB install and workgroup apply",install_and_apply_smb),
         ("FILES-11: file manager without system.read sees truthful storage error",missing_system_read),
         ("FILES-12: file manager without storage.manage cannot attempt mount",missing_storage_manage),
+        ("FILES-13: failed storage API shows actionable cause and request ID",backend_storage_error),
+        ("FILES-14: folder settings failure exposes API details",failed_folder_settings),
+        ("FILES-15: unknown HTTP 502 is not falsely called offline",unknown_file_http_error),
     ]
     failures=[]
     for name, fn in scenarios:

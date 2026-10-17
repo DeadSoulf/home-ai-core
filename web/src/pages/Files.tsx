@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { api } from "../api/client";
+import { api, APIError } from "../api/client";
+import { ErrorNotice } from "../components/ErrorNotice";
+import { describeFileError } from "../ui/fileErrors";
 import type { StoragePurposeAssignment } from "../api/types";
 import { FolderSettings } from "../components/FolderSettings";
 import { SectionGuide } from "../components/SectionGuide";
@@ -78,6 +80,16 @@ export function FilesPage({
   const [entries, setEntries] = useState<Awaited<ReturnType<typeof api.fileEntries>>>([]);
   const [entriesLoading, setEntriesLoading] = useState(false);
   const [browserError, setBrowserError] = useState("");
+  const [formErrorCause, setFormErrorCause] = useState<unknown>();
+  const [browserErrorCause, setBrowserErrorCause] = useState<unknown>();
+  function reportFormError(message: string, cause?: unknown) {
+    setFormError(message);
+    setFormErrorCause(message ? cause : undefined);
+  }
+  function reportBrowserError(message: string, cause?: unknown) {
+    setBrowserError(message);
+    setBrowserErrorCause(message ? cause : undefined);
+  }
   const [newDirectoryName, setNewDirectoryName] = useState("");
   const [trashVisible, setTrashVisible] = useState(false);
   const [trashEntries, setTrashEntries] = useState<Awaited<ReturnType<typeof api.fileTrash>>>([]);
@@ -101,14 +113,14 @@ export function FilesPage({
 
   async function installSMB() {
     setBusy("smb-install");
-    setFormError("");
+    reportFormError("");
     setNotice("");
     try {
       const result = await api.smbOperation({operation: "install"});
       setNotice(result.message);
       resource.reload();
     } catch (reason) {
-      setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
+      reportFormError(describeFileError(reason, locale, t("requestFailed")), reason);
     } finally {
       setBusy("");
     }
@@ -116,7 +128,7 @@ export function FilesPage({
 
   async function applySMB() {
     setBusy("smb-apply");
-    setFormError("");
+    reportFormError("");
     setNotice("");
     try {
       const result = await api.smbOperation({
@@ -126,7 +138,7 @@ export function FilesPage({
       setNotice(result.message);
       resource.reload();
     } catch (reason) {
-      setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
+      reportFormError(describeFileError(reason, locale, t("requestFailed")), reason);
     } finally {
       setBusy("");
     }
@@ -135,11 +147,11 @@ export function FilesPage({
   async function submitSMBPassword(event: FormEvent) {
     event.preventDefault();
     if (!smbUserID || smbPassword.length < 12) {
-      setFormError(t("smbPasswordRequirement"));
+      reportFormError(t("smbPasswordRequirement"));
       return;
     }
     setBusy("smb-password");
-    setFormError("");
+    reportFormError("");
     setNotice("");
     try {
       const result = await api.smbOperation({
@@ -151,7 +163,7 @@ export function FilesPage({
       setNotice(result.message);
       resource.reload();
     } catch (reason) {
-      setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
+      reportFormError(describeFileError(reason, locale, t("requestFailed")), reason);
     } finally {
       setBusy("");
     }
@@ -161,7 +173,7 @@ export function FilesPage({
     if (!canManageStorage) return;
     const busyKey = `storage-mount-${storage.device}`;
     setBusy(busyKey);
-    setFormError("");
+    reportFormError("");
     setNotice("");
     try {
       const result = await api.storageOperation({operation: "mount", device: storage.device});
@@ -174,7 +186,7 @@ export function FilesPage({
       setNotice(t("fileStorageMounted"));
       resource.reload();
     } catch (reason) {
-      setFormError(localizeFileStorageError(reason, locale, t("requestFailed"), t("fileStorageMountFailed"), t("fileStorageMountedElsewhere"), t("fileStorageFilesystemError")));
+      reportFormError(localizeFileStorageError(reason, locale, t("requestFailed"), t("fileStorageMountFailed"), t("fileStorageMountedElsewhere"), t("fileStorageFilesystemError")), reason);
     } finally {
       setBusy("");
     }
@@ -183,7 +195,7 @@ export function FilesPage({
   async function createPool(event: FormEvent) {
     event.preventDefault();
     setBusy("pool");
-    setFormError("");
+    reportFormError("");
     setNotice("");
     try {
       await api.createFilePool({name: poolName, rootPath: poolRoot});
@@ -192,11 +204,11 @@ export function FilesPage({
       setNotice(t("filePoolCreated"));
       resource.reload();
     } catch (reason) {
-      const message = reason instanceof Error ? reason.message : "";
+      const message = reason instanceof APIError ? reason.rawMessage : reason instanceof Error ? reason.message : "";
       if (locale === "ru" && message.includes("file pool root must be a mounted storage device explicitly assigned to Files")) {
-        setFormError(t("filePoolStorageNotReady"));
+        reportFormError(t("filePoolStorageNotReady"), reason);
       } else {
-        setFormError(message || t("requestFailed"));
+        reportFormError(describeFileError(reason, locale, t("requestFailed")), reason);
       }
     } finally {
       setBusy("");
@@ -209,14 +221,14 @@ export function FilesPage({
     const reservePercent = Number(data.get("reserve_percent"));
     const warningPercent = Number(data.get("warning_percent"));
     setBusy(`pool-policy-${poolId}`);
-    setFormError("");
+    reportFormError("");
     setNotice("");
     try {
       await api.updateFilePoolCapacityPolicy(poolId, {reservePercent, warningPercent});
       setNotice(t("filePoolPolicySaved"));
       resource.reload();
     } catch (reason) {
-      setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
+      reportFormError(describeFileError(reason, locale, t("requestFailed")), reason);
     } finally {
       setBusy("");
     }
@@ -225,15 +237,15 @@ export function FilesPage({
   async function createFolder(event: FormEvent) {
     event.preventDefault();
     if (!folderPoolID) {
-      setFormError(t("filePoolRequired"));
+      reportFormError(t("filePoolRequired"));
       return;
     }
     if (folderKind === "private" && !ownerUserID) {
-      setFormError(t("fileOwnerRequired"));
+      reportFormError(t("fileOwnerRequired"));
       return;
     }
     setBusy("folder");
-    setFormError("");
+    reportFormError("");
     setNotice("");
     try {
       const created = await api.createFileFolder({
@@ -246,7 +258,7 @@ export function FilesPage({
       setNotice(created.warning || t("fileFolderCreated"));
       resource.reload();
     } catch (reason) {
-      setFormError(reason instanceof Error ? reason.message : t("requestFailed"));
+      reportFormError(describeFileError(reason, locale, t("requestFailed")), reason);
     } finally {
       setBusy("");
     }
@@ -260,15 +272,15 @@ export function FilesPage({
       return;
     }
     setEntriesLoading(true);
-    setBrowserError("");
+    reportBrowserError("");
     try {
       setEntries(await api.fileEntries(folderID, path));
     } catch (reason) {
-      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+      reportBrowserError(describeFileError(reason, locale, t("requestFailed")), reason);
     } finally {
       setEntriesLoading(false);
     }
-  }, [t]);
+  }, [t, locale]);
 
   useEffect(() => {
     if (selectedFolderID) {
@@ -282,7 +294,7 @@ export function FilesPage({
     setEntries([]);
     setTrashVisible(false);
     setTrashEntries([]);
-    setBrowserError("");
+    reportBrowserError("");
   }
 
   function openDirectory(path: string) {
@@ -300,14 +312,14 @@ export function FilesPage({
     event.preventDefault();
     if (!selectedFolder || !selectedFolder.can_write || !newDirectoryName.trim()) return;
     setBusy("browser-directory");
-    setBrowserError("");
+    reportBrowserError("");
     try {
       const path = joinFilePath(currentPath, newDirectoryName.trim());
       await api.createFileDirectory(selectedFolder.id, path);
       setNewDirectoryName("");
       await loadEntries(selectedFolder.id, currentPath);
     } catch (reason) {
-      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+      reportBrowserError(describeFileError(reason, locale, t("requestFailed")), reason);
     } finally {
       setBusy("");
     }
@@ -316,7 +328,7 @@ export function FilesPage({
   async function uploadSelected(file?: File) {
     if (!file || !selectedFolder || !selectedFolder.can_write) return;
     setBusy("browser-upload");
-    setBrowserError("");
+    reportBrowserError("");
     setNotice("");
 
     const targetPath = joinFilePath(currentPath, file.name);
@@ -388,8 +400,8 @@ export function FilesPage({
       setNotice(t("fileUploadCompleteChecksum").replace("{sha256}", result.sha256));
       await loadEntries(selectedFolder.id, currentPath);
     } catch (reason) {
-      const message = reason instanceof Error ? reason.message : t("requestFailed");
-      setBrowserError(`${t("fileUploadInterrupted")} ${message}`);
+      const message = describeFileError(reason, locale, t("requestFailed"));
+      reportBrowserError(`${t("fileUploadInterrupted")} ${message}`, reason);
     } finally {
       setUploadProgress(undefined);
       setBusy("");
@@ -400,7 +412,7 @@ export function FilesPage({
     if (!selectedFolder?.can_write) return;
     if (!window.confirm(t("fileDeleteConfirm").replace("{name}", name))) return;
     setBusy("browser-delete");
-    setBrowserError("");
+    reportBrowserError("");
     try {
       await api.deleteFileEntry(selectedFolder.id, path);
       await loadEntries(selectedFolder.id, currentPath);
@@ -408,7 +420,7 @@ export function FilesPage({
         await loadTrash(selectedFolder.id);
       }
     } catch (reason) {
-      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+      reportBrowserError(describeFileError(reason, locale, t("requestFailed")), reason);
     } finally {
       setBusy("");
     }
@@ -419,12 +431,12 @@ export function FilesPage({
     const target = window.prompt(t("fileMovePrompt"), path);
     if (!target || target === path) return;
     setBusy("browser-move");
-    setBrowserError("");
+    reportBrowserError("");
     try {
       await api.moveFileEntry(selectedFolder.id, path, target);
       await loadEntries(selectedFolder.id, currentPath);
     } catch (reason) {
-      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+      reportBrowserError(describeFileError(reason, locale, t("requestFailed")), reason);
     } finally {
       setBusy("");
     }
@@ -432,11 +444,11 @@ export function FilesPage({
 
   async function loadTrash(folderID: string) {
     setTrashLoading(true);
-    setBrowserError("");
+    reportBrowserError("");
     try {
       setTrashEntries(await api.fileTrash(folderID));
     } catch (reason) {
-      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+      reportBrowserError(describeFileError(reason, locale, t("requestFailed")), reason);
     } finally {
       setTrashLoading(false);
     }
@@ -454,7 +466,7 @@ export function FilesPage({
   async function restoreTrashEntry(id: string) {
     if (!selectedFolder?.can_write) return;
     setBusy("trash-restore");
-    setBrowserError("");
+    reportBrowserError("");
     try {
       await api.restoreFileTrash(selectedFolder.id, id);
       await Promise.all([
@@ -462,7 +474,7 @@ export function FilesPage({
         loadEntries(selectedFolder.id, currentPath),
       ]);
     } catch (reason) {
-      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+      reportBrowserError(describeFileError(reason, locale, t("requestFailed")), reason);
     } finally {
       setBusy("");
     }
@@ -472,12 +484,12 @@ export function FilesPage({
     if (!selectedFolder?.can_write) return;
     if (!window.confirm(t("fileTrashPurgeConfirm").replace("{name}", name))) return;
     setBusy("trash-purge");
-    setBrowserError("");
+    reportBrowserError("");
     try {
       await api.purgeFileTrash(selectedFolder.id, id);
       await loadTrash(selectedFolder.id);
     } catch (reason) {
-      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+      reportBrowserError(describeFileError(reason, locale, t("requestFailed")), reason);
     } finally {
       setBusy("");
     }
@@ -486,7 +498,7 @@ export function FilesPage({
   async function downloadEntry(path: string, name: string) {
     if (!selectedFolder) return;
     setBusy("browser-download");
-    setBrowserError("");
+    reportBrowserError("");
     try {
       const blob = await api.downloadFile(selectedFolder.id, path);
       const url = URL.createObjectURL(blob);
@@ -498,14 +510,14 @@ export function FilesPage({
       link.remove();
       URL.revokeObjectURL(url);
     } catch (reason) {
-      setBrowserError(reason instanceof Error ? reason.message : t("requestFailed"));
+      reportBrowserError(describeFileError(reason, locale, t("requestFailed")), reason);
     } finally {
       setBusy("");
     }
   }
 
   if (resource.loading && !resource.data) return <LoadingState />;
-  if (resource.error && !resource.data) return <ErrorState message={resource.error} />;
+  if (resource.error && !resource.data) return <div className="page"><ErrorNotice error={resource.failure} message={describeFileError(resource.failure, locale, resource.error)} /><button className="button secondary" type="button" onClick={resource.reload}>{u("retry")}</button></div>;
 
   const folders = resource.data?.folders || [];
   const pools = resource.data?.pools || [];
@@ -541,7 +553,7 @@ export function FilesPage({
       {canManage && section === "windows" && loadErrors?.smb &&
         <ErrorState message={u("filesSMBLoadFailed") + " " + loadErrors.smb} onRetry={resource.reload} />}
 
-      {formError && <div className="form-error">{formError}</div>}
+      {formError && (formErrorCause ? <ErrorNotice error={formErrorCause} message={formError} /> : <div className="form-error" role="alert">{formError}</div>)}
       {notice && <div className="storage-success">{notice}</div>}
 
       {canManage && <nav className="file-section-tabs" aria-label={t("files")}>
@@ -673,7 +685,7 @@ export function FilesPage({
             </div>
           )}
 
-          {browserError && <div className="form-error">{browserError}</div>}
+          {browserError && (browserErrorCause ? <ErrorNotice error={browserErrorCause} message={browserError} /> : <div className="form-error" role="alert">{browserError}</div>)}
           {entriesLoading ? (
             <div className="muted">{t("loading")}</div>
           ) : (
@@ -1266,8 +1278,8 @@ function localizeFileStorageError(
   filesystemError: string,
 ): string {
   if (!(reason instanceof Error)) return fallback;
-  const message = reason.message || "";
-  if (locale !== "ru") return message || fallback;
+  const message = reason instanceof APIError ? reason.rawMessage : reason.message || "";
+  if (locale !== "ru") return describeFileError(reason, locale, fallback);
 
   if (message.includes("device is already mounted at")) {
     const location = message.split("device is already mounted at")[1]?.trim();
@@ -1289,7 +1301,7 @@ function localizeFileStorageError(
   if (message.includes("storage helper")) {
     return "Не удалось связаться с системным модулем управления хранилищем.";
   }
-  return message || fallback;
+  return describeFileError(reason, locale, fallback);
 }
 
 function fileStorageMountOptions(assignments: StoragePurposeAssignment[]): NASMountOption[] {

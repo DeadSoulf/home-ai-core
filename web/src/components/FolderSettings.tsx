@@ -1,5 +1,7 @@
 import {useEffect, useState, type FormEvent} from "react";
 import {api} from "../api/client";
+import {ErrorNotice} from "./ErrorNotice";
+import {describeFileError} from "../ui/fileErrors";
 import {useI18n} from "../i18n";
 import {Panel} from "./Panel";
 
@@ -9,25 +11,26 @@ export function FolderSettings({folderID, users, onSaved, onClose}: {
   onSaved: () => void;
   onClose: () => void;
 }) {
-  const {t} = useI18n();
+  const {t, locale} = useI18n();
   const [value, setValue] = useState<Awaited<ReturnType<typeof api.fileFolderSettings>>>();
   const [name, setName] = useState("");
   const [limit, setLimit] = useState("");
   const [hard, setHard] = useState(false);
   const [access, setAccess] = useState<{user_id: string; read: boolean; write: boolean}[]>([]);
   const [error, setError] = useState("");
+  const [errorCause, setErrorCause] = useState<unknown>();
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let live = true;
-    setValue(undefined); setError("");
+    setValue(undefined); setError(""); setErrorCause(undefined);
     api.fileFolderSettings(folderID).then((result) => {
       if (!live) return;
       setValue(result); setName(result.folder.name);
       setLimit(result.folder.quota_bytes ? String(result.folder.quota_bytes / 2 ** 30) : "");
       setHard(result.folder.hard_quota_bytes > 0); setAccess(result.access);
-    }).catch((reason: unknown) => {if (live) setError(reason instanceof Error ? reason.message : t("requestFailed"));});
+    }).catch((reason: unknown) => {if (live) { setError(describeFileError(reason, locale, t("requestFailed"))); setErrorCause(reason); }});
     return () => {live = false;};
-  }, [folderID, t]);
+  }, [folderID, t, locale]);
   function toggle(id: string, permission: "read" | "write") {
     setAccess((items) => {
       const item = items.find((entry) => entry.user_id === id) || {user_id: id, read: false, write: false};
@@ -38,21 +41,21 @@ export function FolderSettings({folderID, users, onSaved, onClose}: {
     });
   }
   async function save(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setError("");
+    event.preventDefault(); setBusy(true); setError(""); setErrorCause(undefined);
     try {
       const result = await api.updateFileFolderSettings(folderID, {
         name, quota_bytes: limit === "" ? 0 : Math.floor(Number(limit) * 2 ** 30),
         enforce_smb: hard, access,
       });
       onSaved();
-      if (result.warning) setError(result.warning); else onClose();
+      if (result.warning) { setError(result.warning); setErrorCause(undefined); } else onClose();
       window.dispatchEvent(new CustomEvent("home-ai-core:user-access-changed"));
-    } catch (reason) {setError(reason instanceof Error ? reason.message : t("requestFailed"));}
+    } catch (reason) {setError(describeFileError(reason, locale, t("requestFailed"))); setErrorCause(reason);}
     finally {setBusy(false);}
   }
   return <Panel title={t("fileFolderSettings")} className="wide">
-    {error && <div role="alert" className="form-error">{error}</div>}
-    {!value ? <p>{t("loading")}</p> : <form className="user-form" onSubmit={save}>
+    {error && (errorCause ? <ErrorNotice error={errorCause} message={error} /> : <div role="alert" className="form-error">{error}</div>)}
+    {!value ? !error && <p>{t("loading")}</p> : <form className="user-form" onSubmit={save}>
       <label>{t("name")}<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={128}/></label>
       <label>{t("quotaGiB")}<input type="number" min={0} step="any" value={limit} onChange={(event) => setLimit(event.target.value)} placeholder={t("quotaUnlimited")}/></label>
       <p className="muted small">{t("quotaAccountingNotice")}</p>
