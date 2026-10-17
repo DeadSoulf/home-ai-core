@@ -49,7 +49,7 @@ func runClientInstall(reopenSettings bool, configPath, settingsPath string) (run
 		fmt.Printf("Home-AI Windows client is already current: %s\n", result.Path)
 	}
 	if reopenSettings {
-		if err := reopenWindowsClientSettings(result.Path, configPath, settingsPath); err != nil {
+		if err := reopenWindowsClientSettings(result.Path, configPath, settingsPath, result.Changed); err != nil {
 			return err
 		}
 	}
