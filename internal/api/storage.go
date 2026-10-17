@@ -60,7 +60,7 @@ func (s *server) storageOperation(
 			writeAPIError(w, r, http.StatusBadRequest, "invalid_storage_request", "storage purpose can only be supplied while creating a partition", nil)
 			return
 		}
-		if _, err := state.NormalizeStoragePurpose(input.Purpose); err != nil {
+		if _, err := s.validateAssignedModulePurpose(r.Context(), input.Purpose); err != nil {
 			writeAPIError(w, r, http.StatusBadRequest, "invalid_storage_purpose", err.Error(), nil)
 			return
 		}
