@@ -8,6 +8,7 @@ import (
 
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
+	"github.com/DeadSoulf/home-ai-core/internal/systeminfo"
 )
 
 type storagePurposeChoice struct {
@@ -91,3 +92,15 @@ func (s *server) ensureStorageDeviceNotUsedByModule(ctx context.Context, device,
 	return nil
 }
 
+
+func (s *server) ensureStorageNodeNotUsedByModule(ctx context.Context, node systeminfo.BlockNode, records []state.StoragePurposeRecord) error {
+	if err := s.ensureStorageDeviceNotUsedByModule(ctx, node.Path, node.UUID, records); err != nil {
+		return err
+	}
+	for _, child := range node.Children {
+		if err := s.ensureStorageNodeNotUsedByModule(ctx, child, records); err != nil {
+			return err
+		}
+	}
+	return nil
+}
