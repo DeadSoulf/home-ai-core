@@ -8,8 +8,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/DeadSoulf/home-ai-core/internal/windowsclient"
 	"github.com/DeadSoulf/home-ai-core/internal/version"
+	"github.com/DeadSoulf/home-ai-core/internal/windowsclient"
 )
 
 func runClient(args []string) error {
