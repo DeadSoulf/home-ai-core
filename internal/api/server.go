@@ -17,6 +17,7 @@ import (
 type server struct {
 	moduleSubmitMu      sync.Mutex
 	nvrEndpoint         func(context.Context) (string, error)
+	nvrTransport        http.RoundTripper
 	nodeID              string
 	logger              *slog.Logger
 	state               State
