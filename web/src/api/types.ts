@@ -153,6 +153,48 @@ export type SystemResponse = {
   };
 };
 
+// AI Agent module responses are obtained through the Core-authenticated gateway.
+// The module's bearer token is NEVER exposed to the browser.
+export type AIStatus = {
+  version: string;
+  providers: number;
+  approvals_pending: number;
+  core_actions_enabled: boolean;
+};
+
+export type AIProvider = {
+  id: string;
+  name: string;
+  kind: "ollama" | "openai" | "openai_compatible";
+  base_url: string;
+  model: string;
+  has_api_key: boolean | number;
+};
+
+export type AIConversation = {
+  id: string;
+  title: string;
+  created_at: number;
+  updated_at: number;
+};
+
+export type AIMessage = {role: "user" | "assistant"; content: string};
+
+export type AIApproval = {
+  id: string;
+  action: string;
+  target: string;
+  reason: string;
+  status: "pending" | "approved_not_executed" | "rejected";
+  created_at: number;
+};
+
+export type AIChatResponse = {
+  conversation_id: string;
+  reply: string;
+  approval_ids: string[];
+};
+
 export type NVRStatus = {
   ok: boolean;
   service: string;
