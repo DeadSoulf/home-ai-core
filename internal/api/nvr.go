@@ -285,6 +285,9 @@ func (s *server) nvrAddCamera(w http.ResponseWriter, r *http.Request, actor secu
 	if !s.nvrJSON(w, r, http.MethodPost, "/api/nvr/cameras", data, &ignored) {
 		return
 	}
+	s.security.RecordAudit(r.Context(), s.securityRequestContext(r), actor,
+		"nvr.camera.create", "module", "nvr.module", "success",
+		map[string]any{"source_type": input.SourceType})
 	// Never echo a credential-containing RTSP URL back to the browser.
 	writeJSON(w, http.StatusCreated, map[string]any{"ok": true})
 }
@@ -307,6 +310,9 @@ func (s *server) nvrControlCamera(w http.ResponseWriter, r *http.Request, actor 
 	if !s.nvrJSON(w, r, http.MethodPost, "/api/nvr/cameras/"+id+"/"+action, []byte("{}"), &ignored) {
 		return
 	}
+	s.security.RecordAudit(r.Context(), s.securityRequestContext(r), actor,
+		"nvr.camera."+action, "module", "nvr.module", "success",
+		map[string]any{"camera_id": id})
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
