@@ -135,47 +135,67 @@ func TestDeleteLogicalFolderRejectsHardQuota(t *testing.T) {
 
 func TestDeleteVisibleEmptyFolderExplainsHiddenUploadAndTrash(t *testing.T) {
 	for _, tc := range []struct {
-		name string
-		artifact string
+		name      string
+		artifact  string
 		wantField string
 	}{
 		{"hidden upload artifact", ".home-ai-upload-abandoned.part", "upload_artifacts"},
 		{"hidden trash payload", filepath.Join(".home-ai-trash", "items", "orphan"), "trash_items"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			handler,store,folder:=quotaFixture(t)
-			root,err:=filedata.FolderRoot(folder.PoolRoot,folder.RelativePath)
-			if err!=nil {t.Fatal(err)}
-			target:=filepath.Join(root,tc.artifact)
-			if err:=os.MkdirAll(filepath.Dir(target),0o750);err!=nil{t.Fatal(err)}
-			if err:=os.WriteFile(target,[]byte("must not remove"),0o640);err!=nil{t.Fatal(err)}
+			handler, store, folder := quotaFixture(t)
+			root, err := filedata.FolderRoot(folder.PoolRoot, folder.RelativePath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			target := filepath.Join(root, tc.artifact)
+			if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(target, []byte("must not remove"), 0o640); err != nil {
+				t.Fatal(err)
+			}
 			// The browser's ordinary file listing is empty because internal
 			// trash and unfinished-upload files are intentionally hidden.
-			listing:=quotaRequest(handler,http.MethodGet,"/api/v1/files/folders/"+folder.ID+"/entries","")
-			if listing.Code!=http.StatusOK || !strings.Contains(listing.Body.String(),`"entries":[]`) {
-				t.Fatalf("ordinary listing should look empty: %d %s",listing.Code,listing.Body)
+			listing := quotaRequest(handler, http.MethodGet, "/api/v1/files/folders/"+folder.ID+"/entries", "")
+			if listing.Code != http.StatusOK || !strings.Contains(listing.Body.String(), `"entries":[]`) {
+				t.Fatalf("ordinary listing should look empty: %d %s", listing.Code, listing.Body)
 			}
-			rec:=quotaRequest(handler,http.MethodDelete,"/api/v1/files/folders/"+folder.ID,
+			rec := quotaRequest(handler, http.MethodDelete, "/api/v1/files/folders/"+folder.ID,
 				`{"confirm_name":"Personal"}`)
-			if rec.Code!=http.StatusConflict {t.Fatalf("delete must be refused: %d %s",rec.Code,rec.Body)}
+			if rec.Code != http.StatusConflict {
+				t.Fatalf("delete must be refused: %d %s", rec.Code, rec.Body)
+			}
 			var reply struct {
 				Error struct {
-					Code string `json:"code"`
+					Code    string `json:"code"`
 					Details struct {
 						Blockers filedata.FolderRemovalBlockers `json:"blockers"`
 					} `json:"details"`
 				} `json:"error"`
 			}
-			if err:=json.Unmarshal(rec.Body.Bytes(),&reply);err!=nil{t.Fatal(err)}
-			if reply.Error.Code!="file_folder_not_empty"{t.Fatalf("unexpected error: %#v",reply)}
+			if err := json.Unmarshal(rec.Body.Bytes(), &reply); err != nil {
+				t.Fatal(err)
+			}
+			if reply.Error.Code != "file_folder_not_empty" {
+				t.Fatalf("unexpected error: %#v", reply)
+			}
 			switch tc.wantField {
 			case "upload_artifacts":
-				if reply.Error.Details.Blockers.UploadArtifacts!=1{t.Fatalf("expected hidden upload diagnostics: %#v",reply)}
+				if reply.Error.Details.Blockers.UploadArtifacts != 1 {
+					t.Fatalf("expected hidden upload diagnostics: %#v", reply)
+				}
 			case "trash_items":
-				if reply.Error.Details.Blockers.TrashItems!=1{t.Fatalf("expected hidden trash diagnostics: %#v",reply)}
+				if reply.Error.Details.Blockers.TrashItems != 1 {
+					t.Fatalf("expected hidden trash diagnostics: %#v", reply)
+				}
 			}
-			if _,err:=os.Lstat(target);err!=nil{t.Fatalf("data lost after rejected delete: %v",err)}
-			if _,err:=store.NASFolder(context.Background(),folder.ID);err!=nil{t.Fatalf("folder metadata lost: %v",err)}
+			if _, err := os.Lstat(target); err != nil {
+				t.Fatalf("data lost after rejected delete: %v", err)
+			}
+			if _, err := store.NASFolder(context.Background(), folder.ID); err != nil {
+				t.Fatalf("folder metadata lost: %v", err)
+			}
 		})
 	}
 }
