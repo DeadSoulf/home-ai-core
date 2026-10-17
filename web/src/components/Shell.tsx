@@ -5,6 +5,8 @@ import { useUI } from "../ui/useUI";
 import { COPYRIGHT_NOTICE } from "../branding";
 import { LanguageSwitch, useI18n } from "../i18n";
 import { hasPermission, visibleNavigation } from "../navigation";
+import { NavigationIcon } from "./NavigationIcon";
+import { navigationHint } from "../ui/experience";
 
 export function Shell(props: {
   actor: Actor;
@@ -99,7 +101,11 @@ export function Shell(props: {
                 <button type="button" key={path} className={isActivePath(path) ? "nav-item active" : "nav-item"}
                   aria-current={isActivePath(path) ? "page" : undefined}
                   onClick={() => { props.onNavigate(path); if (menuOpen) closeMenu(); }}>
-                  <span>{label ? t(label) : title}</span>
+                  <span className="ux-nav-icon"><NavigationIcon path={path} /></span>
+                  <span className="ux-nav-copy">
+                    <span>{label ? t(label) : title}</span>
+                    <small>{u(navigationHint(path))}</small>
+                  </span>
                   {path === "/system" && props.availableUpdate && hasPermission(props.actor, "updates.read") &&
                     <span className="nav-update-badge" aria-label={t("newUpdateAvailable")}>↑</span>}
                 </button>
