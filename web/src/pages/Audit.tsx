@@ -5,9 +5,12 @@ import { ErrorState, LoadingState, Panel } from "../components/Panel";
 import { useI18n } from "../i18n";
 import { actorLabelKey, auditLabelKey } from "../display";
 import { PageHeading, Status } from "./Dashboard";
+import { SectionGuide } from "../components/SectionGuide";
+import { useUI } from "../ui/useUI";
 
 export function AuditPage({revision}: {revision: number}) {
   const {t, date} = useI18n();
+  const u = useUI();
   const load = useCallback(() => api.audit(), []);
   const {data, loading, error} = useResource(load, revision);
 
@@ -17,6 +20,7 @@ export function AuditPage({revision}: {revision: number}) {
   return (
     <div className="page">
       <PageHeading title={t("securityLog")} subtitle={t("auditSubtitleSimple")} />
+      <SectionGuide title={u("uxAuditGuide")} description={u("uxAuditGuideDescription")} />
       {error && <ErrorState message={error} />}
       <Panel title={t("recentEvents")}>
         <div className="table-wrap">

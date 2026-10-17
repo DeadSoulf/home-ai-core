@@ -4,6 +4,7 @@ import App from "./App";
 import { I18nProvider } from "./i18n";
 import "./styles.css";
 import "./ui-audit.css";
+import "./experience.css";
 
 const root = document.getElementById("root");
 if (!root) {

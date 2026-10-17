@@ -4,12 +4,13 @@ import { useI18n } from "../i18n";
 
 export function Panel(props: {
   title: string;
+  id?: string;
   children: ReactNode;
   action?: ReactNode;
   className?: string;
 }) {
   return (
-    <section className={`panel ${props.className || ""}`.trim()}>
+    <section id={props.id} className={`panel ${props.className || ""}`.trim()}>
       <header className="panel-header">
         <h2>{props.title}</h2>
         {props.action}

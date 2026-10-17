@@ -8,6 +8,8 @@ import { PageHeading } from "./Dashboard";
 import { StorageBrowser } from "../components/StorageBrowser";
 import { NetworkManagement } from "../components/NetworkManagement";
 import { ServerConsole } from "../components/ServerConsole";
+import { SectionGuide } from "../components/SectionGuide";
+import { systemGuides } from "../ui/experience";
 import { useUI } from "../ui/useUI";
 import type { SystemSection } from "../navigation";
 
@@ -250,6 +252,7 @@ export function SystemPage({
           .map((item) => <button type="button" key={item} className={`button secondary${activeSection === item ? " active" : ""}`}
             aria-current={activeSection === item ? "page" : undefined} onClick={() => onSectionChange(item)}>{t(item)}</button>)}
       </nav>
+      <SectionGuide title={u(systemGuides[activeSection].title)} description={u(systemGuides[activeSection].description)} />
       {error && <ErrorState message={error} />}
       <div className="two-column">
         {activeSection === "equipment" && <>

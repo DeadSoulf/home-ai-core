@@ -10,6 +10,8 @@ import { ErrorState, LoadingState, Panel } from "../components/Panel";
 import { useResource } from "../hooks/useResource";
 import { useI18n, type StringKey } from "../i18n";
 import { PageHeading, Status } from "./Dashboard";
+import { SectionGuide } from "../components/SectionGuide";
+import { useUI } from "../ui/useUI";
 
 const baselinePermissions = new Set([
   "security.self.read",
@@ -23,6 +25,7 @@ const administratorOnlyPermissions = new Set([
 
 export function UsersPage({revision, canManage, currentUserID}: {revision: number; canManage: boolean; currentUserID?: string}) {
   const {t, date} = useI18n();
+  const u = useUI();
   const load = useCallback(async () => {
     const users = await api.users();
     const access = canManage ? await api.userAccessCatalog() : undefined;
@@ -209,56 +212,64 @@ export function UsersPage({revision, canManage, currentUserID}: {revision: numbe
   return (
     <div className="page">
       <PageHeading title={t("users")} subtitle={t("usersSubtitle")} />
+      <SectionGuide title={u("uxUsersGuide")} description={u("uxUsersGuideDescription")} />
       {formError && <div role="alert" className="form-error">{formError}</div>}
       {notice && <div role="status" className="notice">{notice}</div>}
 
       <Panel title={t("userAccounts")} className="wide">
         <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>{t("displayName")}</th>
-                <th>{t("username")}</th>
-                <th>{t("userProfile")}</th>
-                <th>{t("userCapabilities")}</th>
-                <th>{t("userResourceAccess")}</th>
-                <th>{t("status")}</th>
-                <th>{t("lastLogin")}</th>
-                {canManage && <th>{t("actions")}</th>}
-              </tr>
-            </thead>
+          <table className="ux-users-table">
+            <thead><tr>
+              <th>{t("displayName")}</th>
+              <th>{t("userProfile")}</th>
+              <th>{t("status")}</th>
+              <th>{t("lastLogin")}</th>
+              {canManage && <th>{t("actions")}</th>}
+            </tr></thead>
             <tbody>
               {users.map((user) => (
-                <tr key={user.id}>
-                  <td><strong>{user.display_name}</strong></td>
-                  <td className="mono">{user.username}</td>
-                  <td>{profileLabel(user.profile, t)}</td>
-                  <td>{user.profile === "administrator" ? t("userFullAccess") : user.permissions.length}</td>
-                  <td>{user.profile === "administrator" ? t("userAllResources") : (user.resource_permissions?.length || 0)}</td>
+                <tr key={user.id} className={selectedUserID === user.id ? "ux-selected-user" : undefined}>
+                  <td>
+                    <strong>{user.display_name}</strong>
+                    <span className="ux-user-login mono">{user.username}</span>
+                  </td>
+                  <td>
+                    {profileLabel(user.profile, t)}
+                    <details className="ux-user-details">
+                      <summary>{u("uxUserAccessDetails")}</summary>
+                      <dl>
+                        <dt>{t("userCapabilities")}</dt>
+                        <dd>{user.profile === "administrator" ? t("userFullAccess") : user.permissions.length}</dd>
+                        <dt>{t("userResourceAccess")}</dt>
+                        <dd>{user.profile === "administrator" ? t("userAllResources") : (user.resource_permissions?.length || 0)}</dd>
+                      </dl>
+                    </details>
+                  </td>
                   <td><Status value={user.disabled ? "disabled" : "active"} /></td>
                   <td>{user.last_login_at ? date(user.last_login_at) : "—"}</td>
-                  {canManage && (
-                    <td>
-                      <button
-                        type="button"
-                        className="button compact secondary"
-                        onClick={() => editUser(user)}
-                      >
-                        {t("userEditAccess")}
-                      </button>
-                    </td>
-                  )}
+                  {canManage && <td>
+                    <button type="button" className="button compact secondary"
+                      aria-controls="user-edit-area"
+                      onClick={() => {
+                        editUser(user);
+                        window.requestAnimationFrame(() => {
+                          document.getElementById("user-edit-area")?.scrollIntoView({block: "start", behavior: "smooth"});
+                        });
+                      }}>
+                      {t("userEditAccess")}
+                    </button>
+                  </td>}
                 </tr>
               ))}
               {users.length === 0 && (
-                <tr><td colSpan={canManage ? 8 : 7} className="muted">{t("noUsers")}</td></tr>
+                <tr><td colSpan={canManage ? 5 : 4} className="muted">{t("noUsers")}</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </Panel>
 
-      {canManage && selectedUser && <Panel title={selectedUser.display_name} className="wide">
+      {canManage && selectedUser && <Panel id="user-edit-area" title={selectedUser.display_name} className="wide">
         <form className="user-form" onSubmit={saveIdentity}>
           <label>{t("username")}<input required minLength={3} maxLength={64} value={username} onChange={(event) => setUsername(event.target.value)}/></label>
           <label>{t("displayName")}<input required maxLength={128} value={displayName} onChange={(event) => setDisplayName(event.target.value)}/></label>
@@ -413,7 +424,8 @@ export function UsersPage({revision, canManage, currentUserID}: {revision: numbe
               </div>
             </details>
 
-            <section className="user-access-section">
+            <details className="user-access-section">
+              <summary>{u("uxUserPermissionsAdvanced")}</summary>
               <h3>{t("userResourceAccess")}</h3>
               <p className="muted small">{t("userResourceAccessNotice")}</p>
               <div className="resource-access-list">
@@ -442,7 +454,7 @@ export function UsersPage({revision, canManage, currentUserID}: {revision: numbe
                   <div className="muted">{t("userNoResourcesYet")}</div>
                 )}
               </div>
-            </section>
+            </details>
 
 
 

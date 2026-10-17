@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import type { StoragePurposeAssignment } from "../api/types";
 import { FolderSettings } from "../components/FolderSettings";
+import { SectionGuide } from "../components/SectionGuide";
+import { filesGuides } from "../ui/experience";
+import { useUI } from "../ui/useUI";
 import { ErrorState, LoadingState, Panel } from "../components/Panel";
 import { useResource } from "../hooks/useResource";
 import { useI18n } from "../i18n";
@@ -20,6 +23,7 @@ export function FilesPage({
   onSectionChange: (section: FileSection) => void;
 }) {
   const {t, date, locale} = useI18n();
+  const u = useUI();
   const load = useCallback(async () => {
     const folders = await api.fileFolders();
     if (!canManage) {
@@ -506,55 +510,48 @@ export function FilesPage({
           className={`button ${section === item ? "primary" : "secondary"}`} aria-current={section === item ? "page" : undefined}
           onClick={() => onSectionChange(item)}>{t(item === "folders" ? "fileFolders" : item === "storage" ? "fileStorageSettings" : "fileWindowsSettings")}</button>)}
       </nav>}
+      <SectionGuide title={u(filesGuides[section].title)} description={u(filesGuides[section].description)} />
       {settingsFolderID && section === "folders" && <FolderSettings folderID={settingsFolderID} users={users}
         onClose={() => setSettingsFolderID("")} onSaved={() => resource.reload()}/>}
 
       {section === "folders" && <Panel title={t("fileFolders")} className="wide">
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>{t("name")}</th>
-                <th>{t("fileFolderType")}</th>
-                <th>{t("filePool")}</th>
-                <th>{t("fileOwner")}</th>
-                <th>{t("fileAccess")}</th>
-                <th>{t("fileFolderUsage")}</th>
-                <th>{t("actions")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {folders.map((folder) => (
-                <tr key={folder.id}>
-                  <td><strong>{folder.name}</strong></td>
-                  <td>{folder.kind === "private" ? t("filePrivate") : t("fileShared")}</td>
-                  <td>{folder.pool_name}</td>
-                  <td>
-                    {folder.kind === "private"
-                      ? (userName.get(folder.owner_user_id || "") || folder.owner_user_id || "—")
-                      : t("fileAllMembers")}
-                  </td>
-                  <td>{folder.can_write ? t("fileReadWrite") : t("fileReadOnly")}</td>
-                  <td>{folder.usage_known ? `${formatFileSize(folder.used_bytes + folder.reserved_bytes)} / ${folder.quota_bytes ? formatFileSize(folder.quota_bytes) : t("quotaUnlimited")}` : t("usageUnavailable")}</td>
-                  <td>
-                    <button
-                      className="button compact secondary"
-                      type="button"
-                      onClick={() => openFolder(folder.id)}
-                    >
-                      {t("fileOpen")}
-                    </button>
-                    {canManage && <button className="button compact secondary" type="button" onClick={() => setSettingsFolderID(folder.id)}>{t("fileFolderSettings")}</button>}
-                  </td>
-                </tr>
-              ))}
-              {folders.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="muted">{t("fileNoFolders")}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="ux-folder-grid">
+          {folders.map((folder) => (
+            <article className="ux-folder-card" key={folder.id}>
+              <div className="ux-folder-head">
+                <span className="ux-folder-symbol" aria-hidden="true">▣</span>
+                <div className="ux-folder-name">
+                  <h3>{folder.name}</h3>
+                  <span>{folder.kind === "private" ? t("filePrivate") : t("fileShared")} · {folder.pool_name}</span>
+                </div>
+                <span className="ux-folder-access">
+                  {folder.can_write ? t("fileReadWrite") : t("fileReadOnly")}
+                </span>
+              </div>
+              <dl className="ux-folder-facts">
+                <div>
+                  <dt>{t("fileOwner")}</dt>
+                  <dd>{folder.kind === "private"
+                    ? (userName.get(folder.owner_user_id || "") || folder.owner_user_id || "—")
+                    : t("fileAllMembers")}</dd>
+                </div>
+                <div>
+                  <dt>{t("fileFolderUsage")}</dt>
+                  <dd>{folder.usage_known
+                    ? formatFileSize(folder.used_bytes + folder.reserved_bytes) + " / " + (folder.quota_bytes ? formatFileSize(folder.quota_bytes) : t("quotaUnlimited"))
+                    : t("usageUnavailable")}</dd>
+                </div>
+              </dl>
+              <div className="ux-folder-actions">
+                <button className="button primary" type="button" onClick={() => openFolder(folder.id)}>
+                  {t("fileOpen")}
+                </button>
+                {canManage && <button className="button secondary" type="button"
+                  onClick={() => setSettingsFolderID(folder.id)}>{t("fileFolderSettings")}</button>}
+              </div>
+            </article>
+          ))}
+          {folders.length === 0 && <p className="muted">{t("fileNoFolders")}</p>}
         </div>
       </Panel>}
 

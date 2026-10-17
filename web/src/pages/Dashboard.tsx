@@ -5,6 +5,9 @@ import { EmptyState, ErrorState, LoadingState, Panel } from "../components/Panel
 import { jobLabelKey } from "../display";
 import { useI18n } from "../i18n";
 import { loadOverview } from "./overview";
+import { useUI } from "../ui/useUI";
+import { visibleQuickDestinations } from "../ui/experience";
+import { NavigationIcon } from "../components/NavigationIcon";
 
 function formatBytes(value?: number): string {
   if (value === undefined) return "—";
@@ -19,6 +22,8 @@ export function Dashboard({actor, revision, onNavigate}: {
   actor: Actor; revision: number; onNavigate: (path: string) => void;
 }) {
   const {t, date} = useI18n();
+  const u = useUI();
+  const shortcuts = visibleQuickDestinations(actor.permissions);
   const load = useCallback(() => loadOverview(actor), [actor]);
   const resource = useResource(load, revision);
   if (resource.loading && !resource.data) return <LoadingState />;
@@ -45,6 +50,27 @@ export function Dashboard({actor, revision, onNavigate}: {
         {data.modules && <Metric label={t("modules")} value={String(data.modules.length)} detail={`${t("active")}: ${data.modules.filter((module) => module.status === "enabled").length}`} />}
         {activeJobs && <Metric label={t("activeTasks")} value={String(activeJobs.length)} detail={t("backgroundOperations")} />}
       </div>}
+      {shortcuts.length > 0 && (
+        <section className="ux-quick-actions" aria-label={u("uxQuickTitle")}>
+          <div className="ux-quick-header">
+            <h2>{u("uxQuickTitle")}</h2>
+            <p>{u("uxQuickSubtitle")}</p>
+          </div>
+          <div className="ux-quick-grid">
+            {shortcuts.map((shortcut) => (
+              <button className="ux-quick-link" type="button" key={shortcut.path}
+                onClick={() => onNavigate(shortcut.path)}>
+                <span className="ux-quick-icon"><NavigationIcon path={shortcut.path} /></span>
+                <span className="ux-quick-copy">
+                  <strong>{u(shortcut.title)}</strong>
+                  <small>{u(shortcut.description)}</small>
+                </span>
+                <span className="ux-quick-arrow" aria-hidden="true">→</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
       {(moduleErrors.length > 0 || missingDrivers.length > 0) && <Panel title={t("needsAttention")}>
         <div className="list">
           {moduleErrors.map((module) => <div className="list-row" key={module.manifest.id}>
