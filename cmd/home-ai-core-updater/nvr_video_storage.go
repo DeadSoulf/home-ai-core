@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"crypto/sha256"
+	"bytes"
 	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
@@ -27,6 +29,7 @@ type nvrContainerMetadata struct {
 	ID     string `json:"Id"`
 	Image  string `json:"Image"`
 	Config struct {
+		Image  string `json:"Image"`
 		Labels map[string]string `json:"Labels"`
 	} `json:"Config"`
 	State struct {
@@ -174,7 +177,13 @@ func copyNVRRecordings(ctx context.Context, source, destination string, uid, gid
 		}
 		if oldInfo, err := os.Lstat(target); err == nil {
 			if oldInfo.Mode().IsRegular() && oldInfo.Size() == info.Size() {
-				return nil
+				same, compareErr := equalNVRFileContents(path, target)
+				if compareErr != nil {
+					return compareErr
+				}
+				if same {
+					return nil
+				}
 			}
 			return errors.New("NVR destination already has a conflicting recording")
 		} else if !errors.Is(err, os.ErrNotExist) {
@@ -305,7 +314,7 @@ func activateNVRVideoStorage(ctx context.Context, req updaterhelper.Request, uid
 		"--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
 		"--mount", "type=bind,src=" + dataRoot + ",dst=/data",
 		"--mount", "type=bind,src=" + destination + ",dst=/data/recordings",
-		info.Image,
+		validatedNVRImageReference(info),
 	}
 	if err := nvrDockerCommand(ctx, docker, "create", args...); err != nil {
 		return "", err
@@ -333,6 +342,11 @@ func activateNVRVideoStorage(ctx context.Context, req updaterhelper.Request, uid
 		case <-time.After(time.Second):
 		}
 	}
+	if err := saveNVRVideoMountConfig(nvrVideoMountConfig{
+		Mountpoint: req.Mountpoint, UUID: req.FilesystemUUID,
+	}); err != nil {
+		return "", fmt.Errorf("persist trusted NVR mount configuration: %w", err)
+	}
 	switched = true
 	// We do not delete the old /data/recordings directory: it is the
 	// migration backup, retained until the operator verifies recordings.
@@ -357,7 +371,13 @@ func nvrVideoStorageMounted(ctx context.Context, uuid string) (bool, string) {
 		return false, ""
 	}
 	source := nvrVideoMountSource(info)
-	return source != "", source
+	if source == "" {
+		return false, ""
+	}
+	if err := safeNVRDiskMount(ctx, filepath.Dir(filepath.Dir(source)), uuid); err != nil {
+		return false, ""
+	}
+	return true, source
 }
 
 func nvrDiskFreeBytes(path string) (uint64, error) {
@@ -366,4 +386,104 @@ func nvrDiskFreeBytes(path string) (uint64, error) {
 		return 0, err
 	}
 	return fs.Bavail * uint64(fs.Bsize), nil
+}
+
+type nvrVideoMountConfig struct {
+	Mountpoint string `json:"mountpoint"`
+	UUID       string `json:"filesystem_uuid"`
+}
+
+// Helper-owned, root-only state: never store the trusted mount target inside
+// /data, because modules can write that directory.
+var nvrVideoMountConfigPath = filepath.Join(trustedUpdateRoot, "nvr-video-storage.json")
+
+func readNVRVideoMountConfig() (nvrVideoMountConfig, bool, error) {
+	info, err := os.Lstat(nvrVideoMountConfigPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return nvrVideoMountConfig{}, false, nil
+	}
+	if err != nil {
+		return nvrVideoMountConfig{}, false, err
+	}
+	owner, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || owner.Uid != 0 || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 {
+		return nvrVideoMountConfig{}, false, errors.New("NVR mount config is not a root-owned private file")
+	}
+	data, err := os.ReadFile(nvrVideoMountConfigPath)
+	if err != nil || len(data) > 2048 {
+		return nvrVideoMountConfig{}, false, errors.New("invalid NVR mount config")
+	}
+	var config nvrVideoMountConfig
+	if err := json.Unmarshal(data, &config); err != nil ||
+		config.Mountpoint == "" || config.UUID == "" {
+		return nvrVideoMountConfig{}, false, errors.New("invalid NVR mount config")
+	}
+	return config, true, nil
+}
+
+func saveNVRVideoMountConfig(config nvrVideoMountConfig) error {
+	if config.Mountpoint == "" || config.UUID == "" {
+		return errors.New("invalid NVR mount config")
+	}
+	previous, existing, err := readNVRVideoMountConfig()
+	if err != nil {
+		return err
+	}
+	if existing && previous != config {
+		return errors.New("NVR already has another trusted video disk assignment")
+	}
+	payload, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+	temp, err := os.CreateTemp(filepath.Dir(nvrVideoMountConfigPath), ".nvr-storage-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(temp.Name())
+	if _, err := temp.Write(payload); err != nil {
+		_ = temp.Close()
+		return err
+	}
+	if err := temp.Chmod(0o600); err != nil {
+		_ = temp.Close()
+		return err
+	}
+	if err := temp.Sync(); err != nil {
+		_ = temp.Close()
+		return err
+	}
+	if err := temp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(temp.Name(), nvrVideoMountConfigPath)
+}
+
+func validatedNVRImageReference(info nvrContainerMetadata) string {
+	if imageDigestPattern.MatchString(info.Config.Image) {
+		return info.Config.Image
+	}
+	// The legacy pinned-source recovery uses the immutable local image ID.
+	return info.Image
+}
+
+func equalNVRFileContents(a, b string) (bool, error) {
+	left, err := os.Open(a)
+	if err != nil {
+		return false, err
+	}
+	defer left.Close()
+	right, err := os.Open(b)
+	if err != nil {
+		return false, err
+	}
+	defer right.Close()
+	leftHash, rightHash := sha256.New(), sha256.New()
+	if _, err := io.Copy(leftHash, left); err != nil {
+		return false, err
+	}
+	if _, err := io.Copy(rightHash, right); err != nil {
+		return false, err
+	}
+	return bytes.Equal(leftHash.Sum(nil), rightHash.Sum(nil)), nil
 }
