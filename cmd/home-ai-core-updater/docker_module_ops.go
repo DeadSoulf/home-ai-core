@@ -53,7 +53,7 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 	// Reject malformed or unsupported operations before starting or installing Docker.
 	// Validation must not trigger privileged system changes.
 	switch request.Operation {
-	case "docker.module.install":
+	case "docker.module.install", "docker.module.install.nvr-storage":
 		if !imageDigestPattern.MatchString(strings.TrimSpace(request.Image)) {
 			return moduleContainerStatus{}, "", errors.New("module image must be an immutable @sha256 reference")
 		}
@@ -61,7 +61,17 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 	default:
 		return moduleContainerStatus{}, "", errors.New("unsupported Docker module operation")
 	}
-	if request.Operation == "docker.module.install" {
+	if request.Operation == "docker.module.install.nvr-storage" {
+		if moduleID != "nvr.module" || request.NVRStorageDevice == "" || request.NVRStorageUUID == "" {
+			return moduleContainerStatus{}, "", errors.New("NVR storage install requires the trusted disk selection")
+		}
+		if _, err := nvrRecordingSource(request.NVRStorageDevice, request.NVRStorageUUID); err != nil {
+			return moduleContainerStatus{}, "", err
+		}
+	} else if request.NVRStorageDevice != "" || request.NVRStorageUUID != "" {
+		return moduleContainerStatus{}, "", errors.New("NVR storage arguments are not allowed for this operation")
+	}
+	if request.Operation == "docker.module.install" || request.Operation == "docker.module.install.nvr-storage" {
 		if _, err := ensureDockerRuntime(ctx, serviceGID); err != nil {
 			return moduleContainerStatus{}, "", err
 		}
@@ -76,6 +86,9 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 	switch request.Operation {
 	case "docker.module.install":
 		return installDockerModule(ctx, moduleID, strings.TrimSpace(request.Image), serviceUID, serviceGID)
+	case "docker.module.install.nvr-storage":
+		return installDockerModuleWithNVRStorage(ctx, moduleID, strings.TrimSpace(request.Image),
+			serviceUID, serviceGID, request.NVRStorageDevice, request.NVRStorageUUID)
 	case "docker.module.start":
 		return controlDockerModule(ctx, moduleID, "start")
 	case "docker.module.stop":
@@ -90,6 +103,11 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 }
 
 func installDockerModule(ctx context.Context, moduleID, image string, serviceUID, serviceGID int) (moduleContainerStatus, string, error) {
+	return installDockerModuleWithNVRStorage(ctx, moduleID, image, serviceUID, serviceGID, "", "")
+}
+
+func installDockerModuleWithNVRStorage(ctx context.Context, moduleID, image string,
+	serviceUID, serviceGID int, storageDevice, storageUUID string) (moduleContainerStatus, string, error) {
 	dockerPath, err := exec.LookPath("docker")
 	if err != nil {
 		return moduleContainerStatus{}, "", errors.New("Docker CLI is unavailable")
@@ -101,6 +119,16 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 	} else if exists {
 		if !managed {
 			return moduleContainerStatus{}, "", errors.New("container name is already used by an unmanaged container")
+		}
+		// A running container cannot gain Docker bind mounts in place.
+		// Force an explicit remove/reinstall with data preservation instead
+		// of accepting a silently ignored storage choice.
+		if storageUUID != "" {
+			output, err := exec.CommandContext(ctx, dockerPath, "inspect", "--format",
+				`{{index .Config.Labels "home-ai.nvr.storage.uuid"}}`, name).CombinedOutput()
+			if err != nil || strings.TrimSpace(string(output)) != storageUUID {
+				return moduleContainerStatus{}, "", errors.New("NVR storage selection requires reinstalling the module; existing camera data is preserved")
+			}
 		}
 		// Never destroy a running module before a candidate has passed start,
 		// health and recovery checks. Transactional upgrades are a separate path.
@@ -131,6 +159,18 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 		return moduleContainerStatus{}, "", fmt.Errorf("set module data permissions: %w", err)
 	}
 
+	videoSource := ""
+	if storageUUID != "" {
+		if moduleID != "nvr.module" {
+			return moduleContainerStatus{}, "", errors.New("dedicated video disks are only supported by NVR")
+		}
+		var err error
+		videoSource, err = ensureNVRRecordingDirectory(ctx, storageDevice, storageUUID, serviceUID, serviceGID)
+		if err != nil {
+			return moduleContainerStatus{}, "", fmt.Errorf("prepare NVR recording storage: %w", err)
+		}
+	}
+
 	args := []string{
 		"create",
 		"--name", name,
@@ -145,6 +185,13 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 		"--read-only",
 		"--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
 		"--mount", "type=bind,src=" + dataDir + ",dst=/data",
+	}
+	if videoSource != "" {
+		args = append(args,
+			"--mount", "type=bind,src="+videoSource+",dst=/data/recordings",
+			"--label", "home-ai.nvr.storage.uuid="+storageUUID,
+			"--label", "home-ai.nvr.storage.device="+storageDevice,
+		)
 	}
 	if fromPinnedSource {
 		args = append(args,
