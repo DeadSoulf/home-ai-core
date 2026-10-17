@@ -275,7 +275,7 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		}
 		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
 			OK: true, Message: "AI GPU allocation verified", AIGPUPCI: selected,
-			HelperVersion: updaterhelper.HelperVersion,
+			HelperVersion:   updaterhelper.HelperVersion,
 			ProtocolVersion: updaterhelper.ProtocolVersion,
 		})
 		return
