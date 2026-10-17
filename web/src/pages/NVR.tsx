@@ -1,13 +1,13 @@
 import {useCallback, useEffect, useRef, useState, type FormEvent} from "react";
 import Hls from "hls.js";
 import {api} from "../api/client";
-import type {NVRCamera, NVRRecording, NVRStatus, NVRDiscoveryNetwork, NVRDiscoveredCamera} from "../api/types";
+import type {NVRCamera, NVRRecording, NVRStatus, NVRDiscoveryNetwork, NVRDiscoveredCamera, StoragePurposeAssignment} from "../api/types";
 import {Panel} from "../components/Panel";
 import {ConfirmDialog} from "../components/ConfirmDialog";
 import {PageHeading} from "./Dashboard";
 import "./NVR.css";
 
-type NVRTab = "live" | "cameras" | "discovery" | "archive";
+type NVRTab = "live" | "cameras" | "discovery" | "archive" | "storage";
 
 const localDate = (seconds: number) => new Date(seconds * 1000).toLocaleString();
 const bytes = (value: number) => value >= 1024 ** 3
@@ -75,6 +75,22 @@ export function NVRPage({canManage}: {canManage: boolean}) {
   const [previewCamera, setPreviewCamera] = useState<NVRCamera>();
   const [previewURL, setPreviewURL] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<NVRCamera>();
+  const [videoStorage, setVideoStorage] = useState<StoragePurposeAssignment>();
+  const [storageError, setStorageError] = useState("");
+  const [storageBusy, setStorageBusy] = useState(false);
+  const [mountHint, setMountHint] = useState("");
+  useEffect(() => {
+    if (tab !== "storage" || !canManage) return;
+    let active = true;
+    void api.storagePurposes().then((items) => {
+      if (!active) return;
+      setVideoStorage(items.find((item) => item.purpose === "module:nvr.module"));
+      setStorageError("");
+    }).catch((error: unknown) => {
+      if (active) setStorageError(error instanceof Error ? error.message : "Невозможно прочитать список дисков");
+    });
+    return () => { active = false; };
+  }, [tab, canManage]);
   const previewRef = useRef<string | undefined>();
   useEffect(() => () => {
     if (previewRef.current) void api.nvrStopLive(previewRef.current).catch(() => {});
@@ -207,6 +223,28 @@ export function NVRPage({canManage}: {canManage: boolean}) {
     await act(() => api.nvrDeleteCamera(camera.id), "Камера удалена. Все существующие записи сохранены.");
   }
 
+  async function attachVideoStorage() {
+    if (storageBusy || !videoStorage) return;
+    setStorageBusy(true);
+    setStorageError("");
+    try {
+      let current = videoStorage;
+      if (!current.mountpoints?.some((mount) => mount.startsWith("/mnt/home-ai-core/"))) {
+        const result = await api.storageOperation({operation: "mount", device: current.device});
+        setMountHint(result.mountpoint || "Раздел подключён");
+        const items = await api.storagePurposes();
+        current = items.find((item) => item.purpose === "module:nvr.module") || current;
+        setVideoStorage(current);
+      }
+      const job = await api.attachNVRStorage();
+      setMessage("Создана операция " + job.id + ". NVR будет кратковременно остановлен и перезапущен для подключения видеодиска.");
+    } catch (err) {
+      setStorageError(err instanceof Error ? err.message : "Не удалось подключить видеодиск");
+    } finally {
+      setStorageBusy(false);
+    }
+  }
+
   async function searchForCameras() {
     if (!selectedNetwork || scanning || !canManage) return;
     setScanning(true);
@@ -256,6 +294,8 @@ export function NVRPage({canManage}: {canManage: boolean}) {
         onClick={() => setTab("discovery")}>Поиск камер</button>}
       <button type="button" className={"button " + (tab === "archive" ? "primary" : "secondary")}
         onClick={() => setTab("archive")}>Архив записей</button>
+      {canManage && <button type="button" className={"button " + (tab === "storage" ? "primary" : "secondary")}
+        onClick={() => setTab("storage")}>Хранилище видео</button>}
       <button type="button" className="button secondary" disabled={busy}
         onClick={() => { setLoading(true); void reload().then(() => setError("")).catch((e: unknown) => setError(String(e))).finally(() => setLoading(false)); }}>
         Обновить
@@ -400,6 +440,27 @@ export function NVRPage({canManage}: {canManage: boolean}) {
         Поиск ограничен напрямую подключённой локальной подсетью, не более /24,
         и никогда не перебирает пароли.
       </p>
+    </Panel>}
+
+    {tab === "storage" && canManage && <Panel title="Хранилище видеозаписей NVR">
+      <p>В разделе «Файлы → Диски» можно создать новый раздел и указать назначение <strong>Модуль: NVR</strong>.</p>
+      <p>Раздел нужно отформатировать в ext4 или xfs и подключить перед использованием. При назначении раздела старый архив остаётся на прежнем диске; новые записи можно переключить после обновления NVR.</p>
+      {storageError && <p role="alert" className="nvr-notice-error">{storageError}</p>}
+      {mountHint && <p className="muted small">{mountHint}</p>}
+      {videoStorage ? <>
+        <dl className="details">
+          <dt>Устройство</dt><dd className="mono">{videoStorage.device}</dd>
+          <dt>Файловая система</dt><dd>{videoStorage.filesystem || "не отформатирован"}</dd>
+          <dt>Раздел доступен</dt><dd>{videoStorage.present ? "Да" : "Нет"}</dd>
+          <dt>Точка монтирования</dt><dd className="mono">{videoStorage.mountpoints?.join(", ") || "не подключён"}</dd>
+        </dl>
+        <button type="button" className="button primary"
+          disabled={storageBusy || !videoStorage.present || !["ext4", "xfs"].includes(videoStorage.filesystem || "")}
+          onClick={() => void attachVideoStorage()}>
+          {storageBusy ? "Проверка и подключение…" : "Подключить видеодиск к NVR"}
+        </button>
+      </> : <p className="muted">Выделенный раздел для NVR пока не назначен. Откройте «Файлы → Диски» и выберите «Модуль: NVR» при создании или выборе раздела.</p>}
+      <p className="muted small">Переключение может кратковременно прервать запись. Старые файлы не переносятся и не удаляются; они останутся доступны через NVR.</p>
     </Panel>}
 
     {tab === "archive" && <Panel title="Архив видеозаписей">
