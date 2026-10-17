@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/windowsclient"
 )
@@ -222,6 +223,9 @@ func runQueue(args []string) error {
 			return err
 		}
 		lastItem, lastPercent := "", -1
+		activityConfig, activityErr := defaultSyncConfigPath()
+		lastUpdate := time.Time{}
+		var lastActivity transferActivity
 		err = queue.Run(ctx, client, windowsclient.UploadOptions{Retries: retries}, func(progress windowsclient.QueueProgress) {
 			percent := 100
 			if progress.TotalBytes > 0 {
@@ -232,7 +236,36 @@ func runQueue(args []string) error {
 			}
 			lastItem, lastPercent = progress.TransferID, percent
 			fmt.Printf("[%d/%d] %s: %d%% %s\n", progress.CompletedTransfers, progress.TotalTransfers, progress.Path, percent, progress.Status)
+			if activityErr != nil {
+				return
+			}
+			status := progress.Status
+			if status == windowsclient.QueueCompleted {
+				status = "copied"
+			}
+			lastActivity = transferActivity{
+				ProfileID: "queue:" + progress.JobID, Path: progress.Path,
+				Status: status, UploadedBytes: progress.UploadedBytes, TotalBytes: progress.TotalBytes,
+				ItemsDone: progress.CompletedTransfers, ItemsTotal: progress.TotalTransfers,
+			}
+			if progress.Status != windowsclient.QueueRunning || time.Since(lastUpdate) >= 500*time.Millisecond {
+				_ = saveTransferProgress(activityConfig, lastActivity)
+				lastUpdate = time.Now()
+			}
+			if status == "copied" || status == windowsclient.QueueFailed {
+				_ = appendTransferHistory(activityConfig, lastActivity)
+			}
 		})
+		if activityErr == nil {
+			if err != nil {
+				lastActivity.Status = "failed"
+				lastActivity.Error = err.Error()
+				_ = appendTransferHistory(activityConfig, lastActivity)
+			} else {
+				lastActivity.Status = "completed"
+			}
+			_ = saveTransferProgress(activityConfig, lastActivity)
+		}
 		if err != nil {
 			return fmt.Errorf("queue stopped; saved progress is retained: %w", err)
 		}
