@@ -206,6 +206,7 @@ type windowsSettingsUI struct {
 	overviewNext           windows.Handle
 	overviewLast           windows.Handle
 	overviewRecent         [3]windows.Handle
+	overviewRecentHint windows.Handle
 	overviewStorage        windows.Handle
 	overviewStorageHint    windows.Handle
 	overviewStoragePercent int
