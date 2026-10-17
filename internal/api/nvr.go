@@ -107,14 +107,16 @@ func (s *server) nvrRequest(ctx context.Context, method, endpoint string, payloa
 	}
 	transport := &http.Transport{
 		Proxy: nil, DisableKeepAlives: true,
-		DialContext: (&net.Dialer{Timeout: 4 * time.Second}).DialContext,
+		DialContext:           (&net.Dialer{Timeout: 4 * time.Second}).DialContext,
 		ResponseHeaderTimeout: 12 * time.Second,
 	}
 	defer transport.CloseIdleConnections()
 	var roundTrip http.RoundTripper = transport
-	if s.nvrTransport != nil { roundTrip = s.nvrTransport }
+	if s.nvrTransport != nil {
+		roundTrip = s.nvrTransport
+	}
 	client := &http.Client{
-		Transport: roundTrip,
+		Transport:     roundTrip,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
 	return client.Do(req)
@@ -146,21 +148,29 @@ func (s *server) nvrJSON(w http.ResponseWriter, r *http.Request, method, endpoin
 }
 
 func (s *server) nvrStatus(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
-	if !s.nvrReady(w, r) { return }
+	if !s.nvrReady(w, r) {
+		return
+	}
 	var result nvrStatusResponse
-	if !s.nvrJSON(w, r, http.MethodGet, "/api/nvr/status", nil, &result) { return }
+	if !s.nvrJSON(w, r, http.MethodGet, "/api/nvr/status", nil, &result) {
+		return
+	}
 	writeJSON(w, http.StatusOK, result)
 }
 
 func (s *server) nvrCameras(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
-	if !s.nvrReady(w, r) { return }
+	if !s.nvrReady(w, r) {
+		return
+	}
 	// Typed decoding prevents the upstream's rtsp_url (which may contain
 	// credentials) and other module-specific secrets from reaching the browser.
 	var result struct {
 		OK      bool        `json:"ok"`
 		Cameras []nvrCamera `json:"cameras"`
 	}
-	if !s.nvrJSON(w, r, http.MethodGet, "/api/nvr/cameras", nil, &result) { return }
+	if !s.nvrJSON(w, r, http.MethodGet, "/api/nvr/cameras", nil, &result) {
+		return
+	}
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -181,7 +191,9 @@ func validNVROutputPath(value string) bool {
 }
 
 func (s *server) nvrRecordings(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
-	if !s.nvrReady(w, r) { return }
+	if !s.nvrReady(w, r) {
+		return
+	}
 	params := url.Values{"limit": {"200"}}
 	if camera := r.URL.Query().Get("camera_id"); camera != "" {
 		if !nvrSafeSegment.MatchString(camera) || camera == ".." {
@@ -201,7 +213,9 @@ func (s *server) nvrRecordings(w http.ResponseWriter, r *http.Request, _ securit
 			Path      string `json:"path"`
 		} `json:"recordings"`
 	}
-	if !s.nvrJSON(w, r, http.MethodGet, "/api/nvr/recordings?"+params.Encode(), nil, &upstream) { return }
+	if !s.nvrJSON(w, r, http.MethodGet, "/api/nvr/recordings?"+params.Encode(), nil, &upstream) {
+		return
+	}
 	rows := make([]nvrRecording, 0, len(upstream.Recordings))
 	for _, source := range upstream.Recordings {
 		item := nvrRecording{
@@ -222,7 +236,9 @@ func (s *server) nvrAddCamera(w http.ResponseWriter, r *http.Request, actor secu
 		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
 		return
 	}
-	if !s.nvrReady(w, r) { return }
+	if !s.nvrReady(w, r) {
+		return
+	}
 	var input struct {
 		Name       string `json:"name"`
 		SourceType string `json:"source_type"`
@@ -259,9 +275,14 @@ func (s *server) nvrAddCamera(w http.ResponseWriter, r *http.Request, actor secu
 		return
 	}
 	data, err := json.Marshal(input)
-	if err != nil { writeAPIError(w, r, http.StatusBadRequest, "invalid_camera", "Invalid camera", nil); return }
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_camera", "Invalid camera", nil)
+		return
+	}
 	var ignored json.RawMessage
-	if !s.nvrJSON(w, r, http.MethodPost, "/api/nvr/cameras", data, &ignored) { return }
+	if !s.nvrJSON(w, r, http.MethodPost, "/api/nvr/cameras", data, &ignored) {
+		return
+	}
 	// Never echo a credential-containing RTSP URL back to the browser.
 	writeJSON(w, http.StatusCreated, map[string]any{"ok": true})
 }
@@ -271,7 +292,9 @@ func (s *server) nvrControlCamera(w http.ResponseWriter, r *http.Request, actor 
 		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
 		return
 	}
-	if !s.nvrReady(w, r) { return }
+	if !s.nvrReady(w, r) {
+		return
+	}
 	id, action := r.PathValue("cameraID"), r.PathValue("action")
 	if !nvrSafeSegment.MatchString(id) || id == ".." ||
 		(action != "start" && action != "stop" && action != "restart") {
@@ -279,12 +302,16 @@ func (s *server) nvrControlCamera(w http.ResponseWriter, r *http.Request, actor 
 		return
 	}
 	var ignored json.RawMessage
-	if !s.nvrJSON(w, r, http.MethodPost, "/api/nvr/cameras/"+id+"/"+action, []byte("{}"), &ignored) { return }
+	if !s.nvrJSON(w, r, http.MethodPost, "/api/nvr/cameras/"+id+"/"+action, []byte("{}"), &ignored) {
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 func (s *server) nvrOutput(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
-	if !s.nvrReady(w, r) { return }
+	if !s.nvrReady(w, r) {
+		return
+	}
 	path := r.PathValue("path")
 	if !validNVROutputPath(path) {
 		writeAPIError(w, r, http.StatusBadRequest, "invalid_nvr_media", "Invalid NVR media path", nil)
@@ -301,8 +328,12 @@ func (s *server) nvrOutput(w http.ResponseWriter, r *http.Request, _ security.Ac
 		return
 	}
 	contentType := "video/mp4"
-	if strings.HasSuffix(path, ".m3u8") { contentType = "application/vnd.apple.mpegurl" }
-	if strings.HasSuffix(path, ".ts") { contentType = "video/mp2t" }
+	if strings.HasSuffix(path, ".m3u8") {
+		contentType = "application/vnd.apple.mpegurl"
+	}
+	if strings.HasSuffix(path, ".ts") {
+		contentType = "video/mp2t"
+	}
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "private, no-store")
