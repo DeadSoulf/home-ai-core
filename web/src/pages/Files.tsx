@@ -1105,7 +1105,7 @@ export function FilesPage({
                     <option value="">{t("fileChooseUser")}</option>
                     {smbStatus.users.map((user) => (
                       <option key={user.user_id} value={user.user_id}>
-                        {user.display_name || user.username} · {user.smb_username}
+                        {user.display_name || user.username}
                       </option>
                     ))}
                   </select>

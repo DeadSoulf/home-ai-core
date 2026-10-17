@@ -346,6 +346,20 @@ async def run_suite(browser):
         assert any(x[1]=="/api/v1/files/smb/operation" for x in h.requests)
         await h.close()
 
+    async def smb_selector_displays_only_name():
+        h=FilesHarness(browser)
+        h.smb["users"][0]["display_name"]="TexNik"
+        h.smb["users"][0]["smb_username"]="hai_478bdee65a906b5b59ce"
+        await h.start("/files/windows")
+        option=h.page.locator('.smb-password-form select option[value="usr-owner"]')
+        await expect(option).to_have_text("TexNik")
+        await expect(h.page.locator(".smb-password-form select")).to_have_value("usr-owner")
+        row=h.page.get_by_role("row").filter(has_text="hai_478bdee65a906b5b59ce")
+        await expect(row).to_contain_text("TexNik")
+        await expect(row).to_contain_text("hai_478bdee65a906b5b59ce")
+        assert not h.unhandled,h.unhandled
+        await h.close()
+
     async def read_only_role():
         h=FilesHarness(browser)
         h.actor["permissions"]=["security.self.read"]
@@ -593,6 +607,7 @@ async def run_suite(browser):
         ("FILES-04: download and chunked upload",downloads_and_uploads),
         ("FILES-05: folder settings and quota",folder_settings),
         ("FILES-06: storage mount/policy and SMB password",admin_storage_and_smb),
+        ("FILES-23: SMB selector shows display name, table keeps SMB login",smb_selector_displays_only_name),
         ("FILES-07: read-only permission enforcement",read_only_role),
         ("FILES-08: partial API outage does not hide folders",ancillary_api_failure),
         ("FILES-09: create shared folder and new pool",create_folder_and_pool),
