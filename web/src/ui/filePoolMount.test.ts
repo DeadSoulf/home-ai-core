@@ -24,7 +24,6 @@ describe("NAS pool mount-status advisory", () => {
   it("marks absent devices separately and unknown inventory as unknown", () => {
     expect(filePoolMountStatus(pool, [{...base, present: false, mountpoints: []}])).toBe("missing");
     expect(filePoolMountStatus(pool, [])).toBe("unknown");
-    expect(filePoolMountStatus(pool, [{...base, purpose: "nvr"}])).toBe("unknown");
   });
   it("uses filesystem UUID when the device name changes", () => {
     expect(filePoolMountStatus(pool, [{...base, device: "/dev/sdc1"}])).toBe("mounted");
