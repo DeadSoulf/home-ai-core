@@ -247,6 +247,45 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		})
 		return
 	}
+	if request.Operation == "docker.module.storage.inspect" {
+		if request.ModuleID != "nvr.module" {
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: "unsupported module storage"})
+			return
+		}
+		ctx, cancel := context.WithTimeout(parent, 8*time.Second)
+		defer cancel()
+		dockerPath, err := exec.LookPath("docker")
+		if err != nil {
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: "Docker unavailable"})
+			return
+		}
+		root, err := inspectNVRRecordingMount(ctx, dockerPath)
+		if err != nil {
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})
+			return
+		}
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{OK: true, ModuleStorageRoot: root})
+		return
+	}
+	if request.Operation == "docker.module.storage.attach" {
+		if request.ModuleID != "nvr.module" {
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: "unsupported module storage"})
+			return
+		}
+		_ = conn.SetDeadline(time.Now().Add(4 * time.Minute))
+		ctx, cancel := context.WithTimeout(parent, 3*time.Minute)
+		defer cancel()
+		result, message, err := attachNVRRecordingStorage(ctx, request, uid, gid)
+		if err != nil {
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})
+			return
+		}
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+			OK: true, Message: message, ContainerID: result.ContainerID,
+			ModuleState: result.State,
+		})
+		return
+	}
 	if strings.HasPrefix(request.Operation, "docker.module.") {
 		_ = conn.SetDeadline(time.Now().Add(31 * time.Minute))
 		ctx, cancel := context.WithTimeout(parent, 30*time.Minute)
