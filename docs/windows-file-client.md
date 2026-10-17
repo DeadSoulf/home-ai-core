@@ -54,7 +54,7 @@ Connection, Synchronization, Backups, Settings and Transfers share consistent
 section outlines, headings, status presentation and owner-drawn buttons.
 The **Transfers / Передачи** page shows actual current file upload bytes
 and completed/total items, with a frequently refreshed history of file
-results (including background sync and persistent queue runs).
+results (including background sync, persistent queue runs and one-off CLI copy/upload operations).
 This is the progress of the *current file*, not a guessed total-time estimate.
 
 Progress is stored atomically in `<sync-profiles.json>.transfer-progress.json`.
@@ -243,7 +243,7 @@ The installed client can also discover, download, verify and hand off the newest
 
 ## Current limitations
 
-- the Transfers page now reports sync and queue operations; aggregate transfer ETA, advanced history filtering and immediate one-off CLI copy/upload history are not yet implemented;
+- the Transfers page now reports sync, queue and one-off CLI copy/upload operations; aggregate transfer ETA and advanced history filtering are not yet implemented;
 - release update is currently an explicit `client update` action; background update checks and unattended installation are deferred;
 - a conventional Windows installer / Start Menu / uninstall entry is still deferred;
 - no bidirectional sync or local-delete propagation;
