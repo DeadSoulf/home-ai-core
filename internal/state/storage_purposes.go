@@ -15,19 +15,7 @@ const (
 	StoragePurposeModulePrefix = "module:"
 )
 
-var storageModuleID = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*package state
-
-import (
-	"context"
-	"database/sql"
-	"errors"
-	"fmt"
-	"regexp"
-	"strings"
-	"time"
-)
-
-)
+var storageModuleID = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
 
 func StoragePurposeModuleID(purpose string) (string, bool) {
 	if !strings.HasPrefix(purpose, StoragePurposeModulePrefix) {
