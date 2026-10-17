@@ -21,6 +21,7 @@ const (
 	settingsPageConnection
 	settingsPageSync
 	settingsPageBackup
+	settingsPageTransfers
 	settingsPageGeneral
 	settingsPageCount
 )
@@ -40,6 +41,8 @@ const (
 	settingsIDOpenLocal     = 2106
 	settingsIDBackupProfile = 2107
 	settingsIDSaveSchedule  = 2108
+	settingsIDNavTransfers  = 2109
+	settingsIDRefreshTransfers = 2110
 
 	settingsWSGroup      = 0x00020000
 	settingsBSAutoRadio  = 0x00000009
@@ -68,7 +71,7 @@ var (
 )
 
 func (state *windowsSettingsUI) createLightControls(module windows.Handle) error {
-	font, _, _ := procSettingsGetStock.Call(settingsDefaultGUIFont)
+	font := uintptr(state.visual.bodyFont)
 
 	staticText := func(name, text string, x, y, w, h int32, page int, role settingsVisualRole) windows.Handle {
 		hwnd := state.createControl(module, "STATIC", text, settingsWSChild|settingsWSVisible, x, y, w, h, 0, windows.Handle(font))
@@ -135,7 +138,8 @@ func (state *windowsSettingsUI) createLightControls(module windows.Handle) error
 	nav(settingsPageConnection, settingsIDNavConnection, "nav_connection", 156, false)
 	nav(settingsPageSync, settingsIDNavSync, "nav_sync", 200, false)
 	nav(settingsPageBackup, settingsIDNavBackup, "nav_backup", 244, false)
-	nav(settingsPageGeneral, settingsIDNavGeneral, "nav_settings", 288, false)
+	nav(settingsPageTransfers, settingsIDNavTransfers, "nav_transfers", 288, false)
+	nav(settingsPageGeneral, settingsIDNavGeneral, "nav_settings", 332, false)
 
 	// Overview — exact compact geometry from Figma node 2:2.
 	title := static("overview_title", "nav_overview", 224, 24, 360, 28, settingsPageOverview, settingsVisualMain)
@@ -249,6 +253,22 @@ func (state *windowsSettingsUI) createLightControls(module windows.Handle) error
 	button("agent_enable", settingsIDAgentEnable, "enable_agent", 224, 418, 180, 34, settingsPageBackup)
 	button("agent_disable", settingsIDAgentDisable, "disable_agent", 416, 418, 180, 34, settingsPageBackup)
 
+	// Transfers: real current upload progress + bounded on-disk event history.
+	transfersTitle := static("transfers_title", "nav_transfers", 224, 32, 340, 28, settingsPageTransfers, settingsVisualCard)
+	state.setControlFont(transfersTitle, state.visual.titleFont)
+	static("transfers_hint", "transfers_hint", 224, 72, 680, 36, settingsPageTransfers, settingsVisualCardMuted)
+	static("transfers_current_title", "transfers_current", 224, 126, 400, 24, settingsPageTransfers, settingsVisualCard)
+	state.transferProgress = state.createControl(module, "msctls_progress32", "",
+		settingsWSChild|settingsWSVisible, 224, 161, 680, 22, 0, windows.Handle(font))
+	state.trackPage(settingsPageTransfers, state.transferProgress)
+	state.transferDetails = staticText("", state.tr("transfer_idle"), 224, 193, 680, 36, settingsPageTransfers, settingsVisualCardMuted)
+	static("transfers_history_title", "transfers_history", 224, 256, 400, 24, settingsPageTransfers, settingsVisualCard)
+	state.transferHistory = state.createControl(module, "LISTBOX", "",
+		settingsWSChild|settingsWSVisible|settingsWSVScroll|settingsWSBorder|settingsLBSNotify,
+		224, 288, 680, 226, 0, windows.Handle(font))
+	state.trackPage(settingsPageTransfers, state.transferHistory)
+	button("transfers_refresh_button", settingsIDRefreshTransfers, "refresh", 704, 526, 200, 34, settingsPageTransfers)
+
 	// General settings.
 	generalTitle := static("general_title", "nav_settings", 224, 32, 340, 28, settingsPageGeneral, settingsVisualCard)
 	state.setControlFont(generalTitle, state.visual.titleFont)
@@ -274,11 +294,13 @@ func (state *windowsSettingsUI) createLightControls(module windows.Handle) error
 		state.folderCombo == 0 || state.sourceEdit == 0 || state.destination == 0 ||
 		state.interval == 0 || state.conflict == 0 || state.profileList == 0 ||
 		state.backupProfileCombo == 0 || state.statusLabel == 0 || state.agentLabel == 0 ||
-		state.languageCombo == 0 || state.overviewStorage == 0 {
+		state.languageCombo == 0 || state.overviewStorage == 0 ||
+		state.transferProgress == 0 || state.transferHistory == 0 || state.transferDetails == 0 {
 		return fmt.Errorf("create Windows client controls")
 	}
 
 	state.showPage(settingsPageOverview)
+	state.layoutControls()
 	return nil
 }
 
@@ -334,6 +356,9 @@ func (state *windowsSettingsUI) showPage(page int) {
 		procSettingsSetFocus.Call(uintptr(hwnd))
 	}
 	state.invalidateVisual()
+	if page == settingsPageTransfers {
+		state.refreshTransfers()
+	}
 }
 
 func (state *windowsSettingsUI) initialFocusForPage(page int) windows.Handle {
@@ -348,6 +373,8 @@ func (state *windowsSettingsUI) initialFocusForPage(page int) windows.Handle {
 		return state.folderCombo
 	case settingsPageBackup:
 		return state.backupProfileCombo
+	case settingsPageTransfers:
+		return state.transferHistory
 	case settingsPageGeneral:
 		return state.languageCombo
 	default:
@@ -370,6 +397,10 @@ func (state *windowsSettingsUI) handlePageCommand(id, notify uint16) bool {
 		state.showPage(settingsPageBackup)
 	case settingsIDNavGeneral:
 		state.showPage(settingsPageGeneral)
+	case settingsIDNavTransfers:
+		state.showPage(settingsPageTransfers)
+	case settingsIDRefreshTransfers:
+		state.refreshTransfers()
 	case settingsIDOpenLocal:
 		state.openPrimaryLocalFolder()
 	case settingsIDSaveSchedule:
