@@ -13,6 +13,17 @@ export function NVRLive({cameras, canManage}: {cameras: NVRCamera[]; canManage: 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const videoRef = useRef<HTMLVideoElement>(null);
+  const sessionRef = useRef<LiveSession>();
+
+  const useSession = (next: LiveSession | undefined) => {
+    sessionRef.current = next;
+    setSession(next);
+  };
+
+  useEffect(() => () => {
+    const current = sessionRef.current;
+    if (current) void api.nvrLiveStop(current.id, current.streamType).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!session) return;
@@ -47,9 +58,8 @@ export function NVRLive({cameras, canManage}: {cameras: NVRCamera[]; canManage: 
       video.pause();
       video.removeAttribute("src");
       video.load();
-      // Releasing the tab stops this preview's transcoder; recording
-      // continues in the NVR independently of preview playback.
-      void api.nvrLiveStop(session.id, session.streamType).catch(() => {});
+      // Only the player is destroyed when switching streams. The stop API
+      // is invoked by explicit control or the page-unmount cleanup.
     };
   }, [session]);
 
@@ -62,15 +72,21 @@ export function NVRLive({cameras, canManage}: {cameras: NVRCamera[]; canManage: 
     try {
       if (session) {
         await api.nvrLiveStop(session.id, session.streamType).catch(() => {});
-        setSession(undefined);
+        useSession(undefined);
       }
       const result = await api.nvrLiveStart(camera.id, streamType);
-      setSession({id: camera.id, name: camera.name, streamType, url: result.playlist_url});
+      useSession({id: camera.id, name: camera.name, streamType, url: result.playlist_url});
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось запустить видеопоток");
     } finally {
       setBusy(false);
     }
+  }
+
+  async function stop() {
+    const current = sessionRef.current;
+    useSession(undefined);
+    if (current) await api.nvrLiveStop(current.id, current.streamType).catch(() => {});
   }
 
   return <Panel title="Просмотр в реальном времени">
@@ -98,7 +114,7 @@ export function NVRLive({cameras, canManage}: {cameras: NVRCamera[]; canManage: 
         {busy ? "Подключаем…" : "Смотреть"}
       </button>
       {session && <button type="button" className="button secondary"
-        onClick={() => setSession(undefined)}>Остановить просмотр</button>}
+        onClick={() => void stop()}>Остановить просмотр</button>}
     </div> : <p className="muted">Для запуска нового видеопотока нужны права управления NVR.</p>}
     {error && <p role="alert" className="nvr-notice-error">{error}</p>}
     {session && <div className="nvr-player nvr-live-player">
