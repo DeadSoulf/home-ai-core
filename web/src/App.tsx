@@ -241,6 +241,7 @@ export default function App() {
             canManage={has("files.manage")}
             canReadSystem={has("system.read")}
             canManageStorage={has("storage.manage")}
+            canManageModules={has("modules.manage")}
             section={fileSection(allowedPath)}
             onSectionChange={(section) => navigate(fileSectionPath(section))}
           />
