@@ -23,6 +23,8 @@ type transferActivity struct {
 	ItemsTotal    int       `json:"items_total,omitempty"`
 	UploadedBytes int64     `json:"uploaded_bytes,omitempty"`
 	TotalBytes    int64     `json:"total_bytes,omitempty"`
+	SpeedBytesPerSec int64 `json:"speed_bytes_per_sec,omitempty"`
+	ETASeconds int64 `json:"eta_seconds,omitempty"`
 	Error         string    `json:"error,omitempty"`
 }
 
