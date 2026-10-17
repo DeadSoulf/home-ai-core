@@ -71,3 +71,28 @@ Authenticode validation. The GUI/tray display an explicit warning and require
 manual confirmation, with an update process log. Background polling,
 unattended installation, Authenticode validation and installer packaging remain
 deferred to tracked work items #193 and #194.
+
+
+## Follow-up (2026-10-17) — visible update completion and relaunch
+
+An authorized Windows client's update log confirmed that version
+`0.1.188-dev` was downloaded, SHA-256 verified and installed, but the
+Settings window was not reopened. A second update attempt showed the
+installed client was already current. This was an unreported successful
+update, not a failed download.
+
+The GUI now stays open while downloading/verifying the release and
+reports errors inline. It closes only after the verified downloaded
+installer starts successfully. After installation the new executable
+opens Settings again with a success indication, waiting for the
+previous Settings window to disappear (prevents a race with previews
+running outside the stable install directory).
+
+The verified `client install` command relaunches Settings by default,
+including when invoked without extra flags by an **older** updater.
+`client install --reopen-settings=false` opts out for CLI-only uses.
+Installation/relaunch failures are shown in a foreground error
+dialog with a path to the detailed update log.
+
+No background polling, automatic approval, Authenticode verification
+or unattended auto-installation is enabled here.
