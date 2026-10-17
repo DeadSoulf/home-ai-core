@@ -28,7 +28,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
   const load = useCallback(() => Promise.all([api.modules(), api.capabilities()]).then(([modules, capabilities]) => ({modules, capabilities})), []);
   const core = useResource(load, revision);
   // Each page loads only what it needs. Installed controls remain usable during catalog outages.
-  const loadCatalog = useCallback(() => section === "catalog" ? api.moduleCatalog() : Promise.resolve(undefined), [section]);
+  const loadCatalog = useCallback(() => section === "catalog" || section === "installed" ? api.moduleCatalog() : Promise.resolve(undefined), [section]);
   const catalog = useResource(loadCatalog);
   const loadRuntime = useCallback((signal: AbortSignal) =>
     section === "catalog" || section === "settings" ? api.moduleRuntime(signal) : Promise.resolve(undefined), [section]);
@@ -151,6 +151,14 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
                   onClick={() => void run(() => api.controlModule(module.manifest.id, module.status === "enabled" ? "disable" : "enable"))}>{t(module.status === "enabled" ? "moduleStop" : "moduleStart")}</button>
                 <button type="button" className="button secondary" disabled={busy || (!core.data || Boolean(core.error))}
                   onClick={() => void run(() => api.controlModule(module.manifest.id, "restart"))}>{t("moduleRestart")}</button>
+                {module.status === "enabled" && catalog.data?.modules.some((candidate) =>
+                  candidate.id === module.manifest.id &&
+                  catalogState(module, candidate) === "newer" &&
+                  candidate.version.split(".").slice(0, 2).join(".") === module.manifest.version.split(".").slice(0, 2).join(".")) &&
+                  <button type="button" className="button primary" disabled={busy}
+                    onClick={() => void run(() => api.upgradeCatalogModule(module.manifest.id))}>
+                    Обновить модуль
+                  </button>}
               </>}
             </div>
             <div className="button-row destructive-actions"><button type="button" className="button danger" disabled={busy || (!core.data || Boolean(core.error))} onClick={() => setConfirmRemove(module)}>{t("moduleRemove")}</button></div>
@@ -174,7 +182,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
         <div className="card-grid">
           {catalog.data.modules.map((manifest) => {
             const existing = installed.get(manifest.id); const state = catalogState(existing, manifest);
-            const hint = state === "newer" ? u("upgradeBlocked") : state === "older" ? u("installedNewer") : state === "changed" ? u("manifestChanged") : state === "invalid" ? u("versionUnknown") : "";
+            const hint = state === "newer" ? "" : state === "older" ? u("installedNewer") : state === "changed" ? u("manifestChanged") : state === "invalid" ? u("versionUnknown") : "";
             const resumable = state === "incomplete" && existing;
             return <article className="module-card" key={manifest.id} data-catalog-id={manifest.id}>
               <div className="module-title"><h2>{manifest.name}</h2><span className="tag">{resumable ? u("incomplete") : existing ? t("moduleInstalled") : t("available")}</span></div>
@@ -184,6 +192,14 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
                 <dt>{t("coreVersion")}</dt><dd>{manifest.core}</dd></dl>
               {hint && <p className="notice">{hint}</p>}
               {resumable && <p>{u("resumeHint")}</p>}
+              {canManage && state === "newer" && existing?.status === "enabled" &&
+                manifest.version.split(".").slice(0, 2).join(".") === existing.manifest.version.split(".").slice(0, 2).join(".") &&
+                <button type="button" className="button primary" disabled={busy}
+                  onClick={() => void run(() => api.upgradeCatalogModule(manifest.id))}>
+                  Обновить до {manifest.version}
+                </button>}
+              {state === "newer" && existing && manifest.version.split(".").slice(0, 2).join(".") !== existing.manifest.version.split(".").slice(0, 2).join(".") &&
+                <p className="notice">Для обновления на новую ветку версии требуется отдельная миграция данных.</p>}
               {canManage && <div className="button-row"><button type="button" className="button primary"
                 disabled={busy || (!core.data || Boolean(core.error)) || Boolean(existing && !resumable)}
                 onClick={() => void run(() => resumable ? api.installModule(resumable.manifest) : api.installCatalogModule(manifest.id))}>
