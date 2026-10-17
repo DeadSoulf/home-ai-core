@@ -405,10 +405,8 @@ func (s *server) nvrStorageUsage(ctx context.Context, node systeminfo.BlockNode)
 	paths := map[string]bool{}
 	uuids := map[string]bool{}
 	collectStorageIdentity(node, &mounts, paths, uuids)
-	matched := record.FilesystemUUID != "" && uuids[record.FilesystemUUID]
-	if !matched && record.FilesystemUUID == "" {
-		matched = paths[record.DevicePath]
-	}
+	matched := (record.FilesystemUUID != "" && uuids[record.FilesystemUUID]) ||
+		(record.DevicePath != "" && paths[record.DevicePath])
 	if !matched {
 		return nil, nil
 	}
