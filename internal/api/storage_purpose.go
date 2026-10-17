@@ -122,8 +122,8 @@ func (s *server) storagePurposes(
 				return
 			}
 			for _, existing := range assigned {
-				if existing.Purpose == purpose && existing.FilesystemUUID != node.UUID &&
-					existing.DevicePath != node.Path {
+				if existing.Purpose == purpose && existing.DevicePath != node.Path &&
+					(node.UUID == "" || existing.FilesystemUUID != node.UUID) {
 					writeAPIError(w, r, http.StatusConflict, "storage_module_assignment_exists",
 						"A module can be assigned one dedicated partition at a time", nil)
 					return
