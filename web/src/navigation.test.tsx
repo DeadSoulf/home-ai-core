@@ -59,6 +59,20 @@ describe("navigation access", () => {
     expect(isModuleRoute("/modules/catalog")).toBe(false);
   });
 
+  it("shows AI Agent only to module managers while other modules retain access", () => {
+    const moduleItems = [
+      {module_id: "ai.agent", status: "enabled" as const, items: [{id:"ai.agent", title:"AI Agent", route:"/modules/ai.agent"}]},
+      {module_id: "nvr.module", status: "enabled" as const, items: [{id:"nvr.module", title:"NVR", route:"/modules/nvr.module"}]},
+    ];
+    const reader = actor(["security.self.read", "modules.read"]);
+    const manager = actor(["security.self.read", "modules.read", "modules.manage"]);
+    const visibleToReader = visibleNavigation(reader, moduleItems).flatMap((g) => g.items.map((x) => x.path));
+    expect(visibleToReader).not.toContain("/modules/ai.agent");
+    expect(visibleToReader).toContain("/modules/nvr.module");
+    expect(accessiblePath(reader, "/modules/ai.agent", moduleItems)).toBe("/");
+    expect(accessiblePath(manager, "/modules/ai.agent", moduleItems)).toBe("/modules/ai.agent");
+  });
+
   it("keeps existing URLs accessible for an actor with the corresponding read permissions", () => {
     const reader = actor(allReads);
     for (const path of ["/", "/system", "/modules", "/files", "/jobs", "/audit", "/users"]) {

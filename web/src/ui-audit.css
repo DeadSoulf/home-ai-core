@@ -1,6 +1,8 @@
 /* Additive workflow fixes; retain the existing Home-AI dark theme and menu. */
 button, input, textarea { font: inherit; }
-.text-input { display: block; width: 100%; max-width: 100%; min-width: 0; min-height: 12rem; resize: vertical; color: #e9edf5; background: #101720; border: 1px solid #485b73; border-radius: 9px; padding: 12px; line-height: 1.5; margin: 8px 0 12px; }
+/* Inputs and selects must stay single-line. Only multi-line editors may grow. */
+.text-input { display: block; width: 100%; max-width: 100%; min-width: 0; color: #e9edf5; background: #101720; border: 1px solid #485b73; border-radius: 9px; padding: 12px; line-height: 1.5; margin: 8px 0 12px; }
+textarea.text-input { min-height: 12rem; resize: vertical; }
 .text-input:focus-visible, .button:focus-visible, summary:focus-visible { outline: 2px solid #8eb8ff; outline-offset: 3px; }
 [aria-invalid="true"] { border-color: #ed9097; }
 .button-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; min-width: 0; }

@@ -10,19 +10,21 @@ import (
 	"strings"
 )
 
-// inspectNVRModuleAddress is deliberately read-only. The updater helper is the
-// only process permitted to inspect Docker; Core never receives docker.sock.
-// Only a running, HOME AI-managed NVR on the HOME AI-managed Docker network
-// can return an address, and the API will use it solely on port 8090.
-func inspectNVRModuleAddress(ctx context.Context) (string, error) {
+// inspectManagedModuleAddress is read-only and strictly restricted to the
+// native Core integrations. It never accepts a caller-chosen network target.
+// Docker labels and the managed network ID are verified before exposing an IP.
+func inspectManagedModuleAddress(ctx context.Context, moduleID string) (string, error) {
+	if moduleID != "nvr.module" && moduleID != "ai.agent" {
+		return "", errors.New("unsupported module endpoint")
+	}
 	dockerPath, err := exec.LookPath("docker")
 	if err != nil {
 		return "", errors.New("Docker is unavailable")
 	}
-	const name = "home-ai-module-nvr.module"
+	name := "home-ai-module-" + moduleID
 	output, err := exec.CommandContext(ctx, dockerPath, "inspect", "--format", "{{json .}}", name).CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("NVR container is unavailable: %s", commandError(output, err))
+		return "", fmt.Errorf("module container is unavailable: %s", commandError(output, err))
 	}
 	var container struct {
 		State struct {
@@ -42,15 +44,15 @@ func inspectNVRModuleAddress(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("decode NVR container metadata: %w", err)
 	}
 	if !container.State.Running {
-		return "", errors.New("NVR container is not running")
+		return "", errors.New("module container is not running")
 	}
 	if container.Config.Labels["home-ai.managed"] != "true" ||
-		container.Config.Labels["home-ai.module.id"] != "nvr.module" {
-		return "", errors.New("refusing to connect to an unmanaged NVR container")
+		container.Config.Labels["home-ai.module.id"] != moduleID {
+		return "", errors.New("refusing to connect to an unmanaged module container")
 	}
 	network, ok := container.NetworkSettings.Networks[dockerNetworkName]
 	if !ok || network.NetworkID == "" {
-		return "", errors.New("NVR is not connected to the managed module network")
+		return "", errors.New("module is not connected to the managed module network")
 	}
 	output, err = exec.CommandContext(ctx, dockerPath, "network", "inspect", "--format",
 		`{{index .Labels "home-ai.managed"}}|{{.Id}}`, dockerNetworkName).CombinedOutput()
@@ -59,11 +61,16 @@ func inspectNVRModuleAddress(ctx context.Context) (string, error) {
 	}
 	parts := strings.SplitN(strings.TrimSpace(string(output)), "|", 2)
 	if len(parts) != 2 || parts[0] != "true" || parts[1] != network.NetworkID {
-		return "", errors.New("NVR Docker network ownership does not match")
+		return "", errors.New("module network ownership does not match")
 	}
 	address, err := netip.ParseAddr(strings.TrimSpace(network.IPAddress))
 	if err != nil || !address.Is4() || !address.IsPrivate() || address.IsLoopback() {
-		return "", errors.New("NVR has no valid private IPv4 container address")
+		return "", errors.New("module has no valid private IPv4 container address")
 	}
 	return address.String(), nil
+}
+
+// Backward-compatible fixed NVR endpoint for existing callers and tests.
+func inspectNVRModuleAddress(ctx context.Context) (string, error) {
+	return inspectManagedModuleAddress(ctx, "nvr.module")
 }

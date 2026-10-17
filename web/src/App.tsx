@@ -5,6 +5,7 @@ import { LoadingState } from "./components/Panel";
 import { useUI } from "./ui/useUI";
 import { ModulePage } from "./pages/Module";
 import { NVRPage } from "./pages/NVR";
+import { AIPage } from "./pages/AI";
 import { isModuleRoute, isModuleManagementRoute, moduleSection, moduleSectionPath } from "./navigation";
 import type { Actor, ModuleNavigationState } from "./api/types";
 import { Shell } from "./components/Shell";
@@ -288,7 +289,10 @@ export default function App() {
         : accountPage;
       break;
     default:
-      page = moduleRoute && allowedPath === "/modules/nvr.module" &&
+      page = moduleRoute && allowedPath === "/modules/ai.agent" &&
+        has("modules.manage") && moduleNavigation?.some((item) => item.module_id === "ai.agent" && item.status === "enabled")
+        ? <AIPage />
+        : moduleRoute && allowedPath === "/modules/nvr.module" &&
         has("modules.read") && moduleNavigation?.some((item) => item.module_id === "nvr.module" && item.status === "enabled")
         ? <NVRPage canManage={has("modules.manage")} />
         : moduleRoute ? (!moduleNavigation ? navigationError ? <div className="page"><ErrorNotice error={navigationError} /><button type="button" className="button secondary" onClick={() => window.dispatchEvent(new CustomEvent("home-ai-core:modules-changed"))}>{u("retry")}</button></div> : <LoadingState /> : <ModulePage path={path} modules={moduleNavigation}

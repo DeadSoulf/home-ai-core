@@ -1,0 +1,46 @@
+.ai-page .ai-tabs {display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px}
+.ai-page .ai-status{color:var(--muted, #8e9aaa);font-size:.9rem;margin-bottom:16px}
+.ai-page .ai-error,.ai-page .ai-notice,.ai-page .ai-note{border-radius:10px;padding:13px 15px;margin:12px 0;overflow-wrap:anywhere}
+.ai-page .ai-error{background:rgba(190,55,55,.12);border:1px solid rgba(190,55,55,.32)}
+.ai-page .ai-notice,.ai-page .ai-note{background:rgba(70,128,200,.09);border:1px solid rgba(70,128,200,.23)}
+.ai-page .ai-note .button{margin-left:12px}
+.ai-page .ai-controls{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:6px 0 18px}
+.ai-page .ai-controls label{display:flex;flex-direction:column;flex:1 1 220px;gap:7px;min-width:0}
+.ai-page .ai-controls label select{width:100%;min-width:0}
+.ai-page .ai-controls button{flex:0 0 auto}
+.ai-page .ai-messages{display:flex;flex-direction:column;gap:12px;min-height:230px;max-height:48vh;overflow:auto;padding:12px;border:1px solid var(--border, rgba(140,150,160,.3));border-radius:12px}
+.ai-page .ai-message{max-width:94%;border:1px solid var(--border, rgba(140,150,160,.25));padding:12px 14px;border-radius:12px;overflow-wrap:anywhere;white-space:pre-wrap}
+.ai-page .ai-message p{margin:8px 0 0}
+.ai-page .ai-human{align-self:flex-end;background:rgba(70,125,200,.1)}
+.ai-page .ai-assistant{align-self:flex-start;background:rgba(120,120,120,.06)}
+.ai-page .ai-compose{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+.ai-page .ai-compose textarea{width:100%;resize:vertical;min-height:86px}
+.ai-page .ai-compose button{align-self:flex-end}
+.ai-page .ai-provider-list{display:flex;flex-direction:column;gap:12px}
+.ai-page .ai-provider{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid var(--border, rgba(140,150,160,.23))}
+.ai-page .ai-provider:last-child{border-bottom:0}
+.ai-page .ai-provider>div:first-child{flex:1 1 250px;min-width:0;overflow-wrap:anywhere}
+.ai-page .ai-provider p{margin:6px 0 0}
+.ai-page .ai-provider-form{display:grid;gap:15px;max-width:640px}
+.ai-page .ai-provider-form label{display:flex;flex-direction:column;gap:7px;min-width:0}
+.ai-page .ai-provider-form .text-input{width:100%;max-width:100%;min-width:0}
+.ai-page .ai-provider-form label{font-size:13px;color:#c9d2df}
+/* Keep single-line form controls compact, regardless of the global editor rules. */
+.ai-page .ai-provider-form :is(input,select).text-input,
+.ai-page .ai-controls select.text-input{
+  width:100%;
+  height:44px;
+  min-height:44px;
+  margin:0;
+  padding:9px 12px;
+  resize:none;
+  line-height:1.35;
+}
+.ai-page .ai-provider-form :is(input,select).text-input:focus-visible,
+.ai-page .ai-controls select.text-input:focus-visible{
+  border-color:#8eb8ff;
+  outline:2px solid #8eb8ff;
+  outline-offset:2px;
+}
+.ai-page .ai-provider-form button{justify-self:start}
+@media(max-width:640px){.ai-page .ai-controls{display:grid;grid-template-columns:minmax(0,1fr)}.ai-page .ai-controls button{justify-self:start}.ai-page .ai-message{max-width:100%}.ai-page .ai-provider{align-items:flex-start}.ai-page .ai-note .button{margin:10px 0 0}}

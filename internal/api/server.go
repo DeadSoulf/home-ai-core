@@ -22,6 +22,9 @@ type server struct {
 	nvrDataRoot         string
 	nvrStorageResolver  func(context.Context) (string, error)
 	nvrStorageAttacher  func(context.Context, string, string) error
+	aiEndpoint          func(context.Context) (string, error)
+	aiTransport         http.RoundTripper
+	aiDataRoot          string
 	nvrScanMu           sync.Mutex
 	nvrLastScan         time.Time
 	nvrNetworks         func() ([]nvrdiscovery.Network, error)
@@ -108,6 +111,10 @@ func New(
 	s.mux.HandleFunc("POST /api/v1/modules/catalog/{moduleID}/upgrade", s.requireAuth("modules.manage", s.moduleCatalogUpgrade))
 	s.mux.HandleFunc("POST /api/v1/modules/install", s.requireAuth("modules.manage", s.moduleInstall))
 	s.mux.HandleFunc("GET /api/v1/modules/navigation", s.requireAuth("", s.moduleNavigation))
+	// The AI provider store currently has no per-user namespaces. Until it does,
+	// all chat, provider and approval routes are restricted to module managers.
+	// The browser never receives the container's access-token or a host port.
+	s.mux.HandleFunc("/api/v1/ai/", s.requireAuth("modules.manage", s.aiGateway))
 	// The NVR UI is native to Core. It never embeds the unauthenticated
 	// module web console or makes the Docker container publicly reachable.
 	s.mux.HandleFunc("GET /api/v1/nvr/status", s.requireAuth("modules.read", s.nvrStatus))
