@@ -26,14 +26,14 @@ func nvrTestService(enabled bool) fakeModules {
 	}
 	return fakeModules{items: []modules.Registered{{
 		Manifest: modules.Manifest{ID: "nvr.module", Name: "NVR", Version: "1.1.2"},
-		Status: status,
+		Status:   status,
 	}}}
 }
 
 func nvrTestUpstream(t *testing.T, body string) *server {
 	t.Helper()
 	return &server{
-		modules: nvrTestService(true),
+		modules:     nvrTestService(true),
 		nvrEndpoint: func(context.Context) (string, error) { return "172.19.0.4", nil },
 		nvrTransport: nvrRoundTripFunc(func(req *http.Request) (*http.Response, error) {
 			if req.URL.Host != "172.19.0.4:8090" {
@@ -44,8 +44,8 @@ func nvrTestUpstream(t *testing.T, body string) *server {
 			}
 			return &http.Response{
 				StatusCode: 200,
-				Header: http.Header{"Content-Type": []string{"application/json"}},
-				Body: io.NopCloser(strings.NewReader(body)),
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+				Body:       io.NopCloser(strings.NewReader(body)),
 			}, nil
 		}),
 	}
@@ -156,6 +156,10 @@ func TestNVRStatusJSONDoesNotLeakDatabasePath(t *testing.T) {
 	w := httptest.NewRecorder()
 	s.nvrStatus(w, httptest.NewRequest(http.MethodGet, "/api/v1/nvr/status", nil), security.Actor{}, authBearer)
 	var result map[string]any
-	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil { t.Fatal(err) }
-	if _, ok := result["database"]; ok { t.Fatal("private NVR database path leaked") }
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := result["database"]; ok {
+		t.Fatal("private NVR database path leaked")
+	}
 }
