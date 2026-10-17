@@ -34,11 +34,11 @@ type settingsMinMaxInfo struct {
 }
 
 var (
-	procSettingsSetProcessDPI = settingsUser32.NewProc("SetProcessDpiAwarenessContext")
+	procSettingsSetProcessDPI   = settingsUser32.NewProc("SetProcessDpiAwarenessContext")
 	procSettingsGetDPIForSystem = settingsUser32.NewProc("GetDpiForSystem")
 	procSettingsGetDPIForWindow = settingsUser32.NewProc("GetDpiForWindow")
-	procSettingsMoveWindow = settingsUser32.NewProc("MoveWindow")
-	procSettingsSetWindowPos = settingsUser32.NewProc("SetWindowPos")
+	procSettingsMoveWindow      = settingsUser32.NewProc("MoveWindow")
+	procSettingsSetWindowPos    = settingsUser32.NewProc("SetWindowPos")
 )
 
 // Manifest PerMonitorV2 takes precedence. An explicit call also covers local
@@ -93,7 +93,7 @@ func (state *windowsSettingsUI) layoutExtra() (int32, int32) {
 	if dpi == 0 {
 		dpi = 96
 	}
-	toLogical := func(v int32) int32 { return int32(int64(v)*96/int64(dpi)) }
+	toLogical := func(v int32) int32 { return int32(int64(v) * 96 / int64(dpi)) }
 	dx := toLogical(rect.Right) - settingsDesignClientWidth
 	dy := toLogical(rect.Bottom) - settingsDesignClientHeight
 	if dx < 0 {
