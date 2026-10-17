@@ -18,10 +18,10 @@ import (
 )
 
 var (
-	moduleOperationMu    sync.Mutex
-	moduleIDPattern      = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
-	imageDigestPattern    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,447}@sha256:[a-f0-9]{64}$`)
-	localImageIDPattern  = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
+	moduleOperationMu   sync.Mutex
+	moduleIDPattern     = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
+	imageDigestPattern  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,447}@sha256:[a-f0-9]{64}$`)
+	localImageIDPattern = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
 )
 
 // The official NVR digest was once published successfully but is not now
@@ -402,8 +402,8 @@ func resumeManagedModule(ctx context.Context, dockerPath, name, image string) (m
 		return moduleContainerStatus{}, "", fmt.Errorf("inspect interrupted module: %s", commandError(output, err))
 	}
 	var info struct {
-		ID    string `json:"Id"`
-		Image string `json:"Image"`
+		ID     string `json:"Id"`
+		Image  string `json:"Image"`
 		Config struct {
 			Image  string            `json:"Image"`
 			Labels map[string]string `json:"Labels"`
