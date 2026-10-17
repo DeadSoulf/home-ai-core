@@ -6,6 +6,7 @@ import { ErrorState, LoadingState, Panel } from "../components/Panel";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { JobProgress } from "../components/JobProgress";
+import { SectionGuide } from "../components/SectionGuide";
 import { useI18n } from "../i18n";
 import { useUI } from "../ui/useUI";
 import { activeJob, canCancelJob, jobTitle } from "../ui/moduleState";
@@ -46,6 +47,7 @@ export function JobsPage({revision, canManage = false, selectedJob}: {revision: 
   if (!data) return <ErrorState message={error} onRetry={reload} />;
   return <div className="page jobs-page">
     <PageHeading title={t("activity")} subtitle={t("jobsSubtitleSimple")} />
+    <SectionGuide title={u("uxJobsGuide")} description={u("uxJobsGuideDescription")} />
     {error && <ErrorState message={error} onRetry={reload} />}
     {actionError !== undefined && <ErrorNotice error={actionError} />}
     <Panel title={t("jobHistory")} action={canManage && <button type="button" className="button secondary" disabled={clearing || Boolean(cancelling) || !data.some((job) => !activeJob(job))}
