@@ -86,6 +86,7 @@ export function StorageDevices({
   expandedByDefault = false,
   showDiskToolbar = true,
   mode = "tree",
+  defaultPurpose = "files",
 }: {
   devices: BlockNode[];
   onChanged: () => void;
@@ -93,6 +94,7 @@ export function StorageDevices({
   expandedByDefault?: boolean;
   showDiskToolbar?: boolean;
   mode?: "tree" | "diskActions" | "partitions";
+  defaultPurpose?: StoragePurpose;
 }) {
   const {t} = useI18n();
   const [busy, setBusy] = useState("");
@@ -105,7 +107,7 @@ export function StorageDevices({
   const [filesystem, setFilesystem] = useState<Filesystem>("ext4");
   const [label, setLabel] = useState("");
   const [diskName, setDiskName] = useState("");
-  const [partitionPurpose, setPartitionPurpose] = useState<StoragePurpose>("files");
+  const [partitionPurpose, setPartitionPurpose] = useState<StoragePurpose>(defaultPurpose);
   const [purposes, setPurposes] = useState<StoragePurposeAssignment[]>([]);
   const [collapsed, setCollapsed] = useState<string[]>(() =>
     expandedByDefault
