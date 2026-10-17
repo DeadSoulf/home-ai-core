@@ -210,7 +210,7 @@ func probeHost(ctx context.Context, host string, results chan<- signal) {
 			// transmits credentials or treats TLS as authenticated.
 			tlsConn := tls.Client(conn, &tls.Config{
 				InsecureSkipVerify: true, // probe-only; never for login, video or credentials
-				MinVersion: tls.VersionTLS12,
+				MinVersion:         tls.VersionTLS12,
 			})
 			if tlsConn.HandshakeContext(ctx) == nil {
 				result := probeHTTP(tlsConn, host, 443)
