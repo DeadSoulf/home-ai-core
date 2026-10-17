@@ -37,6 +37,7 @@ const (
 	settingsWMSyncDone        = settingsWMApp + 202
 	settingsWMAgentDone       = settingsWMApp + 203
 	settingsWMUpdateCheckDone = settingsWMApp + 204
+	settingsWMCertificateProbeDone = settingsWMApp + 205
 
 	settingsWSOverlappedWindow = 0x00CF0000
 	settingsWSVisible          = 0x10000000
@@ -187,6 +188,10 @@ type windowsSettingsUI struct {
 	updateCheckBtn       windows.Handle
 	updateInstallBtn     windows.Handle
 	updateStatusLabel    windows.Handle
+	certificateStatus windows.Handle
+	certificateTrustBtn windows.Handle
+	certificateForgetBtn windows.Handle
+	certificateProbeBusy bool
 	updateBusy           bool
 	updateAvailable      bool
 	updateLatestVersion  string
@@ -231,6 +236,7 @@ type windowsSettingsUI struct {
 	syncResult    *settingsAsyncResult
 	agentResult   *settingsAsyncResult
 	updateResult  *settingsUpdateCheckResult
+	certificateProbe *settingsCertificateProbeResult
 }
 
 var (
@@ -429,6 +435,7 @@ func runSettingsUI(args []string) error {
 	state.applyLanguageTexts()
 	state.loadInitial()
 	state.loadUpdateChannel()
+	state.refreshCertificatePinStatus()
 	state.layoutControls()
 	procSettingsSetTimer.Call(hwnd, settingsTransferTimerID, 1500, 0)
 	procSettingsShowWindow.Call(hwnd, settingsSWShow)
@@ -555,6 +562,11 @@ func settingsWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) ui
 			state.finishUpdateCheck()
 			return 0
 		}
+	case settingsWMCertificateProbeDone:
+		if state != nil {
+			state.finishTrustServerCertificate()
+			return 0
+		}
 	case settingsWMClose:
 		procSettingsDestroyWindow.Call(hwnd)
 		return 0
@@ -632,6 +644,18 @@ func (state *windowsSettingsUI) handleCommand(id, notify uint16) {
 	case settingsIDConnect:
 		if notify == settingsBNClicked {
 			state.beginConnect()
+		}
+	case settingsIDServerEdit:
+		if notify == settingsENChange {
+			state.refreshCertificatePinStatus()
+		}
+	case settingsIDTrustCertificate:
+		if notify == settingsBNClicked {
+			state.beginTrustServerCertificate()
+		}
+	case settingsIDForgetCertificate:
+		if notify == settingsBNClicked {
+			state.forgetServerCertificate()
 		}
 	case settingsIDBrowse:
 		if notify == settingsBNClicked {
