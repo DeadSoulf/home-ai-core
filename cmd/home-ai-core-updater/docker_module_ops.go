@@ -161,9 +161,6 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 func pullDockerModuleImage(ctx context.Context, dockerPath, image string) error {
 	token := strings.TrimSpace(os.Getenv("HOME_AI_MODULE_CATALOG_TOKEN"))
 	lowerImage := strings.ToLower(image)
-	if strings.HasPrefix(lowerImage, "ghcr.io/deadsoulf/") && token == "" {
-		return errors.New("private HOME AI module registry token is not configured; set HOME_AI_MODULE_CATALOG_TOKEN")
-	}
 	if token == "" || !strings.HasPrefix(lowerImage, "ghcr.io/") {
 		if output, err := exec.CommandContext(ctx, dockerPath, "pull", image).CombinedOutput(); err != nil {
 			return fmt.Errorf("pull module image: %s", commandError(output, err))

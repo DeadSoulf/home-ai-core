@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -51,9 +50,6 @@ func loadOfficialModuleCatalog(r *http.Request) (moduleCatalogDocument, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		if resp.StatusCode == http.StatusNotFound && strings.TrimSpace(os.Getenv("HOME_AI_MODULE_CATALOG_TOKEN")) == "" {
-			return moduleCatalogDocument{}, errors.New("official module catalog is private; HOME_AI_MODULE_CATALOG_TOKEN is not configured")
-		}
 		return moduleCatalogDocument{}, fmt.Errorf("GitHub catalog request failed with status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
