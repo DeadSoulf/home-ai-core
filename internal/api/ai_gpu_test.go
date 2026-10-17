@@ -16,7 +16,7 @@ import (
 func aiGPUEnabledModule() fakeModules {
 	return fakeModules{items: []modules.Registered{{
 		Manifest: modules.Manifest{ID: "ai.agent", Version: "0.2.0"},
-		Status: "enabled",
+		Status:   "enabled",
 	}}}
 }
 
@@ -102,7 +102,7 @@ func TestAIGPUCanApplyTwoCardsAndReturnToCPU(t *testing.T) {
 		security.Actor{}, authBearer)
 	var status struct {
 		Assigned []string `json:"assigned_gpu_pci"`
-		Mode string `json:"mode"`
+		Mode     string   `json:"mode"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &status); err != nil {
 		t.Fatal(err)
