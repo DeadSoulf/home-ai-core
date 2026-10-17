@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { api } from "../api/client";
-import type { BlockNode, StoragePurpose, StoragePurposeAssignment } from "../api/types";
+import type { BlockNode, StoragePurpose, StoragePurposeAssignment, StoragePurposeOption } from "../api/types";
 import { useI18n } from "../i18n";
 
 type Filesystem = "ext4" | "xfs" | "vfat";
@@ -107,6 +107,7 @@ export function StorageDevices({
   const [diskName, setDiskName] = useState("");
   const [partitionPurpose, setPartitionPurpose] = useState<StoragePurpose>("files");
   const [purposes, setPurposes] = useState<StoragePurposeAssignment[]>([]);
+  const [purposeOptions, setPurposeOptions] = useState<StoragePurposeOption[]>([{id:"files",name:"Файлы"}]);
   const [collapsed, setCollapsed] = useState<string[]>(() =>
     expandedByDefault
       ? []
@@ -130,7 +131,9 @@ export function StorageDevices({
       return;
     }
     try {
-      setPurposes(await api.storagePurposes());
+      const [assignments, choices] = await Promise.all([api.storagePurposes(), api.storagePurposeOptions()]);
+      setPurposes(assignments);
+      setPurposeOptions(choices);
     } catch (reason) {
       setStorageError(reason);
     }
@@ -662,7 +665,10 @@ export function StorageDevices({
                   value={partitionPurpose}
                   onChange={(event) => setPartitionPurpose(event.target.value as StoragePurpose)}
                 >
-                  <option value="files">{t("storagePurposeFiles")}</option>                </select>
+                  {purposeOptions.map((choice) => <option key={choice.id} value={choice.id}>
+                    {choice.id === "files" ? t("storagePurposeFiles") : `${choice.name} — хранилище модуля`}
+                  </option>)}
+                </select>
               </label>
             </div>
             <div className="storage-capacity-summary">
@@ -864,7 +870,7 @@ export function StorageDevices({
                         {node.label && <span className="storage-inline-label">{node.label}</span>}
                         {purposeAssignment && (
                           <span className="status-badge">
-                            {t("storagePurposeFiles")}
+                            {purposeAssignment.purpose === "files" ? t("storagePurposeFiles") : purposeOptions.find((option) => option.id === purposeAssignment.purpose)?.name || purposeAssignment.purpose}
                           </span>
                         )}
                         {storageInUse && (
@@ -1066,7 +1072,10 @@ export function StorageDevices({
                                   onChange={(event) => void changePurpose(node, event.target.value as "" | StoragePurpose)}
                                 >
                                   <option value="">{t("storagePurposeNone")}</option>
-                                  <option value="files">{t("storagePurposeFiles")}</option>                                </select>
+                                  {purposeOptions.map((choice) => <option key={choice.id} value={choice.id}>
+                                    {choice.id === "files" ? t("storagePurposeFiles") : `${choice.name} — хранилище модуля`}
+                                  </option>)}
+                                </select>
                               </label>
                             )}
                           </div>
