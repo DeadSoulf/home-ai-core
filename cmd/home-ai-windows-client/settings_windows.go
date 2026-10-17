@@ -33,10 +33,10 @@ const (
 	settingsWMSetFont = 0x0030
 	settingsWMApp     = 0x8000
 
-	settingsWMConnected       = settingsWMApp + 201
-	settingsWMSyncDone        = settingsWMApp + 202
-	settingsWMAgentDone       = settingsWMApp + 203
-	settingsWMUpdateCheckDone  = settingsWMApp + 204
+	settingsWMConnected         = settingsWMApp + 201
+	settingsWMSyncDone          = settingsWMApp + 202
+	settingsWMAgentDone         = settingsWMApp + 203
+	settingsWMUpdateCheckDone   = settingsWMApp + 204
 	settingsWMUpdateInstallDone = settingsWMApp + 206
 
 	settingsWSOverlappedWindow = 0x00CF0000
@@ -230,11 +230,11 @@ type windowsSettingsUI struct {
 	profiles          []windowsclient.SyncProfile
 	selectedProfileID string
 
-	asyncMu       sync.Mutex
-	connectResult *settingsConnectResult
-	syncResult    *settingsAsyncResult
-	agentResult   *settingsAsyncResult
-	updateResult  *settingsUpdateCheckResult
+	asyncMu             sync.Mutex
+	connectResult       *settingsConnectResult
+	syncResult          *settingsAsyncResult
+	agentResult         *settingsAsyncResult
+	updateResult        *settingsUpdateCheckResult
 	updateInstallResult *settingsUpdateInstallResult
 }
 
@@ -379,17 +379,17 @@ func runSettingsUI(args []string) error {
 	}
 
 	state := &windowsSettingsUI{
-		configPath:   configPath,
-		settingsPath: settingsPath,
-		language:     preferredUILanguageForSettingsPath(settingsPath),
-		localized:    make(map[string]windows.Handle),
-		visualRoles:  make(map[windows.Handle]settingsVisualRole),
-		buttonRoles:  make(map[windows.Handle]settingsButtonRole),
-		windowIcon:   windows.Handle(icon),
-		dpi:          settingsSystemDPI(),
+		configPath:         configPath,
+		settingsPath:       settingsPath,
+		language:           preferredUILanguageForSettingsPath(settingsPath),
+		localized:          make(map[string]windows.Handle),
+		visualRoles:        make(map[windows.Handle]settingsVisualRole),
+		buttonRoles:        make(map[windows.Handle]settingsButtonRole),
+		windowIcon:         windows.Handle(icon),
+		dpi:                settingsSystemDPI(),
 		updateWasInstalled: updated,
-		controlRects: make(map[windows.Handle]settingsLayoutRect),
-		controlFonts: make(map[windows.Handle]windows.Handle),
+		controlRects:       make(map[windows.Handle]settingsLayoutRect),
+		controlFonts:       make(map[windows.Handle]windows.Handle),
 	}
 	activeSettingsUI.Lock()
 	activeSettingsUI.value = state
