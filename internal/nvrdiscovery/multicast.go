@@ -17,8 +17,8 @@ import (
 
 const (
 	wsDiscoveryMulticast = "239.255.255.250:3702"
-	ssdpMulticast = "239.255.255.250:1900"
-	mdnsMulticast = "224.0.0.251:5353"
+	ssdpMulticast        = "239.255.255.250:1900"
+	mdnsMulticast        = "224.0.0.251:5353"
 )
 
 // Multicast queries originate from the selected LAN interface address. The
@@ -196,7 +196,7 @@ func dnsName(data []byte, offset int) (string, int, error) {
 			}
 			target := (size&0x3f)<<8 | int(data[offset+1])
 			if next == -1 {
-				next = offset+2
+				next = offset + 2
 			}
 			offset = target
 			continue
@@ -240,7 +240,7 @@ func parseMDNSResponse(packet []byte) signal {
 		if err != nil || next+4 > len(packet) {
 			return signal{}
 		}
-		offset = next+4
+		offset = next + 4
 	}
 	for i := 0; i < records; i++ {
 		name, next, err := dnsName(packet, offset)
@@ -249,8 +249,8 @@ func parseMDNSResponse(packet []byte) signal {
 		}
 		recordType := binary.BigEndian.Uint16(packet[next : next+2])
 		length := int(binary.BigEndian.Uint16(packet[next+8 : next+10]))
-		start := next+10
-		offset = start+length
+		start := next + 10
+		offset = start + length
 		if offset > len(packet) {
 			return signal{}
 		}
