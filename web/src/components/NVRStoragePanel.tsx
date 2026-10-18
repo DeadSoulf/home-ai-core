@@ -3,7 +3,7 @@ import {Panel} from "./Panel";
 
 export function formatNVRBytes(value: number): string {
   if (!Number.isFinite(value) || value < 0) return "—";
-  const units = ["Б", "КиБ", "ГиБ", "ТиБ", "ПиБ"];
+  const units = ["Б", "КиБ", "МиБ", "ГиБ", "ТиБ", "ПиБ"];
   let amount = value;
   let unit = 0;
   while (amount >= 1024 && unit < units.length - 1) {
