@@ -37,6 +37,7 @@ class Harness:
         self.system_delay=0; self.system_status=200; self.catalog_status=200; self.runtime_status=200; self.nav_status=200
         self.requests=[]; self.errors=[]; self.system_active=0; self.system_max=0; self.calls=0
         self.ai_providers=[]; self.ai_conversations=[]; self.ai_approvals=[]; self.ai_messages={}
+        self.ai_version='0.1.0';self.ai_gpu_package_ready=False
         self.ai_gpus=[]; self.ai_assigned=[]; self.ai_installed=['qwen3:0.6b']; self.ai_download_status='ready'
         self.overrides={}; self.unhandled=[]; self.offline=os.environ.get('UI_OFFLINE')=='1'
         for k,v in kw.items(): setattr(self,k,v)
@@ -129,6 +130,12 @@ class Harness:
                         memory=dict(total_bytes=17179869184,available_bytes=8589934592),
                         gpus=self.ai_gpus,
                     ))
+                elif sub=='gpu/runtime' and method=='GET':
+                    await respond(dict(ready=self.ai_gpu_package_ready))
+                elif sub=='gpu/runtime/prepare' and method=='POST':
+                    self.jobs=[job('running','module.gpu.prepare','job-optional-gpu')]
+                    self.ai_gpu_package_ready=True
+                    await respond(dict(job=self.jobs[0]),202)
                 elif sub=='gpu/assignment' and method=='GET':
                     await respond(dict(assigned_gpu_pci=self.ai_assigned,mode='nvidia' if self.ai_assigned else 'cpu'))
                 elif sub=='gpu/assignment' and method=='POST':
@@ -145,7 +152,7 @@ class Harness:
                     if name not in self.ai_installed:self.ai_installed.append(name)
                     await respond(dict(queued=True,name=name),202)
                 elif sub=='status' and method=='GET':
-                    await respond(dict(version='0.1.0',providers=len(self.ai_providers),
+                    await respond(dict(version=self.ai_version,providers=len(self.ai_providers),
                                        approvals_pending=len([x for x in self.ai_approvals if x['status']=='pending']),
                                        core_actions_enabled=False))
                 elif sub=='providers' and method=='GET':await respond(dict(providers=self.ai_providers))
@@ -547,6 +554,28 @@ async def suite(browser):
         await expect(h.page.locator('[data-job-id="job-install-pull"]').get_by_text('100%',exact=False)).to_be_visible()
         await h.close()
     await check('UI-19: module install shows real phase and per-layer bytes without fake total percent',live_module_install_progress)
+
+    async def optional_gpu_runtime_download():
+        gpu=dict(model='GPU A',vendor='NVIDIA',pci_address='0000:01:00.0',driver='nvidia')
+        h=await Harness(browser,modules=[ai_module()],ai_version='0.3.0',ai_gpus=[gpu]).start('/modules/ai.agent')
+        await h.page.get_by_role('button',name='Локальный AI',exact=True).click()
+        await expect(h.page.get_by_text('GPU-компоненты:',exact=False)).to_contain_text('не загружены')
+        await h.page.locator('.ai-gpu-device input').first.check()
+        await expect(h.page.get_by_role('button',name='Применить выбранные GPU')).to_be_disabled()
+        assert not h.ai_assigned
+        h.page.once('dialog',lambda d: asyncio.create_task(d.accept()))
+        await h.page.get_by_role('button',name='Загрузить GPU-компоненты',exact=True).click()
+        assert any(req[1]=='/api/v1/ai/gpu/runtime/prepare' for req in h.requests)
+        assert h.jobs[0]['type']=='module.gpu.prepare'
+        assert not h.ai_assigned, 'download must not allocate hardware'
+        await h.page.get_by_role('button',name='Проверить оборудование').click()
+        await expect(h.page.get_by_text('GPU-компоненты:',exact=False)).to_contain_text('загружены')
+        await expect(h.page.get_by_role('button',name='Применить выбранные GPU')).to_be_enabled()
+        h.page.once('dialog',lambda d: asyncio.create_task(d.accept()))
+        await h.page.get_by_role('button',name='Применить выбранные GPU').click()
+        assert h.ai_assigned==['0000:01:00.0']
+        await h.close()
+    await check('UI-23: optional GPU download happens before separately approved device assignment',optional_gpu_runtime_download)
 
     async def responsive_pages():
         for path,kw in [('/users',{}),('/jobs',dict(jobs=[job()])),('/',dict(initialized=False))]:
