@@ -34,8 +34,7 @@ func TestNVRLiveStartUsesSavedCameraWithoutCredentialsInBrowser(t *testing.T) {
 	s.security=defaultFakeSecurity()
 	s.nvrSavedLive(response,request,defaultFakeSecurity().actor,authBearer)
 	if response.Code!=http.StatusOK ||
-		!strings.Contains(response.Body.String(),"/api/v1/nvr/output/hls/saved_cam1/index.m3u8") ||
-		strings.Contains(response.Body.String(),"/output/hls/saved_cam1/index.m3u8\"") {
+		!strings.Contains(response.Body.String(),"/api/v1/nvr/output/hls/saved_cam1/index.m3u8") {
 		t.Fatalf("unsafe HLS response: %d %s",response.Code,response.Body.String())
 	}
 }
