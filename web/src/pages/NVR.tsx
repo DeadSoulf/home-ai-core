@@ -1,8 +1,9 @@
 import {useCallback, useEffect, useRef, useState, type FormEvent} from "react";
 import {api, APIError} from "../api/client";
-import type {NVRCamera, NVRRecording, NVRStatus, NVRDiscoveryNetwork, NVRDiscoveredCamera} from "../api/types";
+import type {NVRCamera, NVRRecording, NVRStatus, NVRDiscoveryNetwork, NVRDiscoveredCamera, NVRStorageStatus} from "../api/types";
 import {Panel} from "../components/Panel";
 import {NVRLivePlayer} from "../components/NVRLivePlayer";
+import {NVRStoragePanel} from "../components/NVRStoragePanel";
 import {PageHeading} from "./Dashboard";
 import "./NVR.css";
 
@@ -16,6 +17,9 @@ const bytes = (value: number) => value >= 1024 ** 3
 export function NVRPage({canManage}: {canManage: boolean}) {
   const [tab, setTab] = useState<NVRTab>("cameras");
   const [status, setStatus] = useState<NVRStatus>();
+  const [storage, setStorage] = useState<NVRStorageStatus>();
+  const [storageLoading, setStorageLoading] = useState(true);
+  const [storageError, setStorageError] = useState("");
   const [cameras, setCameras] = useState<NVRCamera[]>([]);
   const [recordings, setRecordings] = useState<NVRRecording[]>([]);
   const [filter, setFilter] = useState("");
@@ -71,6 +75,37 @@ export function NVRPage({canManage}: {canManage: boolean}) {
     const timer = window.setInterval(() => { void run(); }, 15000);
     return () => { active = false; controller.abort(); clearInterval(timer); };
   }, [reload]);
+
+  const refreshStorage = useCallback(async (signal?: AbortSignal) => {
+    const next = await api.nvrStorage(signal);
+    if (!signal?.aborted) {
+      setStorage(next);
+      setStorageError("");
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    let pending = false;
+    const run = async () => {
+      if (pending) return;
+      pending = true;
+      try {
+        await refreshStorage(controller.signal);
+      } catch (err) {
+        if (active && !controller.signal.aborted) {
+          setStorageError(err instanceof Error ? err.message : "Не удалось прочитать сведения о дисках NVR");
+        }
+      } finally {
+        pending = false;
+        if (active) setStorageLoading(false);
+      }
+    };
+    void run();
+    const timer = window.setInterval(() => { void run(); }, 30000);
+    return () => { active = false; controller.abort(); clearInterval(timer); };
+  }, [refreshStorage]);
 
   const act = async (task: () => Promise<unknown>, success: string) => {
     if (busy) return false;
@@ -252,7 +287,13 @@ export function NVRPage({canManage}: {canManage: boolean}) {
       <button type="button" className={"button " + (tab === "archive" ? "primary" : "secondary")}
         onClick={() => setTab("archive")}>Архив записей</button>
       <button type="button" className="button secondary" disabled={busy}
-        onClick={() => { setLoading(true); void reload().then(() => setError("")).catch((e: unknown) => setError(String(e))).finally(() => setLoading(false)); }}>
+        onClick={() => {
+          setLoading(true);
+          setStorageLoading(true);
+          void reload().then(() => setError("")).catch((e: unknown) => setError(String(e))).finally(() => setLoading(false));
+          void refreshStorage().catch((e: unknown) => setStorageError(e instanceof Error ? e.message : String(e)))
+            .finally(() => setStorageLoading(false));
+        }}>
         Обновить
       </button>
     </div>
@@ -263,8 +304,10 @@ export function NVRPage({canManage}: {canManage: boolean}) {
       <div className="nvr-stat"><small>Камеры</small><strong>{status.cameras} / {status.max_cameras}</strong></div>
       <div className="nvr-stat"><small>Ведётся запись</small><strong>{status.active_recorders}</strong></div>
       <div className="nvr-stat"><small>Файлы архива</small><strong>{status.recordings}</strong></div>
-      <div className="nvr-stat"><small>Занято на диске</small><strong>{bytes(status.storage_bytes)}</strong></div>
+      <div className="nvr-stat"><small>Размер видеоархива</small><strong>{bytes(status.storage_bytes)}</strong></div>
     </div>}
+
+    <NVRStoragePanel storage={storage} loading={storageLoading} error={storageError} />
 
     {tab === "cameras" && <Panel title="Подключённые камеры">
       <div className="button-row">
