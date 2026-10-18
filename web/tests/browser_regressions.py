@@ -157,7 +157,7 @@ class Harness:
                                        core_actions_enabled=False))
                 elif sub=='providers' and method=='GET':await respond(dict(providers=self.ai_providers))
                 elif sub=='providers' and method=='POST':
-                    p=request.post_data_json.copy();p['id']='a'*32;p.pop('api_key',None);self.ai_providers.append(p)
+                    p=request.post_data_json.copy();p['id']=format(len(self.ai_providers)+1,'032x');p.pop('api_key',None);self.ai_providers.append(p)
                     await respond(dict(id=p['id']),201)
                 elif sub=='conversations' and method=='GET':await respond(dict(conversations=self.ai_conversations))
                 elif sub=='approvals' and method=='GET':await respond(dict(approvals=self.ai_approvals))
@@ -524,20 +524,21 @@ async def suite(browser):
         providers=[
             dict(id='a'*32,name='Встроенный Ollama',kind='ollama',model='qwen3:0.6b',
                  base_url=local_url,has_api_key=False),
-            dict(id='b'*32,name='Встроенный Ollama',kind='ollama',model='deepseek-r1:7b',
-                 base_url=local_url,has_api_key=False),
         ]
         models=['qwen3:0.6b','qwen3:8b','deepseek-r1:7b']
         h=await Harness(browser,modules=[ai_module()],ai_version='0.3.2',
                         ai_installed=models,ai_providers=providers).start('/modules/ai.agent')
         await expect(h.page.locator('.ai-status')).to_contain_text('Установлено локальных моделей: 3')
-        await expect(h.page.locator('.ai-status')).to_contain_text('Подключено AI-провайдеров: 2')
+        await expect(h.page.locator('.ai-status')).to_contain_text('Подключено AI-провайдеров: 1')
         await h.page.get_by_role('button',name='Локальный AI',exact=True).click()
         await expect(h.page.get_by_text('Установлено:',exact=False)).to_contain_text('3')
         item=h.page.locator('.ai-model-entry').filter(has_text='deepseek-r1:7b')
         await expect(item).to_be_visible()
         await item.get_by_role('button',name='Выбрать для чата').click()
-        await expect(h.page.locator('section[aria-label="Чат с AI"] select').first).to_have_value('b'*32)
+        await expect(h.page.locator('section[aria-label="Чат с AI"] select').first).to_have_value(format(2,'032x'))
+        assert any(req[1]=='/api/v1/ai/providers' and req[0]=='POST' and req[2].get('model')=='deepseek-r1:7b' for req in h.requests)
+        await expect(h.page.locator('.ai-status')).to_contain_text('Установлено локальных моделей: 3')
+        await expect(h.page.locator('.ai-status')).to_contain_text('Подключено AI-провайдеров: 2')
         await h.close()
     await check('UI-25: count real Ollama installations and select discovered non-catalog model',ai_multiple_installed_models)
 
