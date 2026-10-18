@@ -49,6 +49,14 @@ func validateAIUpgrade(previous, candidate Manifest, status string) error {
 	return nil
 }
 
+// CanUpgradeAI reports whether the current compatible patch update can be
+// offered through the official catalog without promising support for NVR or
+// third-party data formats.
+func CanUpgradeAI(current Registered, candidate Manifest) bool {
+	return validateAIUpgrade(current.Manifest,candidate,current.Status)==nil &&
+		ValidateManifest(candidate)==nil
+}
+
 // UpgradeManifest is only used for official catalog manifests. The privileged
 // helper snapshots persistent /data before booting the candidate and preserves
 // the old container until this store has durably committed the new manifest.
