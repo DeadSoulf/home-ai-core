@@ -17,7 +17,7 @@ func TestAIDurableJournalRejectsOverwriteAndInvalidContents(t *testing.T) {
 	state := aiUpgradeJournal{
 		PreviousImage:    "ghcr.io/deadsoulf/home-ai-core-ai@sha256:" + strings.Repeat("a", 64),
 		NextImage:        "ghcr.io/deadsoulf/home-ai-core-ai@sha256:" + strings.Repeat("b", 64),
-		PreviousManifest: `{"id":"ai.agent","version":"0.3.0"}`,
+		PreviousManifest: `{"id":"ai.agent","version":"0.3.0","runtime":{"docker":{"image":"ghcr.io/deadsoulf/home-ai-core-ai@sha256:` + strings.Repeat("a",64) + `"}}}`,
 	}
 	if err := writeAIUpgradeJournal(state); err != nil {
 		t.Fatal(err)
@@ -53,7 +53,7 @@ func TestAISnapshotRestoresDataAfterFailedCandidate(t *testing.T) {
 	state := aiUpgradeJournal{
 		PreviousImage:    "ghcr.io/deadsoulf/home-ai-core-ai@sha256:" + strings.Repeat("a", 64),
 		NextImage:        "ghcr.io/deadsoulf/home-ai-core-ai@sha256:" + strings.Repeat("b", 64),
-		PreviousManifest: `{"id":"ai.agent","version":"0.3.0"}`,
+		PreviousManifest: `{"id":"ai.agent","version":"0.3.0","runtime":{"docker":{"image":"ghcr.io/deadsoulf/home-ai-core-ai@sha256:` + strings.Repeat("a",64) + `"}}}`,
 	}
 	if err := writeAIUpgradeJournal(state); err != nil {
 		t.Fatal(err)
