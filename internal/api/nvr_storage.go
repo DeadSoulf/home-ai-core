@@ -168,6 +168,6 @@ func (s *server) nvrStorage(w http.ResponseWriter, r *http.Request, _ security.A
 		}
 	}
 	nodes, inspection := inventory(r.Context())
-	w.Header().Set("Cache-Control", "private, no-store")
+	// writeJSON applies Cache-Control: no-store to every Core API response.
 	writeJSON(w, http.StatusOK, nvrCapacityFromInventory(assignments, nodes, inspection))
 }
