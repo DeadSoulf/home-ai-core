@@ -20,6 +20,7 @@ type server struct {
 	nvrEndpoint    func(context.Context) (string, error)
 	nvrTransport   http.RoundTripper
 	nvrDataRoot    string
+	nvrStorageInventory func(context.Context) ([]systeminfo.BlockNode, storage.Inspection)
 	aiEndpoint     func(context.Context) (string, error)
 	aiTransport    http.RoundTripper
 	aiDataRoot     string
@@ -121,6 +122,7 @@ func New(
 	// The NVR UI is native to Core. It never embeds the unauthenticated
 	// module web console or makes the Docker container publicly reachable.
 	s.mux.HandleFunc("GET /api/v1/nvr/status", s.requireAuth("modules.read", s.nvrStatus))
+	s.mux.HandleFunc("GET /api/v1/nvr/storage", s.requireAuth("modules.read", s.nvrStorage))
 	s.mux.HandleFunc("GET /api/v1/nvr/discovery/networks", s.requireAuth("modules.manage", s.nvrDiscoveryNetworks))
 	s.mux.HandleFunc("POST /api/v1/nvr/discovery/search", s.requireAuth("modules.manage", s.nvrDiscover))
 	s.mux.HandleFunc("GET /api/v1/nvr/cameras", s.requireAuth("modules.read", s.nvrCameras))
