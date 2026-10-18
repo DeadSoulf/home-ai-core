@@ -81,6 +81,18 @@ func aiDockerExists(ctx context.Context, docker, name string) (bool, error) {
 	return false, fmt.Errorf("inspect module recovery container: %s", commandError(output, err))
 }
 
+func verifyAIUpgradeContainer(ctx context.Context, docker, name, expectedImage string) error {
+	exists, managed, err := inspectManagedContainer(ctx, docker, name, aiManagedID)
+	if err != nil { return err }
+	if !exists || !managed { return errors.New("unmanaged or missing AI upgrade container") }
+	out, err := exec.CommandContext(ctx, docker, "inspect", "--format", "{{.Config.Image}}", name).CombinedOutput()
+	if err != nil { return fmt.Errorf("verify AI upgrade image: %s", commandError(out, err)) }
+	if strings.TrimSpace(string(out)) != expectedImage {
+		return errors.New("AI upgrade container image does not match the recovery journal")
+	}
+	return nil
+}
+
 func aiUpgradeDockerHealth(ctx context.Context, docker, name string, limit time.Duration) error {
 	checkCtx, cancel := context.WithTimeout(ctx, limit)
 	defer cancel()
@@ -174,40 +186,24 @@ func rollbackAIUpgrade(ctx context.Context, docker string, state aiUpgradeJourna
 		return err
 	}
 	if previous {
-		// Only replace a Core-managed new image, never a foreign container.
+		if err := verifyAIUpgradeContainer(ctx,docker,aiUpgradePrevious,state.PreviousImage);err!=nil{return err}
 		if current {
-			exists, managed, err := inspectManagedContainer(ctx, docker, name, aiManagedID)
-			if err != nil {
-				return err
-			}
-			if !exists || !managed {
-				return errors.New("AI rollback blocked by unmanaged container")
-			}
-			if err := dockerAICommand(ctx, docker, "rm", "-f", name); err != nil {
-				return err
-			}
+			if err := verifyAIUpgradeContainer(ctx,docker,name,state.NextImage);err!=nil{return err}
+			if err := dockerAICommand(ctx,docker,"rm","-f",name);err!=nil{return err}
 		}
-		if err := dockerAICommand(ctx, docker, "rename", aiUpgradePrevious, name); err != nil {
-			return err
-		}
+		if err := dockerAICommand(ctx,docker,"rename",aiUpgradePrevious,name);err!=nil{return err}
 	} else if !current {
 		return errors.New("old AI container missing; refusing to discard recovery snapshot")
+	} else if err:=verifyAIUpgradeContainer(ctx,docker,name,state.PreviousImage);err!=nil{
+		return err
 	}
 	candidate, err := aiDockerExists(ctx, docker, aiUpgradeCandidate)
 	if err != nil {
 		return err
 	}
 	if candidate {
-		exists, managed, err := inspectManagedContainer(ctx, docker, aiUpgradeCandidate, aiManagedID)
-		if err != nil {
-			return err
-		}
-		if !exists || !managed {
-			return errors.New("unmanaged AI candidate blocks recovery")
-		}
-		if err := dockerAICommand(ctx, docker, "rm", "-f", aiUpgradeCandidate); err != nil {
-			return err
-		}
+		if err := verifyAIUpgradeContainer(ctx,docker,aiUpgradeCandidate,state.NextImage);err!=nil{return err}
+		if err := dockerAICommand(ctx,docker,"rm","-f",aiUpgradeCandidate);err!=nil{return err}
 	}
 	ready, err := aiUpgradeSnapshotReady()
 	if err != nil {
@@ -264,9 +260,8 @@ func finalizeAIUpgrade(ctx context.Context, docker string, state aiUpgradeJourna
 		return err
 	}
 	if previous {
-		if err := dockerAICommand(ctx, docker, "rm", "-f", aiUpgradePrevious); err != nil {
-			return err
-		}
+		if err := verifyAIUpgradeContainer(ctx,docker,aiUpgradePrevious,state.PreviousImage);err!=nil{return err}
+		if err := dockerAICommand(ctx,docker,"rm","-f",aiUpgradePrevious);err!=nil{return err}
 	}
 	if err := os.RemoveAll(aiUpgradePath(aiUpgradeBackupName)); err != nil {
 		return err
