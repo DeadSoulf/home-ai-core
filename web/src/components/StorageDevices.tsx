@@ -3,6 +3,7 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import { api } from "../api/client";
 import type { BlockNode, StoragePurpose, StoragePurposeAssignment } from "../api/types";
 import { useI18n } from "../i18n";
+import { StoragePurposeOptions } from "./StoragePurposeOptions";
 
 type Filesystem = "ext4" | "xfs" | "vfat";
 type StorageColumn =
@@ -155,6 +156,9 @@ export function StorageDevices({
 
   async function changePurpose(node: BlockNode, purpose: "" | StoragePurpose) {
     if (!node.path) return;
+    const current = purposeForNode(node)?.purpose || "";
+    if (current === purpose) return;
+    if (current && !window.confirm(t("storagePurposeChangeConfirm"))) return;
     setBusy(node.path);
     setError("");
     setMessage("");
@@ -459,7 +463,12 @@ export function StorageDevices({
         await api.setDiskName(node.path, diskName.trim());
       }
       setPartitionProgress({device: node.path, text: t("partitionRefreshing")});
-      setMessage(result.warning ? `${result.message} · ${result.warning}` : result.message);
+      const destination = partitionPurpose === "nvr" ? t("storagePurposeNVR") : t("storagePurposeFiles");
+      setMessage(result.warning
+        ? `${result.message} · ${result.warning}`
+        : result.purpose_assigned
+          ? `${result.message} · ${t("storagePurposeSaved")} (${destination})`
+          : result.message);
       setCreateDisk("");
       setPartitionSizeGiB("");
       setDiskName("");
@@ -662,10 +671,10 @@ export function StorageDevices({
                   value={partitionPurpose}
                   onChange={(event) => setPartitionPurpose(event.target.value as StoragePurpose)}
                 >
-                  <option value="files">{t("storagePurposeFiles")}</option>
-                  <option value="nvr">NVR · Видеоархив</option>
+                  <StoragePurposeOptions />
                 </select>
               </label>
+              {partitionPurpose === "nvr" && <p className="muted small">{t("storagePurposeNVRNotice")}</p>}
             </div>
             <div className="storage-capacity-summary">
               <strong>{t("unallocated")}:</strong> {bytes(node.unallocated_bytes || 0)}
@@ -866,7 +875,7 @@ export function StorageDevices({
                         {node.label && <span className="storage-inline-label">{node.label}</span>}
                         {purposeAssignment && (
                           <span className="status-badge">
-                            {t("storagePurposeFiles")}
+                            {purposeAssignment.purpose === "nvr" ? t("storagePurposeNVR") : t("storagePurposeFiles")}
                           </span>
                         )}
                         {storageInUse && (
@@ -986,8 +995,8 @@ export function StorageDevices({
                               title={storageInUse ? t("storageInUseBlocked") : undefined}
                               onChange={(event) => void changePurpose(node, event.target.value as "" | StoragePurpose)}
                             >
-                              <option value="">{t("storagePurposeNone")}</option>
-                              <option value="files">{t("storagePurposeFiles")}</option>                            </select>
+                              <StoragePurposeOptions includeNone />
+                            </select>
                           </label>
                         )}
                         {node.type === "part" && (
@@ -1067,8 +1076,8 @@ export function StorageDevices({
                                   title={storageInUse ? t("storageInUseBlocked") : undefined}
                                   onChange={(event) => void changePurpose(node, event.target.value as "" | StoragePurpose)}
                                 >
-                                  <option value="">{t("storagePurposeNone")}</option>
-                                  <option value="files">{t("storagePurposeFiles")}</option>                                </select>
+                                  <StoragePurposeOptions includeNone />
+                                </select>
                               </label>
                             )}
                           </div>
@@ -1132,8 +1141,10 @@ export function StorageDevices({
                                 value={partitionPurpose}
                                 onChange={(event) => setPartitionPurpose(event.target.value as StoragePurpose)}
                               >
-                                <option value="files">{t("storagePurposeFiles")}</option>                              </select>
+                                <StoragePurposeOptions />
+                              </select>
                             </label>
+                            {partitionPurpose === "nvr" && <p className="muted small">{t("storagePurposeNVRNotice")}</p>}
                           </div>
                           <div className="storage-capacity-summary">
                             <strong>{t("unallocated")}:</strong> {bytes(node.unallocated_bytes || 0)}
