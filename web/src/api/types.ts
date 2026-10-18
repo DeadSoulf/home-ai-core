@@ -270,6 +270,28 @@ export type NVRDiscoveryResult = {
 
 };
 
+export type NVRStorageDisk = {
+  device: string;
+  label?: string;
+  filesystem?: string;
+  mountpoint?: string;
+  state: "mounted" | "unmounted" | "missing";
+  size_bytes?: number;
+  total_bytes?: number;
+  free_bytes?: number;
+  used_bytes?: number;
+  capacity_known: boolean;
+};
+
+export type NVRStorageStatus = {
+  disks: NVRStorageDisk[];
+  assigned_count: number;
+  mounted_count: number;
+  capacity_known: boolean;
+  total_bytes?: number;
+  free_bytes?: number;
+};
+
 export type NVRStatus = {
   ok: boolean;
   service: string;
