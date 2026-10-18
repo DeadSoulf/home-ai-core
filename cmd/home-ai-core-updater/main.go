@@ -247,6 +247,56 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		})
 		return
 	}
+	if request.Operation == "docker.ai.gpu.image.status" {
+		if request.ModuleID != aiManagedID {
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: "unsupported AI GPU module"})
+			return
+		}
+		ctx, cancel := context.WithTimeout(parent, 12*time.Second)
+		defer cancel()
+		ready, err := aiOptionalGPUImageReady(ctx)
+		if err != nil {
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})
+			return
+		}
+		state := "missing"
+		if ready {
+			state = "downloaded"
+		}
+		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
+			OK: true, ModuleState: state, HelperVersion: updaterhelper.HelperVersion,
+			ProtocolVersion: updaterhelper.ProtocolVersion,
+		})
+		return
+	}
+	if request.Operation == "docker.ai.gpu.prepare" {
+		if request.ModuleID != aiManagedID {
+			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: "unsupported AI GPU module"})
+			return
+		}
+		_ = conn.SetDeadline(time.Now().Add(31*time.Minute))
+		ctx, cancel := context.WithTimeout(parent, 30*time.Minute)
+		defer cancel()
+		encoder := json.NewEncoder(conn)
+		report := func(stage, detail string) {
+			if err := encoder.Encode(updaterhelper.Response{
+				ProgressStage: stage, ProgressDetail: detail,
+			}); err != nil {
+				cancel()
+			}
+		}
+		err := prepareOptionalAIGPUImage(ctx, report)
+		if err != nil {
+			_ = encoder.Encode(updaterhelper.Response{Error: err.Error()})
+			return
+		}
+		_ = encoder.Encode(updaterhelper.Response{
+			OK: true, ModuleState: "downloaded",
+			HelperVersion: updaterhelper.HelperVersion,
+			ProtocolVersion: updaterhelper.ProtocolVersion,
+		})
+		return
+	}
 	if request.Operation == "docker.ai.gpu.status" || request.Operation == "docker.ai.gpu.apply" {
 		// Fixed managed AI GPU operations only, on the UID-verified helper socket.
 		// No client-supplied container name, Docker args or image is accepted.
