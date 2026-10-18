@@ -94,7 +94,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
   const newestCatalog = new Map((catalog.data?.modules || []).map((item) => [item.id, item]));
   const updateAvailable = (current: RegisteredModule | undefined, candidate: RegisteredModule["manifest"]) =>
     Boolean(current?.status === "enabled" && candidate.id === "ai.agent" &&
-      /^0\\.3\\.[0-9]+$/.test(candidate.version) && /^0\\.3\\.[0-9]+$/.test(current.manifest.version) &&
+      /^0[.]3[.][0-9]+$/.test(candidate.version) && /^0[.]3[.][0-9]+$/.test(current.manifest.version) &&
       catalogState(current, candidate) === "newer");
   // Include recent finished operations so a page reload does not erase the
   // answer to "was the image installed, failed, or is it still downloading?".
