@@ -217,6 +217,21 @@ func applyAIGPUSelection(ctx context.Context, requested []string, serviceUID, se
 	if current := strings.TrimSpace(state.Config.Labels["home-ai.ai.gpu.pci"]); current == strings.Join(selected, ",") {
 		return selected, nil
 	}
+	targetImage, err := aiImageForDeviceSelection(state.Config.Image, len(ids))
+	if err != nil {
+		return nil, err
+	}
+	// In 0.3.0 the expensive GPU image is downloaded separately on explicit
+	// approval. Fail BEFORE touching the working container if it is missing.
+	if targetImage != state.Config.Image {
+		cached, imageErr := aiPinnedImageCached(ctx, dockerPath, targetImage)
+		if imageErr != nil {
+			return nil, imageErr
+		}
+		if !cached {
+			return nil, errors.New("AI runtime image is not downloaded; prepare optional GPU components before applying")
+		}
+	}
 	name := moduleContainerName(aiManagedID)
 	data := filepath.Clean(filepath.Join(moduleDataRoot, aiManagedID))
 	args := []string{
@@ -243,7 +258,7 @@ func applyAIGPUSelection(ctx context.Context, requested []string, serviceUID, se
 			"--env", "NVIDIA_DRIVER_CAPABILITIES=compute,utility",
 		)
 	}
-	args = append(args, state.Config.Image)
+	args = append(args, targetImage)
 	if err := dockerAICommand(ctx, dockerPath, args...); err != nil {
 		return nil, err // Existing AI has not been stopped.
 	}
