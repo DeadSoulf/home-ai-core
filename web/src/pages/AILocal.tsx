@@ -6,7 +6,8 @@ import {Panel} from "../components/Panel";
 const gib = (bytes: number | undefined) => bytes ? (bytes / (1024 ** 3)).toFixed(1) + " ГБ" : "Не определено";
 const modelText = (value: unknown) => value instanceof Error ? value.message : String(value);
 
-export function AILocalPage({onNewGPU, onModelsReady, onOpenChat}: {
+export function AILocalPage({onNewGPU, onModelsReady, onOpenChat, aiVersion}: {
+  aiVersion?: string;
   onNewGPU: (names: string[]) => void;
   onModelsReady: () => void;
   onOpenChat: () => void;
@@ -15,6 +16,13 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat}: {
   const [local, setLocal] = useState<AILocalStatus>();
   const [models, setModels] = useState<AILocalModels>();
   const [assignment, setAssignment] = useState<AIGPUAssignment>();
+  const [gpuPackageReady, setGpuPackageReady] = useState<boolean | undefined>();
+  const [gpuDownloadQueued, setGpuDownloadQueued] = useState(false);
+  const splitGPURuntime = Boolean(aiVersion && (() => {
+    const numbers = aiVersion.split(".").map((part) => Number(part));
+    return numbers.length === 3 && numbers.every(Number.isFinite) &&
+      (numbers[0] > 0 || numbers[1] >= 3);
+  })());
   const [gpuNotice, setGpuNotice] = useState("");
   const seenAssignment = useRef<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
@@ -30,8 +38,9 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat}: {
   const refresh = useCallback(async () => {
     // Existing 0.1.0 AI images do not yet implement /api/local/*.
     // Hardware must remain visible even if Ollama is unavailable.
-    const [resource, engine, catalog, allocation] = await Promise.allSettled([
+    const [resource, engine, catalog, allocation, packageStatus] = await Promise.allSettled([
       api.aiHardware(), api.aiLocalStatus(), api.aiLocalModels(), api.aiGPUAssignment(),
+      splitGPURuntime ? api.aiGPUImageStatus() : Promise.resolve(undefined),
     ]);
     if (resource.status === "fulfilled") {
       const inventory = resource.value;
@@ -56,6 +65,10 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat}: {
       previousReady.current = ready;
     }
     if (catalog.status === "fulfilled") setModels(catalog.value);
+    if (packageStatus.status === "fulfilled" && packageStatus.value) {
+      setGpuPackageReady(packageStatus.value.ready);
+      if (packageStatus.value.ready) setGpuDownloadQueued(false);
+    }
     if (allocation.status === "fulfilled") {
       setAssignment(allocation.value);
       const fingerprint = [...allocation.value.assigned_gpu_pci].sort().join(",");
@@ -68,7 +81,7 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat}: {
     else if (engine.status === "rejected") setError("Для встроенного Ollama требуется обновление AI-модуля");
     else setError("");
     setLoading(false);
-  }, []);
+  }, [splitGPURuntime]);
 
   useEffect(() => {
     let live = true;
@@ -95,11 +108,32 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat}: {
     finally {setBusy(false);}
   }
 
+  async function prepareGPU() {
+    if (busy || gpuDownloadQueued) return;
+    if (!window.confirm("Загрузить отдельный полный GPU-образ Ollama? Это большой пакет. " +
+      "AI продолжит работать на CPU; после загрузки нужно отдельно подтвердить включение GPU.")) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api.aiPrepareGPUImage();
+      setGpuDownloadQueued(true);
+      setGpuNotice("Загрузка GPU-компонентов запущена. Ход загрузки — «Модули → Операции».");
+    } catch (reason) {
+      setError(modelText(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function applyGPU() {
     if (busy || !assignment) return;
     const chosen = selected.filter((id) => hardware?.gpus.some((gpu) =>
       gpu.pci_address === id && ((gpu.vendor_id || "").toLowerCase() === "0x10de" ||
         (gpu.vendor || "").toLowerCase().includes("nvidia")) && gpu.driver === "nvidia"));
+    if (splitGPURuntime && chosen.length > 0 && gpuPackageReady !== true) {
+      setError("Сначала загрузите GPU-компоненты и дождитесь завершения в разделе «Модули → Операции».");
+      return;
+    }
     if (chosen.length !== selected.length) {
       setError("Для использования доступны только GPU NVIDIA с работающим драйвером.");
       return;
@@ -234,8 +268,22 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat}: {
         Выбрано: <strong>{selected.length}</strong> из {gpus.length}.
       </p> : <p className="muted">Назначение GPU недоступно: требуется новый привилегированный helper.
         Видеокарты обнаружены, но их использование пока не подтверждено.</p>}
+      {splitGPURuntime && nvidiaCandidates.length > 0 && <div className="ai-note" role="status">
+        GPU-ускорение использует отдельный полный Docker-образ. Он не загружается
+        при обычной установке AI Agent.
+        <p>GPU-компоненты: <strong>{gpuPackageReady ? "загружены" :
+          gpuDownloadQueued ? "загружаются" : "не загружены"}</strong>.</p>
+        {!gpuPackageReady && <button type="button" className="button secondary"
+          disabled={busy || gpuDownloadQueued}
+          onClick={() => {void prepareGPU();}}>
+          {gpuDownloadQueued ? "Загрузка запущена" : "Загрузить GPU-компоненты"}
+        </button>}
+        {gpuDownloadQueued && <p>Ход скачивания виден на странице «Модули → Операции».
+          После завершения вернитесь и подтвердите назначение выбранных GPU.</p>}
+      </div>}
       {assignment && <div className="button-row">
-        <button type="button" className="button primary" disabled={busy || 
+        <button type="button" className="button primary" disabled={busy ||
+          (splitGPURuntime && selected.length > 0 && gpuPackageReady !== true) ||
           [...selected].sort().join(",") === [...assignment.assigned_gpu_pci].sort().join(",")}
           onClick={() => {void applyGPU();}}>
           {selected.length ? "Применить выбранные GPU" : "Переключить на CPU"}
