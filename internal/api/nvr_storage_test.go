@@ -20,7 +20,9 @@ func testNVRVolume(uuid, path string) state.StoragePurposeRecord {
 }
 func testNVRNode(path, uuid, mount string, size, free uint64, known bool) systeminfo.BlockNode {
 	mounts := []string{}
-	if mount != "" { mounts = append(mounts, mount) }
+	if mount != "" {
+		mounts = append(mounts, mount)
+	}
 	return systeminfo.BlockNode{
 		Path: path, UUID: uuid, Type: "part", Label: "NVR", Filesystem: "ext4",
 		SizeBytes: size, FreeBytes: free, FreeKnown: known, Mountpoints: mounts,
@@ -112,12 +114,18 @@ func TestNVRStorageEndpointPrivacyAndReadOnlyStatus(t *testing.T) {
 		t.Fatalf("storage response: %d %s", rec.Code, rec.Body.String())
 	}
 	var result nvrStorageSnapshot
-	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil { t.Fatal(err) }
-	if !result.CapacityKnown || result.FreeBytes != 1500 { t.Fatalf("bad JSON: %+v", result) }
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if !result.CapacityKnown || result.FreeBytes != 1500 {
+		t.Fatalf("bad JSON: %+v", result)
+	}
 	s.modules = nvrTestService(false)
 	rec = httptest.NewRecorder()
 	s.nvrStorage(rec, req, security.Actor{}, authBearer)
-	if rec.Code != http.StatusServiceUnavailable { t.Fatalf("disabled module leaked storage: %d", rec.Code) }
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("disabled module leaked storage: %d", rec.Code)
+	}
 }
 
 func TestNVRStorageRequiresModulesRead(t *testing.T) {
