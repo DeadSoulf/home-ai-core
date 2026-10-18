@@ -59,3 +59,33 @@ func AssignedAIGPUs(ctx context.Context) ([]string, error) {
 func ApplyAIGPUs(ctx context.Context, pciAddresses []string) ([]string, error) {
 	return aiGPUCall(ctx, "docker.ai.gpu.apply", pciAddresses)
 }
+
+ // AIGPUImageCached checks the exact pinned optional image via the trusted
+ // helper, without exposing Docker access or a free-form registry URL.
+func AIGPUImageCached(ctx context.Context) (bool, error) {
+	result, err := callModuleHelper(ctx, "docker.ai.gpu.image.status", "ai.agent", "")
+	if err != nil {
+		return false, err
+	}
+	switch result.State {
+	case "downloaded":
+		return true, nil
+	case "missing":
+		return false, nil
+	default:
+		return false, errors.New("unexpected GPU image status")
+	}
+}
+
+// PrepareAIGPUImage downloads the pinned acceleration image into Docker's
+// cache. It does not stop, replace or reconfigure the running AI container.
+func PrepareAIGPUImage(ctx context.Context, progress func(stage, detail string)) error {
+	result, err := callModuleHelperWithProgress(ctx, "docker.ai.gpu.prepare", "ai.agent", "", progress)
+	if err != nil {
+		return err
+	}
+	if result.State != "downloaded" {
+		return errors.New("GPU runtime download did not complete")
+	}
+	return nil
+}
