@@ -39,6 +39,7 @@ const (
 type moduleContainerStatus struct {
 	State       string
 	ContainerID string
+	PreviousManifest string
 }
 
 func performDockerModuleOperation(ctx context.Context, request updaterhelper.Request, serviceUID, serviceGID int, progress ...moduleProgressFunc) (moduleContainerStatus, string, error) {
@@ -57,6 +58,15 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 	case "docker.module.install":
 		if !imageDigestPattern.MatchString(strings.TrimSpace(request.Image)) {
 			return moduleContainerStatus{}, "", errors.New("module image must be an immutable @sha256 reference")
+		}
+	case "docker.module.upgrade":
+		if moduleID != aiManagedID || !imageDigestPattern.MatchString(request.Image) ||
+			!imageDigestPattern.MatchString(request.PreviousImage) {
+			return moduleContainerStatus{}, "", errors.New("only pinned AI module upgrades are supported")
+		}
+	case "docker.module.upgrade.rollback", "docker.module.upgrade.finalize", "docker.module.upgrade.reconcile":
+		if moduleID != aiManagedID || (request.Image != "" && !imageDigestPattern.MatchString(request.Image)) {
+			return moduleContainerStatus{}, "", errors.New("invalid AI upgrade reconciliation request")
 		}
 	case "docker.module.start", "docker.module.stop", "docker.module.restart", "docker.module.remove":
 	default:
@@ -78,6 +88,21 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 	switch request.Operation {
 	case "docker.module.install":
 		return installDockerModule(ctx, moduleID, strings.TrimSpace(request.Image), serviceUID, serviceGID, report)
+	case "docker.module.upgrade":
+		return upgradeDockerAI(ctx, request.Image, request.PreviousImage, request.PreviousManifest, serviceUID, serviceGID, report)
+	case "docker.module.upgrade.reconcile", "docker.module.upgrade.rollback":
+		status, err := reconcileAIUpgrade(ctx, request.Image)
+		if err != nil { return moduleContainerStatus{}, "", err }
+		return status, "AI upgrade transaction reconciled", nil
+	case "docker.module.upgrade.finalize":
+		status, exists, err := readAIUpgradeJournal()
+		if err != nil { return moduleContainerStatus{}, "", err }
+		if !exists { return moduleContainerStatus{State:"none"}, "no AI upgrade is pending", nil }
+		if request.Image != status.NextImage { return moduleContainerStatus{}, "", errors.New("cannot finalize AI upgrade with mismatched registry image") }
+		docker, err := exec.LookPath("docker")
+		if err != nil { return moduleContainerStatus{}, "", err }
+		if err := finalizeAIUpgrade(ctx,docker,status); err != nil { return moduleContainerStatus{}, "", err }
+		return moduleContainerStatus{State:"committed"}, "AI upgrade committed", nil
 	case "docker.module.start":
 		return controlDockerModule(ctx, moduleID, "start")
 	case "docker.module.stop":
