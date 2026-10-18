@@ -28,10 +28,10 @@ type Store interface {
 }
 
 type Registry struct {
-	store       Store
-	coreVersion string
-	mu          sync.Mutex
-	helper      func(context.Context, string, string, string) (helperModuleResult, error)
+	store          Store
+	coreVersion    string
+	mu             sync.Mutex
+	helper         func(context.Context, string, string, string) (helperModuleResult, error)
 	progressHelper func(context.Context, string, string, string, func(string, string)) (helperModuleResult, error)
 }
 
@@ -41,15 +41,15 @@ func NewRegistry(store Store, coreVersion ...string) *Registry {
 		version = strings.TrimSpace(coreVersion[0])
 	}
 	return &Registry{
-		store:       store,
-		coreVersion: version,
-		helper:      callModuleHelper,
+		store:          store,
+		coreVersion:    version,
+		helper:         callModuleHelper,
 		progressHelper: callModuleHelperWithProgress,
 	}
 }
 
 // InstallManifest optionally reports verified Docker installation phases.
- // Progress never controls the safety-critical module lifecycle.
+// Progress never controls the safety-critical module lifecycle.
 func (r *Registry) InstallManifest(ctx context.Context, manifest Manifest, progress ...func(string, string)) (Registered, error) {
 	if err := ctx.Err(); err != nil {
 		return Registered{}, err
