@@ -25,7 +25,7 @@ import (
 var (
 	nvrStorageDBPath = "/var/lib/home-ai-core/core.db"
 	nvrStorageRoot   = "/mnt/home-ai-core"
-	nvrUUIDPattern   = regexp.MustCompile(\`(?i)^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$\`)
+	nvrUUIDPattern   = regexp.MustCompile(`(?i)^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`)
 )
 
 const nvrDiskDataName = ".home-ai-nvr-data"
