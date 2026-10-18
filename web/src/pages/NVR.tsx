@@ -298,7 +298,7 @@ export function NVRPage({canManage}: {canManage: boolean}) {
         Обновить
       </button>
     </div>
-    {error && <p role="alert" className="nvr-notice-error">Состояние модуля NVR: {error}</p>
+    {error && <p role="alert" className="nvr-notice-error">Состояние модуля NVR: {error}</p>}
     {message && <p role="status" className="nvr-notice-success">{message}</p>}
     {loading && !status && <p role="status">Подключение к NVR…</p>}
     {status && <div className="nvr-stat-grid">
@@ -417,7 +417,7 @@ export function NVRPage({canManage}: {canManage: boolean}) {
           onClick={() => setDiscoveryRetry((value) => value + 1)}>
           Повторить получение списка сетей
         </button>}
-      </div>
+      </div>}
       {hasScanned && <p role="status" className="muted">{scanSummary} · Найдено устройств: {discovered.length}</p>}
       {hasScanned && discovered.length === 0 && <p className="muted">
         Камеры не обнаружены автоматически. Проверьте выбранную подсеть, VLAN и настройки сети
