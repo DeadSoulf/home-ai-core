@@ -437,7 +437,9 @@ func moduleRuntimeAllows(operation string, status dockerRuntimeStatus) bool {
 	if !status.Available || !status.Active {
 		return false
 	}
-	if operation == "docker.module.stop" || operation == "docker.module.remove" {
+	if operation == "docker.module.stop" || operation == "docker.module.remove" ||
+		operation == "docker.module.upgrade.reconcile" || operation == "docker.module.upgrade.rollback" ||
+		operation == "docker.module.upgrade.finalize" {
 		return true
 	}
 	return status.NetworkReady
