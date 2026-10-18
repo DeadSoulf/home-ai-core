@@ -214,7 +214,7 @@ jobs:
       - name: Create draft, verify uploaded bytes, then optionally publish
         env:
           GH_TOKEN: ${{ github.token }}
-          PUBLISH: ${{ inputs.publish }}
+          PUBLISH: ${{ inputs.publish || (github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-v0.1.199-dev]')) }}
         shell: bash
         run: |
           set -euo pipefail
