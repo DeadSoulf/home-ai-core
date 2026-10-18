@@ -69,6 +69,10 @@ func aiOptionalGPUImageReady(ctx context.Context) (bool, error) {
 }
 
 func prepareOptionalAIGPUImage(ctx context.Context, progress moduleProgressFunc) error {
+	if !moduleOperationMu.TryLock() {
+		return errors.New("another Docker module operation is running")
+	}
+	defer moduleOperationMu.Unlock()
 	dockerPath, err := exec.LookPath("docker")
 	if err != nil {
 		return errors.New("Docker unavailable")
