@@ -33,6 +33,7 @@ type Registry struct {
 	mu             sync.Mutex
 	helper         func(context.Context, string, string, string) (helperModuleResult, error)
 	progressHelper func(context.Context, string, string, string, func(string, string)) (helperModuleResult, error)
+	upgradeHelper func(context.Context, string, string, string, string, func(string,string)) (helperModuleResult,error)
 }
 
 func NewRegistry(store Store, coreVersion ...string) *Registry {
@@ -45,6 +46,7 @@ func NewRegistry(store Store, coreVersion ...string) *Registry {
 		coreVersion:    version,
 		helper:         callModuleHelper,
 		progressHelper: callModuleHelperWithProgress,
+		upgradeHelper: callAIUpgradeHelper,
 	}
 }
 
