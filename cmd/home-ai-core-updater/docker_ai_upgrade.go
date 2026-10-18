@@ -181,12 +181,13 @@ func aiUpgradeSnapshot(ctx context.Context) error {
 }
 
 func aiUpgradeSnapshotReady() (bool, error) {
-	_, err := os.Lstat(aiUpgradePath(aiUpgradeCompleteName))
+	marker, err := os.ReadFile(aiUpgradePath(aiUpgradeCompleteName))
 	if errors.Is(err, os.ErrNotExist) {
 		return false, nil
 	}
-	if err != nil {
-		return false, err
+	if err != nil { return false, err }
+	if string(marker) != "snapshot complete\n" {
+		return false, errors.New("incomplete AI recovery marker; backup cannot be trusted")
 	}
 	info, err := os.Lstat(aiUpgradePath(aiUpgradeBackupName))
 	if err != nil {
