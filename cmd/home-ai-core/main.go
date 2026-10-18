@@ -75,6 +75,14 @@ func main() {
 	eventService := events.New(nodeID, store, realtimeHub)
 	jobService := jobs.New(nodeID, store, eventService, 2)
 	moduleRegistry := modules.NewRegistry(store, version.Version)
+	// Recover interrupted AI upgrades before the jobs worker is allowed to
+	// dispatch new module operations. Failure leaves the helper's journal
+	// intact and future upgrades blocked, rather than deleting user data.
+	recoveryCtx, recoveryCancel := context.WithTimeout(startupCtx, 2*time.Minute)
+	if err := moduleRegistry.RecoverPendingAIUpgrade(recoveryCtx); err != nil {
+		logger.Error("AI module upgrade recovery requires attention", "error", err)
+	}
+	recoveryCancel()
 	updaterService := updater.New(version.Version, cfg.StateDir)
 	if err := registerModuleJobs(jobService, moduleRegistry); err != nil {
 		logger.Error("failed to register module jobs", "error", err)
