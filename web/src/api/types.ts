@@ -206,6 +206,9 @@ export type AIHardware = {
 export type AIStatus = {
   version: string;
   providers: number;
+  // Count reported by Ollama, not the number of provider records.
+  // null means the engine is not ready and the count is unknown.
+  local_models_count?: number | null;
   approvals_pending: number;
   core_actions_enabled: boolean;
 };
