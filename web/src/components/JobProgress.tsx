@@ -12,6 +12,7 @@ const installPhases: Record<string, string> = {
   create: "Создание контейнера",
   start: "Запуск контейнера",
   verify: "Проверка запуска контейнера",
+  backup: "Резервное копирование настроек, моделей и диалогов",
 };
 
 function installStep(message?: string) {
@@ -31,7 +32,7 @@ export function JobProgress({job}: {job: Job}) {
   const u = useUI();
   const percent = progressPercent(job);
   const [now, setNow] = useState(() => Date.now());
-  const installing = ["module.install", "module.gpu.prepare"].includes(job.type) &&
+  const installing = ["module.install", "module.update", "module.gpu.prepare"].includes(job.type) &&
     ["queued", "running", "cancel_requested"].includes(job.status);
   const step = installStep(job.message);
   useEffect(() => {

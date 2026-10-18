@@ -337,7 +337,7 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		go func() { var extra [1]byte; _, _ = conn.Read(extra[:]); cancel() }()
 		encoder := json.NewEncoder(conn)
 		streamProgress := func(stage, detail string) {
-			if request.Operation != "docker.module.install" {
+			if request.Operation != "docker.module.install" && request.Operation != "docker.module.upgrade" {
 				return
 			}
 			// Each progress frame is a standalone JSON object. The final
@@ -356,10 +356,11 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		}
 		logger.Info("Docker module operation completed", "operation", request.Operation, "module_id", request.ModuleID, "state", status.State)
 		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
-			OK:          true,
-			Message:     message,
-			ModuleState: status.State,
-			ContainerID: status.ContainerID,
+			OK:               true,
+			Message:          message,
+			ModuleState:      status.State,
+			ContainerID:      status.ContainerID,
+			PreviousManifest: status.PreviousManifest,
 		})
 		return
 	}

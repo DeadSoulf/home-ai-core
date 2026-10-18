@@ -191,6 +191,11 @@ func ensureAICandidateNamesFree(ctx context.Context, dockerPath string) error {
 // on failure, restart the original and preserve persistent data. No
 // privileged socket is exposed to the AI container or the browser.
 func applyAIGPUSelection(ctx context.Context, requested []string, serviceUID, serviceGID int) ([]string, error) {
+	if _, pending, err := readAIUpgradeJournal(); err != nil {
+		return nil, err
+	} else if pending {
+		return nil, errors.New("AI upgrade recovery must finish before GPU reconfiguration")
+	}
 	if !moduleOperationMu.TryLock() {
 		return nil, errors.New("another module operation is in progress")
 	}
