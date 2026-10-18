@@ -50,6 +50,16 @@ func readAIUpgradeJournal() (aiUpgradeJournal, bool, error) {
 		len(state.PreviousManifest) > 16*1024 || state.PreviousManifest == "" {
 		return aiUpgradeJournal{}, false, errors.New("invalid AI upgrade recovery journal")
 	}
+	var old map[string]any
+	if err := json.Unmarshal([]byte(state.PreviousManifest), &old); err != nil {
+		return aiUpgradeJournal{}, false, errors.New("invalid saved AI recovery manifest")
+	}
+	runtimeInfo, ok := old["runtime"].(map[string]any)
+	if !ok { return aiUpgradeJournal{}, false, errors.New("invalid AI recovery runtime") }
+	dockerInfo, ok := runtimeInfo["docker"].(map[string]any)
+	if !ok || old["id"] != aiManagedID || dockerInfo["image"] != state.PreviousImage {
+		return aiUpgradeJournal{}, false, errors.New("AI recovery manifest differs from previous image")
+	}
 	return state, true, nil
 }
 
