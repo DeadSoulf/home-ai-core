@@ -489,6 +489,11 @@ async def suite(browser):
         await h.page.get_by_role('button',name='Отправить',exact=True).click()
         await expect(h.page.get_by_text('Ответ локального агента')).to_be_visible()
         assert any(req[1]=='/api/v1/ai/chat' for req in h.requests)
+        await h.page.get_by_role('button',name='Закрыть чат',exact=True).click()
+        await expect(h.page.get_by_text('Встроенный Ollama',exact=True)).to_be_visible()
+        await expect(h.page.get_by_role('button',name='Закрыть чат',exact=True)).to_have_count(0)
+        await h.page.get_by_role('button',name='Чат',exact=True).click()
+        await expect(h.page.get_by_text('Ответ локального агента')).to_be_visible()
         await h.close()
 
         reader=copy.deepcopy(ACTOR);reader['permissions']=['security.self.read','modules.read']
@@ -497,6 +502,22 @@ async def suite(browser):
         assert await h.page.get_by_role('button',name='AI Agent',exact=True).count()==0
         await h.close()
     await check('UI-18: native AI chat, provider setup and manager-only navigation',native_ai_agent)
+
+    async def ai_timeout_shows_model_error_not_server_outage():
+        provider=dict(id='a'*32,name='Встроенный Ollama',model='qwen3:8b',kind='ollama',
+                      base_url='http://127.0.0.1:11434',has_api_key=False)
+        async def chat_failure(route):
+            await route.fulfill(status=502,content_type='application/json',
+                body=json.dumps(dict(error=dict(code='ai_upstream_error',
+                                                message='AI model could not generate a reply'))))
+        h=await Harness(browser,modules=[ai_module()],
+                        ai_providers=[provider],overrides={'/api/v1/ai/chat':chat_failure}).start('/modules/ai.agent')
+        await h.page.get_by_role('textbox',name='Сообщение агенту').fill('Привет')
+        await h.page.get_by_role('button',name='Отправить',exact=True).click()
+        await expect(h.page.get_by_role('alert')).to_contain_text('Модель Ollama не смогла сформировать ответ')
+        await expect(h.page.get_by_text('Сервер недоступен',exact=True)).to_have_count(0)
+        await h.close()
+    await check('UI-24: AI model error is not misreported as server outage',ai_timeout_shows_model_error_not_server_outage)
 
     async def local_ai_hardware():
         h=await Harness(browser,modules=[ai_module()]).start('/modules/ai.agent')
