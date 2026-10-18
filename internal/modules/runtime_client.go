@@ -17,9 +17,9 @@ const (
 )
 
 type helperModuleResult struct {
-	State       string
-	ContainerID string
-	Message     string
+	State            string
+	ContainerID      string
+	Message          string
 	PreviousManifest string
 }
 
@@ -76,9 +76,9 @@ func callModuleHelperRequest(ctx context.Context, request updaterhelper.Request,
 			return helperModuleResult{}, errors.New(response.Error)
 		}
 		return helperModuleResult{
-			State:       response.ModuleState,
-			ContainerID: response.ContainerID,
-			Message:     response.Message,
+			State:            response.ModuleState,
+			ContainerID:      response.ContainerID,
+			Message:          response.Message,
 			PreviousManifest: response.PreviousManifest,
 		}, nil
 	}
