@@ -20,6 +20,11 @@ func TestAI030DeviceSelectionUsesOnlyPairedImmutableImages(t *testing.T) {
 		{aiCPU030Image, 8, aiGPU030Image},
 		{aiGPU030Image, 2, aiGPU030Image},
 		{aiGPU030Image, 0, aiCPU030Image},
+		{aiCPU031Image, 0, aiCPU031Image},
+		{aiCPU031Image, 1, aiGPU031Image},
+		{aiCPU031Image, 8, aiGPU031Image},
+		{aiGPU031Image, 2, aiGPU031Image},
+		{aiGPU031Image, 0, aiCPU031Image},
 		// Older images included their own GPU runtimes and never get silently upgraded.
 		{"ghcr.io/deadsoulf/home-ai-core-ai@sha256:" + strings.Repeat("a", 64), 1,
 			"ghcr.io/deadsoulf/home-ai-core-ai@sha256:" + strings.Repeat("a", 64)},
@@ -37,6 +42,23 @@ func TestAI030DeviceSelectionUsesOnlyPairedImmutableImages(t *testing.T) {
 	}
 	if _, err := aiImageForDeviceSelection(aiCPU030Image, 9); err == nil {
 		t.Fatal("too many GPUs allowed")
+	}
+}
+
+func TestAIGPUImageForInstalledVersionPair(t *testing.T) {
+	for _, test := range []struct{image, target string}{
+		{aiCPU030Image, aiGPU030Image},
+		{aiGPU030Image, aiGPU030Image},
+		{aiCPU031Image, aiGPU031Image},
+		{aiGPU031Image, aiGPU031Image},
+	} {
+		got, err := aiGPUImageForInstalled(test.image)
+		if err != nil || got != test.target {
+			t.Fatalf("GPU image target %s: %q, %v", test.image, got, err)
+		}
+	}
+	if _, err := aiGPUImageForInstalled("ghcr.io/malicious@sha256:" + strings.Repeat("c",64)); err == nil {
+		t.Fatal("untrusted image variant accepted")
 	}
 }
 
