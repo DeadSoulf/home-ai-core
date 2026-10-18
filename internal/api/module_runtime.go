@@ -111,6 +111,24 @@ func (s *server) moduleOperations(w http.ResponseWriter, r *http.Request, _ secu
 		writeAPIError(w, r, http.StatusServiceUnavailable, "jobs_unavailable", "module operations unavailable", nil)
 		return
 	}
+	// Keep the last terminal module operations visible after browser refresh.
+	// Return the same redacted view as active jobs: never expose manifest_json.
+	history, err := s.jobs.List(r.Context(), "", 100)
+	if err != nil {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "jobs_unavailable", "module operations unavailable", nil)
+		return
+	}
+	recent := 0
+	for _, job := range history {
+		if !isModuleJob(job.Type) || job.Status == "running" || job.Status == "queued" || job.Status == "cancel_requested" {
+			continue
+		}
+		jobs = append(jobs, moduleJobView(job))
+		recent++
+		if recent == 10 {
+			break
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"jobs": jobs})
 }
 
