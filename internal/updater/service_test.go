@@ -1,6 +1,7 @@
 package updater
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
@@ -12,6 +13,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -116,5 +119,62 @@ func TestVerifyChecksumSignature(t *testing.T) {
 	tampered[0] = 'f'
 	if err := verifyChecksumSignature(tampered, signatureText, publicPEM); err == nil {
 		t.Fatal("tampered checksum unexpectedly verified")
+	}
+}
+
+func TestDownloadArchiveReportsTransferredBytesAndKeepsHashVerification(t *testing.T) {
+	payload := []byte(strings.Repeat("chunked-signed-update-", 1024))
+	hash := sha256.Sum256(payload)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", strconv.Itoa(len(payload)))
+		for offset := 0; offset < len(payload); offset += 1024 {
+			end := offset + 1024
+			if end > len(payload) {
+				end = len(payload)
+			}
+			_, _ = w.Write(payload[offset:end])
+			if flush, ok := w.(http.Flusher); ok {
+				flush.Flush()
+			}
+		}
+	}))
+	defer server.Close()
+
+	service := &Service{bundleClient: &http.Client{Timeout: 5 * time.Second}}
+	target := filepath.Join(t.TempDir(), "payload.tar.gz")
+	var observed []int64
+	err := service.downloadArchive(t.Context(), server.URL, target, int64(len(payload)), hex.EncodeToString(hash[:]), func(downloaded int64) {
+		observed = append(observed, downloaded)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(observed) == 0 || observed[len(observed)-1] != int64(len(payload)) {
+		t.Fatalf("missing final byte count: %v", observed)
+	}
+	for i, count := range observed {
+		if count < 0 || count > int64(len(payload)) || i > 0 && count < observed[i-1] {
+			t.Fatalf("non-monotonic or incorrect byte count: %v", observed)
+		}
+	}
+	if copied, err := os.ReadFile(target); err != nil || !bytes.Equal(copied, payload) {
+		t.Fatalf("saved payload mismatch: %v", err)
+	}
+}
+
+func TestUpdateDownloadProgressUsesRealBytesAndSeparatesVerification(t *testing.T) {
+	service := &Service{
+		stateDir: t.TempDir(),
+		state: State{Phase: PhaseDownloading, ProgressPercent: 15},
+	}
+	service.updateDownloadProgress(25, 100, time.Now().Add(-time.Second))
+	got := service.snapshotState()
+	if got.DownloadedBytes != 25 || got.BundleSizeBytes != 100 || got.ProgressPercent != 28 || got.DownloadSpeedBPS <= 0 {
+		t.Fatalf("incorrect partial transfer state: %+v", got)
+	}
+	service.updateDownloadProgress(100, 100, time.Now().Add(-time.Second))
+	got = service.snapshotState()
+	if got.ProgressPercent >= 70 || got.DownloadedBytes != 100 {
+		t.Fatalf("verification must remain a separate phase: %+v", got)
 	}
 }

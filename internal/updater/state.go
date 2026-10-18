@@ -27,6 +27,8 @@ type State struct {
 	UpdatedAt        time.Time  `json:"updated_at"`
 	PublishedAt      *time.Time `json:"published_at,omitempty"`
 	BundleSizeBytes  int64      `json:"bundle_size_bytes,omitempty"`
+	DownloadedBytes  int64      `json:"downloaded_bytes,omitempty"`
+	DownloadSpeedBPS int64      `json:"download_speed_bytes_per_sec,omitempty"`
 }
 
 func NewState(currentVersion string) State {

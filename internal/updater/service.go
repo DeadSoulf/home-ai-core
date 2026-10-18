@@ -370,7 +370,10 @@ func (s *Service) Download(ctx context.Context, version string) (State, error) {
 	archivePath := filepath.Join(updateDir, item.BundleFile)
 
 	s.updateProgress(15, "Downloading update bundle")
-	if err := s.downloadArchive(ctx, item.BundleURL, archivePath, item.BundleSizeBytes, expectedHash); err != nil {
+	startedDownload := time.Now()
+	if err := s.downloadArchive(ctx, item.BundleURL, archivePath, item.BundleSizeBytes, expectedHash, func(downloaded int64) {
+		s.updateDownloadProgress(downloaded, item.BundleSizeBytes, startedDownload)
+	}); err != nil {
 		s.failState(err)
 		return s.State(), err
 	}
@@ -410,6 +413,7 @@ func (s *Service) Download(ctx context.Context, version string) (State, error) {
 		UpdatedAt:        time.Now().UTC(),
 		PublishedAt:      item.PublishedAt,
 		BundleSizeBytes:  item.BundleSizeBytes,
+		DownloadedBytes:  item.BundleSizeBytes,
 	}
 	s.setState(ready)
 	return ready, nil
@@ -803,7 +807,7 @@ func (s *Service) verifyChecksumSignatureFromURL(ctx context.Context, url string
 	return signatureData, nil
 }
 
-func (s *Service) downloadArchive(ctx context.Context, url, target string, expectedSize int64, expectedHash string) error {
+func (s *Service) downloadArchive(ctx context.Context, url, target string, expectedSize int64, expectedHash string, progress ...func(int64)) error {
 	resp, err := s.downloadBundleResponse(ctx, url)
 	if err != nil {
 		return err
@@ -826,7 +830,12 @@ func (s *Service) downloadArchive(ctx context.Context, url, target string, expec
 	if expectedSize > 0 {
 		limit = expectedSize + 1
 	}
-	written, copyErr := io.Copy(io.MultiWriter(file, hash), io.LimitReader(resp.Body, limit))
+	transfer := &downloadProgressWriter{writer: io.MultiWriter(file, hash)}
+	if len(progress) != 0 {
+		transfer.progress = progress[0]
+	}
+	written, copyErr := io.Copy(transfer, io.LimitReader(resp.Body, limit))
+	transfer.finish()
 	closeErr := file.Close()
 	if copyErr != nil {
 		_ = os.Remove(tmp)
@@ -1056,6 +1065,33 @@ func (s *Service) setState(state State) {
 	s.state = state
 	s.stateMu.Unlock()
 	s.persistState(state)
+}
+
+// Download bytes reflect actual data written to the staged archive.
+// Progress 15-69 is transfer, while checksum and unpack validation follow.
+func (s *Service) updateDownloadProgress(downloaded, total int64, started time.Time) {
+	state := s.snapshotState()
+	if state.Phase != PhaseDownloading {
+		return
+	}
+	if downloaded < 0 {
+		downloaded = 0
+	}
+	state.DownloadedBytes = downloaded
+	if total > 0 {
+		state.BundleSizeBytes = total
+		fractionBytes := downloaded
+		if fractionBytes > total {
+			fractionBytes = total
+		}
+		state.ProgressPercent = 15 + int(54*fractionBytes/total)
+	}
+	if elapsed := time.Since(started).Seconds(); elapsed >= 0.1 {
+		state.DownloadSpeedBPS = int64(float64(downloaded) / elapsed)
+	}
+	state.Message = "Downloading update bundle"
+	state.UpdatedAt = time.Now().UTC()
+	s.setState(state)
 }
 
 func (s *Service) updateProgress(progress int, message string) {
