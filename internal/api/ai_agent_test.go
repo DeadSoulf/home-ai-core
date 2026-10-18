@@ -169,7 +169,6 @@ func TestAIRequestAndResponseSizes(t *testing.T) {
 	}
 }
 
-
 func TestAIChatOverridesGlobalHTTPWriteDeadline(t *testing.T) {
 	s := aiTestServer(t, nil)
 	s.aiTransport = nvrRoundTripFunc(func(req *http.Request) (*http.Response, error) {
@@ -181,8 +180,8 @@ func TestAIChatOverridesGlobalHTTPWriteDeadline(t *testing.T) {
 		time.Sleep(180 * time.Millisecond)
 		return &http.Response{
 			StatusCode: http.StatusOK,
-			Header: http.Header{"Content-Type": {"application/json"}},
-			Body: io.NopCloser(strings.NewReader(`{"conversation_id":"abc","reply":"Привет!","approval_ids":[]}`)),
+			Header:     http.Header{"Content-Type": {"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"conversation_id":"abc","reply":"Привет!","approval_ids":[]}`)),
 		}, nil
 	})
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
