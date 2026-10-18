@@ -69,3 +69,24 @@ func TestNVRCopyVerificationPreservesFilesAndDoesNotFollowLinks(t *testing.T) {
 		t.Fatal("modified copy must fail verification")
 	}
 }
+
+func TestNVRMissingDiskNeverUsesSystemDirectory(t *testing.T) {
+	previousDB, previousRoot := nvrStorageDBPath, nvrStorageRoot
+	nvrStorageDBPath = filepath.Join(t.TempDir(), "core.db")
+	nvrStorageRoot = t.TempDir()
+	t.Cleanup(func() { nvrStorageDBPath, nvrStorageRoot = previousDB, previousRoot })
+	db, err := sql.Open("sqlite", nvrStorageDBPath)
+	if err != nil { t.Fatal(err) }
+	defer db.Close()
+	if _, err := db.Exec("CREATE TABLE storage_purposes (filesystem_uuid TEXT, purpose TEXT)"); err != nil { t.Fatal(err) }
+	if _, err := db.Exec("INSERT INTO storage_purposes VALUES (?, ?)", "6740f386-7f43-4f9a-be9f-617cf7899d67", "nvr"); err != nil { t.Fatal(err) }
+	// An ordinary empty directory at the expected mountpoint is NOT a disk.
+	if err := os.Mkdir(filepath.Join(nvrStorageRoot, "sdc1"), 0o755); err != nil { t.Fatal(err) }
+	moduleDir := filepath.Join(t.TempDir(), "nvr.module")
+	if err := prepareFreshNVRStorage(context.Background(), moduleDir, os.Getuid(), os.Getgid()); err == nil {
+		t.Fatal("NVR install must refuse an unmounted assigned disk")
+	}
+	if _, err := os.Lstat(moduleDir); !os.IsNotExist(err) {
+		t.Fatalf("NVR fallback path should not be created on system disk: %v", err)
+	}
+}
