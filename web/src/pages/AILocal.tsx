@@ -6,10 +6,12 @@ import {Panel} from "../components/Panel";
 const gib = (bytes: number | undefined) => bytes ? (bytes / (1024 ** 3)).toFixed(1) + " ГБ" : "Не определено";
 const modelText = (value: unknown) => value instanceof Error ? value.message : String(value);
 
-export function AILocalPage({onNewGPU, onModelsReady, onOpenChat, aiVersion}: {
+export function AILocalPage({onNewGPU, onModelsReady, onOpenChat, onInstalledModels, onSelectModel, aiVersion}: {
   aiVersion?: string;
   onNewGPU: (names: string[]) => void;
   onModelsReady: () => void;
+  onInstalledModels: (names: string[]) => void;
+  onSelectModel: (name: string) => void;
   onOpenChat: () => void;
 }) {
   const [hardware, setHardware] = useState<AIHardware>();
@@ -34,7 +36,13 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat, aiVersion}: {
   const previousReady = useRef(false);
   const newGPURef = useRef(onNewGPU);
   const readyRef = useRef(onModelsReady);
-  useEffect(() => {newGPURef.current = onNewGPU; readyRef.current = onModelsReady;}, [onNewGPU, onModelsReady]);
+  const modelListRef = useRef(onInstalledModels);
+  const observedModels = useRef<string | null>(null);
+  useEffect(() => {
+    newGPURef.current = onNewGPU;
+    readyRef.current = onModelsReady;
+    modelListRef.current = onInstalledModels;
+  }, [onNewGPU, onModelsReady, onInstalledModels]);
 
   const refresh = useCallback(async () => {
     // Existing 0.1.0 AI images do not yet implement /api/local/*.
@@ -65,7 +73,17 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat, aiVersion}: {
       if (ready && !previousReady.current) readyRef.current();
       previousReady.current = ready;
     }
-    if (catalog.status === "fulfilled") setModels(catalog.value);
+    if (catalog.status === "fulfilled") {
+      setModels(catalog.value);
+      // Ollama's actual installed list, not the curated download presets or
+      // SQLite provider count, is the authority for the installed counter.
+      const installedNames = catalog.value.installed || [];
+      const fingerprint = JSON.stringify([...installedNames].sort());
+      if (observedModels.current !== fingerprint) {
+        observedModels.current = fingerprint;
+        modelListRef.current(installedNames);
+      }
+    }
     if (packageStatus.status === "fulfilled" && packageStatus.value) {
       setGpuPackageReady(packageStatus.value.ready);
       if (packageStatus.value.ready) setGpuDownloadQueued(false);
@@ -184,6 +202,8 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat, aiVersion}: {
 
   const recommended = models?.recommended_models || local?.recommended_models || [];
   const installed = new Set(models?.installed || []);
+  const extraInstalled = [...installed].filter((name) =>
+    !recommended.some((item) => item.name === name));
   const gpus = hardware?.gpus || [];
   const isBusy = busy || local?.model_state === "downloading";
   const availableRAMGiB = (hardware?.memory.available_bytes || 0) / (1024 ** 3);
@@ -247,9 +267,24 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat, aiVersion}: {
             <small>{item.recommended ? "Подходит по объёму ОЗУ" : "Может потребовать больше ОЗУ"}</small>
           </div>
           {installed.has(item.name) ?
-            <span className="tag">Установлена</span> :
+            <div className="button-row">
+              <span className="tag">Установлена</span>
+              <button type="button" className="button secondary" disabled={busy}
+                onClick={() => onSelectModel(item.name)}>Выбрать для чата</button>
+            </div> :
             <button type="button" className="button secondary" disabled={isBusy || local?.engine_state !== "ready"}
               onClick={() => {void download(item.name);}}>Загрузить</button>}
+        </article>)}
+        {extraInstalled.map((name) => <article className="ai-model-entry" key={name}>
+          <div>
+            <strong>{name}</strong>
+            <span>Обнаружена в локальном Ollama</span>
+          </div>
+          <div className="button-row">
+            <span className="tag">Установлена</span>
+            <button type="button" className="button secondary" disabled={busy}
+              onClick={() => onSelectModel(name)}>Выбрать для чата</button>
+          </div>
         </article>)}
       </div>
     </Panel>
