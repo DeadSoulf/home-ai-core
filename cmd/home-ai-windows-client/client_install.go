@@ -12,6 +12,51 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/windowsclient"
 )
 
+// runClientInstall runs in a verified cached executable (not the old running
+// binary). Its default relaunch behavior is compatible with older updaters
+// which invoke "client install" without flags.
+func runClientInstall(reopenSettings bool, configPath, settingsPath string) (runErr error) {
+	if reopenSettings {
+		defer func() {
+			if runErr != nil {
+				notifyWindowsClientUpdateFailure(runErr)
+			}
+		}()
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("locate Windows client executable: %w", err)
+	}
+	result, err := windowsclient.InstallUserClientWithHandoff(executable, 15*time.Second)
+	if err != nil {
+		return err
+	}
+	if result.AgentExitRequested {
+		info, statusErr := windowsclient.UserAgentAutostartStatus()
+		if statusErr != nil {
+			return fmt.Errorf("read agent autostart after client update: %w", statusErr)
+		}
+		if info.Enabled {
+			if err := windowsclient.StartUserAgent(result.Path, info.ConfigPath); err != nil {
+				return fmt.Errorf("restart Home-AI sync agent: %w", err)
+			}
+			fmt.Println("Home-AI sync agent restarted after client update.")
+		}
+	}
+	if result.Changed {
+		fmt.Printf("Home-AI Windows client installed: %s\n", result.Path)
+	} else {
+		fmt.Printf("Home-AI Windows client is already current: %s\n", result.Path)
+	}
+	if reopenSettings {
+		if err := reopenWindowsClientSettings(result.Path, configPath, settingsPath, result.Changed); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func runClient(args []string) error {
 	if len(args) == 0 {
 		return errors.New("client requires install, status, check-update or update")
@@ -28,8 +73,18 @@ func runClient(args []string) error {
 	fs := flag.NewFlagSet("client "+command, flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	var channel string
+	var reopenSettings bool
+	var configPath, settingsPath string
 	if command == "check-update" || command == "update" {
 		fs.StringVar(&channel, "channel", windowsclient.ReleaseChannelBeta, "release channel: stable or beta")
+	}
+	if command == "install" {
+		// Old updater processes start a verified new release with only
+		// "client install". Default to reopening the installed UI so updates
+		// started by older clients also restore a visible application.
+		fs.BoolVar(&reopenSettings, "reopen-settings", true, "open the installed Windows settings after installation")
+		fs.StringVar(&configPath, "config", "", "sync profile path to reopen")
+		fs.StringVar(&settingsPath, "settings", "", "Windows client settings path to reopen")
 	}
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
@@ -40,32 +95,7 @@ func runClient(args []string) error {
 
 	switch command {
 	case "install":
-		executable, err := os.Executable()
-		if err != nil {
-			return fmt.Errorf("locate Windows client executable: %w", err)
-		}
-		result, err := windowsclient.InstallUserClientWithHandoff(executable, 15*time.Second)
-		if err != nil {
-			return err
-		}
-		if result.AgentExitRequested {
-			info, statusErr := windowsclient.UserAgentAutostartStatus()
-			if statusErr != nil {
-				return fmt.Errorf("read agent autostart after client update: %w", statusErr)
-			}
-			if info.Enabled {
-				if err := windowsclient.StartUserAgent(result.Path, info.ConfigPath); err != nil {
-					return fmt.Errorf("restart Home-AI sync agent: %w", err)
-				}
-				fmt.Println("Home-AI sync agent restarted after client update.")
-			}
-		}
-		if result.Changed {
-			fmt.Printf("Home-AI Windows client installed: %s\n", result.Path)
-		} else {
-			fmt.Printf("Home-AI Windows client is already current: %s\n", result.Path)
-		}
-		return nil
+		return runClientInstall(reopenSettings, configPath, settingsPath)
 	case "check-update", "update":
 		var channelErr error
 		channel, channelErr = windowsclient.NormalizeReleaseChannel(channel)
