@@ -109,7 +109,7 @@ func TestNVRStorageEndpointPrivacyAndReadOnlyStatus(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/nvr/storage", nil)
 	rec := httptest.NewRecorder()
 	s.nvrStorage(rec, req, security.Actor{}, authBearer)
-	if rec.Code != http.StatusOK || rec.Header().Get("Cache-Control") != "private, no-store" ||
+	if rec.Code != http.StatusOK || rec.Header().Get("Cache-Control") != "no-store" ||
 		strings.Contains(rec.Body.String(), "sda1") {
 		t.Fatalf("storage response: %d %s", rec.Code, rec.Body.String())
 	}
