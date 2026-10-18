@@ -80,6 +80,11 @@ func (state *windowsSettingsUI) applyLanguageTexts() {
 		{"language_label", "language"},
 		{"general_background_title", "general_background_title"},
 		{"general_background_hint", "general_background_hint"},
+		{"updates_title", "updates_title"},
+		{"updates_channel_label", "updates_channel"},
+		{"updates_check_button", "updates_check"},
+		{"updates_install_button", "updates_install"},
+		{"updates_security_hint", "updates_security_hint"},
 		{"status_title", "status"},
 	} {
 		controlKey, textKey := item[0], item[1]
@@ -100,6 +105,17 @@ func (state *windowsSettingsUI) applyLanguageTexts() {
 	state.comboAdd(state.conflict, state.tr("conflict_replace"))
 	state.setConflictPolicy(policy)
 
+	if state.updateChannelCombo != 0 {
+		selection := state.comboSelection(state.updateChannelCombo)
+		procSettingsSendMessage.Call(uintptr(state.updateChannelCombo), settingsCBReset, 0, 0)
+		state.comboAdd(state.updateChannelCombo, state.tr("updates_stable"))
+		state.comboAdd(state.updateChannelCombo, state.tr("updates_beta"))
+		if selection < 0 {
+			selection = 1
+		}
+		procSettingsSendMessage.Call(uintptr(state.updateChannelCombo), settingsCBSetCurSel, uintptr(selection), 0)
+	}
+	state.renderUpdateStatus()
 	if state.language == uiLanguageRussian {
 		procSettingsSendMessage.Call(uintptr(state.languageCombo), settingsCBSetCurSel, 0, 0)
 	} else {

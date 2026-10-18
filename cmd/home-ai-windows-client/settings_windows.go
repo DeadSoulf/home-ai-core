@@ -33,9 +33,10 @@ const (
 	settingsWMSetFont = 0x0030
 	settingsWMApp     = 0x8000
 
-	settingsWMConnected = settingsWMApp + 201
-	settingsWMSyncDone  = settingsWMApp + 202
-	settingsWMAgentDone = settingsWMApp + 203
+	settingsWMConnected       = settingsWMApp + 201
+	settingsWMSyncDone        = settingsWMApp + 202
+	settingsWMAgentDone       = settingsWMApp + 203
+	settingsWMUpdateCheckDone = settingsWMApp + 204
 
 	settingsWSOverlappedWindow = 0x00CF0000
 	settingsWSVisible          = 0x10000000
@@ -165,23 +166,32 @@ type windowsSettingsUI struct {
 	language     string
 	localized    map[string]windows.Handle
 
-	serverEdit         windows.Handle
-	usernameEdit       windows.Handle
-	passwordEdit       windows.Handle
-	folderCombo        windows.Handle
-	sourceEdit         windows.Handle
-	destination        windows.Handle
-	interval           windows.Handle
-	conflict           windows.Handle
-	profileList        windows.Handle
-	transferProgress   windows.Handle
-	transferDetails    windows.Handle
-	transferHistory    windows.Handle
-	statusLabel        windows.Handle
-	agentLabel         windows.Handle
-	saveProfileBtn     windows.Handle
-	languageCombo      windows.Handle
-	backupProfileCombo windows.Handle
+	serverEdit           windows.Handle
+	usernameEdit         windows.Handle
+	passwordEdit         windows.Handle
+	folderCombo          windows.Handle
+	sourceEdit           windows.Handle
+	destination          windows.Handle
+	interval             windows.Handle
+	conflict             windows.Handle
+	profileList          windows.Handle
+	transferProgress     windows.Handle
+	transferDetails      windows.Handle
+	transferHistory      windows.Handle
+	statusLabel          windows.Handle
+	agentLabel           windows.Handle
+	saveProfileBtn       windows.Handle
+	languageCombo        windows.Handle
+	backupProfileCombo   windows.Handle
+	updateChannelCombo   windows.Handle
+	updateCheckBtn       windows.Handle
+	updateInstallBtn     windows.Handle
+	updateStatusLabel    windows.Handle
+	updateBusy           bool
+	updateAvailable      bool
+	updateLatestVersion  string
+	updateCheckedChannel string
+	updateError          string
 
 	page                   int
 	pageControls           [settingsPageCount][]windows.Handle
@@ -196,6 +206,7 @@ type windowsSettingsUI struct {
 	overviewNext           windows.Handle
 	overviewLast           windows.Handle
 	overviewRecent         [3]windows.Handle
+	overviewRecentHint     windows.Handle
 	overviewStorage        windows.Handle
 	overviewStorageHint    windows.Handle
 	overviewStoragePercent int
@@ -219,6 +230,7 @@ type windowsSettingsUI struct {
 	connectResult *settingsConnectResult
 	syncResult    *settingsAsyncResult
 	agentResult   *settingsAsyncResult
+	updateResult  *settingsUpdateCheckResult
 }
 
 var (
@@ -416,6 +428,7 @@ func runSettingsUI(args []string) error {
 	}
 	state.applyLanguageTexts()
 	state.loadInitial()
+	state.loadUpdateChannel()
 	state.layoutControls()
 	procSettingsSetTimer.Call(hwnd, settingsTransferTimerID, 1500, 0)
 	procSettingsShowWindow.Call(hwnd, settingsSWShow)
@@ -535,6 +548,11 @@ func settingsWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) ui
 	case settingsWMAgentDone:
 		if state != nil {
 			state.finishAgent()
+			return 0
+		}
+	case settingsWMUpdateCheckDone:
+		if state != nil {
+			state.finishUpdateCheck()
 			return 0
 		}
 	case settingsWMClose:
@@ -666,6 +684,18 @@ func (state *windowsSettingsUI) handleCommand(id, notify uint16) {
 	case settingsIDLanguage:
 		if notify == settingsCBNSelect {
 			state.changeLanguage()
+		}
+	case settingsIDUpdateChannel:
+		if notify == settingsCBNSelect {
+			state.changeUpdateChannel()
+		}
+	case settingsIDUpdateCheck:
+		if notify == settingsBNClicked {
+			state.beginUpdateCheck()
+		}
+	case settingsIDUpdateInstall:
+		if notify == settingsBNClicked {
+			state.startUpdateFromUI()
 		}
 	}
 }

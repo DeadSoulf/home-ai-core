@@ -55,7 +55,16 @@ section outlines, headings, status presentation and owner-drawn buttons.
 The **Transfers / Передачи** page shows actual current file upload bytes
 and completed/total items, with a frequently refreshed history of file
 results (including background sync, persistent queue runs and one-off CLI copy/upload operations).
-This is the progress of the *current file*, not a guessed total-time estimate.
+The UI displays copied/total bytes, a smoothed measured throughput (bytes/s)
+and a **rough ETA for the current file only**. It does not estimate time to
+complete every profile. The Overview page shows the last three recorded
+events and 24-hour upload/failure counts from its bounded recent log,
+falling back to profile status snapshots if no event history exists.
+
+The tray menu includes a **Profiles** submenu with each profile's
+enabled/disabled state, most recent attempt and next scheduled run. Profiles
+can be enabled or disabled without opening Settings. It shows up to 24 profiles;
+remaining profiles are managed from Settings.
 
 Progress is stored atomically in `<sync-profiles.json>.transfer-progress.json`.
 Recent completed, unchanged, skipped and failed transfer events are stored in
@@ -241,10 +250,44 @@ The installed client can also discover, download, verify and hand off the newest
 
 `client update` reads the Home-AI GitHub release metadata, requires the exact versioned `.exe` and `.sha256` asset pair, downloads the executable into the per-user Home-AI update cache, verifies SHA-256, and launches only the verified executable for the existing install handoff. If the stable installed client or tray agent still has the old executable open, replacement is retried for a bounded period and the managed agent is restarted afterward when autostart is enabled.
 
+## Client update controls and release channels
+
+In **Settings**, select a release channel under **Updates**:
+**Stable** only considers published non-prerelease versions; **Beta**
+includes prerelease versions and stable versions. The default remains Beta to
+preserve compatibility with previous development releases.
+
+**Check updates** fetches public release metadata without downloading an
+executable. **Install update** is enabled only after a newer version is
+identified and always requires the user's confirmation. The settings window
+closes to allow the updater handoff. The update process writes a diagnostic
+log at `%LOCALAPPDATA%\\HomeAI\\windows-client-update.log`.
+
+The tray menu offers **Check for updates** (asynchronous notification) and
+**Install update...** (requires confirmation). These are manual controls:
+there is no background polling or unattended installation yet.
+
+The CLI provides:
+
+```powershell
+.\\home-ai-windows-client.exe client check-update --channel stable
+.\\home-ai-windows-client.exe client check-update --channel beta
+.\\home-ai-windows-client.exe client update --channel beta
+```
+
+Versioned Windows release builds are stamped with the release VERSION;
+local development builds without linker flags report `dev`.
+
+**Security warning:** the client currently checks SHA-256 integrity from
+release assets but does **not** verify Windows Authenticode or independently
+authenticate the release metadata inside its own updater. The UI explicitly
+warns before installation. Publisher signing and trusted update metadata
+verification are prerequisites for unattended installation.
+
 ## Current limitations
 
-- the Transfers page now reports sync, queue and one-off CLI copy/upload operations; aggregate transfer ETA and advanced history filtering are not yet implemented;
-- release update is currently an explicit `client update` action; background update checks and unattended installation are deferred;
+- the Transfers page shows per-file speed/ETA and recent history; whole-run ETA and advanced filtering are not implemented;
+- release updates can be checked and explicitly installed through GUI, tray or CLI; background polling and unattended installation are deferred pending verified publisher trust;
 - a conventional Windows installer / Start Menu / uninstall entry is still deferred;
 - no bidirectional sync or local-delete propagation;
 - no sync-history/recycle-bin retention policy;
