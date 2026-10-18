@@ -275,6 +275,7 @@ func executeSyncProfiles(
 		activity := transferActivity{ProfileID: profile.ID, Path: profile.Destination, Status: "running"}
 		_ = saveTransferProgress(configPath, activity)
 		lastProgressWrite := time.Time{}
+		var rate transferRate
 		client, runErr := authenticatedClient(ctx, authFlags{
 			server:   profile.ServerURL,
 			username: profile.Username,
@@ -293,6 +294,10 @@ func executeSyncProfiles(
 							return
 						}
 						lastProgressWrite = now
+						if activity.Path != progress.Path {
+							rate = transferRate{}
+						}
+						activity.SpeedBytesPerSec, activity.ETASeconds = rate.observe(now, progress.UploadedBytes, progress.TotalBytes)
 						activity.Path = progress.Path
 						activity.UploadedBytes = progress.UploadedBytes
 						activity.TotalBytes = progress.TotalBytes
@@ -303,6 +308,9 @@ func executeSyncProfiles(
 					activity.Path = progress.Path
 					activity.ItemsTotal = progress.Total
 					activity.ItemsDone = progress.Index
+					rate = transferRate{}
+					activity.SpeedBytesPerSec = 0
+					activity.ETASeconds = 0
 					activity.UploadedBytes = 0
 					activity.TotalBytes = 0
 					_ = saveTransferProgress(configPath, activity)
@@ -326,12 +334,18 @@ func executeSyncProfiles(
 			})
 		}
 		activity.Status = "completed"
+		activity.SpeedBytesPerSec = 0
+		activity.ETASeconds = 0
 		if runErr != nil {
 			activity.Status = "failed"
 			activity.Error = runErr.Error()
 			_ = appendTransferHistory(configPath, activity)
 		}
 		_ = saveTransferProgress(configPath, activity)
+		_ = appendTransferHistory(configPath, transferActivity{
+			ProfileID: profile.ID, Path: profile.Destination, Status: activity.Status,
+			ItemsDone: summary.Planned, ItemsTotal: summary.Planned, Error: activity.Error,
+		})
 		recordErr := windowsclient.RecordSyncProfileResult(configPath, profile.ID, time.Now().UTC(), runErr)
 		if runErr == nil {
 			fmt.Printf(

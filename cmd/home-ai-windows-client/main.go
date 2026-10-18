@@ -187,6 +187,7 @@ func runUpload(args []string) error {
 	activityConfig, activityConfigErr := defaultSyncConfigPath()
 	activity := transferActivity{ProfileID: "upload", Path: destination, Status: "running"}
 	lastActivityWrite := time.Time{}
+	var rate transferRate
 	if activityConfigErr == nil {
 		_ = saveTransferProgress(activityConfig, activity)
 	}
@@ -199,6 +200,7 @@ func runUpload(args []string) error {
 				activity.Path = progress.Path
 				activity.UploadedBytes = progress.UploadedBytes
 				activity.TotalBytes = progress.TotalBytes
+				activity.SpeedBytesPerSec, activity.ETASeconds = rate.observe(time.Now(), progress.UploadedBytes, progress.TotalBytes)
 				_ = saveTransferProgress(activityConfig, activity)
 				lastActivityWrite = time.Now()
 			}
@@ -231,6 +233,8 @@ func runUpload(args []string) error {
 	}
 	if activityConfigErr == nil {
 		activity.Status = "completed"
+		activity.SpeedBytesPerSec = 0
+		activity.ETASeconds = 0
 		activity.Path = result.Path
 		activity.UploadedBytes = result.SizeBytes
 		activity.TotalBytes = result.SizeBytes

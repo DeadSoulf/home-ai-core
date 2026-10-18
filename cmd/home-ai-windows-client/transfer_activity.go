@@ -15,15 +15,17 @@ import (
 // share the same data even when --config points to a non-default location.
 // These files contain paths and statuses only; never credentials or tokens.
 type transferActivity struct {
-	At            time.Time `json:"at"`
-	ProfileID     string    `json:"profile_id,omitempty"`
-	Path          string    `json:"path,omitempty"`
-	Status        string    `json:"status"`
-	ItemsDone     int       `json:"items_done,omitempty"`
-	ItemsTotal    int       `json:"items_total,omitempty"`
-	UploadedBytes int64     `json:"uploaded_bytes,omitempty"`
-	TotalBytes    int64     `json:"total_bytes,omitempty"`
-	Error         string    `json:"error,omitempty"`
+	At               time.Time `json:"at"`
+	ProfileID        string    `json:"profile_id,omitempty"`
+	Path             string    `json:"path,omitempty"`
+	Status           string    `json:"status"`
+	ItemsDone        int       `json:"items_done,omitempty"`
+	ItemsTotal       int       `json:"items_total,omitempty"`
+	UploadedBytes    int64     `json:"uploaded_bytes,omitempty"`
+	TotalBytes       int64     `json:"total_bytes,omitempty"`
+	SpeedBytesPerSec int64     `json:"speed_bytes_per_sec,omitempty"`
+	ETASeconds       int64     `json:"eta_seconds,omitempty"`
+	Error            string    `json:"error,omitempty"`
 }
 
 const transferHistoryLimit = 4 << 20
