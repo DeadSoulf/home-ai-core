@@ -174,7 +174,7 @@ export function AIPage() {
 
     {tab === "chat" && <section aria-label="Чат с AI">
       <Panel title="Разговор с агентом" action={
-        <button type="button" className="button secondary ai-close-chat" disabled={busy}
+        <button type="button" className="button secondary ai-close-chat"
           onClick={() => {setTab("local"); setError(""); setNotice("");}}>
           Закрыть чат
         </button>
