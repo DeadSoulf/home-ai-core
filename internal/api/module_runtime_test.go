@@ -106,7 +106,7 @@ func TestModuleOperationsExposeOnlyScopedSanitizedRecords(t *testing.T) {
 	}}
 	handler := uiAPI(defaultFakeSecurity(), jobs, uiModuleService{})
 	response := uiRequest(handler, "GET", "/api/v1/modules/operations", "")
-	if response.Code != 200 || !strings.Contains(response.Body.String(), "job-module") || strings.Contains(response.Body.String(), "job-other") || strings.Contains(response.Body.String(), "job-done") || strings.Contains(response.Body.String(), "private") {
+	if response.Code != 200 || !strings.Contains(response.Body.String(), "job-module") || !strings.Contains(response.Body.String(), "job-done") || strings.Contains(response.Body.String(), "job-other") || strings.Contains(response.Body.String(), "private") {
 		t.Fatalf("operation scope: %s", response.Body.String())
 	}
 	if response := uiRequest(handler, "GET", "/api/v1/modules/operations/job-other", ""); response.Code != 404 {
