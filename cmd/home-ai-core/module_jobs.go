@@ -72,31 +72,50 @@ func registerModuleJobs(service *jobs.Service, registry *modules.Registry) error
 
 	if err := service.Register("module.update", func(ctx context.Context, job state.JobRecord, reporter jobs.Reporter) (map[string]any, error) {
 		raw, _ := job.Input["manifest_json"].(string)
-		if strings.TrimSpace(raw)==""{return nil,errors.New("updated module manifest is missing")}
-		manifest,err:=modules.DecodeManifest(strings.NewReader(raw))
-		if err!=nil{return nil,err}
+		if strings.TrimSpace(raw) == "" {
+			return nil, errors.New("updated module manifest is missing")
+		}
+		manifest, err := modules.DecodeManifest(strings.NewReader(raw))
+		if err != nil {
+			return nil, err
+		}
 		_ = reporter.Progress(ctx, 500, "validating AI patch upgrade")
-		item,err:=registry.UpgradeManifest(ctx,manifest,func(stage,detail string){
-			progress:=1500
+		item, err := registry.UpgradeManifest(ctx, manifest, func(stage, detail string) {
+			progress := 1500
 			switch stage {
-			case "download":progress=1500
-			case "downloaded":progress=4800
-			case "create":progress=5500
-			case "backup":progress=6200
-			case "start":progress=7400
-			case "verify":progress=8700
-			default:return
+			case "download":
+				progress = 1500
+			case "downloaded":
+				progress = 4800
+			case "create":
+				progress = 5500
+			case "backup":
+				progress = 6200
+			case "start":
+				progress = 7400
+			case "verify":
+				progress = 8700
+			default:
+				return
 			}
-			if len(detail)>110 {detail=detail[:110]}
-			message:="module.phase."+stage
-			if detail!=""{message+="|"+detail}
-			_ = reporter.Progress(ctx,progress,message)
+			if len(detail) > 110 {
+				detail = detail[:110]
+			}
+			message := "module.phase." + stage
+			if detail != "" {
+				message += "|" + detail
+			}
+			_ = reporter.Progress(ctx, progress, message)
 		})
-		if err!=nil{return nil,err}
+		if err != nil {
+			return nil, err
+		}
 		_ = reporter.Progress(ctx, 9500, "AI upgrade committed and prior data protected")
-		return map[string]any{"module_id":item.Manifest.ID,"version":item.Manifest.Version,
-			"status":item.Status},nil
-	}); err != nil{return err}
+		return map[string]any{"module_id": item.Manifest.ID, "version": item.Manifest.Version,
+			"status": item.Status}, nil
+	}); err != nil {
+		return err
+	}
 
 	if err := service.Register("module.control", func(ctx context.Context, job state.JobRecord, reporter jobs.Reporter) (map[string]any, error) {
 		moduleID, _ := job.Input["module_id"].(string)
