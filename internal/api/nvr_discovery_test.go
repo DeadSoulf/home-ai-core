@@ -105,7 +105,7 @@ func TestNVRDiscoveryRejectsMissingCSRFAndWorksWithoutRunningModule(t *testing.T
 	actor := securityService.actor
 	scans := 0
 	s := &server{
-		modules: nvrTestService(false),
+		modules:  nvrTestService(false),
 		security: securityService,
 		nvrNetworks: func() ([]nvrdiscovery.Network, error) {
 			return []nvrdiscovery.Network{allowed}, nil
