@@ -187,6 +187,8 @@ async function postJSON<T>(path: string, body?: unknown, csrf = false): Promise<
 export const api = {
   aiStatus: (signal?: AbortSignal) => request<AIStatus>("/api/v1/ai/status", {signal}),
   aiHardware: (signal?: AbortSignal) => request<AIHardware>("/api/v1/ai/hardware", {signal}),
+  aiGPUImageStatus: (signal?: AbortSignal) => request<{ready: boolean}>("/api/v1/ai/gpu/runtime", {signal}),
+  aiPrepareGPUImage: () => postJSON<{job: Job}>("/api/v1/ai/gpu/runtime/prepare", {}, true),
   aiGPUAssignment: (signal?: AbortSignal) => request<AIGPUAssignment>("/api/v1/ai/gpu/assignment", {signal}),
   aiApplyGPU: (pciAddresses: string[]) => postJSON<AIGPUAssignment>(
     "/api/v1/ai/gpu/assignment", {pci_addresses: pciAddresses, confirmation: "ASSIGN_AI_GPU"}, true),
