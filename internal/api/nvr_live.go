@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -126,6 +125,3 @@ func (s *server) nvrDeleteCamera(w http.ResponseWriter, r *http.Request, actor s
 		map[string]any{"camera_id": id, "recordings_preserved": true})
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "recordings_preserved": true})
 }
-
-// Keep the decoder import above tied to the upstream JSON response schema.
-var _ = json.Valid
