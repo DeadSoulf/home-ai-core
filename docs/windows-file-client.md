@@ -259,9 +259,25 @@ preserve compatibility with previous development releases.
 
 **Check updates** fetches public release metadata without downloading an
 executable. **Install update** is enabled only after a newer version is
-identified and always requires the user's confirmation. The settings window
-closes to allow the updater handoff. The update process writes a diagnostic
-log at `%LOCALAPPDATA%\\HomeAI\\windows-client-update.log`.
+identified and always requires the user's confirmation. The GUI remains
+open while the release asset is downloaded and its SHA-256 hash verified.
+A download or checksum failure appears directly in the current window.
+
+Only after the verified installer starts does the old GUI close to allow
+replacement. The updated installed client then reopens its own Settings
+window with a success message. The installer waits for the old GUI window
+to exit, even when the earlier client ran from a separate downloaded
+preview executable. If installation/relaunch fails, a foreground error
+dialog identifies the problem.
+
+The update log is at
+`%LOCALAPPDATA%\\HomeAI\\windows-client-update.log`; the executable
+that should reopen is
+`%LOCALAPPDATA%\\HomeAI\\bin\\home-ai-windows-client.exe`.
+If using an older release which closed its GUI without reopening, launch
+this installed EXE directly. The `client install` command opens Settings
+by default for backward compatibility with older updater processes; CLI-only
+installation may set `--reopen-settings=false`.
 
 The tray menu offers **Check for updates** (asynchronous notification) and
 **Install update...** (requires confirmation). These are manual controls:
