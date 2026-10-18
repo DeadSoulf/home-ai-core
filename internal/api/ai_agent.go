@@ -88,13 +88,23 @@ func (s *server) aiGateway(w http.ResponseWriter, r *http.Request, actor securit
 
 	timeout := 15 * time.Second
 	if subpath == "chat" {
-		timeout = 70 * time.Second // The local AI model can take up to 45s.
+		// CPU inference for 8B models may need several minutes on the first
+		// response. The HTTP listener has a 30-second global WriteTimeout.
+		// Extend ONLY this authenticated AI chat response, never all routes.
+		if err := http.NewResponseController(w).SetWriteDeadline(time.Now().Add(270 * time.Second)); err != nil && s.logger != nil {
+			s.logger.Warn("AI chat write deadline could not be extended", "error", err)
+		}
+		timeout = 250 * time.Second
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 	response, err := s.aiRequest(ctx, method, path, payload)
 	if err != nil {
-		writeAPIError(w, r, http.StatusBadGateway, "ai_unavailable", "Unable to contact the managed AI module", nil)
+		if ctx.Err() != nil {
+			writeAPIError(w, r, http.StatusGatewayTimeout, "ai_response_timeout", "AI model response timed out", nil)
+		} else {
+			writeAPIError(w, r, http.StatusBadGateway, "ai_unavailable", "Unable to contact the managed AI module", nil)
+		}
 		return
 	}
 	defer response.Body.Close()
@@ -116,6 +126,8 @@ func (s *server) aiGateway(w http.ResponseWriter, r *http.Request, actor securit
 			status, message = http.StatusConflict, "AI action was already decided or is unavailable"
 		case http.StatusUnauthorized:
 			message = "AI module authentication token was rejected"
+		case http.StatusBadGateway, http.StatusGatewayTimeout:
+			status, message = http.StatusBadGateway, "AI model could not generate a reply; check the local model and its resources"
 		}
 		writeAPIError(w, r, status, "ai_upstream_error", message, nil)
 		return
@@ -210,7 +222,7 @@ func (s *server) aiRequest(ctx context.Context, method, path string, data []byte
 		Proxy:                 nil,
 		DisableKeepAlives:     true,
 		DialContext:           (&net.Dialer{Timeout: 4 * time.Second}).DialContext,
-		ResponseHeaderTimeout: 62 * time.Second,
+		ResponseHeaderTimeout: 240 * time.Second,
 	}
 	defer transport.CloseIdleConnections()
 	var roundTrip http.RoundTripper = transport
