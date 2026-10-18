@@ -1,9 +1,9 @@
 package api
 
 import (
-	"errors"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
