@@ -104,7 +104,7 @@ func satisfies(value, constraint string) (bool, error) {
 	return true, nil
 }
 
- // NewerVersion only permits strict stable semantic version advances.
+// NewerVersion only permits strict stable semantic version advances.
 func NewerVersion(candidate, installed string) (bool, error) {
 	next, err := parseVersion(candidate)
 	if err != nil {
