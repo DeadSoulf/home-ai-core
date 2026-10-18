@@ -16,20 +16,20 @@ import (
 )
 
 type server struct {
-	moduleSubmitMu sync.Mutex
-	nvrEndpoint    func(context.Context) (string, error)
-	nvrTransport   http.RoundTripper
-	nvrDataRoot    string
+	moduleSubmitMu      sync.Mutex
+	nvrEndpoint         func(context.Context) (string, error)
+	nvrTransport        http.RoundTripper
+	nvrDataRoot         string
 	nvrStorageInventory func(context.Context) ([]systeminfo.BlockNode, storage.Inspection)
-	aiEndpoint     func(context.Context) (string, error)
-	aiTransport    http.RoundTripper
-	aiDataRoot     string
-	aiGPUStatus    func(context.Context) ([]string, error)
-	aiGPUApplyFunc func(context.Context, []string) ([]string, error)
-	nvrScanMu      sync.Mutex
-	nvrLastScan    time.Time
-	nvrNetworks    func() ([]nvrdiscovery.Network, error)
-	nvrScanner     func(context.Context, nvrdiscovery.Network) ([]nvrdiscovery.Device, error)
+	aiEndpoint          func(context.Context) (string, error)
+	aiTransport         http.RoundTripper
+	aiDataRoot          string
+	aiGPUStatus         func(context.Context) ([]string, error)
+	aiGPUApplyFunc      func(context.Context, []string) ([]string, error)
+	nvrScanMu           sync.Mutex
+	nvrLastScan         time.Time
+	nvrNetworks         func() ([]nvrdiscovery.Network, error)
+	nvrScanner          func(context.Context, nvrdiscovery.Network) ([]nvrdiscovery.Device, error)
 
 	nodeID              string
 	logger              *slog.Logger
