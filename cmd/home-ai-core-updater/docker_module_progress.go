@@ -63,10 +63,13 @@ func splitDockerPullLines(data []byte, atEOF bool) (int, []byte, error) {
 	return 0, nil, nil
 }
 
-type boundedPullOutput struct { b bytes.Buffer }
+type boundedPullOutput struct{ b bytes.Buffer }
+
 func (w *boundedPullOutput) Write(p []byte) (int, error) {
 	original := len(p)
-	if len(p) > 4096 { p = p[len(p)-4096:] }
+	if len(p) > 4096 {
+		p = p[len(p)-4096:]
+	}
 	remaining := 4096 - w.b.Len()
 	if remaining < len(p) {
 		old := w.b.Bytes()
