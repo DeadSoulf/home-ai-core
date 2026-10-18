@@ -43,6 +43,8 @@ type Request struct {
 	SMBShares       []SMBShareRequest `json:"smb_shares,omitempty"`
 	ModuleID        string            `json:"module_id,omitempty"`
 	Image           string            `json:"image,omitempty"`
+	PreviousImage  string            `json:"previous_image,omitempty"`
+	PreviousManifest string          `json:"previous_manifest,omitempty"`
 	AIGPUPCI        []string          `json:"ai_gpu_pci,omitempty"`
 }
 
@@ -154,6 +156,7 @@ type Response struct {
 	DockerNetworkReady bool                  `json:"docker_network_ready"`
 	DockerError        string                `json:"docker_error,omitempty"`
 	ModuleState        string                `json:"module_state,omitempty"`
+	PreviousManifest    string                `json:"previous_manifest,omitempty"`
 	ContainerID        string                `json:"container_id,omitempty"`
 	ModuleAddress      string                `json:"module_address,omitempty"`
 	// Streaming install updates are intermediate JSON frames on the existing
