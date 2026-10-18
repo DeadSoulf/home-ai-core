@@ -71,6 +71,8 @@ func TestAISnapshotRestoresDataAfterFailedCandidate(t *testing.T) {
 		"   case \"$*\" in\n" +
 		"     *ai.agent-upgrade-candidate*|*ai.agent-upgrade-previous*) echo 'No such object' >&2; exit 1;;\n" +
 		"     *Health*) echo 'running|healthy';;\n" +
+		"     *Labels*) echo 'true|ai.agent';;\n" +
+		"     *Config.Image*) echo '"+state.PreviousImage+"';;\n" +
 		"     *) echo 'sha256:" + strings.Repeat("c", 64) + "';;\n" +
 		"   esac;;\n" +
 		" start) exit 0;;\n" +
