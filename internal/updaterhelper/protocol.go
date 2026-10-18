@@ -6,46 +6,46 @@ const ProtocolVersion = 8
 var HelperVersion = "dev"
 
 type Request struct {
-	Operation       string            `json:"operation"`
-	ProtocolVersion int               `json:"protocol_version,omitempty"`
-	Version         string            `json:"version,omitempty"`
-	CurrentVersion  string            `json:"current_version,omitempty"`
-	Device          string            `json:"device,omitempty"`
-	Mountpoint      string            `json:"mountpoint,omitempty"`
-	Filesystem      string            `json:"filesystem,omitempty"`
-	Label           string            `json:"label,omitempty"`
-	Confirm         string            `json:"confirm,omitempty"`
-	DryRun          bool              `json:"dry_run,omitempty"`
-	SizeMiB         uint64            `json:"size_mib,omitempty"`
-	Interface       string            `json:"interface,omitempty"`
-	Address         string            `json:"address,omitempty"`
-	Gateway         string            `json:"gateway,omitempty"`
-	MTU             int               `json:"mtu,omitempty"`
-	Tunnel          string            `json:"tunnel,omitempty"`
-	ListenPort      int               `json:"listen_port,omitempty"`
-	PrivateKey      string            `json:"private_key,omitempty"`
-	PeerPublicKey   string            `json:"peer_public_key,omitempty"`
-	PresharedKey    string            `json:"preshared_key,omitempty"`
-	AllowedIPs      []string          `json:"allowed_ips,omitempty"`
-	Endpoint        string            `json:"endpoint,omitempty"`
-	Keepalive       int               `json:"keepalive,omitempty"`
-	NetworkMethod   string            `json:"network_method,omitempty"`
-	DNS             []string          `json:"dns,omitempty"`
-	RootPath        string            `json:"root_path,omitempty"`
-	ProjectID       uint32            `json:"project_id,omitempty"`
-	QuotaBytes      int64             `json:"quota_bytes,omitempty"`
-	RelativePath    string            `json:"relative_path,omitempty"`
-	ReservePercent  int               `json:"reserve_percent,omitempty"`
-	SMBWorkgroup    string            `json:"smb_workgroup,omitempty"`
-	SMBUser         string            `json:"smb_user,omitempty"`
-	SMBPassword     string            `json:"smb_password,omitempty"`
-	SMBUsers        []string          `json:"smb_users,omitempty"`
-	SMBShares       []SMBShareRequest `json:"smb_shares,omitempty"`
-	ModuleID        string            `json:"module_id,omitempty"`
-	Image           string            `json:"image,omitempty"`
-	PreviousImage  string            `json:"previous_image,omitempty"`
-	PreviousManifest string          `json:"previous_manifest,omitempty"`
-	AIGPUPCI        []string          `json:"ai_gpu_pci,omitempty"`
+	Operation        string            `json:"operation"`
+	ProtocolVersion  int               `json:"protocol_version,omitempty"`
+	Version          string            `json:"version,omitempty"`
+	CurrentVersion   string            `json:"current_version,omitempty"`
+	Device           string            `json:"device,omitempty"`
+	Mountpoint       string            `json:"mountpoint,omitempty"`
+	Filesystem       string            `json:"filesystem,omitempty"`
+	Label            string            `json:"label,omitempty"`
+	Confirm          string            `json:"confirm,omitempty"`
+	DryRun           bool              `json:"dry_run,omitempty"`
+	SizeMiB          uint64            `json:"size_mib,omitempty"`
+	Interface        string            `json:"interface,omitempty"`
+	Address          string            `json:"address,omitempty"`
+	Gateway          string            `json:"gateway,omitempty"`
+	MTU              int               `json:"mtu,omitempty"`
+	Tunnel           string            `json:"tunnel,omitempty"`
+	ListenPort       int               `json:"listen_port,omitempty"`
+	PrivateKey       string            `json:"private_key,omitempty"`
+	PeerPublicKey    string            `json:"peer_public_key,omitempty"`
+	PresharedKey     string            `json:"preshared_key,omitempty"`
+	AllowedIPs       []string          `json:"allowed_ips,omitempty"`
+	Endpoint         string            `json:"endpoint,omitempty"`
+	Keepalive        int               `json:"keepalive,omitempty"`
+	NetworkMethod    string            `json:"network_method,omitempty"`
+	DNS              []string          `json:"dns,omitempty"`
+	RootPath         string            `json:"root_path,omitempty"`
+	ProjectID        uint32            `json:"project_id,omitempty"`
+	QuotaBytes       int64             `json:"quota_bytes,omitempty"`
+	RelativePath     string            `json:"relative_path,omitempty"`
+	ReservePercent   int               `json:"reserve_percent,omitempty"`
+	SMBWorkgroup     string            `json:"smb_workgroup,omitempty"`
+	SMBUser          string            `json:"smb_user,omitempty"`
+	SMBPassword      string            `json:"smb_password,omitempty"`
+	SMBUsers         []string          `json:"smb_users,omitempty"`
+	SMBShares        []SMBShareRequest `json:"smb_shares,omitempty"`
+	ModuleID         string            `json:"module_id,omitempty"`
+	Image            string            `json:"image,omitempty"`
+	PreviousImage    string            `json:"previous_image,omitempty"`
+	PreviousManifest string            `json:"previous_manifest,omitempty"`
+	AIGPUPCI         []string          `json:"ai_gpu_pci,omitempty"`
 }
 
 type SMBShareRequest struct {
@@ -156,7 +156,7 @@ type Response struct {
 	DockerNetworkReady bool                  `json:"docker_network_ready"`
 	DockerError        string                `json:"docker_error,omitempty"`
 	ModuleState        string                `json:"module_state,omitempty"`
-	PreviousManifest    string                `json:"previous_manifest,omitempty"`
+	PreviousManifest   string                `json:"previous_manifest,omitempty"`
 	ContainerID        string                `json:"container_id,omitempty"`
 	ModuleAddress      string                `json:"module_address,omitempty"`
 	// Streaming install updates are intermediate JSON frames on the existing
