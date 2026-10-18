@@ -119,6 +119,7 @@ type settingsVisualResources struct {
 	accentPen          windows.Handle
 	glowPen            windows.Handle
 	checkPen           windows.Handle
+	bodyFont           windows.Handle
 	brandFont          windows.Handle
 	titleFont          windows.Handle
 	headlineFont       windows.Handle
@@ -203,12 +204,13 @@ func (state *windowsSettingsUI) initVisualResources() error {
 	checkPen, _, _ := procSettingsCreatePen.Call(0, 4, settingsRGB(255, 255, 255))
 	state.visual.checkPen = windows.Handle(checkPen)
 
-	state.visual.brandFont = createSettingsFont(-20, settingsFWBold)
-	state.visual.titleFont = createSettingsFont(-22, settingsFWBold)
-	state.visual.headlineFont = createSettingsFont(-20, settingsFWBold)
-	state.visual.subtitleFont = createSettingsFont(-11, settingsFWNormal)
-	state.visual.cardTitleFont = createSettingsFont(-10, settingsFWSemibold)
-	state.visual.cardValueFont = createSettingsFont(-15, settingsFWBold)
+	state.visual.bodyFont = createSettingsFont(state.scale(-12), settingsFWNormal)
+	state.visual.brandFont = createSettingsFont(state.scale(-20), settingsFWBold)
+	state.visual.titleFont = createSettingsFont(state.scale(-22), settingsFWBold)
+	state.visual.headlineFont = createSettingsFont(state.scale(-20), settingsFWBold)
+	state.visual.subtitleFont = createSettingsFont(state.scale(-11), settingsFWNormal)
+	state.visual.cardTitleFont = createSettingsFont(state.scale(-10), settingsFWSemibold)
+	state.visual.cardValueFont = createSettingsFont(state.scale(-15), settingsFWBold)
 
 	if state.visual.mainBrush == 0 || state.visual.sidebarBrush == 0 ||
 		state.visual.heroBrush == 0 || state.visual.cardBrush == 0 ||
@@ -217,7 +219,7 @@ func (state *windowsSettingsUI) initVisualResources() error {
 		state.visual.cyanBrush == 0 || state.visual.navMutedBrush == 0 ||
 		state.visual.storageTrackBrush == 0 || state.visual.borderPen == 0 || state.visual.navBorderPen == 0 ||
 		state.visual.accentPen == 0 || state.visual.glowPen == 0 || state.visual.checkPen == 0 ||
-		state.visual.brandFont == 0 || state.visual.titleFont == 0 || state.visual.headlineFont == 0 ||
+		state.visual.bodyFont == 0 || state.visual.brandFont == 0 || state.visual.titleFont == 0 || state.visual.headlineFont == 0 ||
 		state.visual.subtitleFont == 0 || state.visual.cardTitleFont == 0 ||
 		state.visual.cardValueFont == 0 {
 		return fmt.Errorf("create Windows client visual resources")
@@ -251,6 +253,7 @@ func (state *windowsSettingsUI) releaseVisualResources() {
 		state.visual.accentPen,
 		state.visual.glowPen,
 		state.visual.checkPen,
+		state.visual.bodyFont,
 		state.visual.brandFont,
 		state.visual.titleFont,
 		state.visual.headlineFont,
@@ -282,10 +285,10 @@ func (state *windowsSettingsUI) applyRoundedButtonRegion(hwnd windows.Handle, wi
 	region, _, _ := procSettingsCreateRoundRectRgn.Call(
 		0,
 		0,
-		uintptr(width+1),
-		uintptr(height+1),
-		uintptr(settingsButtonCornerRadius*2),
-		uintptr(settingsButtonCornerRadius*2),
+		uintptr(state.scale(width)+1),
+		uintptr(state.scale(height)+1),
+		uintptr(state.scale(settingsButtonCornerRadius*2)),
+		uintptr(state.scale(settingsButtonCornerRadius*2)),
 	)
 	if region == 0 {
 		return
@@ -314,6 +317,7 @@ func (state *windowsSettingsUI) setControlFont(hwnd, font windows.Handle) {
 		return
 	}
 	procSettingsSendMessage.Call(uintptr(hwnd), settingsWMSetFont, uintptr(font), 1)
+	state.controlFonts[hwnd] = font
 }
 
 func (state *windowsSettingsUI) visualBrush(role settingsVisualRole) windows.Handle {
@@ -386,40 +390,69 @@ func (state *windowsSettingsUI) paintWindow(hwnd uintptr) uintptr {
 	procSettingsGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&client)))
 	procSettingsFillRect.Call(hdc, uintptr(unsafe.Pointer(&client)), uintptr(state.visual.mainBrush))
 
-	sidebar := settingsRect{Left: 0, Top: 0, Right: settingsSidebarWidth, Bottom: client.Bottom}
+	sidebar := settingsRect{Left: 0, Top: 0, Right: state.scale(settingsSidebarWidth), Bottom: client.Bottom}
 	procSettingsFillRect.Call(hdc, uintptr(unsafe.Pointer(&sidebar)), uintptr(state.visual.sidebarBrush))
 	state.paintLogoGlow(windows.Handle(hdc))
 
 	if state.page == settingsPageOverview {
 		state.paintOverviewCards(windows.Handle(hdc))
 	} else {
-		state.paintRoundedPanel(windows.Handle(hdc), 212, 16, client.Right-16, client.Bottom-16, state.visual.cardBrush, state.visual.borderPen, 16)
+		state.paintRoundedPanel(windows.Handle(hdc), state.scale(212), state.scale(16), client.Right-state.scale(16), client.Bottom-state.scale(16), state.visual.cardBrush, state.visual.borderPen, state.scale(16))
+		state.paintFunctionalCards(windows.Handle(hdc), client)
 	}
 	return 0
 }
 
 func (state *windowsSettingsUI) paintLogoGlow(hdc windows.Handle) {
-	state.paintRoundedPanel(hdc, 18, 18, 80, 80, state.visual.sidebarBrush, state.visual.glowPen, 16)
-	state.paintRoundedPanel(hdc, 20, 20, 78, 78, state.visual.sidebarBrush, state.visual.accentPen, 14)
+	state.paintRoundedPanel(hdc, state.scale(18), state.scale(18), state.scale(80), state.scale(80), state.visual.sidebarBrush, state.visual.glowPen, state.scale(16))
+	state.paintRoundedPanel(hdc, state.scale(20), state.scale(20), state.scale(78), state.scale(78), state.visual.sidebarBrush, state.visual.accentPen, state.scale(14))
+}
+
+func (state *windowsSettingsUI) paintFunctionalCards(hdc windows.Handle, client settingsRect) {
+	dx, dy := state.layoutExtra()
+	_ = client
+	var panels [][4]int32
+	switch state.page {
+	case settingsPageConnection:
+		panels = [][4]int32{{218, 116, 928 + dx, 376}}
+	case settingsPageSync:
+		panels = [][4]int32{{218, 106, 928 + dx, 318}, {218, 367, 928 + dx, 575 + dy}}
+	case settingsPageBackup:
+		panels = [][4]int32{{218, 116, 928 + dx, 310}, {218, 319, 928 + dx, 472}}
+	case settingsPageGeneral:
+		panels = [][4]int32{{218, 115, 928 + dx, 204}, {218, 216, 928 + dx, 337}}
+	case settingsPageTransfers:
+		panels = [][4]int32{{218, 114, 928 + dx, 228}, {218, 247, 928 + dx, 575 + dy}}
+	}
+	for _, r := range panels {
+		state.paintRoundedOutline(hdc, state.scale(r[0]), state.scale(r[1]),
+			state.scale(r[2]), state.scale(r[3]), state.visual.borderPen, state.scale(12))
+	}
 }
 
 func (state *windowsSettingsUI) paintOverviewCards(hdc windows.Handle) {
-	state.paintHeroGradient(hdc, 224, 88, 932, 200, 16)
-	state.paintStatusCircle(hdc, 244, 108, 286, 150)
+	dx, dy := state.layoutExtra()
+	s := state.scale
+	state.paintHeroGradient(hdc, s(224), s(88), s(932+dx), s(200), s(16))
+	state.paintStatusCircle(hdc, s(244), s(108), s(286), s(150))
 
-	for _, rect := range [][4]int32{
-		{224, 220, 383, 312},
-		{401, 220, 560, 312},
-		{578, 220, 737, 312},
-		{755, 220, 914, 312},
-		{224, 332, 676, 574},
-		{696, 332, 932, 444},
-		{696, 460, 932, 590},
+	// The four metric cards distribute extra width evenly; recent activity
+	// expands while Backup and Storage remain fixed width on the right.
+	for i := int32(0); i < 4; i++ {
+		x := int32(224) + 177*i + dx*i/4
+		state.paintRoundedPanel(hdc, s(x), s(220), s(x+159+dx/4),
+			s(312), state.visual.cardBrush, state.visual.borderPen, s(14))
+	}
+	for _, r := range [][4]int32{
+		{224, 332, 676 + dx, 574 + dy},
+		{696 + dx, 332, 932 + dx, 444},
+		{696 + dx, 460, 932 + dx, 590 + dy},
 	} {
-		state.paintRoundedPanel(hdc, rect[0], rect[1], rect[2], rect[3], state.visual.cardBrush, state.visual.borderPen, 14)
+		state.paintRoundedPanel(hdc, s(r[0]), s(r[1]), s(r[2]), s(r[3]),
+			state.visual.cardBrush, state.visual.borderPen, s(14))
 	}
 
-	track := settingsRect{Left: 714, Top: 547, Right: 914, Bottom: 554}
+	track := settingsRect{Left: s(714 + dx), Top: s(547 + dy), Right: s(914 + dx), Bottom: s(554 + dy)}
 	procSettingsFillRect.Call(uintptr(hdc), uintptr(unsafe.Pointer(&track)), uintptr(state.visual.storageTrackBrush))
 	percent := state.overviewStoragePercent
 	if percent < 0 {
@@ -481,9 +514,9 @@ func (state *windowsSettingsUI) paintStatusCircle(hdc windows.Handle, left, top,
 	}
 
 	oldCheckPen, _, _ := procSettingsSelectObject.Call(uintptr(hdc), uintptr(state.visual.checkPen))
-	procSettingsMoveToEx.Call(uintptr(hdc), uintptr(left+11), uintptr(top+22), 0)
-	procSettingsLineTo.Call(uintptr(hdc), uintptr(left+18), uintptr(top+29))
-	procSettingsLineTo.Call(uintptr(hdc), uintptr(left+32), uintptr(top+13))
+	procSettingsMoveToEx.Call(uintptr(hdc), uintptr(left+state.scale(11)), uintptr(top+state.scale(22)), 0)
+	procSettingsLineTo.Call(uintptr(hdc), uintptr(left+state.scale(18)), uintptr(top+state.scale(29)))
+	procSettingsLineTo.Call(uintptr(hdc), uintptr(left+state.scale(32)), uintptr(top+state.scale(13)))
 	if oldCheckPen != 0 {
 		procSettingsSelectObject.Call(uintptr(hdc), oldCheckPen)
 	}
@@ -596,7 +629,7 @@ func (state *windowsSettingsUI) drawButton(lParam uintptr) uintptr {
 		uintptr(item.HDC),
 		uintptr(item.Rect.Left), uintptr(item.Rect.Top),
 		uintptr(item.Rect.Right), uintptr(item.Rect.Bottom),
-		settingsButtonCornerRadius*2, settingsButtonCornerRadius*2,
+		uintptr(state.scale(settingsButtonCornerRadius*2)), uintptr(state.scale(settingsButtonCornerRadius*2)),
 	)
 
 	if role == settingsButtonNavigation {
@@ -609,8 +642,8 @@ func (state *windowsSettingsUI) drawButton(lParam uintptr) uintptr {
 		oldDotPen, _, _ := procSettingsSelectObject.Call(uintptr(item.HDC), nullPen)
 		procSettingsEllipse.Call(
 			uintptr(item.HDC),
-			uintptr(item.Rect.Left+13), uintptr(item.Rect.Top+14),
-			uintptr(item.Rect.Left+19), uintptr(item.Rect.Top+20),
+			uintptr(item.Rect.Left+state.scale(13)), uintptr(item.Rect.Top+state.scale(14)),
+			uintptr(item.Rect.Left+state.scale(19)), uintptr(item.Rect.Top+state.scale(20)),
 		)
 		if oldDotBrush != 0 {
 			procSettingsSelectObject.Call(uintptr(item.HDC), oldDotBrush)
@@ -645,8 +678,8 @@ func (state *windowsSettingsUI) drawButton(lParam uintptr) uintptr {
 	flags := uintptr(settingsDTCenter | settingsDTVCenter | settingsDTSingleLine | settingsDTEndEllipsis)
 	if role == settingsButtonNavigation {
 		// Figma uses a 30 px left text inset, not centered navigation labels.
-		rect.Left += 30
-		rect.Right -= 8
+		rect.Left += state.scale(30)
+		rect.Right -= state.scale(8)
 		flags = settingsDTVCenter | settingsDTSingleLine | settingsDTEndEllipsis
 	}
 	procSettingsDrawText.Call(
@@ -675,7 +708,7 @@ func (state *windowsSettingsUI) drawButton(lParam uintptr) uintptr {
 			focus.Right,
 			focus.Bottom,
 			state.visual.accentPen,
-			settingsButtonCornerRadius-3,
+			state.scale(settingsButtonCornerRadius-3),
 		)
 	}
 	return 1

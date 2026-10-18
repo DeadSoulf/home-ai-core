@@ -66,8 +66,31 @@ jobs:
         with:
           go-version: '1.27.x'
           check-latest: false
+      - name: Embed Windows manifest for test binary
+        shell: bash
+        run: sh ./scripts/build-windows-client-resource.sh amd64
       - name: Test Windows copy engine, queue and CLI
         run: go test ./internal/windowsclient ./cmd/home-ai-windows-client
+
+      - name: Build Windows UI preview for PR review
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          go build -trimpath -o dist/home-ai-windows-client-preview_amd64.exe ./cmd/home-ai-windows-client
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $hash = (Get-FileHash -Algorithm SHA256 dist/home-ai-windows-client-preview_amd64.exe).Hash.ToLowerInvariant()
+          "$hash  home-ai-windows-client-preview_amd64.exe" | Out-File -FilePath dist/home-ai-windows-client-preview_amd64.exe.sha256 -NoNewline -Encoding ascii
+
+      - name: Upload unsigned test preview
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-client-ui-preview
+          path: |
+            dist/*.exe
+            dist/*.exe.sha256
+          if-no-files-found: error
 
   test:
     runs-on: ubuntu-latest
@@ -90,6 +113,9 @@ jobs:
         run: |
           go mod tidy
           git diff --exit-code -- go.mod go.sum
+
+      - name: Validate Windows resource manifest
+        run: python3 -m json.tool cmd/home-ai-windows-client/winres/winres.json >/dev/null
 
       - name: Go format check
         run: |
@@ -253,4 +279,5 @@ jobs:
 
       - name: Cross-build Windows file client
         run: |
+          sh ./scripts/build-windows-client-resource.sh amd64
           GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build             -trimpath             -o /tmp/home-ai-windows-client.exe             ./cmd/home-ai-windows-client

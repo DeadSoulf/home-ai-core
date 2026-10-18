@@ -1,0 +1,14 @@
+{
+  "RT_MANIFEST": {
+    "#1": {
+      "0409": {
+        "description": "Home AI Windows File Client",
+        "minimum-os": "win10",
+        "execution-level": "as invoker",
+        "dpi-awareness": "per monitor v2",
+        "use-common-controls-v6": true,
+        "long-path-aware": true
+      }
+    }
+  }
+}

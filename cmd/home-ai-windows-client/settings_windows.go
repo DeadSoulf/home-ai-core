@@ -27,6 +27,7 @@ const (
 	settingsWindowTitle = "Home-AI Windows Client"
 
 	settingsWMCommand = 0x0111
+	settingsWMTimer   = 0x0113
 	settingsWMDestroy = 0x0002
 	settingsWMClose   = 0x0010
 	settingsWMSetFont = 0x0030
@@ -173,6 +174,9 @@ type windowsSettingsUI struct {
 	interval           windows.Handle
 	conflict           windows.Handle
 	profileList        windows.Handle
+	transferProgress   windows.Handle
+	transferDetails    windows.Handle
+	transferHistory    windows.Handle
 	statusLabel        windows.Handle
 	agentLabel         windows.Handle
 	saveProfileBtn     windows.Handle
@@ -196,6 +200,9 @@ type windowsSettingsUI struct {
 	overviewStorageHint    windows.Handle
 	overviewStoragePercent int
 	windowIcon             windows.Handle
+	dpi                    uint32
+	controlRects           map[windows.Handle]settingsLayoutRect
+	controlFonts           map[windows.Handle]windows.Handle
 	connected              bool
 	visual                 settingsVisualResources
 	visualRoles            map[windows.Handle]settingsVisualRole
@@ -241,6 +248,8 @@ var (
 	procSettingsMessageBox    = settingsUser32.NewProc("MessageBoxW")
 	procSettingsLoadIcon      = settingsUser32.NewProc("LoadIconW")
 	procSettingsLoadCursor    = settingsUser32.NewProc("LoadCursorW")
+	procSettingsSetTimer      = settingsUser32.NewProc("SetTimer")
+	procSettingsKillTimer     = settingsUser32.NewProc("KillTimer")
 	procSettingsGetModule     = settingsKernel32.NewProc("GetModuleHandleW")
 	procSettingsGetConsole    = settingsKernel32.NewProc("GetConsoleWindow")
 	procSettingsConsolePIDs   = settingsKernel32.NewProc("GetConsoleProcessList")
@@ -276,6 +285,7 @@ func hidePrivateConsoleWindow() {
 }
 
 func runSettingsUI(args []string) error {
+	settingsEnableDPIAwareness()
 	fs := flag.NewFlagSet("settings", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	var configPath, settingsPath string
@@ -357,6 +367,9 @@ func runSettingsUI(args []string) error {
 		visualRoles:  make(map[windows.Handle]settingsVisualRole),
 		buttonRoles:  make(map[windows.Handle]settingsButtonRole),
 		windowIcon:   windows.Handle(icon),
+		dpi:          settingsSystemDPI(),
+		controlRects: make(map[windows.Handle]settingsLayoutRect),
+		controlFonts: make(map[windows.Handle]windows.Handle),
 	}
 	activeSettingsUI.Lock()
 	activeSettingsUI.value = state
@@ -376,8 +389,8 @@ func runSettingsUI(args []string) error {
 		settingsWSOverlappedWindow,
 		0x80000000,
 		0x80000000,
-		settingsCompactWindowWidth,
-		settingsCompactWindowHeight,
+		uintptr(state.scale(settingsCompactWindowWidth)),
+		uintptr(state.scale(settingsCompactWindowHeight)),
 		0,
 		0,
 		module,
@@ -387,17 +400,24 @@ func runSettingsUI(args []string) error {
 		return fmt.Errorf("create settings window: %w", createErr)
 	}
 	state.hwnd = windows.Handle(hwnd)
+	state.dpi = settingsWindowDPI(state.hwnd)
 	if err := state.initVisualResources(); err != nil {
 		procSettingsDestroyWindow.Call(hwnd)
 		return err
 	}
 	defer state.releaseVisualResources()
+	if err := settingsInitCommonControls(); err != nil {
+		procSettingsDestroyWindow.Call(hwnd)
+		return err
+	}
 	if err := state.createControls(windows.Handle(module)); err != nil {
 		procSettingsDestroyWindow.Call(hwnd)
 		return err
 	}
 	state.applyLanguageTexts()
 	state.loadInitial()
+	state.layoutControls()
+	procSettingsSetTimer.Call(hwnd, settingsTransferTimerID, 1500, 0)
 	procSettingsShowWindow.Call(hwnd, settingsSWShow)
 	procSettingsUpdateWindow.Call(hwnd)
 
@@ -462,6 +482,27 @@ func settingsWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) ui
 	activeSettingsUI.Unlock()
 
 	switch message {
+	case settingsWMGetMinMaxInfo:
+		if state != nil && lParam != 0 {
+			info := (*settingsMinMaxInfo)(unsafe.Pointer(lParam))
+			info.minTrackSize = settingsPoint{X: state.scale(settingsCompactWindowWidth), Y: state.scale(settingsCompactWindowHeight)}
+			return 0
+		}
+	case settingsWMSize:
+		if state != nil {
+			state.layoutControls()
+			return 0
+		}
+	case settingsWMDPIChanged:
+		if state != nil {
+			state.handleDPIChange(hwnd, wParam, lParam)
+			return 0
+		}
+	case settingsWMTimer:
+		if state != nil && wParam == settingsTransferTimerID {
+			state.refreshTransfers()
+			return 0
+		}
 	case settingsWMPaint:
 		if state != nil {
 			return state.paintWindow(hwnd)
@@ -500,6 +541,7 @@ func settingsWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) ui
 		procSettingsDestroyWindow.Call(hwnd)
 		return 0
 	case settingsWMDestroy:
+		procSettingsKillTimer.Call(hwnd, settingsTransferTimerID)
 		procSettingsPostQuit.Call(0)
 		return 0
 	}
@@ -519,17 +561,21 @@ func (state *windowsSettingsUI) createControl(module windows.Handle, class, text
 		uintptr(unsafe.Pointer(classPtr)),
 		uintptr(unsafe.Pointer(textPtr)),
 		uintptr(style),
-		uintptr(x),
-		uintptr(y),
-		uintptr(w),
-		uintptr(h),
+		uintptr(state.scale(x)),
+		uintptr(state.scale(y)),
+		uintptr(state.scale(w)),
+		uintptr(state.scale(h)),
 		uintptr(state.hwnd),
 		uintptr(id),
 		uintptr(module),
 		0,
 	)
-	if hwnd != 0 && font != 0 {
-		procSettingsSendMessage.Call(hwnd, settingsWMSetFont, uintptr(font), 1)
+	if hwnd != 0 {
+		state.controlRects[windows.Handle(hwnd)] = settingsLayoutRect{x: x, y: y, w: w, h: h}
+		if font != 0 {
+			procSettingsSendMessage.Call(hwnd, settingsWMSetFont, uintptr(font), 1)
+			state.controlFonts[windows.Handle(hwnd)] = font
+		}
 	}
 	return windows.Handle(hwnd)
 }

@@ -160,6 +160,7 @@ jobs:
           set -euo pipefail
           VERSION="$(tr -d '\r\n' < VERSION)"
           mkdir -p dist
+          sh ./scripts/build-windows-client-resource.sh amd64
           EXE="dist/home-ai-windows-client_${VERSION}_amd64.exe"
           GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build \
             -trimpath \
