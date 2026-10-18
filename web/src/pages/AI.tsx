@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useState, type FormEvent} from "react";
-import {api} from "../api/client";
+import {api, APIError} from "../api/client";
 import type {AIApproval, AIConversation, AIMessage, AIProvider, AIStatus} from "../api/types";
 import {Panel} from "../components/Panel";
 import {PageHeading} from "./Dashboard";
@@ -8,6 +8,22 @@ import "./AI.css";
 
 type AITab = "chat" | "local" | "providers" | "approvals";
 const messageOf = (error: unknown) => error instanceof Error ? error.message : String(error);
+function chatErrorText(error: unknown) {
+  if (!(error instanceof APIError)) return "Не удалось отправить сообщение. Проверьте соединение с Core.";
+  switch (error.code) {
+    case "ai_response_timeout":
+      return "Локальная модель отвечает слишком долго. Проверьте ОЗУ и загрузку CPU/GPU; история диалога сохранена.";
+    case "ai_upstream_error":
+      return "Модель Ollama не смогла сформировать ответ. Проверьте загрузку модели во вкладке «Локальный AI».";
+    case "ai_unavailable":
+    case "ai_not_running":
+      return "Нет соединения с AI-контейнером. Проверьте его состояние в разделе «Установленные модули».";
+    case "ai_invalid_response":
+      return "AI вернул некорректный ответ. Проверьте состояние модели Ollama.";
+    default:
+      return error.status === 504 ? "Превышено время ожидания ответа AI." : messageOf(error);
+  }
+}
 const tabNames: Record<AITab, string> = {
   chat: "Чат", local: "Локальный AI", providers: "AI-провайдеры", approvals: "Подтверждения",
 };
@@ -97,8 +113,13 @@ export function AIPage() {
       setMessages(await api.aiMessages(result.conversation_id));
       if (result.approval_ids.length) setNotice("Агент предложил действие. Проверьте вкладку «Подтверждения».");
     } catch (err) {
-      setError(messageOf(err));
+      setError(chatErrorText(err));
       await reload().catch(() => {});
+      // Do not automatically resend: the module may already have saved this
+      // message even when an inference timeout closed the response.
+      if (conversationId) {
+        await api.aiMessages(conversationId).then(setMessages).catch(() => {});
+      }
     } finally {
       setBusy(false);
     }
@@ -152,7 +173,12 @@ export function AIPage() {
     </div>
 
     {tab === "chat" && <section aria-label="Чат с AI">
-      <Panel title="Разговор с агентом">
+      <Panel title="Разговор с агентом" action={
+        <button type="button" className="button secondary ai-close-chat" disabled={busy}
+          onClick={() => {setTab("local"); setError(""); setNotice("");}}>
+          Закрыть чат
+        </button>
+      }>
         <div className="ai-controls">
           <label>Модель
             <select className="text-input" value={modelId} onChange={(e) => setModelId(e.target.value)} disabled={busy}>
@@ -169,6 +195,8 @@ export function AIPage() {
           <button type="button" className="button secondary" disabled={busy}
             onClick={() => {setConversationId(""); setMessages([]);}}>Новый диалог</button>
         </div>
+        {providers.find((item) => item.id === modelId)?.model?.startsWith("qwen3:8b") &&
+          <p className="muted ai-chat-hint">Qwen3 8B на CPU может отвечать несколько минут, особенно при первом запросе. Для проверки чата можно выбрать более компактную модель во вкладке «Локальный AI».</p>}
         {!providers.length && <div className="ai-note">
           Провайдер не подключён. Добавьте Ollama или внешнюю модель на странице «AI-провайдеры».
           <button type="button" className="button secondary" onClick={() => setTab("providers")}>Настроить AI</button>
