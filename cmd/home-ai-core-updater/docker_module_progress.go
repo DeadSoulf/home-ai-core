@@ -53,8 +53,7 @@ func sanitizedDockerPullDetail(line string) string {
 // allocate unbounded memory in the privileged helper.
 func splitDockerPullLines(data []byte, atEOF bool) (int, []byte, error) {
 	for i, b := range data {
-		if b == '
-' || b == '' {
+		if b == 10 || b == 13 {
 			return i + 1, data[:i], nil
 		}
 	}
@@ -101,8 +100,7 @@ func pullDockerImageWithProgress(ctx context.Context, binary string, env []strin
 	var stdoutError boundedPullOutput
 	for scanner.Scan() {
 		line := scanner.Text()
-		_, _ = io.WriteString(&stdoutError, line+"
-")
+		_, _ = io.WriteString(&stdoutError, line)
 		detail := sanitizedDockerPullDetail(line)
 		if detail == "" || detail == lastDetail || (!lastReport.IsZero() && time.Since(lastReport) < 700*time.Millisecond) {
 			continue
