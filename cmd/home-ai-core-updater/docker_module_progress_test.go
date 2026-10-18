@@ -99,7 +99,7 @@ func TestDockerLayerAggregatesOnlyCompressedKnownBytes(t *testing.T) {
 
 func TestParseDockerSizesAreDecimalAndBounded(t *testing.T) {
 	for _, tc := range []struct {
-		text string
+		text  string
 		bytes int64
 		valid bool
 	}{

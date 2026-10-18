@@ -165,7 +165,7 @@ func TestDownloadArchiveReportsTransferredBytesAndKeepsHashVerification(t *testi
 func TestUpdateDownloadProgressUsesRealBytesAndSeparatesVerification(t *testing.T) {
 	service := &Service{
 		stateDir: t.TempDir(),
-		state: State{Phase: PhaseDownloading, ProgressPercent: 15},
+		state:    State{Phase: PhaseDownloading, ProgressPercent: 15},
 	}
 	service.updateDownloadProgress(25, 100, time.Now().Add(-time.Second))
 	got := service.snapshotState()
