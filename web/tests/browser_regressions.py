@@ -580,7 +580,7 @@ async def suite(browser):
 
     async def live_module_install_progress():
         installing=job('running','module.install','job-install-pull')
-        installing['message']='module.phase.download|aabbccddeeff Downloading 12.3MB/45.6MB'
+        installing['message']='module.phase.download|known:12300000/45600000 aabbccddeeff Downloading 12.3MB/45.6MB'
         installing['started_at']='2026-10-17T20:00:00Z'
         h=await Harness(browser,jobs=[installing]).start('/modules/operations')
         await expect(h.page.get_by_text('Скачивание Docker-образа')).to_be_visible()
@@ -588,7 +588,8 @@ async def suite(browser):
         bar=h.page.get_by_role('progressbar',name='Ход установки модуля')
         await expect(bar).to_be_visible()
         assert await bar.get_attribute('aria-valuenow') is None
-        await expect(h.page.get_by_text('Процент всей загрузки неизвестен.',exact=False)).to_be_visible()
+        await expect(h.page.get_by_text('Получено по известным слоям:',exact=False)).to_be_visible()
+        await expect(h.page.get_by_text('Размер всего образа может быть больше:',exact=False)).to_be_visible()
         await expect(h.page.get_by_text('Прошло:',exact=False)).to_be_visible()
         assert await h.page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
         installing['status']='succeeded'
