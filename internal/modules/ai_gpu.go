@@ -60,8 +60,8 @@ func ApplyAIGPUs(ctx context.Context, pciAddresses []string) ([]string, error) {
 	return aiGPUCall(ctx, "docker.ai.gpu.apply", pciAddresses)
 }
 
- // AIGPUImageCached checks the exact pinned optional image via the trusted
- // helper, without exposing Docker access or a free-form registry URL.
+// AIGPUImageCached checks the exact pinned optional image via the trusted
+// helper, without exposing Docker access or a free-form registry URL.
 func AIGPUImageCached(ctx context.Context) (bool, error) {
 	result, err := callModuleHelper(ctx, "docker.ai.gpu.image.status", "ai.agent", "")
 	if err != nil {
