@@ -109,5 +109,33 @@ func registerModuleJobs(service *jobs.Service, registry *modules.Registry) error
 		return err
 	}
 
+	if err := service.Register("module.gpu.prepare", func(ctx context.Context, job state.JobRecord, reporter jobs.Reporter) (map[string]any, error) {
+		if job.Input["module_id"] != "ai.agent" {
+			return nil, errors.New("unsupported GPU module")
+		}
+		_ = reporter.Progress(ctx, 1500, "module.phase.download")
+		err := modules.PrepareAIGPUImage(ctx, func(stage, detail string) {
+			progress := 1500
+			if stage == "downloaded" {
+				progress = 9500
+			}
+			if len(detail) > 110 {
+				detail = detail[:110]
+			}
+			message := "module.phase." + stage
+			if detail != "" {
+				message += "|" + detail
+			}
+			_ = reporter.Progress(ctx, progress, message)
+		})
+		if err != nil {
+			return nil, err
+		}
+		_ = reporter.Progress(ctx, 9500, "module.phase.downloaded")
+		return map[string]any{"module_id": "ai.agent", "status": "gpu_image_cached"}, nil
+	}); err != nil {
+		return err
+	}
+
 	return nil
 }
