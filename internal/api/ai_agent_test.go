@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/DeadSoulf/home-ai-core/internal/modules"
 	"github.com/DeadSoulf/home-ai-core/internal/security"
@@ -165,6 +166,45 @@ func TestAIRequestAndResponseSizes(t *testing.T) {
 	s.aiGateway(w, httptest.NewRequest("GET", "/api/v1/ai/status", nil), security.Actor{}, authBearer)
 	if w.Code != 502 {
 		t.Fatalf("oversized response accepted: %d", w.Code)
+	}
+}
+
+
+func TestAIChatOverridesGlobalHTTPWriteDeadline(t *testing.T) {
+	s := aiTestServer(t, nil)
+	s.aiTransport = nvrRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Path != "/api/chat" {
+			t.Errorf("wrong AI upstream path: %s", req.URL.Path)
+		}
+		// Simulate cold inference longer than the Core HTTP listener's
+		// short WriteTimeout. The chat's ResponseController must extend it.
+		time.Sleep(180 * time.Millisecond)
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header: http.Header{"Content-Type": {"application/json"}},
+			Body: io.NopCloser(strings.NewReader(`{"conversation_id":"abc","reply":"Привет!","approval_ids":[]}`)),
+		}, nil
+	})
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.aiGateway(w, r, security.Actor{}, authBearer)
+	})
+	server := httptest.NewUnstartedServer(handler)
+	server.Config.WriteTimeout = 60 * time.Millisecond
+	server.Start()
+	defer server.Close()
+	client := &http.Client{Timeout: 2 * time.Second}
+	request, err := http.NewRequest(http.MethodPost, server.URL+"/api/v1/ai/chat", strings.NewReader(`{"message":"Привет"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Fatalf("Core disconnected slow AI chat before its response: %v", err)
+	}
+	defer response.Body.Close()
+	data, err := io.ReadAll(response.Body)
+	if err != nil || response.StatusCode != 200 || !strings.Contains(string(data), "Привет!") {
+		t.Fatalf("long AI chat response: %d %q %v", response.StatusCode, data, err)
 	}
 }
 
