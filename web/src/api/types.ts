@@ -456,6 +456,8 @@ export type UpdaterState = {
   updated_at: string;
   published_at?: string;
   bundle_size_bytes?: number;
+  downloaded_bytes?: number;
+  download_speed_bytes_per_sec?: number;
 };
 
 

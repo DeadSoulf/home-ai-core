@@ -327,7 +327,19 @@ export function SystemPage({
             <div className="notice">
               <div><strong>{updaterState.phase === "downloading" ? t("downloadingUpdate") : updaterState.phase === "installing" ? t("installing") : updaterState.phase === "rolling_back" ? t("rollingBack") : t("working")}</strong></div>
               <div className="progress"><span style={{width: `${Math.min(100, updaterState.progress_percent || 0)}%`}} /></div>
-              <div className="small">{updaterState.progress_percent || 0}%</div>
+              <div className="small">{updaterState.progress_percent || 0}% — подготовка, загрузка и проверка обновления</div>
+              {updaterState.phase === "downloading" && updaterState.downloaded_bytes !== undefined && (
+                <div className="small" role="status">
+                  Получено: {fileBytes(updaterState.downloaded_bytes)}
+                  {updaterState.bundle_size_bytes && updaterState.bundle_size_bytes > 0
+                    ? ` из ${fileBytes(updaterState.bundle_size_bytes)} · ${Math.min(100, Math.floor(updaterState.downloaded_bytes / updaterState.bundle_size_bytes * 100))}% файла`
+                    : " · общий размер неизвестен"}
+                  {updaterState.download_speed_bytes_per_sec && updaterState.download_speed_bytes_per_sec > 0 &&
+                    Date.now() - Date.parse(updaterState.updated_at) < 5000
+                    ? ` · Средняя скорость: ${fileBytes(updaterState.download_speed_bytes_per_sec)}/с`
+                    : ""}
+                </div>
+              )}
             </div>
           )}
           {canManageUpdates && updateInfo?.available && updaterState?.phase !== "ready" && (

@@ -20,6 +20,27 @@ function installStep(message?: string) {
   return {title: installPhases[match[1]], detail: match[2]};
 }
 
+function knownLayerBytes(detail?: string) {
+  const match = /^known:([0-9]+)\/([0-9]+) (.*)$/.exec(detail || "");
+  if (!match) return undefined;
+  const done = Number(match[1]);
+  const total = Number(match[2]);
+  if (!Number.isSafeInteger(done) || !Number.isSafeInteger(total) ||
+      done < 0 || total <= 0 || done > total) return undefined;
+  return {done, total, layer: match[3]};
+}
+
+function formatLayerBytes(bytes: number) {
+  const units = ["Б", "КиБ", "МиБ", "ГиБ", "ТиБ"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return `${value.toLocaleString("ru-RU", {maximumFractionDigits: unit === 0 ? 0 : 1})} ${units[unit]}`;
+}
+
 function elapsedLabel(job: Job, now: number) {
   const began = Date.parse(job.started_at || job.created_at);
   if (!Number.isFinite(began)) return "";
@@ -34,6 +55,7 @@ export function JobProgress({job}: {job: Job}) {
   const installing = ["module.install", "module.gpu.prepare"].includes(job.type) &&
     ["queued", "running", "cancel_requested"].includes(job.status);
   const step = installStep(job.message);
+  const layerBytes = knownLayerBytes(step?.detail);
   useEffect(() => {
     if (!installing) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -55,9 +77,20 @@ export function JobProgress({job}: {job: Job}) {
         <span className="module-install-progress-animated" />
       </div>
       <strong className="module-install-stage">{phase}</strong>
-      {step?.detail && <span className="small module-install-layer">Слой образа: {step.detail}</span>}
+      {layerBytes && <span className="small module-install-layer" role="status">
+        Получено по известным слоям: {formatLayerBytes(layerBytes.done)} из {formatLayerBytes(layerBytes.total)}
+      </span>}
+      {step?.detail && <span className="small module-install-layer">
+        Слой образа: {layerBytes?.layer || step.detail}
+      </span>}
       {elapsed && <span className="small module-install-elapsed">Прошло: {elapsed}</span>}
-      <span className="small muted">Процент всей загрузки неизвестен. Данные об отдельных слоях появляются по мере ответа Docker.</span>
+      <span className="small muted">
+        {layerBytes
+          ? "Размер всего образа может быть больше: Docker сообщает размеры слоёв по мере загрузки."
+          : step?.title === installPhases.build
+            ? "Идёт сборка из Git-исходников; точный размер загрузки недоступен."
+            : "Ожидаем статистику слоёв Docker. Общий процент образа пока неизвестен."}
+      </span>
     </div>;
   }
   return <div className="job-progress">

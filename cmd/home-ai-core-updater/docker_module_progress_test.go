@@ -73,3 +73,48 @@ func TestDockerPullReportsProgressWithoutLeakingOutput(t *testing.T) {
 		t.Fatalf("raw CLI output leaked: %v", updates)
 	}
 }
+
+func TestDockerLayerAggregatesOnlyCompressedKnownBytes(t *testing.T) {
+	tracker := &dockerPullTracker{}
+	first := tracker.report("aabbccddeeff: Downloading [====>] 12.3MB/45.6MB")
+	if !strings.Contains(first, "known:12300000/45600000") {
+		t.Fatalf("first known layer bytes: %q", first)
+	}
+	second := tracker.report("123456abcdef: Downloading [===>] 5MB/10MB")
+	if !strings.Contains(second, "known:17300000/55600000") {
+		t.Fatalf("parallel layer totals: %q", second)
+	}
+	finished := tracker.report("aabbccddeeff: Download complete")
+	if !strings.Contains(finished, "known:50600000/55600000") {
+		t.Fatalf("completed layer bytes: %q", finished)
+	}
+	extracted := tracker.report("123456abcdef: Extracting [===>] 100MB/120MB")
+	if !strings.Contains(extracted, "known:50600000/55600000") {
+		t.Fatalf("extraction must not count as download: %q", extracted)
+	}
+	if leaked := tracker.report("Authorization: Bearer PRIVATE"); leaked != "" {
+		t.Fatalf("registry secrets leaked: %q", leaked)
+	}
+}
+
+func TestParseDockerSizesAreDecimalAndBounded(t *testing.T) {
+	for _, tc := range []struct {
+		text string
+		bytes int64
+		valid bool
+	}{
+		{"12.3MB", 12300000, true},
+		{"5kB", 5000, true},
+		{"2GB", 2000000000, true},
+		{"100B", 100, true},
+		{"3KiB", 0, false},
+		{"-2GB", 0, false},
+		{"NaNMB", 0, false},
+		{"untrusted", 0, false},
+	} {
+		actual, valid := parseDockerByteSize(tc.text)
+		if actual != tc.bytes || valid != tc.valid {
+			t.Fatalf("parseDockerByteSize(%q)=%d,%t want %d,%t", tc.text, actual, valid, tc.bytes, tc.valid)
+		}
+	}
+}

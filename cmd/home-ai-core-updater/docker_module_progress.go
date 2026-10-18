@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"math"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -46,6 +48,99 @@ func sanitizedDockerPullDetail(line string) string {
 	default:
 		return match[1] + " " + match[2]
 	}
+}
+
+// Docker reports compressed download byte counts per layer; other layers may
+// not be announced yet. These are *known-layer* totals, not whole-image bytes.
+type dockerLayerBytes struct {
+	downloaded int64
+	total      int64
+}
+
+type dockerPullTracker struct {
+	layers map[string]dockerLayerBytes
+}
+
+func parseDockerByteSize(raw string) (int64, bool) {
+	multipliers := []struct {
+		suffix string
+		factor float64
+	}{
+		{"TB", 1e12},
+		{"GB", 1e9},
+		{"MB", 1e6},
+		{"kB", 1e3},
+		{"B", 1},
+	}
+	for _, unit := range multipliers {
+		if !strings.HasSuffix(raw, unit.suffix) {
+			continue
+		}
+		value, err := strconv.ParseFloat(strings.TrimSuffix(raw, unit.suffix), 64)
+		bytes := value * unit.factor
+		if err != nil || math.IsNaN(bytes) || math.IsInf(bytes, 0) || bytes < 0 || bytes > float64(1<<50) {
+			return 0, false
+		}
+		return int64(bytes), true
+	}
+	return 0, false
+}
+
+func (t *dockerPullTracker) report(line string) string {
+	detail := sanitizedDockerPullDetail(line)
+	if detail == "" {
+		return ""
+	}
+	match := dockerLayerLine.FindStringSubmatch(strings.TrimSpace(line))
+	if match == nil {
+		return ""
+	}
+	if t.layers == nil {
+		t.layers = make(map[string]dockerLayerBytes)
+	}
+	layer, exists := t.layers[match[1]]
+	if !exists && len(t.layers) >= 256 {
+		return detail
+	}
+	switch match[2] {
+	case "Downloading":
+		if amounts := dockerLayerSize.FindStringSubmatch(line); amounts != nil {
+			current, validCurrent := parseDockerByteSize(amounts[1])
+			total, validTotal := parseDockerByteSize(amounts[2])
+			if validCurrent && validTotal && total > 0 {
+				if layer.total == 0 || layer.total == total {
+					layer.total = total
+					if current > total {
+						current = total
+					}
+					if current > layer.downloaded {
+						layer.downloaded = current
+					}
+				}
+			}
+		}
+	case "Download complete", "Pull complete":
+		if layer.total > 0 {
+			layer.downloaded = layer.total
+		}
+	}
+	t.layers[match[1]] = layer
+
+	var received, knownSize int64
+	for _, progress := range t.layers {
+		if progress.total == 0 {
+			continue
+		}
+		if knownSize > (1<<60)-progress.total {
+			return detail
+		}
+		knownSize += progress.total
+		received += progress.downloaded
+	}
+	if knownSize == 0 {
+		return detail
+	}
+	return fmt.Sprintf("known:%d/%d %s", received, knownSize, detail)
 }
 
 // Split both terminal-style CR updates and regular line-based CLI output.
@@ -99,18 +194,29 @@ func pullDockerImageWithProgress(ctx context.Context, binary string, env []strin
 	scanner.Split(splitDockerPullLines)
 	scanner.Buffer(make([]byte, 4096), 64*1024)
 	lastDetail := ""
+	lastSent := ""
 	lastReport := time.Time{}
+	tracker := &dockerPullTracker{}
 	var stdoutError boundedPullOutput
 	for scanner.Scan() {
 		line := scanner.Text()
 		_, _ = io.WriteString(&stdoutError, line)
-		detail := sanitizedDockerPullDetail(line)
-		if detail == "" || detail == lastDetail || (!lastReport.IsZero() && time.Since(lastReport) < 700*time.Millisecond) {
+		detail := tracker.report(line)
+		if detail == "" || detail == lastDetail {
+			continue
+		}
+		lastDetail = detail
+		if !lastReport.IsZero() && time.Since(lastReport) < 700*time.Millisecond {
 			continue
 		}
 		progress("download", detail)
-		lastDetail = detail
+		lastSent = detail
 		lastReport = time.Now()
+	}
+	// A short pull can finish within the throttle window; never discard the
+	// final observed byte count before marking the image fully downloaded.
+	if lastDetail != "" && lastDetail != lastSent {
+		progress("download", lastDetail)
 	}
 	if err := scanner.Err(); err != nil {
 		_ = cmd.Process.Kill()
