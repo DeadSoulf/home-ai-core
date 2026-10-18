@@ -28,7 +28,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
   const load = useCallback(() => Promise.all([api.modules(), api.capabilities()]).then(([modules, capabilities]) => ({modules, capabilities})), []);
   const core = useResource(load, revision);
   // Each page loads only what it needs. Installed controls remain usable during catalog outages.
-  const loadCatalog = useCallback(() => section === "catalog" ? api.moduleCatalog() : Promise.resolve(undefined), [section]);
+  const loadCatalog = useCallback(() => section === "catalog" || section === "installed" ? api.moduleCatalog() : Promise.resolve(undefined), [section]);
   const catalog = useResource(loadCatalog);
   const loadRuntime = useCallback((signal: AbortSignal) =>
     section === "catalog" || section === "settings" ? api.moduleRuntime(signal) : Promise.resolve(undefined), [section]);
@@ -91,6 +91,11 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
 
   const value = core.data ?? {modules: [], capabilities: []};
   const installed = new Map(value.modules.map((item) => [item.manifest.id, item]));
+  const newestCatalog = new Map((catalog.data?.modules || []).map((item) => [item.id, item]));
+  const updateAvailable = (current: RegisteredModule | undefined, candidate: RegisteredModule["manifest"]) =>
+    Boolean(current?.status === "enabled" && candidate.id === "ai.agent" &&
+      /^0\\.3\\.[0-9]+$/.test(candidate.version) && /^0\\.3\\.[0-9]+$/.test(current.manifest.version) &&
+      catalogState(current, candidate) === "newer");
   // Include recent finished operations so a page reload does not erase the
   // answer to "was the image installed, failed, or is it still downloading?".
   const displayedJobs = [...(operations.data || [])];
@@ -154,6 +159,11 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
                 <button type="button" className="button secondary" disabled={busy || (!core.data || Boolean(core.error))}
                   onClick={() => void run(() => api.controlModule(module.manifest.id, "restart"))}>{t("moduleRestart")}</button>
               </>}
+              {newestCatalog.get(module.manifest.id) && updateAvailable(module, newestCatalog.get(module.manifest.id)!) &&
+                <button type="button" className="button primary" disabled={busy}
+                  onClick={() => {if (window.confirm(u("moduleUpgradeConfirm"))) {
+                    void run(() => api.installCatalogModule(module.manifest.id));
+                  }}}>{u("moduleUpgrade")} · {newestCatalog.get(module.manifest.id)!.version}</button>}
             </div>
             <div className="button-row destructive-actions"><button type="button" className="button danger" disabled={busy || (!core.data || Boolean(core.error))} onClick={() => setConfirmRemove(module)}>{t("moduleRemove")}</button></div>
           </div>}
@@ -176,7 +186,8 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
         <div className="card-grid">
           {catalog.data.modules.map((manifest) => {
             const existing = installed.get(manifest.id); const state = catalogState(existing, manifest);
-            const hint = state === "newer" ? u("upgradeBlocked") : state === "older" ? u("installedNewer") : state === "changed" ? u("manifestChanged") : state === "invalid" ? u("versionUnknown") : "";
+            const canUpgrade = updateAvailable(existing, manifest);
+            const hint = state === "newer" && !canUpgrade ? u("upgradeBlocked") : state === "older" ? u("installedNewer") : state === "changed" ? u("manifestChanged") : state === "invalid" ? u("versionUnknown") : "";
             const resumable = state === "incomplete" && existing;
             return <article className="module-card" key={manifest.id} data-catalog-id={manifest.id}>
               <div className="module-title"><h2>{manifest.name}</h2><span className="tag">{resumable ? u("incomplete") : existing ? t("moduleInstalled") : t("available")}</span></div>
@@ -187,9 +198,10 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
               {hint && <p className="notice">{hint}</p>}
               {resumable && <p>{u("resumeHint")}</p>}
               {canManage && <div className="button-row"><button type="button" className="button primary"
-                disabled={busy || (!core.data || Boolean(core.error)) || Boolean(existing && !resumable)}
-                onClick={() => void run(() => resumable ? api.installModule(resumable.manifest) : api.installCatalogModule(manifest.id))}>
-                {resumable ? u("retryInstall") : existing ? t("moduleInstalled") : runtime.data?.network_ready ? t("moduleInstall") : u("installAndPrepare")}
+                disabled={busy || (!core.data || Boolean(core.error)) || Boolean(existing && !resumable && !canUpgrade)}
+                onClick={() => {if (canUpgrade && !window.confirm(u("moduleUpgradeConfirm"))) return;
+                  void run(() => resumable ? api.installModule(resumable.manifest) : api.installCatalogModule(manifest.id));}}>
+                {resumable ? u("retryInstall") : canUpgrade ? u("moduleUpgrade") : existing ? t("moduleInstalled") : runtime.data?.network_ready ? t("moduleInstall") : u("installAndPrepare")}
               </button></div>}
             </article>;
           })}
