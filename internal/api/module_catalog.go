@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -130,6 +131,21 @@ func (s *server) moduleCatalogInstall(
 		writeAPIError(w, r, http.StatusNotFound, "module_not_in_catalog", "module is not present in the official catalog", nil)
 		return
 	}
+	jobType := "module.install"
+	auditAction := "modules.catalog.install.queued"
+	if installed, lookupErr := s.modules.Get(r.Context(), manifest.ID); lookupErr == nil {
+		if !modules.CanUpgradeAI(installed, *manifest) {
+			writeAPIError(w, r, http.StatusConflict, "module_upgrade_not_supported",
+				"Only newer compatible AI Agent 0.3.x patch versions can be updated safely", nil)
+			return
+		}
+		jobType = "module.update"
+		auditAction = "modules.catalog.update.queued"
+	} else if !errors.Is(lookupErr, modules.ErrModuleNotFound) {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "module_registry_unavailable",
+			"Cannot verify installed module before upgrade", nil)
+		return
+	}
 	raw, err := json.Marshal(manifest)
 	if err != nil {
 		writeAPIError(w, r, http.StatusInternalServerError, "module_job_failed", "failed to prepare module job", nil)
@@ -137,7 +153,7 @@ func (s *server) moduleCatalogInstall(
 	}
 	meta := metadataFromContext(r.Context())
 	job, err := s.submitModuleJob(r.Context(), state.JobRecord{
-		Type:          "module.install",
+		Type:          jobType,
 		ActorType:     actor.Type,
 		ActorID:       actor.ID,
 		RequestID:     meta.RequestID,
@@ -155,7 +171,7 @@ func (s *server) moduleCatalogInstall(
 		r.Context(),
 		s.securityRequestContext(r),
 		actor,
-		"modules.catalog.install.queued",
+		auditAction,
 		"module",
 		manifest.ID,
 		"success",
