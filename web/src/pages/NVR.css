@@ -43,3 +43,19 @@
 .nvr-page .nvr-live-player video { display:block; width:100%; max-height:70vh; background:#101820; border-radius:10px; aspect-ratio:16/9; }
 @media (max-width:640px){ .nvr-page .nvr-live-toolbar { align-items:stretch; flex-direction:column; }
   .nvr-page .nvr-live-toolbar label { width:100%; flex:auto; } }
+
+/* Storage reserved for NVR, separate from the active recording container. */
+.nvr-page .nvr-storage-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 12px; margin: 14px 0; }
+.nvr-page .nvr-storage-summary > div,
+.nvr-page .nvr-storage-device { border: 1px solid var(--border, #d9e0e8); border-radius: 11px; padding: 14px; min-width: 0; }
+.nvr-page .nvr-storage-summary small,
+.nvr-page .nvr-storage-device-metrics small { display: block; opacity: .75; margin-bottom: 5px; }
+.nvr-page .nvr-storage-summary strong { font-size: 1.3rem; }
+.nvr-page .nvr-storage-device-list { display: grid; gap: 12px; margin: 14px 0; }
+.nvr-page .nvr-storage-device-heading { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.nvr-page .nvr-storage-device-heading p { margin: 5px 0 0; overflow-wrap: anywhere; }
+.nvr-page .nvr-storage-device-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; padding: 10px 0; }
+.nvr-page .nvr-storage-progress { background: var(--border, #d9e0e8); border-radius: 99px; height: 8px; overflow: hidden; }
+.nvr-page .nvr-storage-progress-value { background: currentColor; opacity: .55; height: 100%; border-radius: 99px; }
+.nvr-page .nvr-storage-warning { padding-top: 10px; border-top: 1px solid var(--border, #d9e0e8); }
+@media (max-width: 640px) { .nvr-page .nvr-storage-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
