@@ -271,9 +271,10 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat, aiVersion}: {
       {splitGPURuntime && nvidiaCandidates.length > 0 && <div className="ai-note" role="status">
         GPU-ускорение использует отдельный полный Docker-образ. Он не загружается
         при обычной установке AI Agent.
-        <p>GPU-компоненты: <strong>{gpuPackageReady ? "загружены" :
-          gpuDownloadQueued ? "загружаются" : "не загружены"}</strong>.</p>
-        {!gpuPackageReady && <button type="button" className="button secondary"
+        <p>GPU-компоненты: <strong>{gpuPackageReady === true ? "загружены" :
+          gpuDownloadQueued ? "загружаются" :
+          gpuPackageReady === false ? "не загружены" : "состояние неизвестно"}</strong>.</p>
+        {gpuPackageReady === false && <button type="button" className="button secondary"
           disabled={busy || gpuDownloadQueued}
           onClick={() => {void prepareGPU();}}>
           {gpuDownloadQueued ? "Загрузка запущена" : "Загрузить GPU-компоненты"}
