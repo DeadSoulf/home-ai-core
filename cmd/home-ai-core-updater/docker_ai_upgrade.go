@@ -55,7 +55,9 @@ func readAIUpgradeJournal() (aiUpgradeJournal, bool, error) {
 		return aiUpgradeJournal{}, false, errors.New("invalid saved AI recovery manifest")
 	}
 	runtimeInfo, ok := old["runtime"].(map[string]any)
-	if !ok { return aiUpgradeJournal{}, false, errors.New("invalid AI recovery runtime") }
+	if !ok {
+		return aiUpgradeJournal{}, false, errors.New("invalid AI recovery runtime")
+	}
 	dockerInfo, ok := runtimeInfo["docker"].(map[string]any)
 	if !ok || old["id"] != aiManagedID || dockerInfo["image"] != state.PreviousImage {
 		return aiUpgradeJournal{}, false, errors.New("AI recovery manifest differs from previous image")
@@ -77,9 +79,13 @@ func writeAIUpgradeJournal(state aiUpgradeJournal) error {
 		writeErr = f.Sync()
 	}
 	closeErr := f.Close()
-	if err := errors.Join(writeErr, closeErr); err != nil { return err }
+	if err := errors.Join(writeErr, closeErr); err != nil {
+		return err
+	}
 	root, err := os.Open(moduleDataRoot)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer root.Close()
 	return root.Sync()
 }
@@ -166,8 +172,8 @@ func aiUpgradeSnapshot(ctx context.Context) error {
 	}
 	// Do not mark a snapshot complete until the filesystem has flushed
 	// the copied SQLite database, WAL and Ollama model blobs.
-	if output, err := exec.CommandContext(ctx,"sync","-f",backup).CombinedOutput();err!=nil {
-		return fmt.Errorf("flush AI recovery snapshot: %s",commandError(output,err))
+	if output, err := exec.CommandContext(ctx, "sync", "-f", backup).CombinedOutput(); err != nil {
+		return fmt.Errorf("flush AI recovery snapshot: %s", commandError(output, err))
 	}
 	marker, err := os.OpenFile(aiUpgradePath(aiUpgradeCompleteName), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
@@ -185,7 +191,9 @@ func aiUpgradeSnapshotReady() (bool, error) {
 	if errors.Is(err, os.ErrNotExist) {
 		return false, nil
 	}
-	if err != nil { return false, err }
+	if err != nil {
+		return false, err
+	}
 	if string(marker) != "snapshot complete\n" {
 		return false, errors.New("incomplete AI recovery marker; backup cannot be trusted")
 	}
