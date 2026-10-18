@@ -25,8 +25,8 @@ func firstModuleProgress(values []moduleProgressFunc) moduleProgressFunc {
 }
 
 var (
-	dockerLayerLine = regexp.MustCompile(`^([a-f0-9]{12}):s*(Downloading|Extracting|Download complete|Pull complete|Verifying Checksum|Waiting|Already exists)`)
-	dockerLayerSize = regexp.MustCompile(`([0-9]+(?:.[0-9]+)?[kMGT]?B)/([0-9]+(?:.[0-9]+)?[kMGT]?B)`)
+	dockerLayerLine = regexp.MustCompile(`^([a-f0-9]{12}):\s*(Downloading|Extracting|Download complete|Pull complete|Verifying Checksum|Waiting|Already exists)`)
+	dockerLayerSize = regexp.MustCompile(`([0-9]+(?:\.[0-9]+)?[kMGT]?B)/([0-9]+(?:\.[0-9]+)?[kMGT]?B)`)
 )
 
 // CLI pull output is per-layer, not whole-image progress. It must never be
