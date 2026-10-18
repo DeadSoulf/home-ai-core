@@ -31,7 +31,8 @@ export function JobProgress({job}: {job: Job}) {
   const u = useUI();
   const percent = progressPercent(job);
   const [now, setNow] = useState(() => Date.now());
-  const installing = job.type === "module.install" && ["queued", "running", "cancel_requested"].includes(job.status);
+  const installing = ["module.install", "module.gpu.prepare"].includes(job.type) &&
+    ["queued", "running", "cancel_requested"].includes(job.status);
   const step = installStep(job.message);
   useEffect(() => {
     if (!installing) return;
