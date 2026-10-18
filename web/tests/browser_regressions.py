@@ -524,6 +524,22 @@ async def suite(browser):
         await h.close()
     await check('UI-19: bundled Ollama model selection and live multi-GPU hotplug',local_ai_hardware)
 
+    async def live_module_install_progress():
+        installing=job('running','module.install','job-install-pull')
+        installing['message']='module.phase.download|aabbccddeeff Downloading 12.3MB/45.6MB'
+        installing['started_at']='2026-10-17T20:00:00Z'
+        h=await Harness(browser,jobs=[installing]).start('/modules/operations')
+        await expect(h.page.get_by_text('Скачивание Docker-образа')).to_be_visible()
+        await expect(h.page.get_by_text('Слой образа:',exact=False)).to_contain_text('12.3MB/45.6MB')
+        bar=h.page.get_by_role('progressbar',name='Ход установки модуля')
+        await expect(bar).to_be_visible()
+        assert await bar.get_attribute('aria-valuenow') is None
+        await expect(h.page.get_by_text('Процент всей загрузки неизвестен.',exact=False)).to_be_visible()
+        await expect(h.page.get_by_text('Прошло:',exact=False)).to_be_visible()
+        assert await h.page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
+        await h.close()
+    await check('UI-19: module install shows real phase and per-layer bytes without fake total percent',live_module_install_progress)
+
     async def responsive_pages():
         for path,kw in [('/users',{}),('/jobs',dict(jobs=[job()])),('/',dict(initialized=False))]:
             h=await Harness(browser,**kw).start(path)
