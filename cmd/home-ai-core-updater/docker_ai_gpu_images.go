@@ -67,3 +67,39 @@ func aiOptionalGPUImageReady(ctx context.Context) (bool, error) {
 	}
 	return aiPinnedImageCached(ctx, dockerPath, aiGPU030Image)
 }
+
+func prepareOptionalAIGPUImage(ctx context.Context, progress moduleProgressFunc) error {
+	dockerPath, err := exec.LookPath("docker")
+	if err != nil {
+		return errors.New("Docker unavailable")
+	}
+	// Restrict this to a verified installed AI 0.3.0. All subsequent OCI
+	// requests are pinned by the helper, never by the API or model.
+	container, err := inspectAIContainer(ctx, dockerPath)
+	if err != nil {
+		return err
+	}
+	if container.Config.Image != aiCPU030Image && container.Config.Image != aiGPU030Image {
+		return errors.New("optional GPU package requires installed AI Agent 0.3.0")
+	}
+	cached, err := aiPinnedImageCached(ctx, dockerPath, aiGPU030Image)
+	if err != nil {
+		return err
+	}
+	if cached {
+		progress("downloaded", "")
+		return nil
+	}
+	progress("download", "")
+	if err := pullDockerModuleImage(ctx, dockerPath, aiGPU030Image, progress); err != nil {
+		return err
+	}
+	cached, err = aiPinnedImageCached(ctx, dockerPath, aiGPU030Image)
+	if err != nil {
+		return err
+	}
+	if !cached {
+		return errors.New("GPU image pull finished but pinned image was not verified")
+	}
+	return nil
+}
