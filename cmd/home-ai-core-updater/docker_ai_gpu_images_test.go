@@ -46,7 +46,7 @@ func TestAI030DeviceSelectionUsesOnlyPairedImmutableImages(t *testing.T) {
 }
 
 func TestAIGPUImageForInstalledVersionPair(t *testing.T) {
-	for _, test := range []struct{image, target string}{
+	for _, test := range []struct{ image, target string }{
 		{aiCPU030Image, aiGPU030Image},
 		{aiGPU030Image, aiGPU030Image},
 		{aiCPU031Image, aiGPU031Image},
@@ -57,7 +57,7 @@ func TestAIGPUImageForInstalledVersionPair(t *testing.T) {
 			t.Fatalf("GPU image target %s: %q, %v", test.image, got, err)
 		}
 	}
-	if _, err := aiGPUImageForInstalled("ghcr.io/malicious@sha256:" + strings.Repeat("c",64)); err == nil {
+	if _, err := aiGPUImageForInstalled("ghcr.io/malicious@sha256:" + strings.Repeat("c", 64)); err == nil {
 		t.Fatal("untrusted image variant accepted")
 	}
 }
