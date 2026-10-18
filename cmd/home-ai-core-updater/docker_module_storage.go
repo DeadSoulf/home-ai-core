@@ -30,6 +30,9 @@ var (
 
 const nvrDiskDataName = ".home-ai-nvr-data"
 
+// Overridden only by filesystem-isolated Docker tests.
+var prepareFreshNVRStorageForInstall = prepareFreshNVRStorage
+
 func assignedNVRUUID(ctx context.Context) (string, error) {
 	db, err := sql.Open("sqlite", "file:"+nvrStorageDBPath+"?mode=ro")
 	if err != nil {
