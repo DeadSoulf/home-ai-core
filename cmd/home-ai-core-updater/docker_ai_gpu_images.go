@@ -16,6 +16,8 @@ const (
 	aiGPU030Image = "ghcr.io/deadsoulf/home-ai-core-ai@sha256:df8587d727e1e185c916e7f34c21516d08fb0cee272cb71f54d3a4e8c0bc22c6"
 	aiCPU031Image = "ghcr.io/deadsoulf/home-ai-core-ai@sha256:a1aafe7d847d284f03d85e3d0162f4704e8bec4c97047768d6992c38e9981f40"
 	aiGPU031Image = "ghcr.io/deadsoulf/home-ai-core-ai@sha256:42eca8a3e7e2bfe13a704d4dbcd75e1afcaf2d889d59c78514f4030307b6dcff"
+	aiCPU032Image = "ghcr.io/deadsoulf/home-ai-core-ai@sha256:cf4ead3da44de0df24b4d503122626ef2e3b14d7ee0804cb46f5d594ed444b06"
+	aiGPU032Image = "ghcr.io/deadsoulf/home-ai-core-ai@sha256:96ef5548472e85d0698446031e362c78268ebc4b748000d266c98b993c918bfc"
 )
 
 func aiImageForDeviceSelection(currentImage string, gpuCount int) (string, error) {
@@ -38,6 +40,11 @@ func aiImageForDeviceSelection(currentImage string, gpuCount int) (string, error
 			return aiGPU031Image, nil
 		}
 		return aiCPU031Image, nil
+	case aiCPU032Image, aiGPU032Image:
+		if gpuCount != 0 {
+			return aiGPU032Image, nil
+		}
+		return aiCPU032Image, nil
 	default:
 		// Legacy 0.2.0 images included all backends and use their own image.
 		return currentImage, nil
@@ -50,13 +57,17 @@ func aiGPUImageForInstalled(image string) (string, error) {
 		return aiGPU030Image, nil
 	case aiCPU031Image, aiGPU031Image:
 		return aiGPU031Image, nil
+	case aiCPU032Image, aiGPU032Image:
+		return aiGPU032Image, nil
 	default:
-		return "", errors.New("optional GPU package requires AI Agent 0.3.0 or 0.3.1")
+		return "", errors.New("optional GPU package requires a compatible AI Agent 0.3.x release")
 	}
 }
 
 func aiPinnedImageCached(ctx context.Context, dockerPath, image string) (bool, error) {
-	if image != aiGPU030Image && image != aiCPU030Image && image != aiGPU031Image && image != aiCPU031Image {
+	if image != aiGPU030Image && image != aiCPU030Image &&
+		image != aiGPU031Image && image != aiCPU031Image &&
+		image != aiGPU032Image && image != aiCPU032Image {
 		return false, errors.New("image not approved for AI runtime switching")
 	}
 	output, err := exec.CommandContext(ctx, dockerPath, "image", "inspect", "--format", "{{.Id}}", image).CombinedOutput()
