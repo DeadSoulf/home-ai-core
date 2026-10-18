@@ -34,7 +34,7 @@ func (s *server) moduleRuntime(w http.ResponseWriter, r *http.Request, _ securit
 var errModuleOperationInProgress = errors.New("module operation already in progress")
 
 func isModuleJob(kind string) bool {
-	return kind == "module.install" || kind == "module.control" || kind == "module.remove"
+	return kind == "module.install" || kind == "module.control" || kind == "module.remove" || kind == "module.gpu.prepare"
 }
 
 // The runtime serializes changes globally. Reject duplicate/conflicting queue
