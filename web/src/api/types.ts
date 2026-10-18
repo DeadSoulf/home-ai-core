@@ -357,6 +357,8 @@ export type Job = {
   request_id?: string;
   correlation_id?: string;
   created_at: string;
+  started_at?: string;
+  completed_at?: string;
 };
 
 export type AuditEntry = {
