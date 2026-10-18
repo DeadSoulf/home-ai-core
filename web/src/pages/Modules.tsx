@@ -23,6 +23,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
   const [sending, setSending] = useState(false), [uncertain, setUncertain] = useState(false);
   const [accepted, setAccepted] = useState<Job>();
   const [confirmRemove, setConfirmRemove] = useState<RegisteredModule>();
+  const [confirmNVRStorage, setConfirmNVRStorage] = useState<RegisteredModule>();
   const mutation = useRef(false);
   // Catalog outages never hide the installed registry or stop/remove controls.
   const load = useCallback(() => Promise.all([api.modules(), api.capabilities()]).then(([modules, capabilities]) => ({modules, capabilities})), []);
@@ -153,6 +154,9 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
                   onClick={() => void run(() => api.controlModule(module.manifest.id, module.status === "enabled" ? "disable" : "enable"))}>{t(module.status === "enabled" ? "moduleStop" : "moduleStart")}</button>
                 <button type="button" className="button secondary" disabled={busy || (!core.data || Boolean(core.error))}
                   onClick={() => void run(() => api.controlModule(module.manifest.id, "restart"))}>{t("moduleRestart")}</button>
+                {module.manifest.id === "nvr.module" && module.status === "enabled" &&
+                  <button type="button" className="button secondary" disabled={busy || (!core.data || Boolean(core.error))}
+                    onClick={() => setConfirmNVRStorage(module)}>Подключить назначенный диск NVR</button>}
               </>}
             </div>
             <div className="button-row destructive-actions"><button type="button" className="button danger" disabled={busy || (!core.data || Boolean(core.error))} onClick={() => setConfirmRemove(module)}>{t("moduleRemove")}</button></div>
@@ -210,6 +214,14 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
         <div className="button-row"><button type="button" className="button primary" disabled={busy || !manifestText.trim() || (!core.data || Boolean(core.error))} onClick={installManifest}>{t("moduleInstall")}</button></div>
       </Panel>
     </details>}
+    {confirmNVRStorage && <ConfirmDialog title="Перенос NVR на назначенный диск" confirmLabel="Перенести и проверить"
+      onCancel={() => setConfirmNVRStorage(undefined)} onConfirm={() => {
+        void run(() => api.controlModule("nvr.module", "activate_storage"));
+        setConfirmNVRStorage(undefined);
+      }}>
+      <p>Запись камер будет временно остановлена. HomeAiCore скопирует базу камер и архив на диск, назначенный в «Файлы → Хранилище», проверит целостность данных и работу NVR.</p>
+      <p>Старые файлы сохраняются как резервная копия. Если проверка не пройдёт, будет выполнена попытка отката.</p>
+    </ConfirmDialog>}
     {confirmRemove && <ConfirmDialog title={u("removeTitle")} confirmLabel={u("confirmRemove")} onCancel={() => setConfirmRemove(undefined)}
       onConfirm={() => {void run(() => api.removeModule(confirmRemove.manifest.id)); setConfirmRemove(undefined);}}>
       <p><strong>{confirmRemove.manifest.name}</strong></p><p>{u("removeHint")}</p>
