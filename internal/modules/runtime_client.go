@@ -20,6 +20,7 @@ type helperModuleResult struct {
 	State       string
 	ContainerID string
 	Message     string
+	PreviousManifest string
 }
 
 func callModuleHelper(ctx context.Context, operation, moduleID, image string) (helperModuleResult, error) {
@@ -27,6 +28,19 @@ func callModuleHelper(ctx context.Context, operation, moduleID, image string) (h
 }
 
 func callModuleHelperWithProgress(ctx context.Context, operation, moduleID, image string, progress func(stage, detail string)) (helperModuleResult, error) {
+	return callModuleHelperRequest(ctx, updaterhelper.Request{Operation: operation, ModuleID: moduleID, Image: image}, progress)
+}
+
+// Only the registry can supply old/new pinned images. No browser-provided
+// previous manifest or arbitrary Docker target is passed through this path.
+func callAIUpgradeHelper(ctx context.Context, operation, oldImage, newImage, oldManifest string, progress func(string, string)) (helperModuleResult, error) {
+	return callModuleHelperRequest(ctx, updaterhelper.Request{
+		Operation: operation, ModuleID: "ai.agent", Image: newImage,
+		PreviousImage: oldImage, PreviousManifest: oldManifest,
+	}, progress)
+}
+
+func callModuleHelperRequest(ctx context.Context, request updaterhelper.Request, progress func(stage, detail string)) (helperModuleResult, error) {
 	dialer := net.Dialer{}
 	conn, err := dialer.DialContext(ctx, "unix", moduleHelperSocketPath)
 	if err != nil {
@@ -38,12 +52,7 @@ func callModuleHelperWithProgress(ctx context.Context, operation, moduleID, imag
 	}
 	defer cleanup()
 
-	request := updaterhelper.Request{
-		Operation:       operation,
-		ProtocolVersion: updaterhelper.ProtocolVersion,
-		ModuleID:        moduleID,
-		Image:           image,
-	}
+	request.ProtocolVersion = updaterhelper.ProtocolVersion
 	if err := json.NewEncoder(conn).Encode(request); err != nil {
 		return helperModuleResult{}, err
 	}
@@ -70,6 +79,7 @@ func callModuleHelperWithProgress(ctx context.Context, operation, moduleID, imag
 			State:       response.ModuleState,
 			ContainerID: response.ContainerID,
 			Message:     response.Message,
+			PreviousManifest: response.PreviousManifest,
 		}, nil
 	}
 	return helperModuleResult{}, errors.New("too many module progress frames")
