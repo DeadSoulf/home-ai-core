@@ -244,6 +244,7 @@ export default function App() {
             canManageStorage={has("storage.manage")}
             section={fileSection(allowedPath)}
             onSectionChange={(section) => navigate(fileSectionPath(section))}
+            onNavigate={navigate}
           />
         )
         : accountPage;

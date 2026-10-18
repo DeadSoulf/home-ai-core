@@ -1,11 +1,12 @@
-import {useCallback, useEffect, useState, type FormEvent} from "react";
-import {api} from "../api/client";
+import {useCallback, useEffect, useRef, useState, type FormEvent} from "react";
+import {api, APIError} from "../api/client";
 import type {NVRCamera, NVRRecording, NVRStatus, NVRDiscoveryNetwork, NVRDiscoveredCamera} from "../api/types";
 import {Panel} from "../components/Panel";
+import {NVRLivePlayer} from "../components/NVRLivePlayer";
 import {PageHeading} from "./Dashboard";
 import "./NVR.css";
 
-type NVRTab = "cameras" | "discovery" | "archive";
+type NVRTab = "cameras" | "live" | "discovery" | "archive";
 
 const localDate = (seconds: number) => new Date(seconds * 1000).toLocaleString();
 const bytes = (value: number) => value >= 1024 ** 3
@@ -24,6 +25,12 @@ export function NVRPage({canManage}: {canManage: boolean}) {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [adding, setAdding] = useState(false);
+  const [liveCameraID, setLiveCameraID] = useState("");
+  const [activeLiveID, setActiveLiveID] = useState("");
+  const [livePlaylist, setLivePlaylist] = useState("");
+  const [liveBusy, setLiveBusy] = useState(false);
+  const [liveError, setLiveError] = useState("");
+  const activeLiveRef = useRef("");
   const [name, setName] = useState("");
   const [sourceType, setSourceType] = useState<"hikvision" | "rtsp">("rtsp");
   const [address, setAddress] = useState("");
@@ -153,6 +160,84 @@ export function NVRPage({canManage}: {canManage: boolean}) {
     setTab("cameras");
   }
 
+  useEffect(() => {
+    if (!liveCameraID && cameras.length) setLiveCameraID(cameras[0].id);
+  }, [cameras, liveCameraID]);
+
+  useEffect(() => () => {
+    const id = activeLiveRef.current;
+    if (id) void api.nvrStopLive(id).catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (tab === "live" || !activeLiveRef.current) return;
+    const id = activeLiveRef.current;
+    activeLiveRef.current = "";
+    setActiveLiveID("");
+    setLivePlaylist("");
+    void api.nvrStopLive(id).catch(() => {});
+  }, [tab]);
+
+  function formatNVRActionError(err: unknown): string {
+    if (err instanceof APIError && err.code === "nvr_upgrade_required") {
+      return "Для живого просмотра и безопасного удаления камеры необходим NVR 1.1.3 или новее. Обновите модуль, сохранив его данные.";
+    }
+    return err instanceof Error ? err.message : "Операция NVR завершилась ошибкой";
+  }
+
+  async function stopSavedLive() {
+    const id = activeLiveRef.current;
+    if (!id || liveBusy) return;
+    setLiveBusy(true);
+    setLiveError("");
+    try {
+      await api.nvrStopLive(id);
+      activeLiveRef.current = "";
+      setActiveLiveID("");
+      setLivePlaylist("");
+    } catch (err) {
+      setLiveError(formatNVRActionError(err));
+    } finally {
+      setLiveBusy(false);
+    }
+  }
+
+  async function startSavedLive() {
+    if (!canManage || !liveCameraID || liveBusy) return;
+    setLiveBusy(true);
+    setLiveError("");
+    try {
+      if (activeLiveRef.current) {
+        await api.nvrStopLive(activeLiveRef.current);
+        activeLiveRef.current = "";
+        setActiveLiveID("");
+        setLivePlaylist("");
+      }
+      const result = await api.nvrStartLive(liveCameraID);
+      if (!result.ok || !result.playlist_url.startsWith("/api/v1/nvr/output/hls/")) {
+        throw new Error("NVR вернул некорректный адрес видеопотока");
+      }
+      activeLiveRef.current = liveCameraID;
+      setActiveLiveID(liveCameraID);
+      setLivePlaylist(result.playlist_url);
+    } catch (err) {
+      setLiveError(formatNVRActionError(err));
+    } finally {
+      setLiveBusy(false);
+    }
+  }
+
+  async function removeCamera(camera: NVRCamera) {
+    if (!canManage || busy) return;
+    if (!window.confirm("Удалить камеру «" + camera.name + "» из списка? Сохранённые записи останутся в архиве.")) return;
+    const success = await act(() => api.nvrDeleteCamera(camera.id), "Камера удалена. Архив сохранён.");
+    if (success && activeLiveRef.current === camera.id) {
+      activeLiveRef.current = "";
+      setActiveLiveID("");
+      setLivePlaylist("");
+    }
+    if (!success) setError("Не удалось удалить камеру. Проверьте доступ и версию модуля NVR (не ниже 1.1.3).");
+  }
+
   const archiveSelected = selected && recordings.some((item) => item.id === selected.id) ? selected : undefined;
 
   return <div className="page nvr-page">
@@ -160,6 +245,8 @@ export function NVRPage({canManage}: {canManage: boolean}) {
     <div className="button-row">
       <button type="button" className={"button " + (tab === "cameras" ? "primary" : "secondary")}
         onClick={() => setTab("cameras")}>Камеры</button>
+      <button type="button" className={"button " + (tab === "live" ? "primary" : "secondary")}
+        onClick={() => setTab("live")}>Просмотр в реальном времени</button>
       {canManage && <button type="button" className={"button " + (tab === "discovery" ? "primary" : "secondary")}
         onClick={() => setTab("discovery")}>Поиск камер</button>}
       <button type="button" className={"button " + (tab === "archive" ? "primary" : "secondary")}
@@ -222,9 +309,34 @@ export function NVRPage({canManage}: {canManage: boolean}) {
             {camera.enabled && <button type="button" className="button secondary" disabled={busy} onClick={() => {
               void act(() => api.nvrControlCamera(camera.id, "restart"), "Камера перезапущена");
             }}>Перезапустить</button>}
+            <button type="button" className="button danger" disabled={busy}
+              onClick={() => void removeCamera(camera)}>Удалить камеру</button>
           </div>}
         </article>)}
       </div>
+    </Panel>}
+
+    {tab === "live" && <Panel title="Просмотр камер в реальном времени">
+      <div className="nvr-live-toolbar">
+        <label>Камера
+          <select value={liveCameraID} disabled={liveBusy} onChange={(event) => setLiveCameraID(event.target.value)}>
+            <option value="">Выбрать камеру</option>
+            {cameras.filter((camera) => camera.enabled).map((camera) =>
+              <option key={camera.id} value={camera.id}>{camera.name}</option>)}
+          </select>
+        </label>
+        {canManage && <button type="button" className="button primary"
+          disabled={!liveCameraID || liveBusy} onClick={() => void startSavedLive()}>
+          {liveBusy ? "Подключение…" : "Смотреть"}
+        </button>}
+        {canManage && activeLiveID && <button type="button" className="button secondary"
+          disabled={liveBusy} onClick={() => void stopSavedLive()}>Остановить просмотр</button>}
+      </div>
+      {liveError && <p role="alert" className="nvr-notice-error">{liveError}</p>}
+      {livePlaylist && <NVRLivePlayer playlistURL={livePlaylist} />}
+      {!livePlaylist && <p className="muted">Выберите сохранённую камеру и нажмите «Смотреть».
+        Просмотр использует HLS через защищённый API HOME AI Core.</p>}
+      {!canManage && <p className="muted small">Для запуска прямого видеопотока необходимы права управления NVR.</p>}
     </Panel>}
 
     {tab === "discovery" && canManage && <Panel title="Поиск сетевых камер">

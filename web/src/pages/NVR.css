@@ -34,3 +34,12 @@
   .nvr-page .nvr-discovery-toolbar { align-items: stretch; flex-direction: column; }
   .nvr-page .nvr-discovery-toolbar label { width: 100%; flex: 1 1 auto; }
 }
+
+/* Authenticated live view */
+.nvr-page .nvr-live-toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin:12px 0; }
+.nvr-page .nvr-live-toolbar label { min-width:200px; flex:1; max-width:440px; display:flex; flex-direction:column; gap:6px; }
+.nvr-page .nvr-live-toolbar select { width:100%; min-height:38px; padding:8px; border-radius:8px; }
+.nvr-page .nvr-live-player { max-width:1100px; margin:12px 0; }
+.nvr-page .nvr-live-player video { display:block; width:100%; max-height:70vh; background:#101820; border-radius:10px; aspect-ratio:16/9; }
+@media (max-width:640px){ .nvr-page .nvr-live-toolbar { align-items:stretch; flex-direction:column; }
+  .nvr-page .nvr-live-toolbar label { width:100%; flex:auto; } }

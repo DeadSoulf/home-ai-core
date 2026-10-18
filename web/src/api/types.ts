@@ -478,7 +478,7 @@ export type NetworkProfileStatus = {
   profiles: NetworkProfile[];
 };
 
-export type StoragePurpose = "files";
+export type StoragePurpose = "files" | "nvr";
 
 export type StoragePurposeUsage = {
   type: "file_pool";

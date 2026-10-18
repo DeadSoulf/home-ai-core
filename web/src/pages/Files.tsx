@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, APIError } from "../api/client";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { describeFileError } from "../ui/fileErrors";
-import type { StoragePurposeAssignment } from "../api/types";
+import type { StoragePurposeAssignment, BlockNode } from "../api/types";
 import { FolderSettings } from "../components/FolderSettings";
 import { SectionGuide } from "../components/SectionGuide";
 import { filesGuides } from "../ui/experience";
@@ -20,6 +20,7 @@ export function FilesPage({
   canManageStorage,
   section,
   onSectionChange,
+  onNavigate,
 }: {
   revision: number;
   canManage: boolean;
@@ -27,6 +28,7 @@ export function FilesPage({
   canManageStorage: boolean;
   section: FileSection;
   onSectionChange: (section: FileSection) => void;
+  onNavigate: (path: string) => void;
 }) {
   const {t, date, locale} = useI18n();
   const u = useUI();
@@ -66,6 +68,10 @@ export function FilesPage({
 
   const [settingsFolderID, setSettingsFolderID] = useState("");
   const [poolName, setPoolName] = useState("");
+  const [nvrStorageOptions, setNVRStorageOptions] = useState<BlockNode[]>([]);
+  const [nvrStorageDevice, setNVRStorageDevice] = useState("");
+  const [nvrStorageBusy, setNVRStorageBusy] = useState(false);
+  const [nvrStorageError, setNVRStorageError] = useState("");
   const [poolRoot, setPoolRoot] = useState("");
   const [mountedStorageOverrides, setMountedStorageOverrides] = useState<Record<string, string>>({});
   const [folderPoolID, setFolderPoolID] = useState("");
@@ -170,6 +176,70 @@ export function FilesPage({
       reportFormError(describeFileError(reason, locale, t("requestFailed")), reason);
     } finally {
       setBusy("");
+    }
+  }
+
+  useEffect(() => {
+    if (section !== "storage" || !canReadSystem || !canManage) return;
+    const controller = new AbortController();
+    void api.system(controller.signal).then((result) => {
+      if (controller.signal.aborted) return;
+      const candidates: BlockNode[] = [];
+      const collect = (node: BlockNode) => {
+        if (!node.system && (node.type === "part" || node.type === "lvm") &&
+            ["ext4", "xfs"].includes((node.filesystem || "").toLowerCase()) && node.path) {
+          candidates.push(node);
+        }
+        for (const child of node.children || []) collect(child);
+      };
+      result.system.block_tree.forEach(collect);
+      setNVRStorageOptions(candidates);
+    }).catch(() => {
+      if (!controller.signal.aborted) setNVRStorageOptions([]);
+    });
+    return () => controller.abort();
+  }, [section, canReadSystem, canManage, revision]);
+
+  async function assignNVRDisk() {
+    if (!nvrStorageDevice || !canManageStorage) return;
+    setNVRStorageBusy(true);
+    setNVRStorageError("");
+    const existing = resource.data?.storagePurposes.find((item) => item.device === nvrStorageDevice);
+    if (existing?.purpose === "files" && existing.in_use) {
+      setNVRStorageError("Диск занят файловым пулом HOME AI Core. Выберите другой раздел.");
+      setNVRStorageBusy(false);
+      return;
+    }
+    if (!window.confirm(
+      "Зарезервировать " + nvrStorageDevice + " для NVR? Существующие файлы не будут форматироваться или удаляться."
+    )) {
+      setNVRStorageBusy(false);
+      return;
+    }
+    try {
+      await api.setStoragePurpose(nvrStorageDevice, "nvr");
+      setNVRStorageDevice("");
+      setNotice("Диск назначен NVR. Для фактической записи необходимо подключение хранилища к контейнеру NVR.");
+      resource.reload();
+    } catch (reason) {
+      setNVRStorageError(reason instanceof Error ? reason.message : "Не удалось назначить диск NVR");
+    } finally {
+      setNVRStorageBusy(false);
+    }
+  }
+
+  async function mountNVRDisk(storage: StoragePurposeAssignment) {
+    if (!canManageStorage) return;
+    setNVRStorageBusy(true);
+    setNVRStorageError("");
+    try {
+      await api.storageOperation({operation: "mount", device: storage.device});
+      setNotice("Видео-диск смонтирован. Подключение его в /data/recordings установленного контейнера — отдельная операция с сохранением старого архива.");
+      resource.reload();
+    } catch (reason) {
+      setNVRStorageError(reason instanceof Error ? reason.message : "Не удалось смонтировать диск NVR");
+    } finally {
+      setNVRStorageBusy(false);
     }
   }
 
@@ -617,6 +687,8 @@ export function FilesPage({
   const pools = resource.data?.pools || [];
   const users = resource.data?.users || [];
   const fileStorage = (resource.data?.storagePurposes || []).filter((item) => item.purpose === "files");
+  const nvrStorage = (resource.data?.storagePurposes || []).filter((item) => item.purpose === "nvr");
+  const existingAssignments = resource.data?.storagePurposes || [];
   const effectiveFileStorage = fileStorage.map((storage) => {
     const override = mountedStorageOverrides[storage.device];
     const mountpoints = storage.mountpoints || [];
@@ -1234,6 +1306,58 @@ export function FilesPage({
           </div>
           <p className="muted small">{t("filePoolCapacityNotice")}</p>
           <p className="muted small">{t("filePoolSMBReserveNotice")}</p>
+        </Panel>
+      )}
+
+      {canManage && section === "storage" && canShowStorageInventory && (
+        <Panel title="Диски для видеоархива NVR" className="wide">
+          <p className="muted">Создайте отдельный раздел на диске или выберите существующий раздел
+            для NVR. Назначение диска не форматирует его и не переносит видеозаписи.</p>
+          {nvrStorageError && <p className="form-error" role="alert">{nvrStorageError}</p>}
+          <div className="button-row">
+            <button type="button" className="button secondary"
+              onClick={() => onNavigate("/system#storage")}>Создать диск / раздел для NVR</button>
+          </div>
+          {canManageStorage && <div className="network-actions">
+            <label>Выберите раздел с файловой системой ext4 или XFS
+              <select value={nvrStorageDevice} onChange={(event) => setNVRStorageDevice(event.target.value)}>
+                <option value="">Выбрать диск</option>
+                {nvrStorageOptions
+                  .filter((node) => !existingAssignments.some((a) =>
+                    (a.device === node.path || a.filesystem_uuid && a.filesystem_uuid === node.uuid) &&
+                    (a.purpose === "nvr" || a.in_use)))
+                  .map((node) => <option key={node.path} value={node.path}>
+                    {node.display_name || node.label || node.name} — {node.path}
+                  </option>)}
+              </select>
+            </label>
+            <button type="button" className="button primary" disabled={!nvrStorageDevice || nvrStorageBusy}
+              onClick={() => void assignNVRDisk()}>Назначить NVR</button>
+          </div>}
+          <div className="table-wrap"><table><thead><tr>
+            <th>Раздел</th><th>Название</th><th>Файловая система</th><th>Точка монтирования</th><th>Состояние</th><th>Действия</th>
+          </tr></thead><tbody>
+            {nvrStorage.map((storage) => <tr key={storage.filesystem_uuid || storage.device}>
+              <td className="mono">{storage.device}</td>
+              <td>{storage.label || "—"}</td>
+              <td>{storage.filesystem || "—"}</td>
+              <td className="mono">{(storage.mountpoints || []).join(", ") || "—"}</td>
+              <td>{!storage.present ? "Диск не обнаружен" :
+                !storage.filesystem ? "Требуется файловая система" :
+                (storage.mountpoints || []).length === 0 ? "Не смонтирован" : "Подготовлен"}</td>
+              <td>{storage.present && storage.filesystem && (storage.mountpoints || []).length === 0 ?
+                <button type="button" className="button secondary compact"
+                  disabled={!canManageStorage || nvrStorageBusy}
+                  onClick={() => void mountNVRDisk(storage)}>Смонтировать</button> : "—"}</td>
+            </tr>)}
+            {nvrStorage.length === 0 && <tr><td colSpan={6} className="muted">
+              Видеодиск пока не назначен. Записи NVR продолжают храниться в текущем каталоге модуля.
+            </td></tr>}
+          </tbody></table></div>
+          <p className="muted small">Важно: назначение и монтирование диска ещё не переключает
+            действующий NVR на новый диск. Нельзя удалять старый архив или форматировать
+            его раздел. Перенос и перенастройка Docker-монтирования должны проходить
+            отдельной безопасной процедурой, иначе часть записей станет недоступна.</p>
         </Panel>
       )}
 

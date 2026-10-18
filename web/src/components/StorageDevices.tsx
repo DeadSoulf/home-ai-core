@@ -662,7 +662,9 @@ export function StorageDevices({
                   value={partitionPurpose}
                   onChange={(event) => setPartitionPurpose(event.target.value as StoragePurpose)}
                 >
-                  <option value="files">{t("storagePurposeFiles")}</option>                </select>
+                  <option value="files">{t("storagePurposeFiles")}</option>
+                  <option value="nvr">NVR · Видеоархив</option>
+                </select>
               </label>
             </div>
             <div className="storage-capacity-summary">

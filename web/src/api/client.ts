@@ -684,6 +684,19 @@ export const api = {
   }) => postJSON<{ok: boolean}>("/api/v1/nvr/cameras", camera, true),
   nvrControlCamera: (id: string, action: "start" | "stop" | "restart") =>
     postJSON<{ok: boolean}>(`/api/v1/nvr/cameras/${encodeURIComponent(id)}/${action}`, {}, true),
+  nvrStartLive: (id: string) =>
+    postJSON<{ok: boolean; playlist_url: string}>(`/api/v1/nvr/cameras/${encodeURIComponent(id)}/live/start`, {}, true),
+  nvrStopLive: (id: string) =>
+    postJSON<{ok: boolean; stopped: boolean}>(`/api/v1/nvr/cameras/${encodeURIComponent(id)}/live/stop`, {}, true),
+  nvrDeleteCamera: (id: string) => {
+    const headers = new Headers();
+    const token = getCSRFToken();
+    if (token) headers.set("X-CSRF-Token", token);
+    return request<{ok: boolean; recordings_preserved: boolean}>(
+      `/api/v1/nvr/cameras/${encodeURIComponent(id)}`,
+      {method: "DELETE", headers},
+    );
+  },
 
   modules: async () => {
     const result = await request<{modules: RegisteredModule[]}>("/api/v1/modules");
