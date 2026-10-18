@@ -11,12 +11,9 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/security"
 )
 
-// Discovery runs only on the Core host's directly connected private networks.
-// The NVR Docker container is intentionally not given host networking.
+// Discovery runs on the Core host, independently of the NVR container.
+// Authentication, local-network allowlisting and scan throttling remain mandatory.
 func (s *server) nvrDiscoveryNetworks(w http.ResponseWriter, r *http.Request, _ security.Actor, _ authSource) {
-	if !s.nvrReady(w, r) {
-		return
-	}
 	networks, err := s.availableNVRDiscoveryNetworks()
 	if err != nil {
 		writeAPIError(w, r, http.StatusServiceUnavailable, "nvr_discovery_networks_unavailable",
@@ -36,9 +33,6 @@ func (s *server) availableNVRDiscoveryNetworks() ([]nvrdiscovery.Network, error)
 func (s *server) nvrDiscover(w http.ResponseWriter, r *http.Request, actor security.Actor, source authSource) {
 	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
 		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
-		return
-	}
-	if !s.nvrReady(w, r) {
 		return
 	}
 	var input struct {

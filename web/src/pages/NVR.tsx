@@ -47,6 +47,7 @@ export function NVRPage({canManage}: {canManage: boolean}) {
   const [discovered, setDiscovered] = useState<NVRDiscoveredCamera[]>([]);
   const [discoveryError, setDiscoveryError] = useState("");
   const [discoveryLoading, setDiscoveryLoading] = useState(false);
+  const [discoveryRetry, setDiscoveryRetry] = useState(0);
   const [scanning, setScanning] = useState(false);
   const [scanSummary, setScanSummary] = useState("");
   const [hasScanned, setHasScanned] = useState(false);
@@ -157,7 +158,7 @@ export function NVRPage({canManage}: {canManage: boolean}) {
       if (!controller.signal.aborted) setDiscoveryLoading(false);
     });
     return () => controller.abort();
-  }, [tab, canManage]);
+  }, [tab, canManage, discoveryRetry]);
 
   async function searchForCameras() {
     if (!selectedNetwork || scanning || !canManage) return;
@@ -297,7 +298,7 @@ export function NVRPage({canManage}: {canManage: boolean}) {
         Обновить
       </button>
     </div>
-    {error && <p role="alert" className="nvr-notice-error">{error}</p>}
+    {error && <p role="alert" className="nvr-notice-error">Состояние модуля NVR: {error}</p>
     {message && <p role="status" className="nvr-notice-success">{message}</p>}
     {loading && !status && <p role="status">Подключение к NVR…</p>}
     {status && <div className="nvr-stat-grid">
@@ -410,7 +411,13 @@ export function NVRPage({canManage}: {canManage: boolean}) {
       </div>
       {discoveryLoading && <p role="status">Определяем доступные сетевые интерфейсы…</p>}
       {scanning && <p role="status">Сканирование локальной сети. Поиск может занять до 15 секунд.</p>}
-      {discoveryError && <p role="alert" className="nvr-notice-error">{discoveryError}</p>}
+      {discoveryError && <div role="alert" className="nvr-notice-error">
+        <p>Поиск камер: {discoveryError}</p>
+        {!scanning && <button type="button" className="button secondary"
+          onClick={() => setDiscoveryRetry((value) => value + 1)}>
+          Повторить получение списка сетей
+        </button>}
+      </div>
       {hasScanned && <p role="status" className="muted">{scanSummary} · Найдено устройств: {discovered.length}</p>}
       {hasScanned && discovered.length === 0 && <p className="muted">
         Камеры не обнаружены автоматически. Проверьте выбранную подсеть, VLAN и настройки сети

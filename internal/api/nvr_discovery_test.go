@@ -99,22 +99,49 @@ func TestNVRDiscoverySearchRejectsUnlistedNetworkAndRateLimits(t *testing.T) {
 	}
 }
 
-func TestNVRDiscoveryRejectsMissingCSRFAndDisabledModule(t *testing.T) {
-	actor := defaultFakeSecurity().actor
-	s := &server{modules: nvrTestService(true), nvrNetworks: func() ([]nvrdiscovery.Network, error) {
-		return []nvrdiscovery.Network{testDiscoveryNetwork()}, nil
-	}}
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/nvr/discovery/search",
-		strings.NewReader(`{"network_id":"eth0|192.168.42.0/24"}`))
-	w := httptest.NewRecorder()
-	s.nvrDiscover(w, req, actor, authCookie)
-	if w.Code != 403 {
-		t.Fatalf("cookie mutation without CSRF accepted: %d", w.Code)
+func TestNVRDiscoveryRejectsMissingCSRFAndWorksWithoutRunningModule(t *testing.T) {
+	allowed := testDiscoveryNetwork()
+	securityService := defaultFakeSecurity()
+	actor := securityService.actor
+	scans := 0
+	s := &server{
+		modules: nvrTestService(false),
+		security: securityService,
+		nvrNetworks: func() ([]nvrdiscovery.Network, error) {
+			return []nvrdiscovery.Network{allowed}, nil
+		},
+		nvrScanner: func(ctx context.Context, scope nvrdiscovery.Network) ([]nvrdiscovery.Device, error) {
+			scans++
+			if scope.ID != allowed.ID {
+				t.Fatalf("unexpected scan network %q", scope.ID)
+			}
+			return []nvrdiscovery.Device{}, nil
+		},
 	}
-	s.modules = nvrTestService(false)
-	w = httptest.NewRecorder()
-	s.nvrDiscoveryNetworks(w, httptest.NewRequest(http.MethodGet, "/api/v1/nvr/discovery/networks", nil), actor, authBearer)
-	if w.Code != 503 {
-		t.Fatalf("disabled NVR allowed scan network list: %d", w.Code)
+	payload := `{"network_id":"eth0|192.168.42.0/24"}`
+	request := func(method, path, body string, source authSource) *httptest.ResponseRecorder {
+		t.Helper()
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(method, path, strings.NewReader(body))
+		if method == http.MethodGet {
+			s.nvrDiscoveryNetworks(w, req, actor, source)
+		} else {
+			s.nvrDiscover(w, req, actor, source)
+		}
+		return w
+	}
+	if got := request(http.MethodPost, "/api/v1/nvr/discovery/search", payload, authCookie); got.Code != http.StatusForbidden || scans != 0 {
+		t.Fatalf("cookie scan without CSRF accepted: status=%d scans=%d", got.Code, scans)
+	}
+	if got := request(http.MethodGet, "/api/v1/nvr/discovery/networks", "", authBearer); got.Code != http.StatusOK {
+		t.Fatalf("disabled NVR prevented host-only discovery: %d %s", got.Code, got.Body.String())
+	}
+	if got := request(http.MethodPost, "/api/v1/nvr/discovery/search", payload, authBearer); got.Code != http.StatusOK || scans != 1 {
+		t.Fatalf("host-only scan failed without running NVR: status=%d scans=%d %s", got.Code, scans, got.Body.String())
+	}
+	// The network inventory is a Core capability even before installation.
+	s.modules = nil
+	if got := request(http.MethodGet, "/api/v1/nvr/discovery/networks", "", authBearer); got.Code != http.StatusOK {
+		t.Fatalf("network discovery unnecessarily depends on module service: %d", got.Code)
 	}
 }
