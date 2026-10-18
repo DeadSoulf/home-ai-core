@@ -26,7 +26,37 @@ func registerModuleJobs(service *jobs.Service, registry *modules.Registry) error
 		}
 		_ = reporter.Progress(ctx, 500, "validating module manifest")
 		_ = reporter.Progress(ctx, 1500, "pulling and creating module container")
-		item, err := registry.InstallManifest(ctx, manifest)
+		item, err := registry.InstallManifest(ctx, manifest, func(stage, detail string) {
+			progress := 1500
+			switch stage {
+			case "prepare":
+				progress = 900
+			case "download", "build":
+				progress = 1500
+			case "downloaded":
+				progress = 6000
+			case "storage":
+				progress = 7000
+			case "create":
+				progress = 8000
+			case "start":
+				progress = 8800
+			case "verify":
+				progress = 9200
+			default:
+				return
+			}
+			// This is a phase milestone, NOT an image-download percentage.
+			// Details are sanitized at the privileged Docker helper boundary.
+			if len(detail) > 110 {
+				detail = detail[:110]
+			}
+			message := "module.phase." + stage
+			if detail != "" {
+				message += "|" + detail
+			}
+			_ = reporter.Progress(ctx, progress, message)
+		})
 		if err != nil {
 			return nil, err
 		}

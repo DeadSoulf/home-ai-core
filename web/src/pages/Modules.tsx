@@ -91,8 +91,10 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
 
   const value = core.data ?? {modules: [], capabilities: []};
   const installed = new Map(value.modules.map((item) => [item.manifest.id, item]));
-  const displayedJobs = [...active];
-  if (lastJob && !displayedJobs.some((job) => job.id === lastJob.id)) displayedJobs.push(lastJob);
+  // Include recent finished operations so a page reload does not erase the
+  // answer to "was the image installed, failed, or is it still downloading?".
+  const displayedJobs = [...(operations.data || [])];
+  if (lastJob && !displayedJobs.some((job) => job.id === lastJob.id)) displayedJobs.unshift(lastJob);
   return <div className="page modules-page">
     <PageHeading title={t("modules")} subtitle={u(section === "catalog" ? "moduleCatalogSubtitle" : section === "operations" ? "moduleOperationsSubtitle" : section === "settings" ? "moduleSettingsSubtitle" : "moduleInstalledSubtitle")} />
     <nav className="ux-section-jumps module-section-tabs" aria-label={t("modules")}>
@@ -122,7 +124,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
     {monitoringFailed && <ErrorState message={u("operationMonitorFailed")} onRetry={() => void verifyStatus()} />}
     {uncertain && <div className="notice" role="status"><p>{u("operationUnknown")}</p><button type="button" className="button secondary" disabled={sending} onClick={() => void verifyStatus()}>{u("refresh")}</button></div>}
     {actionError !== undefined && <ErrorNotice error={actionError} />}
-    {section === "operations" && (displayedJobs.length > 0 ? <Panel title={u("activeOperation")}>
+    {section === "operations" && (displayedJobs.length > 0 ? <Panel title={u("uxOperationsJump")}>
       <div className="module-operations">
         {displayedJobs.map((job) => <article key={job.id} className="operation-card" data-job-id={job.id}>
           <h3>{u(jobTitle(job))}: {installed.get(job.input?.module_id || "")?.manifest.name || job.input?.module_id || job.result?.module_id || ""}</h3>

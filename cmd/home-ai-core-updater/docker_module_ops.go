@@ -41,7 +41,8 @@ type moduleContainerStatus struct {
 	ContainerID string
 }
 
-func performDockerModuleOperation(ctx context.Context, request updaterhelper.Request, serviceUID, serviceGID int) (moduleContainerStatus, string, error) {
+func performDockerModuleOperation(ctx context.Context, request updaterhelper.Request, serviceUID, serviceGID int, progress ...moduleProgressFunc) (moduleContainerStatus, string, error) {
+	report := firstModuleProgress(progress)
 	if !moduleOperationMu.TryLock() {
 		return moduleContainerStatus{}, "", errors.New("another Docker module operation is already in progress")
 	}
@@ -62,6 +63,7 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 		return moduleContainerStatus{}, "", errors.New("unsupported Docker module operation")
 	}
 	if request.Operation == "docker.module.install" {
+		report("prepare", "")
 		if _, err := ensureDockerRuntime(ctx, serviceGID); err != nil {
 			return moduleContainerStatus{}, "", err
 		}
@@ -75,7 +77,7 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 
 	switch request.Operation {
 	case "docker.module.install":
-		return installDockerModule(ctx, moduleID, strings.TrimSpace(request.Image), serviceUID, serviceGID)
+		return installDockerModule(ctx, moduleID, strings.TrimSpace(request.Image), serviceUID, serviceGID, report)
 	case "docker.module.start":
 		return controlDockerModule(ctx, moduleID, "start")
 	case "docker.module.stop":
@@ -89,7 +91,8 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 	}
 }
 
-func installDockerModule(ctx context.Context, moduleID, image string, serviceUID, serviceGID int) (moduleContainerStatus, string, error) {
+func installDockerModule(ctx context.Context, moduleID, image string, serviceUID, serviceGID int, progress ...moduleProgressFunc) (moduleContainerStatus, string, error) {
+	report := firstModuleProgress(progress)
 	dockerPath, err := exec.LookPath("docker")
 	if err != nil {
 		return moduleContainerStatus{}, "", errors.New("Docker CLI is unavailable")
@@ -107,7 +110,8 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 		return resumeManagedModule(ctx, dockerPath, name, image)
 	}
 
-	installImage, fromPinnedSource, err := resolveInstallModuleImage(ctx, dockerPath, moduleID, image)
+	report("download", "")
+	installImage, fromPinnedSource, err := resolveInstallModuleImage(ctx, dockerPath, moduleID, image, report)
 	if err != nil {
 		return moduleContainerStatus{}, "", err
 	}
@@ -120,6 +124,7 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 			return moduleContainerStatus{}, "", err
 		}
 	}
+	report("storage", "")
 	dataDir := filepath.Join(moduleDataRoot, moduleID)
 	if err := os.MkdirAll(dataDir, 0o750); err != nil {
 		return moduleContainerStatus{}, "", fmt.Errorf("create module data directory: %w", err)
@@ -153,15 +158,18 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 		)
 	}
 	args = append(args, installImage)
+	report("create", "")
 	output, err := exec.CommandContext(ctx, dockerPath, args...).CombinedOutput()
 	if err != nil {
 		return moduleContainerStatus{}, "", fmt.Errorf("create module container: %s", commandError(output, err))
 	}
 	containerID := strings.TrimSpace(string(output))
 
+	report("start", "")
 	if output, err := exec.CommandContext(ctx, dockerPath, "start", name).CombinedOutput(); err != nil {
 		return moduleContainerStatus{}, "", cleanupFailedModuleStart(dockerPath, name, fmt.Errorf("start module container: %s", commandError(output, err)))
 	}
+	report("verify", "")
 	// Docker 'start' can return success when the container process exits
 	// immediately. Never publish such an instance as an enabled module.
 	select {
@@ -183,8 +191,9 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 	return moduleContainerStatus{State: status.State, ContainerID: containerID}, message, nil
 }
 
-func resolveInstallModuleImage(ctx context.Context, dockerPath, moduleID, manifestImage string) (string, bool, error) {
-	pullErr := pullDockerModuleImage(ctx, dockerPath, manifestImage)
+func resolveInstallModuleImage(ctx context.Context, dockerPath, moduleID, manifestImage string, progress ...moduleProgressFunc) (string, bool, error) {
+	report := firstModuleProgress(progress)
+	pullErr := pullDockerModuleImage(ctx, dockerPath, manifestImage, report)
 	if pullErr == nil {
 		return manifestImage, false, nil
 	}
@@ -194,6 +203,7 @@ func resolveInstallModuleImage(ctx context.Context, dockerPath, moduleID, manife
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		return "", false, fmt.Errorf("pinned NVR source build requires Linux amd64: %w", pullErr)
 	}
+	report("build", "")
 	localImage, err := buildPinnedNVRImage(ctx, dockerPath)
 	if err != nil {
 		return "", false, fmt.Errorf("NVR image access was denied in GHCR (%v); build from pinned GitHub source failed: %w", pullErr, err)
@@ -263,14 +273,12 @@ func buildPinnedNVRImage(ctx context.Context, dockerPath string) (string, error)
 	return imageID, nil
 }
 
-func pullDockerModuleImage(ctx context.Context, dockerPath, image string) error {
+func pullDockerModuleImage(ctx context.Context, dockerPath, image string, progress ...moduleProgressFunc) error {
+	report := firstModuleProgress(progress)
 	token := strings.TrimSpace(os.Getenv("HOME_AI_MODULE_CATALOG_TOKEN"))
 	lowerImage := strings.ToLower(image)
 	if token == "" || !strings.HasPrefix(lowerImage, "ghcr.io/") {
-		if output, err := exec.CommandContext(ctx, dockerPath, "pull", image).CombinedOutput(); err != nil {
-			return fmt.Errorf("pull module image: %s", commandError(output, err))
-		}
-		return nil
+		return pullDockerImageWithProgress(ctx, dockerPath, nil, image, report)
 	}
 
 	user := strings.TrimSpace(os.Getenv("HOME_AI_MODULE_REGISTRY_USER"))
@@ -290,12 +298,7 @@ func pullDockerModuleImage(ctx context.Context, dockerPath, image string) error 
 	if output, err := login.CombinedOutput(); err != nil {
 		return fmt.Errorf("authenticate to private module registry: %s", commandError(output, err))
 	}
-	pull := exec.CommandContext(ctx, dockerPath, "pull", image)
-	pull.Env = env
-	if output, err := pull.CombinedOutput(); err != nil {
-		return fmt.Errorf("pull module image: %s", commandError(output, err))
-	}
-	return nil
+	return pullDockerImageWithProgress(ctx, dockerPath, env, image, report)
 }
 
 func controlDockerModule(ctx context.Context, moduleID, action string) (moduleContainerStatus, string, error) {

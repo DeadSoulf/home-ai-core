@@ -28,10 +28,11 @@ type Store interface {
 }
 
 type Registry struct {
-	store       Store
-	coreVersion string
-	mu          sync.Mutex
-	helper      func(context.Context, string, string, string) (helperModuleResult, error)
+	store          Store
+	coreVersion    string
+	mu             sync.Mutex
+	helper         func(context.Context, string, string, string) (helperModuleResult, error)
+	progressHelper func(context.Context, string, string, string, func(string, string)) (helperModuleResult, error)
 }
 
 func NewRegistry(store Store, coreVersion ...string) *Registry {
@@ -40,13 +41,16 @@ func NewRegistry(store Store, coreVersion ...string) *Registry {
 		version = strings.TrimSpace(coreVersion[0])
 	}
 	return &Registry{
-		store:       store,
-		coreVersion: version,
-		helper:      callModuleHelper,
+		store:          store,
+		coreVersion:    version,
+		helper:         callModuleHelper,
+		progressHelper: callModuleHelperWithProgress,
 	}
 }
 
-func (r *Registry) InstallManifest(ctx context.Context, manifest Manifest) (Registered, error) {
+// InstallManifest optionally reports verified Docker installation phases.
+// Progress never controls the safety-critical module lifecycle.
+func (r *Registry) InstallManifest(ctx context.Context, manifest Manifest, progress ...func(string, string)) (Registered, error) {
 	if err := ctx.Err(); err != nil {
 		return Registered{}, err
 	}
@@ -104,7 +108,13 @@ func (r *Registry) InstallManifest(ctx context.Context, manifest Manifest) (Regi
 	default:
 		return Registered{}, err
 	}
-	if _, err := r.helper(ctx, "docker.module.install", manifest.ID, manifest.Runtime.Docker.Image); err != nil {
+	var installErr error
+	if len(progress) > 0 && progress[0] != nil && r.progressHelper != nil {
+		_, installErr = r.progressHelper(ctx, "docker.module.install", manifest.ID, manifest.Runtime.Docker.Image, progress[0])
+	} else {
+		_, installErr = r.helper(ctx, "docker.module.install", manifest.ID, manifest.Runtime.Docker.Image)
+	}
+	if err := installErr; err != nil {
 		recordCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		recordErr := r.store.SetModuleStatus(recordCtx, manifest.ID, "registered", "install incomplete; retry the same manifest or remove: "+err.Error())

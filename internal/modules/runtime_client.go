@@ -23,6 +23,10 @@ type helperModuleResult struct {
 }
 
 func callModuleHelper(ctx context.Context, operation, moduleID, image string) (helperModuleResult, error) {
+	return callModuleHelperWithProgress(ctx, operation, moduleID, image, nil)
+}
+
+func callModuleHelperWithProgress(ctx context.Context, operation, moduleID, image string, progress func(stage, detail string)) (helperModuleResult, error) {
 	dialer := net.Dialer{}
 	conn, err := dialer.DialContext(ctx, "unix", moduleHelperSocketPath)
 	if err != nil {
@@ -44,21 +48,31 @@ func callModuleHelper(ctx context.Context, operation, moduleID, image string) (h
 		return helperModuleResult{}, err
 	}
 
-	var response updaterhelper.Response
-	if err := json.NewDecoder(conn).Decode(&response); err != nil {
-		return helperModuleResult{}, err
-	}
-	if !response.OK {
-		if response.Error == "" {
-			response.Error = "privileged module helper rejected operation"
+	decoder := json.NewDecoder(conn)
+	for frames := 0; frames < 4096; frames++ {
+		var response updaterhelper.Response
+		if err := decoder.Decode(&response); err != nil {
+			return helperModuleResult{}, fmt.Errorf("read module helper response: %w", err)
 		}
-		return helperModuleResult{}, errors.New(response.Error)
+		if response.ProgressStage != "" {
+			if progress != nil {
+				progress(response.ProgressStage, response.ProgressDetail)
+			}
+			continue
+		}
+		if !response.OK {
+			if response.Error == "" {
+				response.Error = "privileged module helper rejected operation"
+			}
+			return helperModuleResult{}, errors.New(response.Error)
+		}
+		return helperModuleResult{
+			State:       response.ModuleState,
+			ContainerID: response.ContainerID,
+			Message:     response.Message,
+		}, nil
 	}
-	return helperModuleResult{
-		State:       response.ModuleState,
-		ContainerID: response.ContainerID,
-		Message:     response.Message,
-	}, nil
+	return helperModuleResult{}, errors.New("too many module progress frames")
 }
 
 // protectModuleHelperConn enforces a deadline for the full JSON exchange.

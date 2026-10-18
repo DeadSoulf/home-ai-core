@@ -285,7 +285,20 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		ctx, cancel := context.WithTimeout(parent, 30*time.Minute)
 		defer cancel()
 		go func() { var extra [1]byte; _, _ = conn.Read(extra[:]); cancel() }()
-		status, message, err := performDockerModuleOperation(ctx, request, uid, gid)
+		encoder := json.NewEncoder(conn)
+		streamProgress := func(stage, detail string) {
+			if request.Operation != "docker.module.install" {
+				return
+			}
+			// Each progress frame is a standalone JSON object. The final
+			// response has no progress_stage and is sent after the operation.
+			if err := encoder.Encode(updaterhelper.Response{
+				ProgressStage: stage, ProgressDetail: detail,
+			}); err != nil {
+				cancel()
+			}
+		}
+		status, message, err := performDockerModuleOperation(ctx, request, uid, gid, streamProgress)
 		if err != nil {
 			logger.Error("Docker module operation failed", "operation", request.Operation, "module_id", request.ModuleID, "error", err)
 			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: err.Error()})

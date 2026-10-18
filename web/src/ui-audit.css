@@ -46,3 +46,20 @@ textarea.text-input { min-height: 12rem; resize: vertical; }
   .confirm-dialog { padding: 18px; }
   .resource-summary .button { width: 100%; }
 }
+
+/* Installation is an indeterminate multi-stage operation; Docker only reports
+   bytes per layer, never a trustworthy percentage of the complete install. */
+.module-install-progress { min-width: 0; width: 100%; max-width: 700px; gap: 8px; }
+.module-install-progress-bar { width: min(100%, 460px); height: 8px; margin: 2px 0; position: relative; }
+.module-install-progress-animated {
+  position: absolute; top: 0; bottom: 0; left: 0;
+  width: 28% !important; border-radius: inherit;
+  animation: module-install-moving 1.65s ease-in-out infinite alternate;
+}
+.module-install-stage { font-size: 14px; color: #dce8fa; }
+.module-install-layer { overflow-wrap: anywhere; color: #bfd0e7; }
+.module-install-elapsed { color: #aabdd6; font-variant-numeric: tabular-nums; }
+@keyframes module-install-moving { from { transform: translateX(0); } to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) {
+  .module-install-progress-animated { animation: none; left: 35%; }
+}
