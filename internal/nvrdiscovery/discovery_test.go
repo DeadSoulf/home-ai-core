@@ -10,7 +10,47 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/DeadSoulf/home-ai-core/internal/systeminfo"
 )
+
+func TestHostNetworkDiscoveryDoesNotRequireNetlink(t *testing.T) {
+	// These are the same sysfs/ioctl interface records used by Core's System
+	// page. The regression reproduces a hardened service that cannot call
+	// net.Interfaces() because AF_NETLINK is not permitted.
+	interfaces := []systeminfo.NetworkInterface{
+		{Name: "eno1", Up: true, Multicast: true, Addresses: []string{"192.168.50.10/16", "fe80::1/64"}},
+		{Name: "eno1", Up: true, Multicast: true, Addresses: []string{"192.168.50.10/16"}},
+		{Name: "enp2s0", Up: true, Addresses: []string{"10.3.4.5/24"}},
+		{Name: "docker0", Up: true, Addresses: []string{"172.17.0.1/16"}},
+		{Name: "veth8f4", Up: true, Addresses: []string{"192.168.99.1/24"}},
+		{Name: "br-1a2b", Up: true, Addresses: []string{"10.11.0.1/24"}},
+		{Name: "lo", Up: true, Loopback: true, Addresses: []string{"127.0.0.1/8"}},
+		{Name: "down0", Up: false, Addresses: []string{"10.10.0.5/24"}},
+		{Name: "public", Up: true, Addresses: []string{"8.8.8.10/24"}},
+		{Name: "hostonly", Up: true, Addresses: []string{"192.168.100.3/31"}},
+		{Name: "badaddr", Up: true, Addresses: []string{"not-an-ip"}},
+	}
+	networks := networksFromHostInterfaces(interfaces)
+	if len(networks) != 2 {
+		t.Fatalf("unexpected network inventory: %+v", networks)
+	}
+	want := []Network{
+		{ID: "eno1|192.168.50.0/24", Interface: "eno1", Address: "192.168.50.10", CIDR: "192.168.50.0/24", Hosts: 253},
+		{ID: "enp2s0|10.3.4.0/24", Interface: "enp2s0", Address: "10.3.4.5", CIDR: "10.3.4.0/24", Hosts: 253},
+	}
+	for i, n := range networks {
+		if n != want[i] {
+			t.Fatalf("network %d: got %+v, want %+v", i, n, want[i])
+		}
+		if _, err := SelectNetwork(networks, n.ID); err != nil {
+			t.Fatalf("Core-selected local network not accepted: %v", err)
+		}
+	}
+	if _, err := SelectNetwork(networks, "192.168.0.0/16"); err == nil {
+		t.Fatal("arbitrary browser CIDR must not be accepted")
+	}
+}
 
 func TestSubnetForAddressIsBoundedAndPrivate(t *testing.T) {
 	for _, tc := range []struct {

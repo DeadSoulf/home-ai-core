@@ -6,10 +6,11 @@ package nvrdiscovery
 import (
 	"encoding/binary"
 	"errors"
-	"net"
 	"net/netip"
 	"sort"
 	"strings"
+
+	"github.com/DeadSoulf/home-ai-core/internal/systeminfo"
 )
 
 const maxNetworkHosts = 254
@@ -45,38 +46,34 @@ func excludedInterface(name string) bool {
 	return false
 }
 
-// Networks enumerates directly connected, private IPv4 interface ranges.
-// No arbitrary target supplied by a browser is ever accepted as a scan scope.
+// Networks enumerates directly connected private IPv4 interfaces without
+// AF_NETLINK, which is intentionally denied by the hardened Core service.
+// No browser-supplied CIDR can influence this inventory.
 func Networks() ([]Network, error) {
-	interfaces, err := net.Interfaces()
+	interfaces, err := systeminfo.HostNetworkInterfaces()
 	if err != nil {
 		return nil, err
 	}
+	return networksFromHostInterfaces(interfaces), nil
+}
+
+// Kept separate from the OS inventory so policy can be tested without network
+// privileges. Only private, currently active, directly connected addresses are
+// eligible; wide networks are bounded to the host's /24.
+func networksFromHostInterfaces(interfaces []systeminfo.NetworkInterface) []Network {
 	found := make([]Network, 0, 8)
 	seen := make(map[string]bool)
 	for _, iface := range interfaces {
-		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 ||
-			excludedInterface(iface.Name) {
+		if !iface.Up || iface.Loopback || excludedInterface(iface.Name) {
 			continue
 		}
-		addrs, err := iface.Addrs()
-		if err != nil {
-			continue
-		}
-		for _, value := range addrs {
-			network, ok := value.(*net.IPNet)
-			if !ok {
+		for _, rawAddress := range iface.Addresses {
+			address, err := netip.ParsePrefix(rawAddress)
+			if err != nil {
 				continue
 			}
-			ip, ok := netip.AddrFromSlice(network.IP.To4())
-			if !ok {
-				continue
-			}
-			ones, size := network.Mask.Size()
-			if size != 32 {
-				continue
-			}
-			prefix, ok := subnetForAddress(ip.Unmap(), ones)
+			ip := address.Addr().Unmap()
+			prefix, ok := subnetForAddress(ip, address.Bits())
 			if !ok {
 				continue
 			}
@@ -104,7 +101,7 @@ func Networks() ([]Network, error) {
 	if len(found) > 24 {
 		found = found[:24]
 	}
-	return found, nil
+	return found
 }
 
 func SelectNetwork(available []Network, id string) (Network, error) {

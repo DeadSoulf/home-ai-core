@@ -3,6 +3,7 @@ package systeminfo
 import (
 	"bufio"
 	"encoding/hex"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -19,6 +20,18 @@ func networkInterfaces(sysClassNet string) []NetworkInterface {
 		"/proc/net/if_inet6",
 		interfaceIPv4Address,
 	)
+}
+
+// HostNetworkInterfaces returns the local interface inventory without opening
+// AF_NETLINK sockets. The hardened Core service permits AF_INET ioctls and
+// read-only sysfs access but intentionally does not permit AF_NETLINK.
+// Reuse the same inventory as the System page instead of net.Interfaces().
+func HostNetworkInterfaces() ([]NetworkInterface, error) {
+	const sysClassNet = "/sys/class/net"
+	if _, err := os.ReadDir(sysClassNet); err != nil {
+		return nil, fmt.Errorf("read host network interfaces: %w", err)
+	}
+	return networkInterfaces(sysClassNet), nil
 }
 
 func networkInterfacesFromPaths(
