@@ -105,7 +105,9 @@ async def main():
 
             harness.page.once("dialog", lambda dialog: asyncio.create_task(dialog.accept("CREATE /dev/sdb")))
             await harness.page.locator(".storage-disk-create-form button.button.primary").click()
-            await expect(harness.page.get_by_text("Назначение раздела сохранено.", exact=False).first).to_be_visible()
+            # Wait for the real, confirmed create response — the earlier
+            # assignment also produces a "purpose saved" notification.
+            await expect(harness.page.get_by_text("partition created", exact=False).first).to_be_visible()
             assert any(item.get("device") == "/dev/sdb1" and item.get("purpose") == "nvr" for item in posted)
             assert any(item.get("purpose") == "nvr" and item.get("operation") == "partition.create" and
                        not item.get("dry_run") for item in posted)
