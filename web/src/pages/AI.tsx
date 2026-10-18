@@ -144,6 +144,7 @@ export function AIPage() {
     {/* Always mounted: GPU hot-plug events are detected while using chat too. */}
     <div hidden={tab !== "local"}>
       <AILocalPage
+        aiVersion={status?.version}
         onNewGPU={(names) => setGpuNotice(names)}
         onModelsReady={() => {void reload().catch(() => {});}}
         onOpenChat={() => {void reload().then(() => setTab("chat")).catch((err: unknown) => setError(messageOf(err)));}}
