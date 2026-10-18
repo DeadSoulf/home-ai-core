@@ -25,6 +25,11 @@ func TestAI030DeviceSelectionUsesOnlyPairedImmutableImages(t *testing.T) {
 		{aiCPU031Image, 8, aiGPU031Image},
 		{aiGPU031Image, 2, aiGPU031Image},
 		{aiGPU031Image, 0, aiCPU031Image},
+		{aiCPU032Image, 0, aiCPU032Image},
+		{aiCPU032Image, 1, aiGPU032Image},
+		{aiCPU032Image, 8, aiGPU032Image},
+		{aiGPU032Image, 2, aiGPU032Image},
+		{aiGPU032Image, 0, aiCPU032Image},
 		// Older images included their own GPU runtimes and never get silently upgraded.
 		{"ghcr.io/deadsoulf/home-ai-core-ai@sha256:" + strings.Repeat("a", 64), 1,
 			"ghcr.io/deadsoulf/home-ai-core-ai@sha256:" + strings.Repeat("a", 64)},
@@ -51,6 +56,8 @@ func TestAIGPUImageForInstalledVersionPair(t *testing.T) {
 		{aiGPU030Image, aiGPU030Image},
 		{aiCPU031Image, aiGPU031Image},
 		{aiGPU031Image, aiGPU031Image},
+		{aiCPU032Image, aiGPU032Image},
+		{aiGPU032Image, aiGPU032Image},
 	} {
 		got, err := aiGPUImageForInstalled(test.image)
 		if err != nil || got != test.target {
