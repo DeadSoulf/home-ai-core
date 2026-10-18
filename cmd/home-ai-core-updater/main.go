@@ -274,7 +274,7 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: "unsupported AI GPU module"})
 			return
 		}
-		_ = conn.SetDeadline(time.Now().Add(31*time.Minute))
+		_ = conn.SetDeadline(time.Now().Add(31 * time.Minute))
 		ctx, cancel := context.WithTimeout(parent, 30*time.Minute)
 		defer cancel()
 		encoder := json.NewEncoder(conn)
@@ -292,7 +292,7 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		}
 		_ = encoder.Encode(updaterhelper.Response{
 			OK: true, ModuleState: "downloaded",
-			HelperVersion: updaterhelper.HelperVersion,
+			HelperVersion:   updaterhelper.HelperVersion,
 			ProtocolVersion: updaterhelper.ProtocolVersion,
 		})
 		return
