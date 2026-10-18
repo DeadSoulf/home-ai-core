@@ -598,6 +598,33 @@ async def suite(browser):
         await h.close()
     await check('UI-23: optional GPU download happens before separately approved device assignment',optional_gpu_runtime_download)
 
+    async def ai_patch_upgrade_from_web():
+        installed=ai_module()
+        installed['manifest']['version']='0.3.0'
+        installed['manifest']['runtime']['docker']['image']='ghcr.io/deadsoulf/home-ai-core-ai@sha256:'+'a'*64
+        candidate=copy.deepcopy(installed['manifest'])
+        candidate['version']='0.3.1'
+        candidate['runtime']['docker']['image']='ghcr.io/deadsoulf/home-ai-core-ai@sha256:'+'b'*64
+        candidate['runtime']['health']={'port':8080,'path':'/health'}
+        h=await Harness(browser,modules=[installed],catalog=[candidate]).start('/modules/installed')
+        await h.ready()
+        button=h.page.get_by_role('button',name='Обновить модуль',exact=False)
+        await expect(button).to_be_visible()
+        h.page.once('dialog',lambda d: asyncio.create_task(d.accept()))
+        await button.click()
+        assert any(req[0]=='POST' and req[1]=='/api/v1/modules/catalog/ai.agent/install' for req in h.requests)
+        assert (await h.url()).endswith('/modules/operations')
+        await h.close()
+
+        other=module(version='1.0.0')
+        newer=copy.deepcopy(other['manifest'])
+        newer['version']='1.1.0'
+        h=await Harness(browser,modules=[other],catalog=[newer]).start('/modules/catalog')
+        await h.ready()
+        assert await h.page.get_by_role('button',name='Обновить модуль',exact=False).count()==0
+        await h.close()
+    await check('UI-25: safe AI-only upgrade from Installed and non-AI upgrades remain blocked',ai_patch_upgrade_from_web)
+
     async def responsive_pages():
         for path,kw in [('/users',{}),('/jobs',dict(jobs=[job()])),('/',dict(initialized=False))]:
             h=await Harness(browser,**kw).start(path)
