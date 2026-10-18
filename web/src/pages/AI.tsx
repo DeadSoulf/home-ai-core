@@ -31,6 +31,7 @@ const tabNames: Record<AITab, string> = {
 export function AIPage() {
   const [tab, setTab] = useState<AITab>("chat");
   const [status, setStatus] = useState<AIStatus>();
+  const [installedLocalModels, setInstalledLocalModels] = useState<string[] | null>(null);
   const [providers, setProviders] = useState<AIProvider[]>([]);
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [approvals, setApprovals] = useState<AIApproval[]>([]);
@@ -59,6 +60,7 @@ export function AIPage() {
     setApprovals(nextApprovals);
     setModelId((current) => nextProviders.some((item) => item.id === current)
       ? current : nextProviders[0]?.id || "");
+    return nextProviders;
   }, []);
 
   useEffect(() => {
@@ -159,7 +161,10 @@ export function AIPage() {
       </button>
     </div>}
 
-    {status && <p className="ai-status">AI Agent {status.version} · Подключено моделей: {status.providers} ·
+    {status && <p className="ai-status">AI Agent {status.version} ·
+      Установлено локальных моделей: {installedLocalModels !== null
+        ? installedLocalModels.length : status.local_models_count ?? "проверяется"} ·
+      Подключено AI-провайдеров: {status.providers} ·
       Выполнение команд ядра: {status.core_actions_enabled ? "включено" : "отключено"}</p>}
 
     {/* Always mounted: GPU hot-plug events are detected while using chat too. */}
@@ -168,6 +173,34 @@ export function AIPage() {
         aiVersion={status?.version}
         onNewGPU={(names) => setGpuNotice(names)}
         onModelsReady={() => {void reload().catch(() => {});}}
+        onInstalledModels={(names) => {
+          setInstalledLocalModels(names);
+          void reload().catch(() => {});
+        }}
+        onSelectModel={(name) => {
+          void (async () => {
+            let items = await reload();
+            const findLocal = () => items.find((item) =>
+              item.kind === "ollama" && item.model === name &&
+              item.base_url === "http://127.0.0.1:11434");
+            let provider = findLocal();
+            if (!provider) {
+              // Older installed Agent images have no automatic model sync.
+              // Explicitly selecting a model already found in local Ollama
+              // registers only that model; it does not re-download anything.
+              await api.aiAddProvider({
+                name: "Встроенный Ollama", kind: "ollama",
+                base_url: "http://127.0.0.1:11434", model: name, api_key: "",
+              });
+              items = await reload();
+              provider = findLocal();
+            }
+            if (!provider) throw new Error("Модель не появилась в списке провайдеров.");
+            setModelId(provider.id);
+            setTab("chat");
+            setError("");
+          })().catch((err: unknown) => setError(messageOf(err)));
+        }}
         onOpenChat={() => {void reload().then(() => setTab("chat")).catch((err: unknown) => setError(messageOf(err)));}}
       />
     </div>
