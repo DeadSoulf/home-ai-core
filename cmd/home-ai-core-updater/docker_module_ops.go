@@ -58,7 +58,7 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 		if !imageDigestPattern.MatchString(strings.TrimSpace(request.Image)) {
 			return moduleContainerStatus{}, "", errors.New("module image must be an immutable @sha256 reference")
 		}
-	case "docker.module.start", "docker.module.stop", "docker.module.restart", "docker.module.remove":
+	case "docker.module.start", "docker.module.stop", "docker.module.restart", "docker.module.remove", "docker.module.storage.activate":
 	default:
 		return moduleContainerStatus{}, "", errors.New("unsupported Docker module operation")
 	}
@@ -86,6 +86,8 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 		return controlDockerModule(ctx, moduleID, "restart")
 	case "docker.module.remove":
 		return removeDockerModule(ctx, moduleID)
+	case "docker.module.storage.activate":
+		return activateNVRStorage(ctx, moduleID, serviceUID, serviceGID)
 	default:
 		return moduleContainerStatus{}, "", errors.New("unsupported Docker module operation")
 	}
@@ -107,6 +109,11 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 		}
 		// Never destroy a running module before a candidate has passed start,
 		// health and recovery checks. Transactional upgrades are a separate path.
+		if moduleID == "nvr.module" {
+			if _, err := validateNVRDataLink(ctx, filepath.Join(moduleDataRoot, moduleID)); err != nil {
+				return moduleContainerStatus{}, "", err
+			}
+		}
 		return resumeManagedModule(ctx, dockerPath, name, image)
 	}
 
@@ -126,6 +133,11 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 	}
 	report("storage", "")
 	dataDir := filepath.Join(moduleDataRoot, moduleID)
+	if moduleID == "nvr.module" {
+		if err := prepareFreshNVRStorageForInstall(ctx, dataDir, serviceUID, serviceGID); err != nil {
+			return moduleContainerStatus{}, "", fmt.Errorf("prepare assigned NVR disk: %w", err)
+		}
+	}
 	if err := os.MkdirAll(dataDir, 0o750); err != nil {
 		return moduleContainerStatus{}, "", fmt.Errorf("create module data directory: %w", err)
 	}
@@ -302,6 +314,11 @@ func pullDockerModuleImage(ctx context.Context, dockerPath, image string, progre
 }
 
 func controlDockerModule(ctx context.Context, moduleID, action string) (moduleContainerStatus, string, error) {
+	if moduleID == "nvr.module" && action != "stop" {
+		if _, err := validateNVRDataLink(ctx, filepath.Join(moduleDataRoot, moduleID)); err != nil {
+			return moduleContainerStatus{}, "", err
+		}
+	}
 	dockerPath, err := exec.LookPath("docker")
 	if err != nil {
 		return moduleContainerStatus{}, "", errors.New("Docker CLI is unavailable")

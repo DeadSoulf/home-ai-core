@@ -220,8 +220,13 @@ func (s *server) moduleControl(
 	input.Operation = strings.TrimSpace(input.Operation)
 	switch input.Operation {
 	case "enable", "disable", "restart":
+	case "activate_storage":
+		if id != "nvr.module" {
+			writeAPIError(w, r, http.StatusBadRequest, "invalid_module_operation", "storage activation is restricted to NVR", nil)
+			return
+		}
 	default:
-		writeAPIError(w, r, http.StatusBadRequest, "invalid_module_operation", "operation must be enable, disable or restart", nil)
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_module_operation", "operation must be enable, disable, restart or NVR storage activation", nil)
 		return
 	}
 

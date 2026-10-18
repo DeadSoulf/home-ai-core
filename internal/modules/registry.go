@@ -159,6 +159,12 @@ func (r *Registry) Control(ctx context.Context, id, operation string) (Registere
 	case "restart":
 		helperOperation = "docker.module.restart"
 		nextStatus = "enabled"
+	case "activate_storage":
+		if id != "nvr.module" || item.Status != "enabled" {
+			return Registered{}, errors.New("assigned storage can be activated only for enabled NVR")
+		}
+		helperOperation = "docker.module.storage.activate"
+		nextStatus = "enabled"
 	default:
 		return Registered{}, fmt.Errorf("unsupported module control operation %q", operation)
 	}

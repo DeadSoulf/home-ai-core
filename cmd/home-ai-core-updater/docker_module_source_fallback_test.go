@@ -136,6 +136,10 @@ exit 99
 	oldDataRoot := moduleDataRoot
 	moduleDataRoot = filepath.Join(t.TempDir(), "module-data")
 	t.Cleanup(func() { moduleDataRoot = oldDataRoot })
+	// This test verifies immutable-image provenance, not host filesystem mounts.
+	originalStorageSetup := prepareFreshNVRStorageForInstall
+	prepareFreshNVRStorageForInstall = func(context.Context, string, int, int) error { return nil }
+	t.Cleanup(func() { prepareFreshNVRStorageForInstall = originalStorageSetup })
 	status, message, err := installDockerModule(context.Background(), "nvr.module", nvrLegacyImage, os.Getuid(), os.Getgid())
 	if err != nil || status.State != "running" || status.ContainerID != "new-id" {
 		t.Fatalf("built-from-source NVR install failed: %#v %q %v", status, message, err)
