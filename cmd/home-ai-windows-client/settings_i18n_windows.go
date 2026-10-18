@@ -26,7 +26,8 @@ func (state *windowsSettingsUI) applyLanguageTexts() {
 		{"nav_1", "nav_connection"},
 		{"nav_2", "nav_sync"},
 		{"nav_3", "nav_backup"},
-		{"nav_4", "nav_settings"},
+		{"nav_4", "nav_transfers"},
+		{"nav_5", "nav_settings"},
 		{"overview_title", "nav_overview"},
 		{"overview_main_subtitle", "overview_main_subtitle"},
 		{"overview_sync_button", "sync_compact"},
@@ -69,6 +70,11 @@ func (state *windowsSettingsUI) applyLanguageTexts() {
 		{"backup_agent_title", "backup_agent_title"},
 		{"agent_enable", "enable_agent"},
 		{"agent_disable", "disable_agent"},
+		{"transfers_title", "nav_transfers"},
+		{"transfers_hint", "transfers_hint"},
+		{"transfers_current_title", "transfers_current"},
+		{"transfers_history_title", "transfers_history"},
+		{"transfers_refresh_button", "refresh"},
 		{"general_title", "nav_settings"},
 		{"general_hint", "general_hint"},
 		{"language_label", "language"},
@@ -126,6 +132,7 @@ func (state *windowsSettingsUI) changeLanguage() {
 	state.refreshAgentStatus()
 	state.refreshBackupProfiles(state.selectedProfileID)
 	state.refreshOverview()
+	state.refreshTransfers()
 	state.setStatus(state.tr("ready"))
 	notifyTrayLanguageChanged()
 }
