@@ -356,10 +356,10 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 		}
 		logger.Info("Docker module operation completed", "operation", request.Operation, "module_id", request.ModuleID, "state", status.State)
 		_ = json.NewEncoder(conn).Encode(updaterhelper.Response{
-			OK:          true,
-			Message:     message,
-			ModuleState: status.State,
-			ContainerID: status.ContainerID,
+			OK:               true,
+			Message:          message,
+			ModuleState:      status.State,
+			ContainerID:      status.ContainerID,
 			PreviousManifest: status.PreviousManifest,
 		})
 		return
