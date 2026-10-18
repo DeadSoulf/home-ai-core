@@ -134,7 +134,7 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 	report("storage", "")
 	dataDir := filepath.Join(moduleDataRoot, moduleID)
 	if moduleID == "nvr.module" {
-		if err := prepareFreshNVRStorage(ctx, dataDir, serviceUID, serviceGID); err != nil {
+		if err := prepareFreshNVRStorageForInstall(ctx, dataDir, serviceUID, serviceGID); err != nil {
 			return moduleContainerStatus{}, "", fmt.Errorf("prepare assigned NVR disk: %w", err)
 		}
 	}
