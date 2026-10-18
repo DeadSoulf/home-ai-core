@@ -168,6 +168,14 @@ export function NVRPage({canManage}: {canManage: boolean}) {
     const id = activeLiveRef.current;
     if (id) void api.nvrStopLive(id).catch(() => {});
   }, []);
+  useEffect(() => {
+    if (tab === "live" || !activeLiveRef.current) return;
+    const id = activeLiveRef.current;
+    activeLiveRef.current = "";
+    setActiveLiveID("");
+    setLivePlaylist("");
+    void api.nvrStopLive(id).catch(() => {});
+  }, [tab]);
 
   function formatNVRActionError(err: unknown): string {
     if (err instanceof APIError && err.code === "nvr_upgrade_required") {
@@ -227,7 +235,7 @@ export function NVRPage({canManage}: {canManage: boolean}) {
       setActiveLiveID("");
       setLivePlaylist("");
     }
-    if (!success) setError("Не удалось удалить камеру. " + (error || "Проверьте версию NVR (требуется 1.1.3+)."));
+    if (!success) setError("Не удалось удалить камеру. Проверьте доступ и версию модуля NVR (не ниже 1.1.3).");
   }
 
   const archiveSelected = selected && recordings.some((item) => item.id === selected.id) ? selected : undefined;
