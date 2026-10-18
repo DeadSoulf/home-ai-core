@@ -77,7 +77,11 @@ func writeAIUpgradeJournal(state aiUpgradeJournal) error {
 		writeErr = f.Sync()
 	}
 	closeErr := f.Close()
-	return errors.Join(writeErr, closeErr)
+	if err := errors.Join(writeErr, closeErr); err != nil { return err }
+	root, err := os.Open(moduleDataRoot)
+	if err != nil { return err }
+	defer root.Close()
+	return root.Sync()
 }
 
 func aiDockerExists(ctx context.Context, docker, name string) (bool, error) {
