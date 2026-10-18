@@ -1,8 +1,6 @@
 package api
 
 import (
-	"context"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -25,7 +23,6 @@ func TestNVRVersionGateForArchiveSafeCameraRemoval(t *testing.T) {
 
 func TestNVRLiveStartUsesSavedCameraWithoutCredentialsInBrowser(t *testing.T) {
 	s:=nvrTestUpstream(t, `{"ok":true,"key":"saved_cam1","playlist_url":"/output/hls/saved_cam1/index.m3u8"}`)
-	s.modules = fakeModules{items: nvrTestService(true).items}
 	// Fixture ships 1.1.2; only the new tested module permits mutation.
 	mod:=nvrTestService(true)
 	mod.items[0].Manifest.Version="1.1.3"
@@ -108,6 +105,3 @@ func TestNVRLiveRejectsHostSuppliedPlaylistURL(t *testing.T) {
 	if rec.Code!=http.StatusBadGateway {t.Fatalf("unsafe URL accepted %d",rec.Code)}
 }
 
-// Keep tests independent of the actual Docker runtime.
-var _ = context.Background
-var _ = io.NopCloser
