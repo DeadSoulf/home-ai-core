@@ -164,6 +164,11 @@ func aiUpgradeSnapshot(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("backup persistent AI data: %s", commandError(output, err))
 	}
+	// Do not mark a snapshot complete until the filesystem has flushed
+	// the copied SQLite database, WAL and Ollama model blobs.
+	if output, err := exec.CommandContext(ctx,"sync","-f",backup).CombinedOutput();err!=nil {
+		return fmt.Errorf("flush AI recovery snapshot: %s",commandError(output,err))
+	}
 	marker, err := os.OpenFile(aiUpgradePath(aiUpgradeCompleteName), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return err
