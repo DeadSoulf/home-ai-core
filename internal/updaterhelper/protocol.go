@@ -156,6 +156,10 @@ type Response struct {
 	ModuleState        string                `json:"module_state,omitempty"`
 	ContainerID        string                `json:"container_id,omitempty"`
 	ModuleAddress      string                `json:"module_address,omitempty"`
+	// Streaming install updates are intermediate JSON frames on the existing
+	// authenticated helper socket. A final frame has no ProgressStage.
+	ProgressStage      string                `json:"progress_stage,omitempty"`
+	ProgressDetail     string                `json:"progress_detail,omitempty"`
 	AIGPUPCI           []string              `json:"ai_gpu_pci,omitempty"`
 }
 
