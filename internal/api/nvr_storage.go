@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"math"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -116,7 +115,7 @@ func nvrCapacityFromInventory(
 		// Unknown is different from full. Never display a misleading "0 GB"
 		// when inspection failed, or a negative/overflowed used-space value.
 		if total == 0 || !freeKnown || free > total ||
-			total > math.MaxUint64-result.TotalBytes || free > math.MaxUint64-result.FreeBytes {
+			total > ^uint64(0)-result.TotalBytes || free > ^uint64(0)-result.FreeBytes {
 			result.CapacityKnown = false
 			result.Disks = append(result.Disks, disk)
 			continue
