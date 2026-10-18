@@ -729,7 +729,7 @@ export const api = {
     return result.job;
   },
 
-  controlModule: async (id: string, operation: "enable" | "disable" | "restart") => {
+  controlModule: async (id: string, operation: "enable" | "disable" | "restart" | "activate_storage") => {
     const result = await postJSON<{job: Job}>(
       `/api/v1/modules/${encodeURIComponent(id)}/control`,
       {operation},
