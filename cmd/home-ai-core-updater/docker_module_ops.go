@@ -52,6 +52,12 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 	if !moduleIDPattern.MatchString(moduleID) || len(moduleID) > 96 {
 		return moduleContainerStatus{}, "", errors.New("invalid module id")
 	}
+	if moduleID == aiManagedID && request.Operation != "docker.module.upgrade.reconcile" &&
+		request.Operation != "docker.module.upgrade.rollback" && request.Operation != "docker.module.upgrade.finalize" {
+		_,pending,err:=readAIUpgradeJournal()
+		if err!=nil{return moduleContainerStatus{},"",err}
+		if pending{return moduleContainerStatus{},"",errors.New("AI upgrade recovery is pending; lifecycle changes are blocked")}
+	}
 	// Reject malformed or unsupported operations before starting or installing Docker.
 	// Validation must not trigger privileged system changes.
 	switch request.Operation {
