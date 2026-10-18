@@ -18,6 +18,7 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat, aiVersion}: {
   const [assignment, setAssignment] = useState<AIGPUAssignment>();
   const [gpuPackageReady, setGpuPackageReady] = useState<boolean | undefined>();
   const [gpuDownloadQueued, setGpuDownloadQueued] = useState(false);
+  const [gpuDownloadJobID, setGpuDownloadJobID] = useState("");
   const splitGPURuntime = Boolean(aiVersion && (() => {
     const numbers = aiVersion.split(".").map((part) => Number(part));
     return numbers.length === 3 && numbers.every(Number.isFinite) &&
@@ -94,6 +95,29 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat, aiVersion}: {
     return () => {live = false; window.clearInterval(timer);};
   }, [refresh]);
 
+  useEffect(() => {
+    if (!gpuDownloadJobID) return;
+    let live = true;
+    const check = async () => {
+      try {
+        const job = await api.moduleOperation(gpuDownloadJobID);
+        if (!live || !["succeeded", "failed", "cancelled"].includes(job.status)) return;
+        setGpuDownloadJobID("");
+        setGpuDownloadQueued(false);
+        if (job.status === "succeeded") {
+          void refresh();
+        } else {
+          setError("Загрузка GPU-компонентов не завершилась. Подробности — в «Модули → Операции». Повторную загрузку можно запустить после проверки ошибки.");
+        }
+      } catch {
+        // A temporary loss of contact is not proof the operation failed.
+      }
+    };
+    void check();
+    const timer = window.setInterval(() => {void check();}, 3000);
+    return () => {live = false; window.clearInterval(timer);};
+  }, [gpuDownloadJobID, refresh]);
+
   async function download(name: string) {
     if (busy) return;
     const preset = models?.recommended_models?.find((item) => item.name === name);
@@ -115,7 +139,8 @@ export function AILocalPage({onNewGPU, onModelsReady, onOpenChat, aiVersion}: {
     setBusy(true);
     setError("");
     try {
-      await api.aiPrepareGPUImage();
+      const result = await api.aiPrepareGPUImage();
+      setGpuDownloadJobID(result.job.id);
       setGpuDownloadQueued(true);
       setGpuNotice("Загрузка GPU-компонентов запущена. Ход загрузки — «Модули → Операции».");
     } catch (reason) {
