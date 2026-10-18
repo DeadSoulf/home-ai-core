@@ -178,18 +178,28 @@ export function AIPage() {
           void reload().catch(() => {});
         }}
         onSelectModel={(name) => {
-          void reload().then((nextProviders) => {
-            const provider = nextProviders.find((item) =>
+          void (async () => {
+            let items = await reload();
+            const findLocal = () => items.find((item) =>
               item.kind === "ollama" && item.model === name &&
               item.base_url === "http://127.0.0.1:11434");
-            if (provider) {
-              setModelId(provider.id);
-              setTab("chat");
-              setError("");
-            } else {
-              setError("Модель установлена в Ollama, но пока не зарегистрирована для чата. Обновите AI Agent.");
+            let provider = findLocal();
+            if (!provider) {
+              // Older installed Agent images have no automatic model sync.
+              // Explicitly selecting a model already found in local Ollama
+              // registers only that model; it does not re-download anything.
+              await api.aiAddProvider({
+                name: "Встроенный Ollama", kind: "ollama",
+                base_url: "http://127.0.0.1:11434", model: name, api_key: "",
+              });
+              items = await reload();
+              provider = findLocal();
             }
-          }).catch((err: unknown) => setError(messageOf(err)));
+            if (!provider) throw new Error("Модель не появилась в списке провайдеров.");
+            setModelId(provider.id);
+            setTab("chat");
+            setError("");
+          })().catch((err: unknown) => setError(messageOf(err)));
         }}
         onOpenChat={() => {void reload().then(() => setTab("chat")).catch((err: unknown) => setError(messageOf(err)));}}
       />
