@@ -94,9 +94,13 @@ func registerModuleJobs(service *jobs.Service, registry *modules.Registry) error
 			case "cleanup_warning":
 				progress = 9400
 			}
+			// Match install progress encoding so Docker layer bytes render live.
+			if len(detail) > 110 {
+				detail = detail[:110]
+			}
 			message := "module.phase." + stage
 			if detail != "" {
-				message += ":" + detail
+				message += "|" + detail
 			}
 			_ = reporter.Progress(ctx, progress, message)
 		})
