@@ -103,7 +103,7 @@ func registerModuleJobs(service *jobs.Service, registry *modules.Registry) error
 		if err != nil {
 			return nil, err
 		}
-		_ = reporter.Progress(ctx, 9800, "AI module upgraded; persistent data preserved")
+		_ = reporter.Progress(ctx, 9800, "module upgraded; persistent data preserved")
 		return map[string]any{"module_id": item.Manifest.ID, "status": item.Status, "version": item.Manifest.Version}, nil
 	}); err != nil {
 		return err
