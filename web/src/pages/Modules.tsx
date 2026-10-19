@@ -149,9 +149,9 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
           const aiAgent = module.manifest.id === "ai.agent";
           const candidate = aiAgent ? catalog.data?.modules.find((item) => item.id === module.manifest.id) : undefined;
           const state = candidate ? catalogState(module, candidate) : undefined;
-          const upgradeReady = !catalog.error && !catalog.loading && canUpgradeAI(module, candidate);
+          const upgradeReady = !catalog.error && !catalog.loading && !core.error && canUpgradeAI(module, candidate);
           const upgradeStatus = catalog.error ? u("moduleUpgradeCatalogError") :
-            !catalog.data ? u("moduleUpgradeChecking") :
+            catalog.loading || !catalog.data ? u("moduleUpgradeChecking") :
             !candidate ? u("moduleUpgradeNotListed") :
             state === "newer" && candidate.runtime.docker.image === module.manifest.runtime.docker.image ? u("moduleUpgradeSameImage") :
             state === "newer" ? (module.status === "enabled" ? u("moduleUpgradeAvailable") : u("moduleUpgradeDisabled")) :
@@ -227,7 +227,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
               </button>
                 {manifest.id === "ai.agent" && existing && <button type="button"
                   className="button primary" data-catalog-upgrade={manifest.id}
-                  disabled={busy || !canUpgradeAI(existing, manifest)}
+                  disabled={busy || catalog.loading || Boolean(catalog.error) || !canUpgradeAI(existing, manifest)}
                   onClick={() => setConfirmUpgrade(existing)}>{u("moduleUpgradeButton")}</button>}
               </div>}
             </article>;
