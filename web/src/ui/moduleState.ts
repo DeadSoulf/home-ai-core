@@ -34,6 +34,13 @@ export function catalogState(installed: RegisteredModule | undefined, candidate:
   if (order > 0) return "newer";
   return installed.manifest.runtime.docker.image === candidate.runtime.docker.image ? "installed" : "changed";
 }
+/** A catalog entry does not imply an update is safe or available. */
+export function canUpgradeAI(installed: RegisteredModule, candidate?: RegisteredModule["manifest"]): boolean {
+  return installed.manifest.id === "ai.agent" && installed.status === "enabled" &&
+    candidate?.id === installed.manifest.id &&
+    catalogState(installed, candidate) === "newer" &&
+    candidate.runtime.docker.image !== installed.manifest.runtime.docker.image;
+}
 export function runtimeMessage(status?: ModuleRuntime): UIKey {
   if (!status) return "runtimeUnknown";
   if (!status.available) return "runtimeAbsent";
