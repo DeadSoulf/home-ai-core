@@ -51,8 +51,12 @@ async def main():
         browser = await playwright.chromium.launch(headless=True, args=["--no-sandbox"])
         harness = await ui.Harness(browser, modules=installed, overrides=overrides).start("/modules/nvr.module")
         try:
-            panel = harness.page.locator(".nvr-page").get_by_role("region", name="Хранилище NVR")
-            # A section with a title is not automatically an aria named region.
+            storage_tab = harness.page.get_by_role("button", name="Хранилище NVR", exact=True)
+            await expect(storage_tab).to_be_visible()
+            # The storage window belongs only to its own tab, not the camera tab.
+            await expect(harness.page.locator(".nvr-storage-summary")).to_have_count(0)
+            await expect(harness.page.get_by_role("button", name="Камеры", exact=True)).to_be_visible()
+            await storage_tab.click()
             panel = harness.page.locator(".nvr-page .nvr-storage-device-list")
             await expect(panel).to_be_visible()
             await expect(harness.page.locator(".nvr-storage-summary")).to_contain_text("700 ГиБ")
@@ -64,6 +68,14 @@ async def main():
             await expect(harness.page.locator(".nvr-storage-warning")).to_contain_text(
                 "не подтверждает, что NVR записывает видео"
             )
+            # Switching to archive/cameras must not leak storage controls into them.
+            await harness.page.get_by_role("button", name="Архив записей", exact=True).click()
+            await expect(harness.page.locator(".nvr-storage-device-list")).to_have_count(0)
+            await expect(harness.page.get_by_text("Архив видеозаписей", exact=True)).to_be_visible()
+            await harness.page.get_by_role("button", name="Камеры", exact=True).click()
+            await expect(harness.page.locator(".nvr-storage-device-list")).to_have_count(0)
+            await storage_tab.click()
+            await expect(panel).to_be_visible()
 
             video_disk.update(disks=[{
                 "device": "/dev/sdb1", "label": "Видеоархив",
@@ -78,7 +90,7 @@ async def main():
         finally:
             await browser.close()
 
-    print("PASS: NVR reports mounted video disk space and unmounted unknown state without changing disks.")
+    print("PASS: NVR storage tab isolates video disk status and preserves mounted/unmounted display without changing disks.")
 
 
 if __name__ == "__main__":
