@@ -310,7 +310,7 @@ async def suite(browser):
     await check('UI-02/07: install prepares Docker, tracks job without websocket, prevents double submit',no_docker)
 
     async def versions():
-        for candidate,label in [('1.1.0','Установлена более новая версия'),('1.3.0','не заявлена поддержка безопасного обновления')]:
+        for candidate,label in [('1.1.0','Установлена более новая версия'),('1.3.0','В каталоге указана более новая версия с тем же Docker-образом')]:
             manifest=copy.deepcopy(MANIFEST);manifest['version']=candidate
             h=await Harness(browser,modules=[module()],catalog=[manifest]).start('/modules/catalog'); await h.ready()
             card=h.page.locator('[data-catalog-id=\"demo.nvr\"]')
