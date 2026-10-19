@@ -310,17 +310,17 @@ async def suite(browser):
     await check('UI-02/07: install prepares Docker, tracks job without websocket, prevents double submit',no_docker)
 
     async def versions():
-        for candidate,label in [('1.1.0','Установлена более новая версия'),('1.3.0','безопасное обновление модулей пока не реализовано')]:
+        for candidate,label in [('1.1.0','Установлена более новая версия'),('1.3.0','не заявлена поддержка безопасного обновления')]:
             manifest=copy.deepcopy(MANIFEST);manifest['version']=candidate
             h=await Harness(browser,modules=[module()],catalog=[manifest]).start('/modules/catalog'); await h.ready()
             card=h.page.locator('[data-catalog-id=\"demo.nvr\"]')
-            await expect(card).to_contain_text(label); await expect(card.locator('button')).to_be_disabled()
+            await expect(card).to_contain_text(label); await expect(card.get_by_role('button',name='Установлен')).to_be_disabled(); await expect(card.get_by_role('button',name='Обновить модуль')).to_be_disabled()
             assert not h.requests
             await h.screenshot('05-catalog-'+candidate);await h.close()
         manifest=copy.deepcopy(MANIFEST);manifest['runtime']['docker']['image']='example.com/camera@sha256:'+'b'*64
         h=await Harness(browser,modules=[module()],catalog=[manifest]).start('/modules/catalog');await h.ready()
         await expect(h.page.locator('[data-catalog-id=\"demo.nvr\"]')).to_contain_text('Манифест каталога отличается')
-        await expect(h.page.locator('[data-catalog-id=\"demo.nvr\"] button')).to_be_disabled();await h.close()
+        await expect(h.page.locator('[data-catalog-id=\"demo.nvr\"]').get_by_role('button',name='Обновить модуль')).to_be_disabled();await h.close()
     await check('UI-03: older/newer/same-version different digest do not offer unsafe update',versions)
 
     async def ai_upgrade():
