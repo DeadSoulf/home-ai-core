@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,13 +18,20 @@ import (
 	"github.com/DeadSoulf/home-ai-core/internal/state"
 )
 
-const officialModuleCatalogAPI = "https://api.github.com/repos/DeadSoulf/home-ai-core_modules/contents/catalog.json?ref=main"
+const (
+	officialModuleCatalogAPI = "https://api.github.com/repos/DeadSoulf/home-ai-core_modules/contents/catalog.json?ref=main"
+	// Private SDK611 overrides are only read when the host explicitly enables
+	// this channel. Public NVR users retain their downloadable stable image.
+	privateNVRManifestAPI = "https://api.github.com/repos/DeadSoulf/home-ai-bridge/contents/modules/nvr.sdk611.manifest.json?ref=main"
+	privateNVRImagePrefix = "ghcr.io/deadsoulf/home-ai-core_dvr-sdk611@sha256:"
+)
 
 type moduleCatalogDocument struct {
 	SchemaVersion int                `json:"schema_version"`
 	ID            string             `json:"id"`
 	GeneratedAt   string             `json:"generated_at"`
 	Modules       []modules.Manifest `json:"modules"`
+	PrivateNVRStatus string `json:"-"`
 }
 
 type githubContentResponse struct {
@@ -77,8 +86,119 @@ func loadOfficialModuleCatalog(r *http.Request) (moduleCatalogDocument, error) {
 			return moduleCatalogDocument{}, fmt.Errorf("invalid catalog module %q: %w", manifest.ID, err)
 		}
 	}
+	// Never replace the public NVR image for other users. Only a host with
+	// explicit SDK611 opt-in *and* authenticated private GitHub access sees
+	// the private candidate in its own Core UI.
+	if strings.TrimSpace(os.Getenv("HOME_AI_MODULE_PRIVATE_SDK611")) == "1" {
+		token := strings.TrimSpace(os.Getenv("HOME_AI_MODULE_CATALOG_TOKEN"))
+		if token == "" {
+			catalog.PrivateNVRStatus = "missing_token"
+		} else {
+			manifest, err := fetchPrivateNVRManifest(r.Context(), &http.Client{Timeout: 5 * time.Second}, token, privateNVRManifestAPI)
+			if err != nil {
+				catalog.PrivateNVRStatus = "unavailable"
+			} else {
+				catalog.PrivateNVRStatus = mergePrivateNVRCandidate(&catalog, manifest)
+			}
+		}
+	}
 	return catalog, nil
 }
+
+// fetchPrivateNVRManifest accepts only an authenticated, constant GitHub
+// Contents endpoint in production. Never forward caller-controlled URLs from
+// the browser to the privileged module helper or public catalog.
+func fetchPrivateNVRManifest(ctx context.Context, client *http.Client, token, url string) (modules.Manifest, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return modules.Manifest{}, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	req.Header.Set("User-Agent", "home-ai-core")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := client.Do(req)
+	if err != nil {
+		return modules.Manifest{}, fmt.Errorf("read private NVR update metadata: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		// Do not report response bodies: they may contain authentication or
+		// private repository information, and never fall back to an unsafe image.
+		return modules.Manifest{}, fmt.Errorf("private NVR metadata unavailable (HTTP %d)", resp.StatusCode)
+	}
+	var payload githubContentResponse
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 256<<10)).Decode(&payload); err != nil {
+		return modules.Manifest{}, fmt.Errorf("decode private NVR metadata: %w", err)
+	}
+	if payload.Encoding != "base64" {
+		return modules.Manifest{}, errors.New("private NVR metadata has unsupported encoding")
+	}
+	raw, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(payload.Content, "\n", ""))
+	if err != nil || len(raw) > 64<<10 {
+		return modules.Manifest{}, errors.New("private NVR manifest is invalid or oversized")
+	}
+	var candidate modules.Manifest
+	if err := json.Unmarshal(raw, &candidate); err != nil {
+		return modules.Manifest{}, errors.New("private NVR manifest is invalid")
+	}
+	if err := modules.ValidateManifest(candidate); err != nil {
+		return modules.Manifest{}, fmt.Errorf("private NVR manifest validation failed: %w", err)
+	}
+	if candidate.ID != "nvr.module" || !strings.HasPrefix(candidate.Runtime.Docker.Image, privateNVRImagePrefix) {
+		return modules.Manifest{}, errors.New("private NVR manifest has an untrusted module ID or image repository")
+	}
+	return candidate, nil
+}
+
+func newerNVRSemver(candidate, stable string) bool {
+	parse := func(value string) ([3]uint64, bool) {
+		var parts [3]uint64
+		tokens := strings.Split(strings.TrimPrefix(value, "v"), ".")
+		if len(tokens) != 3 {
+			return parts, false
+		}
+		for i, token := range tokens {
+			if token == "" || strings.Trim(token, "0123456789") != "" {
+				return parts, false
+			}
+			num, err := strconv.ParseUint(token, 10, 64)
+			if err != nil {
+				return parts, false
+			}
+			parts[i] = num
+		}
+		return parts, true
+	}
+	c, okC := parse(candidate)
+	s, okS := parse(stable)
+	if !okC || !okS {
+		return false
+	}
+	for i := range c {
+		if c[i] != s[i] {
+			return c[i] > s[i]
+		}
+	}
+	return false
+}
+
+func mergePrivateNVRCandidate(catalog *moduleCatalogDocument, private modules.Manifest) string {
+	for i := range catalog.Modules {
+		if catalog.Modules[i].ID != private.ID {
+			continue
+		}
+		if !newerNVRSemver(private.Version, catalog.Modules[i].Version) {
+			return "up_to_date"
+		}
+		catalog.Modules[i] = private
+		return "available"
+	}
+	return "unavailable"
+}
+
 
 func (s *server) moduleCatalog(
 	w http.ResponseWriter,
@@ -96,6 +216,7 @@ func (s *server) moduleCatalog(
 			"id":           catalog.ID,
 			"generated_at": catalog.GeneratedAt,
 			"modules":      catalog.Modules,
+			"private_nvr_status": catalog.PrivateNVRStatus,
 		},
 	})
 }
