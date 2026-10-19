@@ -38,7 +38,9 @@ func TestModuleUpgradeNamesAreIsolatedPerModule(t *testing.T) {
 	for _, id := range []string{"ai.agent", "nvr.module", "reference.module"} {
 		candidate, previous := moduleUpgradeStageNames(id)
 		for _, name := range []string{candidate, previous} {
-			if seen[name] { t.Fatalf("upgrade staging name collision: %s", name) }
+			if seen[name] {
+				t.Fatalf("upgrade staging name collision: %s", name)
+			}
 			seen[name] = true
 		}
 	}
@@ -66,7 +68,9 @@ func TestModuleUpgradeWillNotOverwriteExistingStagingContainer(t *testing.T) {
 }
 
 func TestModuleUpgradeRejectsUnexpectedPersistentDataMount(t *testing.T) {
-	if runtime.GOOS == "windows" { t.Skip("POSIX fake Docker CLI") }
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX fake Docker CLI")
+	}
 	dir := t.TempDir()
 	original := moduleDataRoot
 	moduleDataRoot = filepath.Join(dir, "module-data")
@@ -78,7 +82,9 @@ func TestModuleUpgradeRejectsUnexpectedPersistentDataMount(t *testing.T) {
 		"  exit 0\n" +
 		"fi\n" +
 		"exit 91\n"
-	if err := os.WriteFile(binary, []byte(script), 0o755); err != nil { t.Fatal(err) }
+	if err := os.WriteFile(binary, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := verifyModuleUpgradeDataMount(context.Background(), binary, "reference.module", "home-ai-module-reference.module"); err == nil || !strings.Contains(err.Error(), "persistent bind mount") {
 		t.Fatalf("unexpected /data mount accepted: %v", err)
 	}
