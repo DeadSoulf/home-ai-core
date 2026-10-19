@@ -174,8 +174,8 @@ func (s *server) moduleCatalogUpgrade(w http.ResponseWriter, r *http.Request, ac
 		return
 	}
 	id := strings.TrimSpace(r.PathValue("moduleID"))
-	if id != "ai.agent" {
-		writeAPIError(w, r, http.StatusBadRequest, "module_upgrade_not_supported", "safe upgrades currently support only ai.agent", nil)
+	if id == "" {
+		s.notFound(w, r)
 		return
 	}
 	installed, err := s.modules.Get(r.Context(), id)
@@ -188,7 +188,7 @@ func (s *server) moduleCatalogUpgrade(w http.ResponseWriter, r *http.Request, ac
 		return
 	}
 	if installed.Status != "enabled" {
-		writeAPIError(w, r, http.StatusConflict, "module_not_running", "AI module must be running to upgrade safely", nil)
+		writeAPIError(w, r, http.StatusConflict, "module_not_running", "module must be running to upgrade safely", nil)
 		return
 	}
 	catalog, err := loadOfficialModuleCatalog(r)
