@@ -592,8 +592,6 @@ func settingsWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) ui
 			state.finishTrustServerCertificate()
 			return 0
 		}
-			return 0
-		}
 	case settingsWMClose:
 		procSettingsDestroyWindow.Call(hwnd)
 		return 0
