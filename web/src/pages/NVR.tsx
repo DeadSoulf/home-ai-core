@@ -7,7 +7,7 @@ import {NVRStoragePanel} from "../components/NVRStoragePanel";
 import {PageHeading} from "./Dashboard";
 import "./NVR.css";
 
-type NVRTab = "cameras" | "live" | "discovery" | "archive";
+type NVRTab = "cameras" | "live" | "discovery" | "archive" | "storage";
 
 const localDate = (seconds: number) => new Date(seconds * 1000).toLocaleString();
 const bytes = (value: number) => value >= 1024 ** 3
@@ -287,6 +287,8 @@ export function NVRPage({canManage}: {canManage: boolean}) {
         onClick={() => setTab("discovery")}>Поиск камер</button>}
       <button type="button" className={"button " + (tab === "archive" ? "primary" : "secondary")}
         onClick={() => setTab("archive")}>Архив записей</button>
+      <button type="button" className={"button " + (tab === "storage" ? "primary" : "secondary")}
+        onClick={() => setTab("storage")}>Хранилище NVR</button>
       <button type="button" className="button secondary" disabled={busy}
         onClick={() => {
           setLoading(true);
@@ -308,7 +310,7 @@ export function NVRPage({canManage}: {canManage: boolean}) {
       <div className="nvr-stat"><small>Размер видеоархива</small><strong>{bytes(status.storage_bytes)}</strong></div>
     </div>}
 
-    <NVRStoragePanel storage={storage} loading={storageLoading} error={storageError} />
+    {tab === "storage" && <NVRStoragePanel storage={storage} loading={storageLoading} error={storageError} />}
 
     {tab === "cameras" && <Panel title="Подключённые камеры">
       <div className="button-row">
