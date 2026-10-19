@@ -33,11 +33,12 @@ const (
 	settingsWMSetFont = 0x0030
 	settingsWMApp     = 0x8000
 
-	settingsWMConnected         = settingsWMApp + 201
-	settingsWMSyncDone          = settingsWMApp + 202
-	settingsWMAgentDone         = settingsWMApp + 203
-	settingsWMUpdateCheckDone   = settingsWMApp + 204
-	settingsWMUpdateInstallDone = settingsWMApp + 206
+	settingsWMConnected            = settingsWMApp + 201
+	settingsWMSyncDone             = settingsWMApp + 202
+	settingsWMAgentDone            = settingsWMApp + 203
+	settingsWMUpdateCheckDone      = settingsWMApp + 204
+	settingsWMCertificateProbeDone = settingsWMApp + 205
+	settingsWMUpdateInstallDone    = settingsWMApp + 206
 
 	settingsWSOverlappedWindow = 0x00CF0000
 	settingsWSVisible          = 0x10000000
@@ -188,6 +189,10 @@ type windowsSettingsUI struct {
 	updateCheckBtn       windows.Handle
 	updateInstallBtn     windows.Handle
 	updateStatusLabel    windows.Handle
+	certificateStatus    windows.Handle
+	certificateTrustBtn  windows.Handle
+	certificateForgetBtn windows.Handle
+	certificateProbeBusy bool
 	updateBusy           bool
 	updateInstalling     bool
 	updateWasInstalled   bool
@@ -237,6 +242,7 @@ type windowsSettingsUI struct {
 	agentResult         *settingsAsyncResult
 	updateResult        *settingsUpdateCheckResult
 	updateInstallResult *settingsUpdateInstallResult
+	certificateProbe    *settingsCertificateProbeResult
 }
 
 var (
@@ -440,6 +446,7 @@ func runSettingsUI(args []string) error {
 	state.applyLanguageTexts()
 	state.loadInitial()
 	state.loadUpdateChannel()
+	state.refreshCertificatePinStatus()
 	if updated || alreadyCurrent {
 		state.showPage(settingsPageGeneral)
 		if updated {
@@ -580,6 +587,11 @@ func settingsWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) ui
 			state.finishUpdateInstallation()
 			return 0
 		}
+	case settingsWMCertificateProbeDone:
+		if state != nil {
+			state.finishTrustServerCertificate()
+			return 0
+		}
 	case settingsWMClose:
 		procSettingsDestroyWindow.Call(hwnd)
 		return 0
@@ -657,6 +669,18 @@ func (state *windowsSettingsUI) handleCommand(id, notify uint16) {
 	case settingsIDConnect:
 		if notify == settingsBNClicked {
 			state.beginConnect()
+		}
+	case settingsIDServerEdit:
+		if notify == settingsENChange {
+			state.refreshCertificatePinStatus()
+		}
+	case settingsIDTrustCertificate:
+		if notify == settingsBNClicked {
+			state.beginTrustServerCertificate()
+		}
+	case settingsIDForgetCertificate:
+		if notify == settingsBNClicked {
+			state.forgetServerCertificate()
 		}
 	case settingsIDBrowse:
 		if notify == settingsBNClicked {
@@ -824,7 +848,11 @@ func (state *windowsSettingsUI) finishConnect() {
 	if result.err != nil {
 		state.connected = false
 		if !result.silent {
-			state.setStatus(state.tr("connection_failed") + ": " + result.err.Error())
+			details := result.err.Error()
+			if key := certificateErrorMessageKey(result.err); key != "" {
+				details = state.tr(key)
+			}
+			state.setStatus(state.tr("connection_failed") + ": " + details)
 		}
 		state.refreshOverview()
 		if !result.silent {
@@ -1276,6 +1304,11 @@ func (state *windowsSettingsUI) showError(text string) {
 
 func (state *windowsSettingsUI) showTechnicalError(err error) {
 	if err == nil {
+		return
+	}
+	if key := certificateErrorMessageKey(err); key != "" {
+		state.showError(state.tr(key) + "\n\n" + state.tr("tls_resolution") +
+			"\n\n" + state.tr("tls_diagnostic") + ": " + err.Error())
 		return
 	}
 	state.showError(state.tr("error_prefix") + ": " + err.Error())
