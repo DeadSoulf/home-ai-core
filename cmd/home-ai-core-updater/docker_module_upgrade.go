@@ -230,22 +230,29 @@ func rollbackModuleUpgrade(ctx context.Context, binary, name, previousName strin
 	return inspectModuleContainer(ctx, binary, name)
 }
 
-	
 // verifyModuleUpgradeSource prevents a privileged switch away from an
 // unrecognized container, local-source fallback, modified data mount or GPU.
 func verifyModuleUpgradeSource(ctx context.Context, binary, moduleID, name, registeredImage string) error {
 	exists, managed, err := inspectManagedContainer(ctx, binary, name, moduleID)
-	if err != nil { return err }
-	if !exists || !managed { return fmt.Errorf("module %q has no managed running container", moduleID) }
+	if err != nil {
+		return err
+	}
+	if !exists || !managed {
+		return fmt.Errorf("module %q has no managed running container", moduleID)
+	}
 	if moduleID == aiManagedID || moduleID == "nvr.module" {
 		if _, err := inspectManagedModuleAddress(ctx, moduleID); err != nil {
 			return fmt.Errorf("verify managed module network: %w", err)
 		}
 	}
 	output, err := exec.CommandContext(ctx, binary, "inspect", "--format", "{{json .}}", name).CombinedOutput()
-	if err != nil { return fmt.Errorf("inspect module for upgrade: %s", commandError(output, err)) }
+	if err != nil {
+		return fmt.Errorf("inspect module for upgrade: %s", commandError(output, err))
+	}
 	var state aiGPUContainer
-	if err := json.Unmarshal(output, &state); err != nil { return fmt.Errorf("decode module container: %w", err) }
+	if err := json.Unmarshal(output, &state); err != nil {
+		return fmt.Errorf("decode module container: %w", err)
+	}
 	if !state.State.Running || state.Config.Labels["home-ai.managed"] != "true" ||
 		state.Config.Labels["home-ai.module.id"] != moduleID {
 		return errors.New("module container is stopped or unmanaged")
@@ -256,9 +263,13 @@ func verifyModuleUpgradeSource(ctx context.Context, binary, moduleID, name, regi
 	if moduleID == aiManagedID && strings.TrimSpace(state.Config.Labels["home-ai.ai.gpu.pci"]) != "" {
 		return errors.New("AI GPU allocation must be disabled before a CPU image upgrade")
 	}
-	if err := verifyModuleUpgradeDataMount(ctx, binary, moduleID, name); err != nil { return err }
+	if err := verifyModuleUpgradeDataMount(ctx, binary, moduleID, name); err != nil {
+		return err
+	}
 	requests, err := exec.CommandContext(ctx, binary, "inspect", "--format", "{{json .HostConfig.DeviceRequests}}", name).Output()
-	if err != nil { return fmt.Errorf("inspect module device assignments: %w", err) }
+	if err != nil {
+		return fmt.Errorf("inspect module device assignments: %w", err)
+	}
 	if value := strings.TrimSpace(string(requests)); value != "" && value != "null" && value != "[]" {
 		return errors.New("module has custom device requests; upgrade refused")
 	}
@@ -277,19 +288,27 @@ func verifyModuleUpgradeDataMount(ctx context.Context, binary, moduleID, name st
 		return verifyNVRContainerMount(ctx, binary, name, dataDir)
 	}
 	out, err := exec.CommandContext(ctx, binary, "inspect", "--format", "{{json .Mounts}}", name).CombinedOutput()
-	if err != nil { return fmt.Errorf("inspect module data mount: %s", commandError(out, err)) }
+	if err != nil {
+		return fmt.Errorf("inspect module data mount: %s", commandError(out, err))
+	}
 	var mounts []struct {
 		Type, Source, Destination string
 	}
-	if err := json.Unmarshal(out, &mounts); err != nil { return fmt.Errorf("decode module mounts: %w", err) }
+	if err := json.Unmarshal(out, &mounts); err != nil {
+		return fmt.Errorf("decode module mounts: %w", err)
+	}
 	found := false
 	for _, mount := range mounts {
-		if mount.Destination != "/data" { continue }
+		if mount.Destination != "/data" {
+			continue
+		}
 		if mount.Type != "bind" || filepath.Clean(mount.Source) != dataDir {
 			return errors.New("module /data is not the expected managed persistent bind mount")
 		}
 		found = true
 	}
-	if !found { return errors.New("module /data managed persistent bind mount is missing") }
+	if !found {
+		return errors.New("module /data managed persistent bind mount is missing")
+	}
 	return nil
 }
