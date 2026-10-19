@@ -169,21 +169,23 @@ func TestUpgradeSupportsNVRAndReferenceModules(t *testing.T) {
 
 func TestUpgradeRejectsWithoutLifecycleOptIn(t *testing.T) {
 	ctx := context.Background()
-	for _, candidateOptIn := range []bool{false, true} {
+	for _, missingIn := range []string{"installed", "candidate"} {
 		db, err := state.Open(ctx, t.TempDir())
 		if err != nil {
 			t.Fatal(err)
 		}
 		old := validManifest("nvr.module", "1.1.4")
-		if candidateOptIn {
+		if missingIn == "candidate" {
 			old.Lifecycle = append(old.Lifecycle, "upgrade")
 		}
 		persistManifest(t, db, old, "enabled")
 		next := old
 		next.Version = "1.1.5"
 		next.Runtime.Docker.Image = "ghcr.io/home-ai/test@sha256:" + strings.Repeat("b", 64)
-		if !candidateOptIn {
+		if missingIn == "installed" {
 			next.Lifecycle = append(next.Lifecycle, "upgrade")
+		} else {
+			next.Lifecycle = []string{"install", "remove"}
 		}
 		registry := NewRegistry(db, "0.1.203")
 		calls := 0
