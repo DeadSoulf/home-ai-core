@@ -34,7 +34,9 @@ func TestModuleUpgradeRejectsOtherModulesBeforeDockerAccess(t *testing.T) {
 }
 
 func TestModuleUpgradeWillNotOverwriteExistingStagingContainer(t *testing.T) {
-	if runtime.GOOS == "windows" { t.Skip("POSIX fake Docker CLI") }
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX fake Docker CLI")
+	}
 	dir := t.TempDir()
 	binary := filepath.Join(dir, "docker")
 	script := "#!/bin/sh\n" +
@@ -43,7 +45,9 @@ func TestModuleUpgradeWillNotOverwriteExistingStagingContainer(t *testing.T) {
 		"  exit 0\n" +
 		"fi\n" +
 		"exit 91\n"
-	if err := os.WriteFile(binary, []byte(script), 0o755); err != nil { t.Fatal(err) }
+	if err := os.WriteFile(binary, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := ensureAIUpgradeNamesFree(context.Background(), binary); err == nil || !strings.Contains(err.Error(), "recovery") {
 		t.Fatalf("staging collision ignored: %v", err)
 	}
