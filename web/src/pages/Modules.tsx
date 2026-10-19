@@ -144,6 +144,10 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
       action={<button type="button" className="button secondary" disabled={catalog.loading || busy} onClick={catalog.reload}>{u("moduleUpgradeCheck")}</button>}>
       <p className="ux-panel-description">{u("uxModulesInstalledHint")}</p>
       {catalog.error && <p className="notice" role="status">{u("moduleUpgradeCatalogError")}</p>}
+      {catalog.data?.private_nvr_status === "missing_token" &&
+        <p className="notice" role="status">Закрытое обновление NVR 1.1.6 доступно владельцу, но не настроен ключ доступа GHCR. Стабильная публичная версия остаётся доступной.</p>}
+      {catalog.data?.private_nvr_status === "unavailable" &&
+        <p className="notice" role="status">Закрытое обновление NVR недоступно: проверьте токен с правами чтения приватного репозитория и пакетов GHCR.</p>}
       <div className="card-grid">
         {value.modules.map((module) => {
           const candidate = catalog.data?.modules.find((item) => item.id === module.manifest.id);
@@ -207,6 +211,9 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
       {catalog.error && <ErrorState message={catalog.error} onRetry={catalog.reload} />}
       {catalog.data && <>
         <div className="catalog-summary"><p>{t("moduleCatalogOfficial")}</p><span className="mono small">{catalog.data.id}</span></div>
+        {catalog.data.private_nvr_status === "available" && <p className="notice" role="status">NVR: доступна закрытая версия HCNetSDK 6.1.11.40. Перед обновлением проверьте диск NVR и сохранность архива.</p>}
+        {catalog.data.private_nvr_status === "missing_token" && <p className="notice" role="status">Для закрытого обновления NVR требуется настроить HOME_AI_MODULE_CATALOG_TOKEN на Core и updater. Пока доступна публичная версия.</p>}
+        {catalog.data.private_nvr_status === "unavailable" && <p className="notice" role="status">Закрытый каталог NVR недоступен по текущим учётным данным GitHub/GHCR.</p>}
         <div className="card-grid">
           {catalog.data.modules.map((manifest) => {
             const existing = installed.get(manifest.id); const state = catalogState(existing, manifest);
