@@ -23,6 +23,7 @@ def module(status='enabled',version='1.2.0'):
 def ai_module(status='enabled'):
     manifest=copy.deepcopy(MANIFEST)
     manifest.update(id='ai.agent', name='AI Agent')
+    manifest['lifecycle'].append('upgrade')
     manifest['ui']={'navigation':[dict(id='ai.agent',title='AI Agent',route='/modules/ai.agent')]}
     return dict(manifest=manifest,status=status)
 
@@ -332,7 +333,7 @@ async def suite(browser):
         await expect(card.get_by_role('button',name='Обновить модуль',exact=True)).to_be_enabled()
         await card.get_by_role('button',name='Обновить модуль',exact=True).click()
         dialog=h.page.get_by_role('dialog')
-        await expect(dialog).to_contain_text('Модели и переписка в /data сохраняются')
+        await expect(dialog).to_contain_text('Постоянные данные /data сохраняются')
         await dialog.get_by_role('button',name='Обновить модуль',exact=True).click()
         await expect(h.page.get_by_role('progressbar')).to_be_visible()
         assert (await h.url()).endswith('/modules/operations')
@@ -367,6 +368,33 @@ async def suite(browser):
         await expect(card).to_contain_text('Обновлений нет')
         await h.close()
     await check('UI-03b: AI update action stays visible when no release or catalog is unavailable',ai_upgrade_visible_without_release)
+    async def other_module_upgrades():
+        for module_id in ['nvr.module','reference.module','custom.module']:
+            current=module()
+            current['manifest']['id']=module_id
+            current['manifest']['lifecycle'].append('upgrade')
+            candidate=copy.deepcopy(current['manifest'])
+            candidate['version']='1.3.0'
+            candidate['runtime']['docker']['image']='example.com/new@sha256:'+'b'*64
+            h=await Harness(browser,modules=[current],catalog=[candidate]).start('/modules/installed');await h.ready()
+            card=h.page.locator('[data-module-id="'+module_id+'"]')
+            await expect(card.get_by_role('button',name='Проверить обновления')).to_be_enabled()
+            await expect(card.get_by_role('button',name='Обновить модуль',exact=True)).to_be_enabled()
+            await card.get_by_role('button',name='Обновить модуль',exact=True).click()
+            await h.page.get_by_role('dialog').get_by_role('button',name='Обновить модуль',exact=True).click()
+            assert len(h.posts('/upgrade'))==1, (module_id, h.posts('/upgrade'))
+            assert h.posts('/upgrade')[0][1].endswith('/'+module_id+'/upgrade')
+            await h.close()
+
+            current['manifest']['lifecycle'].remove('upgrade')
+            h=await Harness(browser,modules=[current],catalog=[candidate]).start('/modules/installed');await h.ready()
+            card=h.page.locator('[data-module-id="'+module_id+'"]')
+            await expect(card.get_by_role('button',name='Обновить модуль',exact=True)).to_be_disabled()
+            await expect(card).to_contain_text('не заявлена поддержка')
+            assert not h.posts('/upgrade')
+            await h.close()
+    await check('UI-03c: safe updates appear for NVR, reference and custom modules',other_module_upgrades)
+
 
 
     async def retry():
