@@ -143,8 +143,14 @@ func upgradeDockerAI(ctx context.Context, request updaterhelper.Request, uid, gi
 	// The stopped previous container is intentionally retained until the Core
 	// SQLite manifest write succeeds. Commit and rollback are separate calls.
 	status, err := inspectModuleContainer(critical, binary, name)
-	if err != nil {
-		return moduleContainerStatus{}, "", fmt.Errorf("new AI active; previous container retained for recovery: %w", err)
+	if err != nil || status.State != "running" {
+		if err == nil {
+			err = errors.New("upgraded AI container is not running after the swap")
+		}
+		recovery, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+		defer cancel()
+		_, rollbackErr := rollbackAIUpgrade(recovery, binary, name)
+		return moduleContainerStatus{}, "", errors.Join(err, rollbackErr)
 	}
 	return status, "AI candidate healthy; previous container retained pending registry commit", nil
 }
