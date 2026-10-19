@@ -217,7 +217,9 @@ func (r *Registry) UpgradeManifest(ctx context.Context, manifest Manifest, progr
 	if _, err := r.upgradeHelper(cleanup, "docker.module.upgrade.commit", manifest.ID, newImage, oldImage, nil); err != nil && callback != nil {
 		callback("cleanup_warning", "old container cleanup needs attention")
 	}
-	return r.Get(finishCtx, manifest.ID)
+	readCtx, readDone := context.WithTimeout(context.Background(), 5*time.Second)
+	defer readDone()
+	return r.Get(readCtx, manifest.ID)
 }
 
 func (r *Registry) Control(ctx context.Context, id, operation string) (Registered, error) {
