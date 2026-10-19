@@ -200,7 +200,7 @@ class Harness:
                 await respond(dict(job=self.jobs[0]))
             elif path=='/api/v1/jobs' and method=='DELETE': self.jobs=[j for j in self.jobs if j['status'] in ('running','queued','cancel_requested')]; await respond(dict(deleted=1))
             elif path.startswith('/api/v1/modules/') and method in ('POST','DELETE'):
-                typ='module.remove' if method=='DELETE' else 'module.control' if path.endswith('/control') else 'module.install'
+                typ='module.remove' if method=='DELETE' else 'module.upgrade' if path.endswith('/upgrade') else 'module.control' if path.endswith('/control') else 'module.install'
                 self.jobs=[job('queued',typ)]; await respond(dict(job=self.jobs[0]),202)
             elif path=='/api/v1/security/users': await respond(dict(users=[dict(id='usr-owner',username='owner',display_name='Home Owner',roles=['owner'],permissions=PERMISSIONS,profile='owner',created_at='2026-10-14T00:00:00Z')]))
             else:self.unhandled.append((method,path)); await respond(None,404)
@@ -321,6 +321,28 @@ async def suite(browser):
         await expect(h.page.locator('[data-catalog-id=\"demo.nvr\"]')).to_contain_text('Манифест каталога отличается')
         await expect(h.page.locator('[data-catalog-id=\"demo.nvr\"] button')).to_be_disabled();await h.close()
     await check('UI-03: older/newer/same-version different digest do not offer unsafe update',versions)
+
+    async def ai_upgrade():
+        current=ai_module()
+        candidate=copy.deepcopy(current['manifest'])
+        candidate['version']='1.3.0'
+        candidate['runtime']['docker']['image']='example.com/camera@sha256:'+'b'*64
+        h=await Harness(browser,modules=[current],catalog=[candidate]).start('/modules/installed');await h.ready()
+        card=h.page.locator('[data-module-id="ai.agent"]')
+        await expect(card.get_by_role('button',name='Обновить модуль',exact=True)).to_be_enabled()
+        await card.get_by_role('button',name='Обновить модуль',exact=True).click()
+        dialog=h.page.get_by_role('dialog')
+        await expect(dialog).to_contain_text('Модели и переписка в /data сохраняются')
+        await dialog.get_by_role('button',name='Обновить модуль',exact=True).click()
+        await expect(h.page.get_by_role('progressbar')).to_be_visible()
+        assert (await h.url()).endswith('/modules/operations')
+        assert len(h.posts('/upgrade'))==1
+        assert h.jobs[0]['type']=='module.upgrade'
+        await h.close()
+        h=await Harness(browser,modules=[ai_module('disabled')],catalog=[candidate]).start('/modules/installed');await h.ready()
+        await expect(h.page.locator('[data-module-id="ai.agent"]').get_by_role('button',name='Обновить модуль')).to_be_disabled()
+        await h.close()
+    await check('UI-03a: only running AI Agent offers confirmed catalog upgrade',ai_upgrade)
 
     async def retry():
         manifest=copy.deepcopy(MANIFEST);manifest['version']='9.0.0';manifest['runtime']['docker']['image']='example.com/camera@sha256:'+'b'*64
