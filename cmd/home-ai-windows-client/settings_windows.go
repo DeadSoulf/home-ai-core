@@ -1051,29 +1051,10 @@ func (state *windowsSettingsUI) deleteSelectedProfile() {
 func (state *windowsSettingsUI) populateFolders(preferred string) {
 	procSettingsSendMessage.Call(uintptr(state.folderCombo), settingsCBReset, 0, 0)
 	state.folderIDs = state.folderIDs[:0]
-	selected := -1
-	for _, folder := range state.folders {
-		if !folder.CanWrite {
-			continue
-		}
-		label := folder.Name
-		if folder.PoolName != "" {
-			label += " (" + folder.PoolName + ")"
-		}
-		label += " — " + folder.ID
-		state.comboAdd(state.folderCombo, label)
-		state.folderIDs = append(state.folderIDs, folder.ID)
-		if folder.ID == preferred {
-			selected = len(state.folderIDs) - 1
-		}
-	}
-	if preferred != "" && selected < 0 {
-		state.comboAdd(state.folderCombo, state.tr("saved_folder")+" — "+preferred)
-		state.folderIDs = append(state.folderIDs, preferred)
-		selected = len(state.folderIDs) - 1
-	}
-	if selected < 0 && len(state.folderIDs) > 0 {
-		selected = 0
+	choices, selected := writableFolderChoices(state.folders, preferred, state.tr("saved_folder"))
+	for _, choice := range choices {
+		state.comboAdd(state.folderCombo, choice.label)
+		state.folderIDs = append(state.folderIDs, choice.id)
 	}
 	if selected >= 0 {
 		procSettingsSendMessage.Call(uintptr(state.folderCombo), settingsCBSetCurSel, uintptr(selected), 0)
