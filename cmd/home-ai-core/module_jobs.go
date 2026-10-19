@@ -70,6 +70,30 @@ func registerModuleJobs(service *jobs.Service, registry *modules.Registry) error
 		return err
 	}
 
+    if err := service.Register("module.upgrade", func(ctx context.Context, job state.JobRecord, reporter jobs.Reporter) (map[string]any, error) {
+        raw, ok := job.Input["manifest_json"].(string)
+        if !ok || raw == "" { return nil, errors.New("module upgrade manifest missing") }
+        manifest, err := modules.DecodeManifest(strings.NewReader(raw))
+        if err != nil { return nil, err }
+        _ = reporter.Progress(ctx, 500, "validating module upgrade")
+        item, err := registry.UpgradeManifest(ctx, manifest, func(stage, detail string) {
+            progress := 1500
+            switch stage {
+            case "download": progress = 1500
+            case "create": progress = 6800
+            case "start": progress = 8000
+            case "verify": progress = 8900
+            case "cleanup_warning": progress = 9400
+            }
+            message := "module.phase." + stage
+            if detail != "" { message += ":" + detail }
+            _ = reporter.Progress(ctx, progress, message)
+        })
+        if err != nil { return nil, err }
+        _ = reporter.Progress(ctx, 9800, "AI module upgraded; persistent data preserved")
+        return map[string]any{"module_id": item.Manifest.ID, "status": item.Status, "version": item.Manifest.Version}, nil
+    }); err != nil { return err }
+
 	if err := service.Register("module.control", func(ctx context.Context, job state.JobRecord, reporter jobs.Reporter) (map[string]any, error) {
 		moduleID, _ := job.Input["module_id"].(string)
 		operation, _ := job.Input["operation"].(string)
