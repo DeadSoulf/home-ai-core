@@ -1,9 +1,9 @@
 package api
 
 import (
-	"errors"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -169,55 +169,61 @@ func (s *server) moduleCatalogInstall(
 // The official catalog is reloaded on each request and the registry validates
 // both the installed and candidate immutable manifests before switching Docker.
 func (s *server) moduleCatalogUpgrade(w http.ResponseWriter, r *http.Request, actor security.Actor, source authSource) {
-    if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
-        writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
-        return
-    }
-    id := strings.TrimSpace(r.PathValue("moduleID"))
-    if id != "ai.agent" {
-        writeAPIError(w, r, http.StatusBadRequest, "module_upgrade_not_supported", "safe upgrades currently support only ai.agent", nil)
-        return
-    }
-    installed, err := s.modules.Get(r.Context(), id)
-    if err != nil {
-        if errors.Is(err, modules.ErrModuleNotFound) {
-            writeAPIError(w, r, http.StatusNotFound, "module_not_found", "module not found", nil)
-        } else {
-            writeAPIError(w, r, http.StatusServiceUnavailable, "modules_unavailable", "module registry is unavailable", nil)
-        }
-        return
-    }
-    if installed.Status != "enabled" {
-        writeAPIError(w, r, http.StatusConflict, "module_not_running", "AI module must be running to upgrade safely", nil)
-        return
-    }
-    catalog, err := loadOfficialModuleCatalog(r)
-    if err != nil {
-        writeAPIError(w, r, http.StatusServiceUnavailable, "module_catalog_unavailable", err.Error(), nil)
-        return
-    }
-    var candidate *modules.Manifest
-    for i := range catalog.Modules {
-        if catalog.Modules[i].ID == id { candidate = &catalog.Modules[i]; break }
-    }
-    if candidate == nil {
-        writeAPIError(w, r, http.StatusNotFound, "module_not_in_catalog", "module is not present in the official catalog", nil)
-        return
-    }
-    raw, err := json.Marshal(candidate)
-    if err != nil {
-        writeAPIError(w, r, http.StatusInternalServerError, "module_job_failed", "failed to prepare module upgrade", nil)
-        return
-    }
-    meta := metadataFromContext(r.Context())
-    job, err := s.submitModuleJob(r.Context(), state.JobRecord{
-        Type: "module.upgrade", ActorType: actor.Type, ActorID: actor.ID,
-        RequestID: meta.RequestID, CorrelationID: meta.CorrelationID,
-        Input: map[string]any{"module_id": id, "manifest_json": string(raw)},
-    })
-    if err != nil { writeModuleSubmitError(w, r, err); return }
-    s.security.RecordAudit(r.Context(), s.securityRequestContext(r), actor,
-        "modules.catalog.upgrade.queued", "module", id, "success",
-        map[string]any{"version": candidate.Version, "job_id": job.ID, "catalog": catalog.ID})
-    writeJSON(w, http.StatusAccepted, map[string]any{"job": job})
+	if source == authCookie && !actor.ValidCSRF(r.Header.Get("X-CSRF-Token")) {
+		writeAPIError(w, r, http.StatusForbidden, "csrf_required", "valid CSRF token required", nil)
+		return
+	}
+	id := strings.TrimSpace(r.PathValue("moduleID"))
+	if id != "ai.agent" {
+		writeAPIError(w, r, http.StatusBadRequest, "module_upgrade_not_supported", "safe upgrades currently support only ai.agent", nil)
+		return
+	}
+	installed, err := s.modules.Get(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, modules.ErrModuleNotFound) {
+			writeAPIError(w, r, http.StatusNotFound, "module_not_found", "module not found", nil)
+		} else {
+			writeAPIError(w, r, http.StatusServiceUnavailable, "modules_unavailable", "module registry is unavailable", nil)
+		}
+		return
+	}
+	if installed.Status != "enabled" {
+		writeAPIError(w, r, http.StatusConflict, "module_not_running", "AI module must be running to upgrade safely", nil)
+		return
+	}
+	catalog, err := loadOfficialModuleCatalog(r)
+	if err != nil {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "module_catalog_unavailable", err.Error(), nil)
+		return
+	}
+	var candidate *modules.Manifest
+	for i := range catalog.Modules {
+		if catalog.Modules[i].ID == id {
+			candidate = &catalog.Modules[i]
+			break
+		}
+	}
+	if candidate == nil {
+		writeAPIError(w, r, http.StatusNotFound, "module_not_in_catalog", "module is not present in the official catalog", nil)
+		return
+	}
+	raw, err := json.Marshal(candidate)
+	if err != nil {
+		writeAPIError(w, r, http.StatusInternalServerError, "module_job_failed", "failed to prepare module upgrade", nil)
+		return
+	}
+	meta := metadataFromContext(r.Context())
+	job, err := s.submitModuleJob(r.Context(), state.JobRecord{
+		Type: "module.upgrade", ActorType: actor.Type, ActorID: actor.ID,
+		RequestID: meta.RequestID, CorrelationID: meta.CorrelationID,
+		Input: map[string]any{"module_id": id, "manifest_json": string(raw)},
+	})
+	if err != nil {
+		writeModuleSubmitError(w, r, err)
+		return
+	}
+	s.security.RecordAudit(r.Context(), s.securityRequestContext(r), actor,
+		"modules.catalog.upgrade.queued", "module", id, "success",
+		map[string]any{"version": candidate.Version, "job_id": job.ID, "catalog": catalog.ID})
+	writeJSON(w, http.StatusAccepted, map[string]any{"job": job})
 }
