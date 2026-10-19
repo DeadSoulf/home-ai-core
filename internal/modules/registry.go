@@ -132,9 +132,10 @@ func (r *Registry) InstallManifest(ctx context.Context, manifest Manifest, progr
 	return r.Get(finishCtx, manifest.ID)
 }
 
-// UpgradeManifest replaces only a running CPU AI Agent with a strictly newer,
-// catalog-provided immutable image. The old container is retained until the
-// new manifest is durably recorded, so a failed registry write can roll back.
+// UpgradeManifest replaces only a running, upgrade-capable module with a
+// strictly newer catalog-provided immutable image. A helper health-checks the
+// candidate and retains the old container until the new manifest is committed.
+// /data is preserved, not snapshotted; modules must handle schema migrations.
 func (r *Registry) UpgradeManifest(ctx context.Context, manifest Manifest, progress ...func(string, string)) (Registered, error) {
 	if err := ctx.Err(); err != nil {
 		return Registered{}, err
@@ -143,9 +144,6 @@ func (r *Registry) UpgradeManifest(ctx context.Context, manifest Manifest, progr
 		return Registered{}, ErrModuleBusy
 	}
 	defer r.mu.Unlock()
-	if manifest.ID != "ai.agent" {
-		return Registered{}, errors.New("safe in-place upgrades currently support only ai.agent")
-	}
 	if err := ValidateManifest(manifest); err != nil {
 		return Registered{}, err
 	}
@@ -169,7 +167,10 @@ func (r *Registry) UpgradeManifest(ctx context.Context, manifest Manifest, progr
 		return Registered{}, err
 	}
 	if old.Status != "enabled" {
-		return Registered{}, errors.New("AI Agent must be running to upgrade safely")
+		return Registered{}, errors.New("module must be running to upgrade safely")
+	}
+	if !moduleSupportsUpgrade(old.Manifest) || !moduleSupportsUpgrade(manifest) {
+		return Registered{}, errors.New("module or candidate does not declare upgrade capability")
 	}
 	oldVersion, err := parseVersion(old.Manifest.Version)
 	if err != nil {
@@ -220,6 +221,17 @@ func (r *Registry) UpgradeManifest(ctx context.Context, manifest Manifest, progr
 	readCtx, readDone := context.WithTimeout(context.Background(), 5*time.Second)
 	defer readDone()
 	return r.Get(readCtx, manifest.ID)
+}
+
+// A manifest explicitly opts in to upgrades. Never silently replace a module
+// that was installed without an upgrade lifecycle contract.
+func moduleSupportsUpgrade(manifest Manifest) bool {
+	for _, op := range manifest.Lifecycle {
+		if op == "upgrade" {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *Registry) Control(ctx context.Context, id, operation string) (Registered, error) {

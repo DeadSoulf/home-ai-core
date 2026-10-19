@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { validateAuth } from "./authValidation";
 import { browserLocale, errorText, uiMessages } from "./messages";
-import { activeJob, canCancelJob, canUpgradeAI, catalogState, compareSemver, jobMessage, jobTitle, progressPercent, runtimeMessage } from "./moduleState";
+import { activeJob, canCancelJob, canUpgradeModule, catalogState, compareSemver, jobMessage, jobTitle, progressPercent, runtimeMessage } from "./moduleState";
 import type { Job, ModuleRuntime, RegisteredModule } from "../api/types";
 const manifest: RegisteredModule["manifest"] = {schema_version: 2, id: "demo", name: "Demo", version: "1.2.0", core: ">=0.1.0", runtime: {type: "docker", docker: {image: "example/image@sha256:" + "a".repeat(64)}}, lifecycle: ["install"]};
 const installed: RegisteredModule = {manifest, status: "enabled"};
@@ -19,19 +19,22 @@ describe("UI-03 and UI-04: safe module action states", () => {
     expect(catalogState(installed, manifest)).toBe("installed");
     expect(catalogState(undefined, manifest)).toBe("available");
   });
-  it("shows the AI update only for a running agent and a strictly newer immutable image", () => {
-    const ai = {...installed, manifest: {...manifest, id: "ai.agent"}};
-    const next = {...ai.manifest, version: "1.3.0", runtime: {...ai.manifest.runtime,
-      docker: {image: "example/image@sha256:" + "b".repeat(64)}}};
-    expect(canUpgradeAI(ai, next)).toBe(true);
-    expect(canUpgradeAI(ai, undefined)).toBe(false);
-    expect(canUpgradeAI(ai, {...next, version: ai.manifest.version})).toBe(false);
-    expect(canUpgradeAI(ai, {...next, version: "1.1.0"})).toBe(false);
-    expect(canUpgradeAI(ai, {...next, runtime: ai.manifest.runtime})).toBe(false);
-    expect(canUpgradeAI({...ai, status: "disabled"}, next)).toBe(false);
-    expect(canUpgradeAI({...ai, status: "registered"}, next)).toBe(false);
-    expect(canUpgradeAI(installed, next)).toBe(false);
-    expect(canUpgradeAI(ai, {...next, id: "other"})).toBe(false);
+  it("offers catalog updates for any running upgrade-capable module", () => {
+    for (const id of ["ai.agent", "nvr.module", "reference.module", "custom.module"]) {
+      const current = {...installed, manifest: {...manifest, id, lifecycle: ["install", "upgrade", "remove"]}};
+      const next = {...current.manifest, version: "1.3.0", runtime: {...current.manifest.runtime,
+        docker: {image: "example/image@sha256:" + "b".repeat(64)}}};
+      expect(canUpgradeModule(current, next)).toBe(true);
+      expect(canUpgradeModule(current, undefined)).toBe(false);
+      expect(canUpgradeModule(current, {...next, version: current.manifest.version})).toBe(false);
+      expect(canUpgradeModule(current, {...next, version: "1.1.0"})).toBe(false);
+      expect(canUpgradeModule(current, {...next, runtime: current.manifest.runtime})).toBe(false);
+      expect(canUpgradeModule({...current, status: "disabled"}, next)).toBe(false);
+      expect(canUpgradeModule({...current, status: "registered"}, next)).toBe(false);
+      expect(canUpgradeModule(current, {...next, id: "other"})).toBe(false);
+      expect(canUpgradeModule({...current, manifest: {...current.manifest, lifecycle: ["install"]}}, next)).toBe(false);
+      expect(canUpgradeModule(current, {...next, lifecycle: ["install"]})).toBe(false);
+    }
   });
   it("offers recovery independently of newer/changed catalog data", () => {
     expect(catalogState({...installed, status: "registered"}, {...manifest, version: "9.0.0"})).toBe("incomplete");

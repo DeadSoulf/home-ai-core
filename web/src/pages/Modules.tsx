@@ -9,7 +9,7 @@ import { JobProgress } from "../components/JobProgress";
 import type { ModuleSection } from "../navigation";
 import { useI18n } from "../i18n";
 import { useUI } from "../ui/useUI";
-import { activeJob, canUpgradeAI, catalogState, jobTitle, runtimeMessage } from "../ui/moduleState";
+import { activeJob, canUpgradeModule, catalogState, jobTitle, runtimeMessage } from "../ui/moduleState";
 import { PageHeading, Status } from "./Dashboard";
 
 export function ModulesPage({revision, section = "installed", canManage, canReadJobs = false, onSectionChange = () => {}, onNavigate = () => {}}: {
@@ -146,14 +146,14 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
       {catalog.error && <p className="notice" role="status">{u("moduleUpgradeCatalogError")}</p>}
       <div className="card-grid">
         {value.modules.map((module) => {
-          const aiAgent = module.manifest.id === "ai.agent";
-          const candidate = aiAgent ? catalog.data?.modules.find((item) => item.id === module.manifest.id) : undefined;
+          const candidate = catalog.data?.modules.find((item) => item.id === module.manifest.id);
           const state = candidate ? catalogState(module, candidate) : undefined;
-          const upgradeReady = !catalog.error && !catalog.loading && !core.error && canUpgradeAI(module, candidate);
+          const upgradeReady = !catalog.error && !catalog.loading && !core.error && canUpgradeModule(module, candidate);
           const upgradeStatus = catalog.error ? u("moduleUpgradeCatalogError") :
             catalog.loading || !catalog.data ? u("moduleUpgradeChecking") :
             !candidate ? u("moduleUpgradeNotListed") :
             state === "newer" && candidate.runtime.docker.image === module.manifest.runtime.docker.image ? u("moduleUpgradeSameImage") :
+            state === "newer" && (!module.manifest.lifecycle.includes("upgrade") || !candidate.lifecycle.includes("upgrade")) ? u("moduleUpgradeNotSupported") :
             state === "newer" ? (module.status === "enabled" ? u("moduleUpgradeAvailable") : u("moduleUpgradeDisabled")) :
             state === "installed" ? u("moduleUpgradeUpToDate") :
             state === "changed" ? u("manifestChanged") :
@@ -176,7 +176,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
                     onClick={() => setConfirmNVRStorage(module)}>Подключить назначенный диск NVR</button>}
               </>}
             </div>
-            {aiAgent && <div className="module-upgrade-controls">
+            <div className="module-upgrade-controls">
               <div className="button-row">
                 <button type="button" className="button secondary" disabled={catalog.loading || busy}
                   onClick={catalog.reload}>{catalog.loading ? u("refreshing") : u("moduleUpgradeCheck")}</button>
@@ -187,7 +187,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
                 {upgradeStatus}
                 {candidate && state === "newer" && <> {t("currentVersion")}: {module.manifest.version} → {t("availableVersion")}: {candidate.version}</>}
               </p>
-            </div>}
+            </div>
             <div className="button-row destructive-actions"><button type="button" className="button danger" disabled={busy || (!core.data || Boolean(core.error))} onClick={() => setConfirmRemove(module)}>{t("moduleRemove")}</button></div>
           </div>}
           <details className="technical-details"><summary>{u("details")}</summary>
@@ -210,7 +210,16 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
         <div className="card-grid">
           {catalog.data.modules.map((manifest) => {
             const existing = installed.get(manifest.id); const state = catalogState(existing, manifest);
-            const hint = state === "newer" ? (manifest.id === "ai.agent" ? u("moduleUpgradeAvailable") : u("upgradeBlocked")) : state === "older" ? u("installedNewer") : state === "changed" ? u("manifestChanged") : state === "invalid" ? u("versionUnknown") : state === "installed" && manifest.id === "ai.agent" ? u("moduleUpgradeUpToDate") : "";
+            const hint = state === "newer" ?
+              !existing ? "" :
+              manifest.runtime.docker.image === existing.manifest.runtime.docker.image ? u("moduleUpgradeSameImage") :
+              !existing.manifest.lifecycle.includes("upgrade") || !manifest.lifecycle.includes("upgrade") ? u("moduleUpgradeNotSupported") :
+              existing.status !== "enabled" ? u("moduleUpgradeDisabled") :
+              u("moduleUpgradeAvailable") :
+              state === "older" ? u("installedNewer") :
+              state === "changed" ? u("manifestChanged") :
+              state === "invalid" ? u("versionUnknown") :
+              state === "installed" && existing ? u("moduleUpgradeUpToDate") : "";
             const resumable = state === "incomplete" && existing;
             return <article className="module-card" key={manifest.id} data-catalog-id={manifest.id}>
               <div className="module-title"><h2>{manifest.name}</h2><span className="tag">{resumable ? u("incomplete") : existing ? t("moduleInstalled") : t("available")}</span></div>
@@ -225,9 +234,9 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
                 onClick={() => void run(() => resumable ? api.installModule(resumable.manifest) : api.installCatalogModule(manifest.id))}>
                 {resumable ? u("retryInstall") : existing ? t("moduleInstalled") : runtime.data?.network_ready ? t("moduleInstall") : u("installAndPrepare")}
               </button>
-                {manifest.id === "ai.agent" && existing && <button type="button"
+                {existing && <button type="button"
                   className="button primary" data-catalog-upgrade={manifest.id}
-                  disabled={busy || catalog.loading || Boolean(catalog.error) || !canUpgradeAI(existing, manifest)}
+                  disabled={busy || catalog.loading || Boolean(catalog.error) || !canUpgradeModule(existing, manifest)}
                   onClick={() => setConfirmUpgrade(existing)}>{u("moduleUpgradeButton")}</button>}
               </div>}
             </article>;

@@ -34,10 +34,14 @@ export function catalogState(installed: RegisteredModule | undefined, candidate:
   if (order > 0) return "newer";
   return installed.manifest.runtime.docker.image === candidate.runtime.docker.image ? "installed" : "changed";
 }
-/** A catalog entry does not imply an update is safe or available. */
-export function canUpgradeAI(installed: RegisteredModule, candidate?: RegisteredModule["manifest"]): boolean {
-  return installed.manifest.id === "ai.agent" && installed.status === "enabled" &&
+/** Do not offer an upgrade without two explicit lifecycle opt-ins, a new
+ * catalog digest, and a verified, strictly newer version. The API revalidates
+ * the latest official catalog before queuing a job. */
+export function canUpgradeModule(installed: RegisteredModule, candidate?: RegisteredModule["manifest"]): boolean {
+  return installed.status === "enabled" &&
+    installed.manifest.lifecycle.includes("upgrade") &&
     candidate?.id === installed.manifest.id &&
+    candidate.lifecycle.includes("upgrade") &&
     catalogState(installed, candidate) === "newer" &&
     candidate.runtime.docker.image !== installed.manifest.runtime.docker.image;
 }

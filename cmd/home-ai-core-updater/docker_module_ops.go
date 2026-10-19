@@ -82,7 +82,7 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 	case "docker.module.install":
 		return installDockerModule(ctx, moduleID, strings.TrimSpace(request.Image), serviceUID, serviceGID, report)
 	case "docker.module.upgrade", "docker.module.upgrade.commit", "docker.module.upgrade.rollback":
-		return upgradeDockerAI(ctx, request, serviceUID, serviceGID, report)
+		return upgradeDockerModule(ctx, request, serviceUID, serviceGID, report)
 	case "docker.module.start":
 		return controlDockerModule(ctx, moduleID, "start")
 	case "docker.module.stop":
