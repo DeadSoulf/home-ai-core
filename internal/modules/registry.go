@@ -136,58 +136,88 @@ func (r *Registry) InstallManifest(ctx context.Context, manifest Manifest, progr
 // catalog-provided immutable image. The old container is retained until the
 // new manifest is durably recorded, so a failed registry write can roll back.
 func (r *Registry) UpgradeManifest(ctx context.Context, manifest Manifest, progress ...func(string, string)) (Registered, error) {
-    if err := ctx.Err(); err != nil { return Registered{}, err }
-    if !r.mu.TryLock() { return Registered{}, ErrModuleBusy }
-    defer r.mu.Unlock()
-    if manifest.ID != "ai.agent" { return Registered{}, errors.New("safe in-place upgrades currently support only ai.agent") }
-    if err := ValidateManifest(manifest); err != nil { return Registered{}, err }
-    if r.coreVersion != "" {
-        current := strings.TrimPrefix(r.coreVersion, "v")
-        if idx := strings.IndexAny(current, "+-"); idx >= 0 { current = current[:idx] }
-        if _, err := parseVersion(current); err == nil {
-            ok, err := satisfies(current, manifest.Core)
-            if err != nil { return Registered{}, err }
-            if !ok { return Registered{}, fmt.Errorf("module %q is incompatible with Core %s", manifest.ID, r.coreVersion) }
-        }
-    }
-    old, err := r.Get(ctx, manifest.ID)
-    if err != nil { return Registered{}, err }
-    if old.Status != "enabled" { return Registered{}, errors.New("AI Agent must be running to upgrade safely") }
-    oldVersion, err := parseVersion(old.Manifest.Version)
-    if err != nil { return Registered{}, err }
-    newVersion, err := parseVersion(manifest.Version)
-    if err != nil { return Registered{}, err }
-    if compareVersion(newVersion, oldVersion) <= 0 { return Registered{}, errors.New("upgrade requires a newer module version") }
-    if manifest.Runtime.Docker.Image == old.Manifest.Runtime.Docker.Image { return Registered{}, errors.New("upgrade requires a new immutable Docker image") }
-    if r.upgradeHelper == nil { return Registered{}, errors.New("module upgrade helper is unavailable") }
-    var callback func(string, string)
-    if len(progress) > 0 { callback = progress[0] }
-    newImage, oldImage := manifest.Runtime.Docker.Image, old.Manifest.Runtime.Docker.Image
-    if _, err := r.upgradeHelper(ctx, "docker.module.upgrade", manifest.ID, newImage, oldImage, callback); err != nil {
-        return Registered{}, err
-    }
-    // The helper has switched a healthy candidate into place but still holds
-    // the previous, stopped container for compensation until persistence ends.
-    finishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 20*time.Second)
-    defer cancel()
-    raw, err := json.Marshal(manifest)
-    if err == nil {
-        err = r.store.UpsertModule(finishCtx, state.ModuleRecord{ID: manifest.ID, Version: manifest.Version, Status: old.Status, ManifestJSON: string(raw)})
-    }
-    if err != nil {
-        recovery, done := context.WithTimeout(context.Background(), 90*time.Second)
-        defer done()
-        _, rollbackErr := r.upgradeHelper(recovery, "docker.module.upgrade.rollback", manifest.ID, newImage, oldImage, nil)
-        return Registered{}, errors.Join(fmt.Errorf("failed to persist upgraded module: %w", err), rollbackErr)
-    }
-    // Cleanup failure leaves a stopped backup behind for manual recovery, not
-    // a falsely reported rollback of the already committed new manifest.
-    cleanup, done := context.WithTimeout(context.Background(), 30*time.Second)
-    defer done()
-    if _, err := r.upgradeHelper(cleanup, "docker.module.upgrade.commit", manifest.ID, newImage, oldImage, nil); err != nil && callback != nil {
-        callback("cleanup_warning", "old container cleanup needs attention")
-    }
-    return r.Get(finishCtx, manifest.ID)
+	if err := ctx.Err(); err != nil {
+		return Registered{}, err
+	}
+	if !r.mu.TryLock() {
+		return Registered{}, ErrModuleBusy
+	}
+	defer r.mu.Unlock()
+	if manifest.ID != "ai.agent" {
+		return Registered{}, errors.New("safe in-place upgrades currently support only ai.agent")
+	}
+	if err := ValidateManifest(manifest); err != nil {
+		return Registered{}, err
+	}
+	if r.coreVersion != "" {
+		current := strings.TrimPrefix(r.coreVersion, "v")
+		if idx := strings.IndexAny(current, "+-"); idx >= 0 {
+			current = current[:idx]
+		}
+		if _, err := parseVersion(current); err == nil {
+			ok, err := satisfies(current, manifest.Core)
+			if err != nil {
+				return Registered{}, err
+			}
+			if !ok {
+				return Registered{}, fmt.Errorf("module %q is incompatible with Core %s", manifest.ID, r.coreVersion)
+			}
+		}
+	}
+	old, err := r.Get(ctx, manifest.ID)
+	if err != nil {
+		return Registered{}, err
+	}
+	if old.Status != "enabled" {
+		return Registered{}, errors.New("AI Agent must be running to upgrade safely")
+	}
+	oldVersion, err := parseVersion(old.Manifest.Version)
+	if err != nil {
+		return Registered{}, err
+	}
+	newVersion, err := parseVersion(manifest.Version)
+	if err != nil {
+		return Registered{}, err
+	}
+	if compareVersion(newVersion, oldVersion) <= 0 {
+		return Registered{}, errors.New("upgrade requires a newer module version")
+	}
+	if manifest.Runtime.Docker.Image == old.Manifest.Runtime.Docker.Image {
+		return Registered{}, errors.New("upgrade requires a new immutable Docker image")
+	}
+	if r.upgradeHelper == nil {
+		return Registered{}, errors.New("module upgrade helper is unavailable")
+	}
+	var callback func(string, string)
+	if len(progress) > 0 {
+		callback = progress[0]
+	}
+	newImage, oldImage := manifest.Runtime.Docker.Image, old.Manifest.Runtime.Docker.Image
+	if _, err := r.upgradeHelper(ctx, "docker.module.upgrade", manifest.ID, newImage, oldImage, callback); err != nil {
+		return Registered{}, err
+	}
+	// The helper has switched a healthy candidate into place but still holds
+	// the previous, stopped container for compensation until persistence ends.
+	finishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 20*time.Second)
+	defer cancel()
+	raw, err := json.Marshal(manifest)
+	if err == nil {
+		err = r.store.UpsertModule(finishCtx, state.ModuleRecord{ID: manifest.ID, Version: manifest.Version, Status: old.Status, ManifestJSON: string(raw)})
+	}
+	if err != nil {
+		recovery, done := context.WithTimeout(context.Background(), 90*time.Second)
+		defer done()
+		_, rollbackErr := r.upgradeHelper(recovery, "docker.module.upgrade.rollback", manifest.ID, newImage, oldImage, nil)
+		return Registered{}, errors.Join(fmt.Errorf("failed to persist upgraded module: %w", err), rollbackErr)
+	}
+	// Cleanup failure leaves a stopped backup behind for manual recovery, not
+	// a falsely reported rollback of the already committed new manifest.
+	cleanup, done := context.WithTimeout(context.Background(), 30*time.Second)
+	defer done()
+	if _, err := r.upgradeHelper(cleanup, "docker.module.upgrade.commit", manifest.ID, newImage, oldImage, nil); err != nil && callback != nil {
+		callback("cleanup_warning", "old container cleanup needs attention")
+	}
+	return r.Get(finishCtx, manifest.ID)
 }
 
 func (r *Registry) Control(ctx context.Context, id, operation string) (Registered, error) {
