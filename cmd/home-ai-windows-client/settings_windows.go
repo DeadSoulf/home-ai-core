@@ -651,11 +651,24 @@ func (state *windowsSettingsUI) loadInitial() {
 		state.setStatus(state.tr("error_prefix") + ": " + settingsErr.Error())
 	}
 	if settings.ServerURL == "" && len(state.profiles) > 0 {
-		state.setText(state.serverEdit, state.profiles[0].ServerURL)
-		state.setText(state.usernameEdit, state.profiles[0].Username)
+		// Never prefill the Connection page with an old remote HTTP URL.
+		for _, profile := range state.profiles {
+			if windowsclient.IsLegacyRemoteHTTPServerURL(profile.ServerURL) {
+				continue
+			}
+			state.setText(state.serverEdit, profile.ServerURL)
+			state.setText(state.usernameEdit, profile.Username)
+			break
+		}
 	}
 	state.refreshAgentStatus()
 	state.refreshOverview()
+	for _, profile := range state.profiles {
+		if windowsclient.IsLegacyRemoteHTTPServerURL(profile.ServerURL) {
+			state.setStatus(state.tr("legacy_sync_disabled_notice"))
+			break
+		}
+	}
 	if strings.TrimSpace(state.text(state.serverEdit)) != "" && strings.TrimSpace(state.text(state.usernameEdit)) != "" {
 		state.beginInitialRefresh()
 	}
@@ -950,6 +963,9 @@ func (state *windowsSettingsUI) reloadProfiles(selectID string) error {
 			}
 		}
 		item := fmt.Sprintf("[%s] %s -> %s | %s | %s", enabled, filepath.Base(profile.Source), profile.Destination, profile.Interval(), last)
+		if windowsclient.IsLegacyRemoteHTTPServerURL(profile.ServerURL) {
+			item += " | " + state.tr("legacy_sync_https_required")
+		}
 		state.listAdd(state.profileList, item)
 		if profile.ID == selectID {
 			selectedIndex = i
