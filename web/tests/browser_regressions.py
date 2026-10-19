@@ -343,6 +343,31 @@ async def suite(browser):
         await expect(h.page.locator('[data-module-id="ai.agent"]').get_by_role('button',name='Обновить модуль')).to_be_disabled()
         await h.close()
     await check('UI-03a: only running AI Agent offers confirmed catalog upgrade',ai_upgrade)
+    async def ai_upgrade_visible_without_release():
+        current=ai_module()
+        h=await Harness(browser,modules=[current],catalog=[copy.deepcopy(current['manifest'])]).start('/modules/installed');await h.ready()
+        card=h.page.locator('[data-module-id="ai.agent"]')
+        await expect(card.get_by_role('button',name='Проверить обновления')).to_be_enabled()
+        await expect(card.get_by_role('button',name='Обновить модуль',exact=True)).to_be_disabled()
+        await expect(card).to_contain_text('Обновлений нет')
+        assert not h.posts('/upgrade')
+        await h.close()
+
+        h=await Harness(browser,modules=[current],catalog_status=503).start('/modules/installed');await h.ready()
+        card=h.page.locator('[data-module-id="ai.agent"]')
+        await expect(card.get_by_role('button',name='Проверить обновления')).to_be_enabled()
+        await expect(card.get_by_role('button',name='Обновить модуль',exact=True)).to_be_disabled()
+        await expect(card).to_contain_text('Не удалось проверить официальный каталог')
+        assert not h.posts('/upgrade')
+        await h.close()
+
+        h=await Harness(browser,modules=[current],catalog=[copy.deepcopy(current['manifest'])]).start('/modules/catalog');await h.ready()
+        card=h.page.locator('[data-catalog-id="ai.agent"]')
+        await expect(card.get_by_role('button',name='Обновить модуль',exact=True)).to_be_disabled()
+        await expect(card).to_contain_text('Обновлений нет')
+        await h.close()
+    await check('UI-03b: AI update action stays visible when no release or catalog is unavailable',ai_upgrade_visible_without_release)
+
 
     async def retry():
         manifest=copy.deepcopy(MANIFEST);manifest['version']='9.0.0';manifest['runtime']['docker']['image']='example.com/camera@sha256:'+'b'*64
