@@ -52,7 +52,7 @@ export function JobProgress({job}: {job: Job}) {
   const u = useUI();
   const percent = progressPercent(job);
   const [now, setNow] = useState(() => Date.now());
-  const installing = ["module.install", "module.gpu.prepare"].includes(job.type) &&
+  const installing = ["module.install", "module.upgrade", "module.gpu.prepare"].includes(job.type) &&
     ["queued", "running", "cancel_requested"].includes(job.status);
   const step = installStep(job.message);
   const layerBytes = knownLayerBytes(step?.detail);

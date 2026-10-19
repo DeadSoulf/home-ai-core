@@ -43,6 +43,7 @@ type Request struct {
 	SMBShares       []SMBShareRequest `json:"smb_shares,omitempty"`
 	ModuleID        string            `json:"module_id,omitempty"`
 	Image           string            `json:"image,omitempty"`
+	PreviousImage   string            `json:"previous_image,omitempty"`
 	AIGPUPCI        []string          `json:"ai_gpu_pci,omitempty"`
 }
 

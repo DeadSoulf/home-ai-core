@@ -23,13 +23,14 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
   const [sending, setSending] = useState(false), [uncertain, setUncertain] = useState(false);
   const [accepted, setAccepted] = useState<Job>();
   const [confirmRemove, setConfirmRemove] = useState<RegisteredModule>();
+  const [confirmUpgrade, setConfirmUpgrade] = useState<RegisteredModule>();
   const [confirmNVRStorage, setConfirmNVRStorage] = useState<RegisteredModule>();
   const mutation = useRef(false);
   // Catalog outages never hide the installed registry or stop/remove controls.
   const load = useCallback(() => Promise.all([api.modules(), api.capabilities()]).then(([modules, capabilities]) => ({modules, capabilities})), []);
   const core = useResource(load, revision);
   // Each page loads only what it needs. Installed controls remain usable during catalog outages.
-  const loadCatalog = useCallback(() => section === "catalog" ? api.moduleCatalog() : Promise.resolve(undefined), [section]);
+  const loadCatalog = useCallback(() => section === "catalog" || section === "installed" ? api.moduleCatalog() : Promise.resolve(undefined), [section]);
   const catalog = useResource(loadCatalog);
   const loadRuntime = useCallback((signal: AbortSignal) =>
     section === "catalog" || section === "settings" ? api.moduleRuntime(signal) : Promise.resolve(undefined), [section]);
@@ -139,8 +140,10 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
       </div>
     </Panel> : <EmptyState>{u("moduleNoOperations")}</EmptyState>)}
 
-    {section === "installed" && core.data && <Panel id="installed-modules" title={t("moduleInstalledList")}>
+    {section === "installed" && core.data && <Panel id="installed-modules" title={t("moduleInstalledList")}
+      action={<button type="button" className="button secondary" disabled={catalog.loading || busy} onClick={catalog.reload}>{u("moduleUpgradeCheck")}</button>}>
       <p className="ux-panel-description">{u("uxModulesInstalledHint")}</p>
+      {catalog.error && <p className="notice" role="status">{u("moduleUpgradeCatalogError")}</p>}
       <div className="card-grid">
         {value.modules.map((module) => <article className="module-card" key={module.manifest.id} data-module-id={module.manifest.id}>
           <div className="module-title"><h2>{module.manifest.name}</h2>{module.status === "registered" ? <span className="tag">{u("incomplete")}</span> : <Status value={module.status} />}</div>
@@ -154,6 +157,12 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
                   onClick={() => void run(() => api.controlModule(module.manifest.id, module.status === "enabled" ? "disable" : "enable"))}>{t(module.status === "enabled" ? "moduleStop" : "moduleStart")}</button>
                 <button type="button" className="button secondary" disabled={busy || (!core.data || Boolean(core.error))}
                   onClick={() => void run(() => api.controlModule(module.manifest.id, "restart"))}>{t("moduleRestart")}</button>
+                {module.manifest.id === "ai.agent" && catalog.data?.modules.some((candidate) =>
+                  candidate.id === module.manifest.id && catalogState(module, candidate) === "newer") && <>
+                  <button type="button" className="button primary" disabled={busy || module.status !== "enabled"}
+                    onClick={() => setConfirmUpgrade(module)}>{u("moduleUpgradeButton")}</button>
+                  {module.status !== "enabled" && <span className="small muted">{u("moduleUpgradeDisabled")}</span>}
+                </>}
                 {module.manifest.id === "nvr.module" && module.status === "enabled" &&
                   <button type="button" className="button secondary" disabled={busy || (!core.data || Boolean(core.error))}
                     onClick={() => setConfirmNVRStorage(module)}>Подключить назначенный диск NVR</button>}
@@ -180,7 +189,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
         <div className="card-grid">
           {catalog.data.modules.map((manifest) => {
             const existing = installed.get(manifest.id); const state = catalogState(existing, manifest);
-            const hint = state === "newer" ? u("upgradeBlocked") : state === "older" ? u("installedNewer") : state === "changed" ? u("manifestChanged") : state === "invalid" ? u("versionUnknown") : "";
+            const hint = state === "newer" ? (manifest.id === "ai.agent" ? u("moduleUpgradeAvailable") : u("upgradeBlocked")) : state === "older" ? u("installedNewer") : state === "changed" ? u("manifestChanged") : state === "invalid" ? u("versionUnknown") : "";
             const resumable = state === "incomplete" && existing;
             return <article className="module-card" key={manifest.id} data-catalog-id={manifest.id}>
               <div className="module-title"><h2>{manifest.name}</h2><span className="tag">{resumable ? u("incomplete") : existing ? t("moduleInstalled") : t("available")}</span></div>
@@ -194,7 +203,11 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
                 disabled={busy || (!core.data || Boolean(core.error)) || Boolean(existing && !resumable)}
                 onClick={() => void run(() => resumable ? api.installModule(resumable.manifest) : api.installCatalogModule(manifest.id))}>
                 {resumable ? u("retryInstall") : existing ? t("moduleInstalled") : runtime.data?.network_ready ? t("moduleInstall") : u("installAndPrepare")}
-              </button></div>}
+              </button>
+                {manifest.id === "ai.agent" && existing && state === "newer" && <button type="button"
+                  className="button primary" disabled={busy || existing.status !== "enabled"}
+                  onClick={() => setConfirmUpgrade(existing)}>{u("moduleUpgradeButton")}</button>}
+              </div>}
             </article>;
           })}
           {catalog.data.modules.length === 0 && <EmptyState>{t("moduleCatalogEmpty")}</EmptyState>}
@@ -221,6 +234,16 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
       }}>
       <p>Запись камер будет временно остановлена. HomeAiCore скопирует базу камер и архив на диск, назначенный в «Файлы → Хранилище», проверит целостность данных и работу NVR.</p>
       <p>Старые файлы сохраняются как резервная копия. Если проверка не пройдёт, будет выполнена попытка отката.</p>
+    </ConfirmDialog>}
+    {confirmUpgrade && <ConfirmDialog title={u("moduleUpgradeTitle")} confirmLabel={u("moduleUpgradeButton")}
+      onCancel={() => setConfirmUpgrade(undefined)}
+      onConfirm={() => {
+        const id = confirmUpgrade.manifest.id;
+        setConfirmUpgrade(undefined);
+        void run(() => api.upgradeCatalogModule(id));
+      }}>
+      <p><strong>{confirmUpgrade.manifest.name}</strong></p>
+      <p>{u("moduleUpgradeHint")}</p>
     </ConfirmDialog>}
     {confirmRemove && <ConfirmDialog title={u("removeTitle")} confirmLabel={u("confirmRemove")} onCancel={() => setConfirmRemove(undefined)}
       onConfirm={() => {void run(() => api.removeModule(confirmRemove.manifest.id)); setConfirmRemove(undefined);}}>

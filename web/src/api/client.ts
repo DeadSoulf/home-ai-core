@@ -716,6 +716,11 @@ export const api = {
     return result.job;
   },
 
+  upgradeCatalogModule: async (id: string) => {
+    const result = await postJSON<{job: Job}>(`/api/v1/modules/catalog/${encodeURIComponent(id)}/upgrade`, undefined, true);
+    return result.job;
+  },
+
   moduleNavigation: async () => {
     const result = await request<{modules: ModuleNavigationState[]}>("/api/v1/modules/navigation");
     return result.modules;

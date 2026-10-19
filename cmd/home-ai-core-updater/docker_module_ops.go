@@ -54,9 +54,12 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 	// Reject malformed or unsupported operations before starting or installing Docker.
 	// Validation must not trigger privileged system changes.
 	switch request.Operation {
-	case "docker.module.install":
+	case "docker.module.install", "docker.module.upgrade", "docker.module.upgrade.commit", "docker.module.upgrade.rollback":
 		if !imageDigestPattern.MatchString(strings.TrimSpace(request.Image)) {
 			return moduleContainerStatus{}, "", errors.New("module image must be an immutable @sha256 reference")
+		}
+		if request.Operation != "docker.module.install" && !imageDigestPattern.MatchString(strings.TrimSpace(request.PreviousImage)) {
+			return moduleContainerStatus{}, "", errors.New("previous module image must be an immutable @sha256 reference")
 		}
 	case "docker.module.start", "docker.module.stop", "docker.module.restart", "docker.module.remove", "docker.module.storage.activate":
 	default:
@@ -78,6 +81,8 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 	switch request.Operation {
 	case "docker.module.install":
 		return installDockerModule(ctx, moduleID, strings.TrimSpace(request.Image), serviceUID, serviceGID, report)
+	case "docker.module.upgrade", "docker.module.upgrade.commit", "docker.module.upgrade.rollback":
+		return upgradeDockerAI(ctx, request, serviceUID, serviceGID, report)
 	case "docker.module.start":
 		return controlDockerModule(ctx, moduleID, "start")
 	case "docker.module.stop":
@@ -429,7 +434,7 @@ func moduleRuntimeAllows(operation string, status dockerRuntimeStatus) bool {
 	if !status.Available || !status.Active {
 		return false
 	}
-	if operation == "docker.module.stop" || operation == "docker.module.remove" {
+	if operation == "docker.module.stop" || operation == "docker.module.remove" || operation == "docker.module.upgrade.rollback" || operation == "docker.module.upgrade.commit" {
 		return true
 	}
 	return status.NetworkReady
