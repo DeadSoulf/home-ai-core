@@ -27,13 +27,13 @@ func callModuleHelper(ctx context.Context, operation, moduleID, image string) (h
 }
 
 func callModuleHelperWithProgress(ctx context.Context, operation, moduleID, image string, progress func(stage, detail string)) (helperModuleResult, error) {
-    return callModuleHelperRequest(ctx, updaterhelper.Request{Operation: operation, ProtocolVersion: updaterhelper.ProtocolVersion, ModuleID: moduleID, Image: image}, progress)
+	return callModuleHelperRequest(ctx, updaterhelper.Request{Operation: operation, ProtocolVersion: updaterhelper.ProtocolVersion, ModuleID: moduleID, Image: image}, progress)
 }
 
 // A separate operation carries both immutable digests so the privileged helper
 // can refuse to touch a container whose image differs from the recorded one.
 func callModuleUpgradeHelper(ctx context.Context, operation, moduleID, image, previousImage string, progress func(string, string)) (helperModuleResult, error) {
-    return callModuleHelperRequest(ctx, updaterhelper.Request{Operation: operation, ProtocolVersion: updaterhelper.ProtocolVersion, ModuleID: moduleID, Image: image, PreviousImage: previousImage}, progress)
+	return callModuleHelperRequest(ctx, updaterhelper.Request{Operation: operation, ProtocolVersion: updaterhelper.ProtocolVersion, ModuleID: moduleID, Image: image, PreviousImage: previousImage}, progress)
 }
 
 func callModuleHelperRequest(ctx context.Context, request updaterhelper.Request, progress func(stage, detail string)) (helperModuleResult, error) {
