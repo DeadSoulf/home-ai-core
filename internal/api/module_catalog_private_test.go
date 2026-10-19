@@ -102,7 +102,7 @@ func TestPrivateNVRMetadataFailsClosedOnForbiddenAndUntrustedImages(t *testing.T
 		manifest := strings.Replace(testedPrivateNVRManifest, "home-ai-core_dvr-sdk611@", "untrusted-image@", 1)
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			_ = json.NewEncoder(w).Encode(githubContentResponse{
-				Content: base64.StdEncoding.EncodeToString([]byte(manifest)),
+				Content:  base64.StdEncoding.EncodeToString([]byte(manifest)),
 				Encoding: "base64",
 			})
 		}))
