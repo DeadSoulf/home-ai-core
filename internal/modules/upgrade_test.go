@@ -134,7 +134,9 @@ func TestUpgradeSupportsNVRAndReferenceModules(t *testing.T) {
 		t.Run(moduleID, func(t *testing.T) {
 			ctx := context.Background()
 			db, err := state.Open(ctx, t.TempDir())
-			if err != nil { t.Fatal(err) }
+			if err != nil {
+				t.Fatal(err)
+			}
 			defer db.Close()
 			old := validManifest(moduleID, "1.1.4")
 			old.Lifecycle = append(old.Lifecycle, "upgrade")
@@ -152,7 +154,9 @@ func TestUpgradeSupportsNVRAndReferenceModules(t *testing.T) {
 				return helperModuleResult{State: "running"}, nil
 			}
 			updated, err := registry.UpgradeManifest(ctx, newer)
-			if err != nil { t.Fatal(err) }
+			if err != nil {
+				t.Fatal(err)
+			}
 			if updated.Manifest.Version != "1.1.5" || updated.Status != "enabled" {
 				t.Fatalf("unexpected result: %#v", updated)
 			}
@@ -167,14 +171,20 @@ func TestUpgradeRejectsWithoutLifecycleOptIn(t *testing.T) {
 	ctx := context.Background()
 	for _, candidateOptIn := range []bool{false, true} {
 		db, err := state.Open(ctx, t.TempDir())
-		if err != nil { t.Fatal(err) }
+		if err != nil {
+			t.Fatal(err)
+		}
 		old := validManifest("nvr.module", "1.1.4")
-		if candidateOptIn { old.Lifecycle = append(old.Lifecycle, "upgrade") }
+		if candidateOptIn {
+			old.Lifecycle = append(old.Lifecycle, "upgrade")
+		}
 		persistManifest(t, db, old, "enabled")
 		next := old
 		next.Version = "1.1.5"
 		next.Runtime.Docker.Image = "ghcr.io/home-ai/test@sha256:" + strings.Repeat("b", 64)
-		if !candidateOptIn { next.Lifecycle = append(next.Lifecycle, "upgrade") }
+		if !candidateOptIn {
+			next.Lifecycle = append(next.Lifecycle, "upgrade")
+		}
 		registry := NewRegistry(db, "0.1.203")
 		calls := 0
 		registry.upgradeHelper = func(context.Context, string, string, string, string, func(string, string)) (helperModuleResult, error) {
@@ -184,7 +194,9 @@ func TestUpgradeRejectsWithoutLifecycleOptIn(t *testing.T) {
 		if _, err := registry.UpgradeManifest(ctx, next); err == nil || !strings.Contains(err.Error(), "upgrade capability") {
 			t.Fatalf("lifecycle opt-in ignored: %v", err)
 		}
-		if calls != 0 { t.Fatal("unsafe Docker helper invoked") }
+		if calls != 0 {
+			t.Fatal("unsafe Docker helper invoked")
+		}
 		db.Close()
 	}
 }
