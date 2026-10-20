@@ -186,6 +186,7 @@ async function postJSON<T>(path: string, body?: unknown, csrf = false): Promise<
 }
 
 export const api = {
+  frigateUI: (signal?: AbortSignal) => request<{available: boolean; url?: string; error?: string; official_ui?: boolean}>("/api/v1/frigate/ui", {signal}),
   frigateVersion: (signal?: AbortSignal) => request<{version: string}>("/api/v1/frigate/api/version", {signal}),
   frigateConfig: (signal?: AbortSignal) => request<FrigateConfig>("/api/v1/frigate/api/config", {signal}),
   frigateStats: (signal?: AbortSignal) => request<FrigateStats>("/api/v1/frigate/api/stats", {signal}),

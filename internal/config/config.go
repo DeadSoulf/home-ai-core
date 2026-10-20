@@ -18,6 +18,7 @@ const (
 
 type Config struct {
 	ListenAddress    string
+	FrigateUIListen  string
 	StateDir         string
 	WebDir           string
 	TLSCertFile      string
@@ -27,15 +28,17 @@ type Config struct {
 
 func Load(args []string) (Config, error) {
 	cfg := Config{
-		ListenAddress: envOrDefault("HOME_AI_LISTEN", defaultListen),
-		StateDir:      envOrDefault("HOME_AI_STATE_DIR", defaultStateDir),
-		WebDir:        envOrDefault("HOME_AI_WEB_DIR", defaultWebDir),
-		TLSCertFile:   strings.TrimSpace(os.Getenv("HOME_AI_TLS_CERT")),
-		TLSKeyFile:    strings.TrimSpace(os.Getenv("HOME_AI_TLS_KEY")),
+		ListenAddress:   envOrDefault("HOME_AI_LISTEN", defaultListen),
+		FrigateUIListen: strings.TrimSpace(os.Getenv("HOME_AI_FRIGATE_UI_LISTEN")),
+		StateDir:        envOrDefault("HOME_AI_STATE_DIR", defaultStateDir),
+		WebDir:          envOrDefault("HOME_AI_WEB_DIR", defaultWebDir),
+		TLSCertFile:     strings.TrimSpace(os.Getenv("HOME_AI_TLS_CERT")),
+		TLSKeyFile:      strings.TrimSpace(os.Getenv("HOME_AI_TLS_KEY")),
 	}
 	fs := flag.NewFlagSet("home-ai-core", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	fs.StringVar(&cfg.ListenAddress, "listen", cfg.ListenAddress, "HTTPS listen address")
+	fs.StringVar(&cfg.FrigateUIListen, "frigate-ui-listen", cfg.FrigateUIListen, "isolated Frigate HTTPS listener (default same interface:8971; off disables)")
 	fs.StringVar(&cfg.StateDir, "state-dir", cfg.StateDir, "persistent state directory")
 	fs.StringVar(&cfg.WebDir, "web-dir", cfg.WebDir, "built Web UI directory")
 	fs.StringVar(&cfg.TLSCertFile, "tls-cert", cfg.TLSCertFile, "PEM certificate chain (optional)")
@@ -65,6 +68,16 @@ func Load(args []string) (Config, error) {
 		ip := net.ParseIP(host)
 		if ip == nil || !ip.IsLoopback() {
 			return Config{}, fmt.Errorf("plaintext HTTP is permitted only on a literal loopback address")
+		}
+	}
+	if cfg.FrigateUIListen == "" {
+		cfg.FrigateUIListen = net.JoinHostPort(host, "8971")
+	}
+	if cfg.FrigateUIListen != "off" {
+		uiHost, uiPort, e := net.SplitHostPort(cfg.FrigateUIListen)
+		uiN, pe := strconv.Atoi(uiPort)
+		if e != nil || pe != nil || uiN < 1 || uiN > 65535 || uiN == n || uiHost != host {
+			return Config{}, fmt.Errorf("Frigate UI must use the same bind interface and a separate valid port, or off")
 		}
 	}
 	return cfg, nil

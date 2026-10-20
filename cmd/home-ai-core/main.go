@@ -123,6 +123,10 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go api.ReconcileFileAccess(ctx, logger, store, securityService)
+	frigateServer := startFrigateUIServer(ctx, cfg, apiHandler, server.TLSConfig, logger)
+	if frigateServer != nil {
+		defer frigateServer.Close()
+	}
 
 	errCh := make(chan error, 1)
 	go func() {

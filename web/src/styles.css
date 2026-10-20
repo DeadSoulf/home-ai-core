@@ -1364,3 +1364,12 @@ button:focus-visible, summary:focus-visible { outline: 2px solid #8bb0ff; outlin
   .server-console-input { grid-template-columns: 1fr; align-items: stretch; }
   .server-console-input > span { display: none; }
 }
+
+/* The official Frigate app owns its layout inside an isolated HTTPS origin. */
+.frigate-full-page { min-width: 0; }
+.frigate-toolbar { flex-wrap: wrap; margin-bottom: 0.7rem; }
+.frigate-toolbar a.button { text-decoration: none; }
+.frigate-connection-help { margin-bottom: 0.7rem; font-size: 0.9rem; }
+.frigate-connection-help p { max-width: 80rem; overflow-wrap: anywhere; }
+.frigate-official-frame { display: block; width: 100%; height: calc(100dvh - 205px); min-height: 600px; border: 1px solid var(--border, #374151); border-radius: 12px; background: #0b0f19; }
+@media (max-width: 760px) { .frigate-official-frame { height: 80dvh; min-height: 520px; border-radius: 8px; } }

@@ -21,6 +21,7 @@ type server struct {
 	frigateCatalog      frigateCatalogCache
 	frigateEndpoint     func(context.Context) (string, error)
 	frigateTransport    http.RoundTripper
+	frigateUI           *frigateUIState
 	nvrEndpoint         func(context.Context) (string, error)
 	nvrTransport        http.RoundTripper
 	nvrDataRoot         string
@@ -58,7 +59,7 @@ func New(
 	moduleService ModuleService,
 	updaterService UpdaterService,
 	realtimeHub *realtime.Hub,
-) http.Handler {
+) *Handler {
 	s := &server{
 		nodeID:              nodeID,
 		logger:              logger,
@@ -109,6 +110,7 @@ func New(
 	s.mux.HandleFunc("/api/v1/jobs", s.requireAuth("jobs.read", s.jobsCollection))
 	s.mux.HandleFunc("/api/v1/jobs/", s.requireAuth("jobs.read", s.jobResource))
 	s.mux.HandleFunc("/api/v1/modules", s.requireAuth("modules.read", s.modulesCollection))
+	s.mux.HandleFunc("GET /api/v1/frigate/ui", s.requireAuth("modules.manage", s.frigateUIStatus))
 	s.mux.HandleFunc("GET /api/v1/frigate/releases", s.requireAuth("modules.read", s.frigateReleases))
 	s.mux.HandleFunc("/api/v1/frigate/api/", s.requireAuth("modules.manage", s.frigateGateway))
 	s.mux.HandleFunc("GET /api/v1/modules/runtime", s.requireAuth("modules.read", s.moduleRuntime))
@@ -197,7 +199,7 @@ func New(
 	))
 	s.mux.HandleFunc("/", s.notFound)
 
-	return s.requestContext(s.mux)
+	return &Handler{Handler: s.requestContext(s.mux), server: s}
 }
 
 func (s *server) health(w http.ResponseWriter, r *http.Request) {

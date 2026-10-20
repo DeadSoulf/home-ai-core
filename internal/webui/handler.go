@@ -41,6 +41,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	setSecurityHeaders(w)
+	// The upstream application's scripts and storage must remain cross-origin.
+	// Only the explicitly configured, same-host module gateway may be framed.
+	if source, ok := h.api.(interface{ FrigateFrameOrigin(*http.Request) string }); ok {
+		if origin := source.FrigateFrameOrigin(r); origin != "" {
+			w.Header().Set("Content-Security-Policy", contentSecurityPolicy+"; frame-src 'self' "+origin)
+			w.Header().Set("Permissions-Policy", "camera=(), microphone=(\""+origin+"\"), geolocation=()")
+		}
+	}
 
 	cleanPath := filepath.Clean("/" + r.URL.Path)
 	candidate := filepath.Join(h.webDir, filepath.FromSlash(strings.TrimPrefix(cleanPath, "/")))

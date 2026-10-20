@@ -124,7 +124,7 @@ platform digests and the supported version range are accepted. The upstream
 container uses root and a writable image layer, fixed minimum capabilities,
 separate `home-ai-frigate` network and managed `/config` and `/media/frigate`
 mounts. Host ports, devices/GPU, privileged mode and docker.sock are forbidden.
-Core renders a native administrative API bridge, not module-supplied JavaScript.
+Core 0.1.213+ serves the original Frigate application through a separate, authenticated HTTPS origin (default :8971), never in Core's origin. Every request requires modules.manage; Core credentials and upstream cookies do not cross this boundary. The earlier administrative API bridge remains for compatibility. No manifest can select an arbitrary UI host, port or executable code.
 Updates include a verified stopped-container configuration/SQLite snapshot,
 transaction journal, manual approval and rollback. See `../integrations/frigate.md`.
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.213
+
+- Replaced the reduced Frigate snapshot page with the original official Frigate application in an isolated HTTPS gateway and optional separate tab.
+- Preserve the complete native UI, REST APIs, WebSockets, MSE, HLS archive, configuration, logs and exports. Existing containers/data need no reinstallation.
+- Authenticate every gateway request using Core module-management permissions; strip Core credentials and upstream cookies; require exact write/WS Origin and revoke long streams after session changes.
+- Keep lifecycle, official digest verification, manual upgrades and rollback in Core. Port conflicts fail only the optional UI listener, not the Core service.
+- Added real original-container/browser acceptance using synthetic recordings and exports; no claim of automatically configured GPU/USB, WebRTC media reachability or paid services.
+
+
 ## 0.1.211
 
 - Added independent official Frigate integration, dynamic GitHub release discovery and verified per-architecture GHCR manifests.

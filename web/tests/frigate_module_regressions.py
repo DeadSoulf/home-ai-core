@@ -21,6 +21,7 @@ def overrides():
             await route.fulfill(status=200, content_type='application/json', body=json.dumps(payload))
         return respond
     return {
+        '/api/v1/frigate/ui': reply({'available': True, 'url': 'https://home-ai.test:8971/', 'official_ui': True}),
         '/api/v1/frigate/api/version': reply({'version': '0.18.2'}),
         '/api/v1/frigate/api/config': reply({'cameras': {}}),
         '/api/v1/frigate/api/stats': reply({'cameras': {}}),
@@ -48,10 +49,12 @@ async def main():
             await expect(nav).to_have_count(1, timeout=12000)  # No page reload or manual navigation configuration.
             await nav.click()
             await expect(h.page.locator('.frigate-page')).to_be_visible()
+            await expect(h.page.locator('iframe.frigate-official-frame')).to_have_attribute('src', 'https://home-ai.test:8971/')
             await expect(h.page.locator('main h1')).to_have_text('Frigate')
             await h.reload()
             await expect(nav).to_have_count(1)
             await expect(h.page.locator('.frigate-page')).to_be_visible()
+            await expect(h.page.locator('iframe.frigate-official-frame')).to_have_attribute('src', 'https://home-ai.test:8971/')
             print('PASS: install approval, automatic sidebar appearance, empty navigation and reload', flush=True)
 
             await h.page.get_by_role('button', name='Модули и обновления', exact=True).click()
