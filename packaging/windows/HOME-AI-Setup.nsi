@@ -30,6 +30,7 @@ ShowUninstDetails show
 BrandingText "HOME AI | ${VERSION}"
 
 !insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_INSTFILES
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${CLIENT_NAME}"
 !define MUI_FINISHPAGE_RUN_PARAMETERS "settings"
@@ -98,8 +99,9 @@ Section "Uninstall"
   RMDir "$SMPROGRAMS\HOME AI"
   Delete "$DESKTOP\HOME AI.lnk"
 
+  ClearErrors
   Delete "$INSTDIR\${CLIENT_NAME}"
-  ${If} ${FileExists} "$INSTDIR\${CLIENT_NAME}"
+  ${If} ${Errors}
     MessageBox MB_ICONEXCLAMATION|MB_OK "HOME AI is still running. Exit the tray application and run uninstall again to remove its executable."
     Abort
   ${EndIf}
