@@ -34,6 +34,10 @@ const (
 	trayPopupWAInactive = 0
 	trayPopupSWShow     = 5
 	trayPopupSTMSetIcon = 0x0170
+	trayPopupSSNoPrefix = 0x00000080
+	trayPopupSSNoWrap = 0x0000000C
+	trayPopupSSEndEllipsis = 0x00004000
+	trayPopupMonitorNearest = 2
 )
 
 var (
@@ -42,7 +46,16 @@ var (
 
 	procTrayPopupShowWindow   = trayUser32.NewProc("ShowWindow")
 	procTrayPopupUpdateWindow = trayUser32.NewProc("UpdateWindow")
+	procTrayPopupMonitorFromWindow = trayUser32.NewProc("MonitorFromWindow")
+	procTrayPopupGetMonitorInfo = trayUser32.NewProc("GetMonitorInfoW")
 )
+
+type trayPopupMonitorInfo struct {
+	CbSize uint32
+	RcMonitor settingsRect
+	RcWork settingsRect
+	DwFlags uint32
+}
 
 func (state *windowsAgentTray) showStatusPopup() {
 	if state.popup != 0 {
@@ -56,38 +69,48 @@ func (state *windowsAgentTray) showStatusPopup() {
 
 	var point trayPoint
 	procGetCursorPos.Call(uintptr(unsafe.Pointer(&point)))
-	x := point.X - 390
-	y := point.Y - 430
-	if x < 8 {
-		x = 8
-	}
-	if y < 8 {
-		y = 8
-	}
-
 	className, _ := windows.UTF16PtrFromString(trayPopupClassName)
 	windowName, _ := windows.UTF16PtrFromString("HOME AI")
 	module, _, _ := procGetModuleHandleW.Call(0)
+
+	// Create hidden at the pointer location first so GetDpiForWindow reports
+	// the DPI of the exact monitor containing the tray icon.
 	hwnd, _, _ := procCreateWindowExW.Call(
 		trayPopupEXTopMost|trayPopupEXToolWin,
 		uintptr(unsafe.Pointer(className)),
 		uintptr(unsafe.Pointer(windowName)),
 		trayPopupWSPopup|trayPopupWSBorder,
-		uintptr(x),
-		uintptr(y),
-		390,
-		410,
-		0,
-		0,
-		module,
-		0,
+		uintptr(point.X), uintptr(point.Y),
+		1, 1,
+		0, 0, module, 0,
 	)
 	if hwnd == 0 {
 		state.showMenu()
 		return
 	}
+
+	dpi := settingsWindowDPI(windows.Handle(hwnd))
+	var work settingsRect
+	monitor, _, _ := procTrayPopupMonitorFromWindow.Call(hwnd, trayPopupMonitorNearest)
+	if monitor != 0 {
+		info := trayPopupMonitorInfo{CbSize: uint32(unsafe.Sizeof(trayPopupMonitorInfo{}))}
+		if result, _, _ := procTrayPopupGetMonitorInfo.Call(monitor, uintptr(unsafe.Pointer(&info))); result != 0 {
+			work = info.RcWork
+			dpi = trayPopupEffectiveDPI(dpi, work.Right-work.Left, work.Bottom-work.Top)
+		}
+	}
+	layout := trayPopupBuildLayout(dpi)
+	x, y := trayPopupPosition(point.X, point.Y,
+		work.Left, work.Top, work.Right, work.Bottom, layout.Width, layout.Height)
+	moved, _, _ := procSettingsMoveWindow.Call(hwnd, uintptr(x), uintptr(y),
+		uintptr(layout.Width), uintptr(layout.Height), 0)
+	if moved == 0 {
+		procDestroyWindow.Call(hwnd)
+		state.showMenu()
+		return
+	}
 	state.popup = windows.Handle(hwnd)
-	state.createStatusPopupControls(windows.Handle(module))
+	state.createStatusPopupControls(windows.Handle(module), layout, dpi)
 	state.refreshStatusPopup()
 	procSetForegroundWindow.Call(hwnd)
 	procTrayPopupShowWindow.Call(hwnd, trayPopupSWShow)
@@ -119,9 +142,18 @@ func ensureTrayPopupClass() error {
 	return trayPopupClassErr
 }
 
-func (state *windowsAgentTray) createStatusPopupControls(module windows.Handle) {
-	font, _, _ := procSettingsGetStock.Call(settingsDefaultGUIFont)
-	create := func(class, text string, style uint32, x, y, w, h int32, id uint16) windows.Handle {
+func (state *windowsAgentTray) createStatusPopupControls(module windows.Handle, layout trayPopupLayout, dpi uint32) {
+	// DEFAULT_GUI_FONT follows the desktop's font metrics and can be much
+	// taller than a fixed 32px STATIC at high DPI. Own DPI-aware Segoe UI
+	// fonts and use the same scale for text bounds and the popup.
+	state.popupFonts = [4]windows.Handle{
+		createSettingsFont(trayPopupScale(-14, dpi), settingsFWNormal),
+		createSettingsFont(trayPopupScale(-19, dpi), settingsFWSemibold),
+		createSettingsFont(trayPopupScale(-17, dpi), settingsFWSemibold),
+		createSettingsFont(trayPopupScale(-13, dpi), settingsFWNormal),
+	}
+	stockFont, _, _ := procSettingsGetStock.Call(settingsDefaultGUIFont)
+	create := func(class, text string, style uint32, r trayPopupRect, id uint16, fontIndex int) windows.Handle {
 		classPtr, _ := windows.UTF16PtrFromString(class)
 		textPtr, _ := windows.UTF16PtrFromString(text)
 		hwnd, _, _ := procCreateWindowExW.Call(
@@ -129,36 +161,41 @@ func (state *windowsAgentTray) createStatusPopupControls(module windows.Handle) 
 			uintptr(unsafe.Pointer(classPtr)),
 			uintptr(unsafe.Pointer(textPtr)),
 			uintptr(style),
-			uintptr(x), uintptr(y), uintptr(w), uintptr(h),
-			uintptr(state.popup),
-			uintptr(id),
-			uintptr(module),
-			0,
+			uintptr(r.X), uintptr(r.Y), uintptr(r.Width), uintptr(r.Height),
+			uintptr(state.popup), uintptr(id), uintptr(module), 0,
 		)
-		if hwnd != 0 && font != 0 {
-			procSettingsSendMessage.Call(hwnd, settingsWMSetFont, font, 1)
+		if hwnd != 0 {
+			font := uintptr(state.popupFonts[fontIndex])
+			if font == 0 {
+				font = stockFont
+			}
+			if font != 0 {
+				procSettingsSendMessage.Call(hwnd, settingsWMSetFont, font, 1)
+			}
 		}
 		return windows.Handle(hwnd)
 	}
 
 	if state.icon != 0 {
-		icon := create("STATIC", "", trayPopupWSChild|trayPopupWSVisible|trayPopupSSIcon, 20, 18, 34, 34, 0)
+		icon := create("STATIC", "", trayPopupWSChild|trayPopupWSVisible|trayPopupSSIcon, layout.Icon, 0, 0)
 		if icon != 0 {
 			procSettingsSendMessage.Call(uintptr(icon), trayPopupSTMSetIcon, uintptr(state.icon), 0)
 		}
 	}
-	create("STATIC", "HOME AI", trayPopupWSChild|trayPopupWSVisible, 66, 22, 150, 26, 0)
-	state.popupStatus = create("STATIC", "", trayPopupWSChild|trayPopupWSVisible, 20, 70, 340, 32, 0)
-	state.popupSubtitle = create("STATIC", "", trayPopupWSChild|trayPopupWSVisible, 20, 104, 340, 38, 0)
-
-	create("STATIC", textForLanguage(preferredUILanguage(), "recent_activity"), trayPopupWSChild|trayPopupWSVisible, 20, 158, 220, 24, 0)
+	// Ellipsis prevents long translations, filenames and scaled fonts from
+	// drawing into the next section. Hard CRLFs remain supported in rows.
+	textStyle := uint32(trayPopupWSChild | trayPopupWSVisible | trayPopupSSNoPrefix | trayPopupSSEndEllipsis | trayPopupSSNoWrap)
+	create("STATIC", "HOME AI", textStyle, layout.Title, 0, 1)
+	state.popupStatus = create("STATIC", "", textStyle, layout.Headline, 0, 2)
+	state.popupSubtitle = create("STATIC", "", textStyle, layout.Subtitle, 0, 0)
+	create("STATIC", textForLanguage(preferredUILanguage(), "recent_activity"), textStyle, layout.RecentTitle, 0, 2)
 	for i := range state.popupRows {
-		state.popupRows[i] = create("STATIC", "", trayPopupWSChild|trayPopupWSVisible, 22, int32(188+i*46), 336, 40, 0)
+		state.popupRows[i] = create("STATIC", "", textStyle, layout.Rows[i], 0, 3)
 	}
-
-	create("BUTTON", textForLanguage(preferredUILanguage(), "sync_now"), trayPopupWSChild|trayPopupWSVisible|trayPopupWSTabStop|trayPopupBSFlat, 20, 330, 168, 34, traySyncNow)
-	create("BUTTON", textForLanguage(preferredUILanguage(), "open_home_folder"), trayPopupWSChild|trayPopupWSVisible|trayPopupWSTabStop|trayPopupBSFlat, 202, 330, 168, 34, trayOpenFolder)
-	create("BUTTON", textForLanguage(preferredUILanguage(), "settings"), trayPopupWSChild|trayPopupWSVisible|trayPopupWSTabStop|trayPopupBSFlat, 202, 370, 168, 28, traySettings)
+	buttonStyle := uint32(trayPopupWSChild | trayPopupWSVisible | trayPopupWSTabStop | trayPopupBSFlat)
+	create("BUTTON", textForLanguage(preferredUILanguage(), "tray_sync_short"), buttonStyle, layout.SyncButton, traySyncNow, 0)
+	create("BUTTON", textForLanguage(preferredUILanguage(), "open_home_folder"), buttonStyle, layout.FolderButton, trayOpenFolder, 0)
+	create("BUTTON", textForLanguage(preferredUILanguage(), "settings"), buttonStyle, layout.SettingsButton, traySettings, 0)
 }
 
 func trayPopupWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
@@ -189,6 +226,12 @@ func trayPopupWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) u
 			state.popupStatus = 0
 			state.popupSubtitle = 0
 			state.popupRows = [3]windows.Handle{}
+			for _, font := range state.popupFonts {
+				if font != 0 {
+					procSettingsDeleteObject.Call(uintptr(font))
+				}
+			}
+			state.popupFonts = [4]windows.Handle{}
 		}
 		return 0
 	}
@@ -319,9 +362,9 @@ func trayPopupSnapshot(configPath, language string) (string, string, [3]string) 
 		rows[index] = textForLanguagef(language, "recent_activity_row", name, status, dashboardTime(profile.LastAttemptAt.Local(), language))
 		index++
 	}
-	for index < len(rows) {
-		rows[index] = textForLanguage(language, "recent_activity_empty")
-		index++
+	if index == 0 {
+		// Show the empty-state notice once, not three times.
+		rows[0] = textForLanguage(language, "recent_activity_empty")
 	}
 	return headline, subtitle, rows
 }
