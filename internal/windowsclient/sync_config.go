@@ -46,8 +46,9 @@ type SyncProfileInput struct {
 }
 
 type syncConfigState struct {
-	Version  int           `json:"version"`
-	Profiles []SyncProfile `json:"profiles"`
+	Version               int           `json:"version"`
+	Profiles              []SyncProfile `json:"profiles"`
+	legacyHTTPQuarantined bool          `json:"-"`
 }
 
 func (profile SyncProfile) Interval() time.Duration {
@@ -259,6 +260,9 @@ func SetSyncProfileEnabled(filename, profileID string, enabled bool) error {
 	return updateSyncConfig(filename, func(state *syncConfigState) error {
 		for i := range state.Profiles {
 			if state.Profiles[i].ID == profileID {
+				if enabled && IsLegacyRemoteHTTPServerURL(state.Profiles[i].ServerURL) {
+					return errors.New("legacy HTTP sync profile cannot be enabled; edit its server URL to a trusted HTTPS address first")
+				}
 				state.Profiles[i].Enabled = enabled
 				state.Profiles[i].UpdatedAt = time.Now().UTC()
 				return nil
@@ -357,6 +361,15 @@ func updateSyncConfig(filename string, mutate func(*syncConfigState) error) erro
 	if err := validateSyncConfig(state); err != nil {
 		return fmt.Errorf("invalid sync profile update: %w", err)
 	}
+	// A previous client may have saved a remote HTTP sync target.
+	// Before the first write that disables it, preserve a byte-for-byte
+	// private backup for explicit repair and audit. Do not change the host
+	// to the currently connected server: that could upload files elsewhere.
+	if state.legacyHTTPQuarantined {
+		if _, err := backupLegacySyncConfig(filename); err != nil {
+			return fmt.Errorf("preserve legacy HTTP sync profile backup: %w", err)
+		}
+	}
 	return persistSyncConfig(filename, state)
 }
 
@@ -412,6 +425,15 @@ func readSyncConfig(filename string) (syncConfigState, error) {
 	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
 		return syncConfigState{}, errors.New("sync profile file must contain exactly one JSON object")
 	}
+	// Do not execute a pre-HTTPS remote HTTP profile. Keep its original URL,
+	// IDs and schedule metadata intact for the UI or an explicit update,
+	// but force it disabled in memory without writing on a mere read.
+	for i := range state.Profiles {
+		if state.Profiles[i].Enabled && IsLegacyRemoteHTTPServerURL(state.Profiles[i].ServerURL) {
+			state.Profiles[i].Enabled = false
+			state.legacyHTTPQuarantined = true
+		}
+	}
 	if err := validateSyncConfig(state); err != nil {
 		return syncConfigState{}, fmt.Errorf("invalid sync profiles: %w", err)
 	}
@@ -465,7 +487,11 @@ func validateSyncConfig(state syncConfigState) error {
 		ids[profile.ID] = true
 		server, err := normalizeQueueServer(profile.ServerURL)
 		if err != nil || server != profile.ServerURL {
-			return errors.New("invalid sync profile server URL")
+			// For compatibility, an old remote HTTP URL may remain in an
+			// explicitly disabled profile. Never enable or connect to it.
+			if profile.Enabled || !IsLegacyRemoteHTTPServerURL(profile.ServerURL) {
+				return errors.New("invalid sync profile server URL")
+			}
 		}
 		if strings.TrimSpace(profile.Username) == "" || strings.TrimSpace(profile.Username) != profile.Username ||
 			strings.TrimSpace(profile.FolderID) == "" || strings.TrimSpace(profile.FolderID) != profile.FolderID {

@@ -356,6 +356,36 @@ authenticate the release metadata inside its own updater. The UI explicitly
 warns before installation. Publisher signing and trusted update metadata
 verification are prerequisites for unattended installation.
 
+## Upgrading an old remote HTTP synchronization profile
+
+Current Windows clients require HTTPS for any server outside the local loopback
+interface. Before this compatibility fix, a legacy profile stored by an
+older client with a URL such as `http://legacy-host:8080` caused
+`invalid sync profiles: invalid sync profile server URL` whenever
+a new folder was added, even if the new connection used valid HTTPS.
+
+The client now safely loads a well-formed **legacy remote HTTP profile as
+disabled**, showing **HTTPS required — old profile disabled** in the profiles
+list. This happens *in memory* on read, without changing the user's
+`sync-profiles.json` on disk. No HTTP connection or upload is attempted.
+
+The user may then add a new HTTPS synchronization profile. On the **first
+successful write**, the client preserves the exact original configuration
+under the same directory with a `sync-profiles.json.legacy-http-*.json`
+filename and saves the existing legacy profile as disabled alongside the
+new profile. Existing IDs, source paths, destinations and past results are
+preserved; the client never redirects them to the new server automatically.
+
+To repair the legacy profile, select it, change the server to its *correct*
+trusted HTTPS address, select the appropriate remote folder, save, and
+enable it explicitly. Attempts to re-enable it while it still points to a
+remote HTTP URL are rejected. The old backup is for disaster recovery and
+should not be copied over the active configuration without reviewing it.
+
+An invalid profile containing credentials in its URL, a malformed URL or
+unsafe configuration still causes strict validation failure. The client
+does not weaken the HTTPS requirement.
+
 ## Current limitations
 
 - the Transfers page shows per-file speed/ETA and recent history; whole-run ETA and advanced filtering are not implemented;
