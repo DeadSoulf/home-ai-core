@@ -1,0 +1,17 @@
+# Standalone Home Assistant Container profile for HomeAiCore.
+# Staged deployment: this file does NOT register a module in the Core catalog.
+# Before using, verify host-port 8123 and review privileged/host-network access.
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: home-ai-homeassistant
+    restart: unless-stopped
+    stop_grace_period: 60s
+    privileged: true
+    network_mode: host
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - /var/lib/home-ai-core/integrations/homeassistant/config:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
