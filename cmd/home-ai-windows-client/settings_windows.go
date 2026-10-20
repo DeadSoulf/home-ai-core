@@ -41,6 +41,7 @@ const (
 	settingsWMCertificateProbeDone = settingsWMApp + 205
 	settingsWMUpdateInstallDone    = settingsWMApp + 206
 	settingsWMTrayMinimizeDone     = settingsWMApp + 207
+	settingsWMExitFromTray       = settingsWMApp + 208
 
 	settingsWSOverlappedWindow = 0x00CF0000
 	settingsWSVisible          = 0x10000000
@@ -209,6 +210,7 @@ type windowsSettingsUI struct {
 	updateError          string
 	trayHidden           bool
 	trayMinimizePending  bool
+	trayClosePending     bool
 
 	page                   int
 	pageControls           [settingsPageCount][]windows.Handle
@@ -620,6 +622,13 @@ func settingsWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) ui
 			return 0
 		}
 	case settingsWMClose:
+		if state != nil {
+			state.requestCloseToTray()
+			return 0
+		}
+		procSettingsDestroyWindow.Call(hwnd)
+		return 0
+	case settingsWMExitFromTray:
 		procSettingsDestroyWindow.Call(hwnd)
 		return 0
 	case settingsWMDestroy:
