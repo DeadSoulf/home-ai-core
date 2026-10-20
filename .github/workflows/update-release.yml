@@ -15,6 +15,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  browser-integration:
+    needs: preflight
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/web-ui-regression.yml
+
   frigate-integration:
     needs: preflight
     if: github.ref == 'refs/heads/main'
@@ -223,7 +228,7 @@ jobs:
     permissions:
       contents: write
     name: Publish GitHub release
-    needs: [build, debian-installer, windows-client, windows-installer, frigate-integration]
+    needs: [build, debian-installer, windows-client, windows-installer, frigate-integration, browser-integration]
     runs-on: ubuntu-latest
 
     steps:

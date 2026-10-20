@@ -100,6 +100,7 @@ export function Shell(props: {
               {group.items.map(({path, label, title, moduleStatus}) => (
                 <button type="button" key={path} className={isActivePath(path) ? "nav-item active" : "nav-item"}
                   aria-current={isActivePath(path) ? "page" : undefined}
+                  data-module-status={moduleStatus}
                   aria-label={label ? t(label) : title}
                   aria-describedby={"nav-help-" + encodeURIComponent(path)}
                   onClick={() => { props.onNavigate(path); if (menuOpen) closeMenu(); }}>
