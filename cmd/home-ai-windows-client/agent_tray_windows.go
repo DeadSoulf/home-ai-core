@@ -119,6 +119,7 @@ type windowsAgentTray struct {
 	popupStatus    windows.Handle
 	popupSubtitle  windows.Handle
 	popupRows      [3]windows.Handle
+	popupFonts     [4]windows.Handle
 	trayProfileIDs []string
 
 	updateCheckBusy bool
@@ -161,6 +162,9 @@ var activeWindowsTray struct {
 }
 
 func startAgentTray(logPath, configPath string) (*agentTrayRuntime, error) {
+	// The agent runs in a separate process from Settings. Its popup must be
+	// per-monitor-DPI aware too, including local development EXEs.
+	settingsEnableDPIAwareness()
 	logPath, err := filepath.Abs(logPath)
 	if err != nil {
 		return nil, fmt.Errorf("resolve tray log path: %w", err)
