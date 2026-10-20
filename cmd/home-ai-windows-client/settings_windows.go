@@ -513,11 +513,7 @@ func startSettingsProcess(configPath string) error {
 }
 
 func focusExistingSettingsWindow() bool {
-	className, _ := windows.UTF16PtrFromString(settingsWindowClass)
-	hwnd, _, _ := procSettingsFindWindow.Call(
-		uintptr(unsafe.Pointer(className)),
-		0,
-	)
+	hwnd := findHomeAISettingsWindow()
 	if hwnd == 0 {
 		return false
 	}
