@@ -137,6 +137,15 @@ func (state *windowsSettingsUI) restoreIfTrayStopped() {
 	state.setStatus(state.tr("tray_unavailable"))
 }
 
+// Reuse the existing settings window instead of spawning another process on
+// every tray double click. A hidden/minimized window is restored by the
+// existing focusExistingSettingsWindow implementation.
+func showSettingsFromTray(configPath string) {
+	if !focusExistingSettingsWindow() {
+		_ = startSettingsProcess(configPath)
+	}
+}
+
 func closeHiddenSettingsWhenTrayExits() {
 	className, _ := windows.UTF16PtrFromString(settingsWindowClass)
 	hwnd, _, _ := procSettingsFindWindow.Call(uintptr(unsafe.Pointer(className)), 0)
