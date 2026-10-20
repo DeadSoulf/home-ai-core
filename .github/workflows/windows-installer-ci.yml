@@ -1,0 +1,83 @@
+name: Windows installer validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - packaging/windows/**
+      - .github/workflows/windows-installer-ci.yml
+      - .github/workflows/update-release.yml
+      - scripts/sign-release-assets.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.x'
+      - name: Generate Windows icon and manifest
+        shell: pwsh
+        run: |
+          go run github.com/tc-hib/go-winres@v0.3.3 make --arch amd64 --in cmd/home-ai-windows-client/winres/winres.json --out cmd/home-ai-windows-client/rsrc
+      - name: Compile application
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          New-Item dist -ItemType Directory -Force | Out-Null
+          $env:GOOS = 'windows'
+          $env:GOARCH = 'amd64'
+          $env:CGO_ENABLED = '0'
+          go build -trimpath -ldflags "-X github.com/DeadSoulf/home-ai-core/internal/version.Version=$version" -o "dist/home-ai-windows-client_${version}_amd64.exe" ./cmd/home-ai-windows-client
+          if ($LASTEXITCODE -ne 0) { throw "Go Windows build failed" }
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis --yes --no-progress --limit-output
+          if ($LASTEXITCODE -ne 0) { throw "NSIS install failed" }
+      - name: Compile per-user installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content VERSION -Raw).Trim()
+          $output = (Resolve-Path dist).Path
+          $client = Join-Path $output "home-ai-windows-client_${version}_amd64.exe"
+          $compiler = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          if (!(Test-Path $compiler)) { throw "NSIS compiler missing" }
+          & $compiler "/DVERSION=$version" "/DCLIENT_EXE=$client" "/DOUTPUT_DIR=$output" "packaging/windows/HOME-AI-Setup.nsi"
+          if ($LASTEXITCODE -ne 0) { throw "NSIS compilation failed" }
+          if (!(Test-Path (Join-Path $output "HOME-AI-Setup_${version}_x64.exe"))) { throw "Setup missing" }
+      - name: Verify silent install, shortcuts, uninstall and user-data preservation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content VERSION -Raw).Trim()
+          $setup = (Resolve-Path "dist/HOME-AI-Setup_${version}_x64.exe").Path
+          $config = Join-Path $env:APPDATA "HomeAI\sync-profiles.json"
+          New-Item (Split-Path $config) -ItemType Directory -Force | Out-Null
+          $payload = '{"version":1,"profiles":[]}'
+          [IO.File]::WriteAllText($config, $payload)
+          $install = Start-Process -FilePath $setup -ArgumentList '/S' -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Silent setup failed: $($install.ExitCode)" }
+          $installed = Join-Path $env:LOCALAPPDATA 'HomeAI\bin\home-ai-windows-client.exe'
+          $uninstall = Join-Path $env:LOCALAPPDATA 'HomeAI\bin\Uninstall HOME AI.exe'
+          $shortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\HOME AI\HOME AI.lnk'
+          if (!(Test-Path $installed) -or !(Test-Path $uninstall) -or !(Test-Path $shortcut)) { throw "Installer did not create exe, uninstall or Start Menu shortcut" }
+          $reg = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\HomeAIWindowsClient'
+          if ($reg.DisplayVersion -ne $version) { throw "Uninstall registration version mismatch" }
+          $removed = Start-Process -FilePath $uninstall -ArgumentList '/S' -Wait -PassThru
+          if ($removed.ExitCode -ne 0) { throw "Silent uninstall failed: $($removed.ExitCode)" }
+          if (Test-Path $installed) { throw "Executable remains after uninstall" }
+          if (Test-Path $shortcut) { throw "Start Menu shortcut remains after uninstall" }
+          if ((Get-Content -LiteralPath $config -Raw) -ne $payload) { throw "Uninstall modified user profiles" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-smoke
+          path: dist/HOME-AI-Setup_*.exe
+          if-no-files-found: error
