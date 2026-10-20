@@ -48,6 +48,7 @@ var (
 	procTrayPopupUpdateWindow      = trayUser32.NewProc("UpdateWindow")
 	procTrayPopupMonitorFromWindow = trayUser32.NewProc("MonitorFromWindow")
 	procTrayPopupGetMonitorInfo    = trayUser32.NewProc("GetMonitorInfoW")
+	procTrayPopupGetMonitorDPI     = windows.NewLazySystemDLL("shcore.dll").NewProc("GetDpiForMonitor")
 )
 
 type trayPopupMonitorInfo struct {
@@ -89,13 +90,31 @@ func (state *windowsAgentTray) showStatusPopup() {
 		return
 	}
 
-	observedDPI := settingsWindowDPI(windows.Handle(hwnd))
+	// GetDpiForWindow on a newly-created, still-hidden 1px popup can
+	// return a stale 96 DPI until after ShowWindow (seen on the Asus 200%
+	// desktop). Read the actual tray monitor DPI instead; the agent's
+	// existing window already has a stable DPI value.
+	observedDPI := settingsWindowDPI(state.hwnd)
 	var work settingsRect
 	monitor, _, _ := procTrayPopupMonitorFromWindow.Call(hwnd, trayPopupMonitorNearest)
 	if monitor != 0 {
 		info := trayPopupMonitorInfo{CbSize: uint32(unsafe.Sizeof(trayPopupMonitorInfo{}))}
 		if result, _, _ := procTrayPopupGetMonitorInfo.Call(monitor, uintptr(unsafe.Pointer(&info))); result != 0 {
 			work = info.RcWork
+		}
+		if procTrayPopupGetMonitorDPI.Find() == nil {
+			var x, y uint32
+			hr, _, _ := procTrayPopupGetMonitorDPI.Call(monitor, 0,
+				uintptr(unsafe.Pointer(&x)), uintptr(unsafe.Pointer(&y)))
+			if hr == 0 && x >= 96 && x <= 768 {
+				observedDPI = x
+			}
+		}
+		trayMonitor, _, _ := procTrayPopupMonitorFromWindow.Call(uintptr(state.hwnd), trayPopupMonitorNearest)
+		if trayMonitor == monitor {
+			// Same monitor: prefer the DPI from the existing tray window
+			// if Shcore returns a virtualized DPI (e.g. 96 instead of 192).
+			observedDPI = settingsWindowDPI(state.hwnd)
 		}
 	}
 	// Some Windows sessions first report 96 DPI for a new hidden 1px
