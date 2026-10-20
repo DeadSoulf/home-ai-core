@@ -30,13 +30,13 @@ const (
 	trayPopupEXTopMost = 0x00000008
 	trayPopupEXToolWin = 0x00000080
 
-	trayPopupWMActivate = 0x0006
-	trayPopupWAInactive = 0
-	trayPopupSWShow     = 5
-	trayPopupSTMSetIcon = 0x0170
-	trayPopupSSNoPrefix = 0x00000080
-	trayPopupSSNoWrap = 0x0000000C
-	trayPopupSSEndEllipsis = 0x00004000
+	trayPopupWMActivate     = 0x0006
+	trayPopupWAInactive     = 0
+	trayPopupSWShow         = 5
+	trayPopupSTMSetIcon     = 0x0170
+	trayPopupSSNoPrefix     = 0x00000080
+	trayPopupSSNoWrap       = 0x0000000C
+	trayPopupSSEndEllipsis  = 0x00004000
 	trayPopupMonitorNearest = 2
 )
 
@@ -44,17 +44,17 @@ var (
 	trayPopupClassOnce sync.Once
 	trayPopupClassErr  error
 
-	procTrayPopupShowWindow   = trayUser32.NewProc("ShowWindow")
-	procTrayPopupUpdateWindow = trayUser32.NewProc("UpdateWindow")
+	procTrayPopupShowWindow        = trayUser32.NewProc("ShowWindow")
+	procTrayPopupUpdateWindow      = trayUser32.NewProc("UpdateWindow")
 	procTrayPopupMonitorFromWindow = trayUser32.NewProc("MonitorFromWindow")
-	procTrayPopupGetMonitorInfo = trayUser32.NewProc("GetMonitorInfoW")
+	procTrayPopupGetMonitorInfo    = trayUser32.NewProc("GetMonitorInfoW")
 )
 
 type trayPopupMonitorInfo struct {
-	CbSize uint32
+	CbSize    uint32
 	RcMonitor settingsRect
-	RcWork settingsRect
-	DwFlags uint32
+	RcWork    settingsRect
+	DwFlags   uint32
 }
 
 func (state *windowsAgentTray) showStatusPopup() {
