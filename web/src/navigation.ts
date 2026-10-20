@@ -7,6 +7,7 @@ export type NavigationItem = {
   title?: string;
   permission?: string;
   moduleId?: string;
+  moduleStatus?: ModuleNavigationState["status"];
   order?: number;
 };
 
@@ -61,18 +62,21 @@ export function isModuleRoute(path: string): boolean {
 }
 
 function dynamicModuleItems(modules?: ModuleNavigationState[]): NavigationItem[] {
-  if (!modules) return [];
-  return modules
-    .filter((module) => module.status === "enabled")
-    .flatMap((module) => (module.items || []).filter((item) => isModuleRoute(item.route) && (item.route === "/modules/" + module.module_id || item.route.startsWith("/modules/" + module.module_id + "/"))).map((item) => ({
-      path: item.route,
-      title: item.title,
-      permission: module.module_id === "ai.agent" ? "modules.manage" :
-        module.module_id === "nvr.module" ? "modules.read" : "security.self.read",
-      moduleId: module.module_id,
-      order: item.order || 0,
-    })))
-    .sort((a, b) => (a.order || 0) - (b.order || 0) || a.path.localeCompare(b.path));
+  const entries = new Map<string, NavigationItem>();
+  for (const module of modules || []) {
+    const root = "/modules/" + module.module_id;
+    const declared = (module.items || []).filter(item => isModuleRoute(item.route) && (item.route === root || item.route.startsWith(root + "/")));
+    if (!declared.some(item => item.route === root)) declared.push({id: module.module_id, title: module.name || module.module_id, route: root});
+    for (const item of declared) {
+      if (!isModuleRoute(item.route) || entries.has(item.route)) continue;
+      entries.set(item.route, {
+        path: item.route, title: item.title, moduleId: module.module_id, moduleStatus: module.status,
+        permission: module.module_id === "ai.agent" || module.module_id === "frigate.module" ? "modules.manage" : "modules.read",
+        order: item.order || 0,
+      });
+    }
+  }
+  return [...entries.values()].sort((a, b) => (a.order || 0) - (b.order || 0) || a.path.localeCompare(b.path));
 }
 
 export function visibleNavigation(actor: Actor, modules?: ModuleNavigationState[]): NavigationGroup[] {

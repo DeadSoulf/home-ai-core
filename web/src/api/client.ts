@@ -1,3 +1,4 @@
+import type {FrigateConfig, FrigateStats, FrigateEvent, FrigateSourceStatus} from "./types";
 import { browserLocale, errorText } from "../ui/messages";
 import type {
   Actor,
@@ -118,7 +119,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
 
-  const shortRequest = !init.method || init.method === "GET" || path.startsWith("/api/v1/auth/") || path === "/api/v1/security/bootstrap" || path === "/api/v1/system/console/session" || path.startsWith("/api/v1/modules/");
+  const shortRequest = !init.method || init.method === "GET" || path.startsWith("/api/v1/auth/") || path === "/api/v1/security/bootstrap" || path === "/api/v1/system/console/session" || path.startsWith("/api/v1/modules/") || path.startsWith("/api/v1/frigate/");
   const timeout = new AbortController();
   const timer = shortRequest ? setTimeout(() => timeout.abort(), 30000) : undefined;
   const signal = init.signal ? AbortSignal.any([init.signal, timeout.signal]) : timeout.signal;
@@ -185,6 +186,16 @@ async function postJSON<T>(path: string, body?: unknown, csrf = false): Promise<
 }
 
 export const api = {
+  frigateVersion: (signal?: AbortSignal) => request<{version: string}>("/api/v1/frigate/api/version", {signal}),
+  frigateConfig: (signal?: AbortSignal) => request<FrigateConfig>("/api/v1/frigate/api/config", {signal}),
+  frigateStats: (signal?: AbortSignal) => request<FrigateStats>("/api/v1/frigate/api/stats", {signal}),
+  frigateEvents: (signal?: AbortSignal) => request<FrigateEvent[]>("/api/v1/frigate/api/events?limit=50", {signal}),
+  frigateRawConfig: () => request<{config: string}>("/api/v1/frigate/api/config/raw"),
+  frigateSaveConfig: (config: string) => {
+    const headers = new Headers({"Content-Type": "text/plain; charset=utf-8"});
+    const csrf = getCSRFToken(); if (csrf) headers.set("X-CSRF-Token", csrf);
+    return request<{success: boolean; message?: string}>("/api/v1/frigate/api/config/save", {method: "POST", headers, body: config});
+  },
   aiStatus: (signal?: AbortSignal) => request<AIStatus>("/api/v1/ai/status", {signal}),
   aiHardware: (signal?: AbortSignal) => request<AIHardware>("/api/v1/ai/hardware", {signal}),
   aiGPUImageStatus: (signal?: AbortSignal) => request<{ready: boolean}>("/api/v1/ai/gpu/runtime", {signal}),
@@ -706,18 +717,18 @@ export const api = {
     return result.modules;
   },
 
-  moduleCatalog: async () => {
-    const result = await request<{catalog: {id: string; generated_at?: string; private_nvr_status?: string; homeassistant_status?: string; modules: RegisteredModule["manifest"][]}}>("/api/v1/modules/catalog");
+  moduleCatalog: async (refresh = false) => {
+    const result = await request<{catalog: {id: string; generated_at?: string; private_nvr_status?: string; homeassistant_status?: string; frigate_upstream?: FrigateSourceStatus; modules: RegisteredModule["manifest"][]}}>("/api/v1/modules/catalog" + (refresh ? "?refresh=1" : ""));
     return result.catalog;
   },
 
-  installCatalogModule: async (id: string) => {
-    const result = await postJSON<{job: Job}>(`/api/v1/modules/catalog/${encodeURIComponent(id)}/install`, undefined, true);
+  installCatalogModule: async (id: string, approved?: RegisteredModule["manifest"]) => {
+    const result = await postJSON<{job: Job}>(`/api/v1/modules/catalog/${encodeURIComponent(id)}/install`, id === "frigate.module" ? {expected_version: approved?.version, expected_image: approved?.runtime.docker.image} : undefined, true);
     return result.job;
   },
 
-  upgradeCatalogModule: async (id: string) => {
-    const result = await postJSON<{job: Job}>(`/api/v1/modules/catalog/${encodeURIComponent(id)}/upgrade`, undefined, true);
+  upgradeCatalogModule: async (id: string, approved?: RegisteredModule["manifest"]) => {
+    const result = await postJSON<{job: Job}>(`/api/v1/modules/catalog/${encodeURIComponent(id)}/upgrade`, id === "frigate.module" ? {expected_version: approved?.version, expected_image: approved?.runtime.docker.image} : undefined, true);
     return result.job;
   },
 
@@ -736,7 +747,7 @@ export const api = {
     return result.job;
   },
 
-  controlModule: async (id: string, operation: "enable" | "disable" | "restart" | "activate_storage") => {
+  controlModule: async (id: string, operation: "enable" | "disable" | "restart" | "activate_storage" | "recover_upgrade") => {
     const result = await postJSON<{job: Job}>(
       `/api/v1/modules/${encodeURIComponent(id)}/control`,
       {operation},

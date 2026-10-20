@@ -6,12 +6,6 @@ on:
     paths:
       - VERSION
   workflow_dispatch:
-    inputs:
-      publish:
-        description: Publish only after uploaded assets pass verification (otherwise keep a draft)
-        required: true
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -21,6 +15,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  frigate-integration:
+    needs: preflight
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/frigate-container.yml
+
   preflight:
     name: Check release signing and source before building
     if: github.ref == 'refs/heads/main'
@@ -37,7 +36,7 @@ jobs:
           set -euo pipefail
           test "$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)" = "$GITHUB_SHA"
           VERSION="$(tr -d '\r\n' < VERSION)"
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           if gh release view "v$VERSION" >/dev/null 2>&1; then
             echo 'A release/draft already exists. Never overwrite published binaries; review the existing draft or use a new version.' >&2
             exit 1
@@ -72,13 +71,16 @@ jobs:
           cache-dependency-path: web/package-lock.json
 
       - name: Test Go
-        run: go test ./...
+        run: |
+          go test ./...
+          go vet ./...
 
       - name: Typecheck Web
         working-directory: web
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           npm run typecheck
+          npm test
 
       - name: Build update bundle
         run: sh ./scripts/build-update-bundle.sh "${{ matrix.arch }}"
@@ -221,7 +223,7 @@ jobs:
     permissions:
       contents: write
     name: Publish GitHub release
-    needs: [build, debian-installer, windows-client, windows-installer]
+    needs: [build, debian-installer, windows-client, windows-installer, frigate-integration]
     runs-on: ubuntu-latest
 
     steps:
@@ -259,10 +261,9 @@ jobs:
           HOME_AI_UPDATE_SIGNING_KEY: ${{ secrets.HOME_AI_UPDATE_SIGNING_KEY }}
         run: bash scripts/sign-release-assets.sh --sign dist "$(tr -d '\r\n' < VERSION)"
 
-      - name: Create draft, verify uploaded bytes, then optionally publish
+      - name: Verify signed files, publish ordinary release, verify uploaded bytes
         env:
           GH_TOKEN: ${{ github.token }}
-          PUBLISH: ${{ inputs.publish }}
         shell: bash
         run: |
           set -euo pipefail
@@ -280,7 +281,8 @@ jobs:
           Do not bootstrap protocol 8, systemd permissions or the new trust boundary through the old Web updater.
           After migration use **https://SERVER-IP:82/** and verify/trust the server's TLS certificate.
           Back up state/configuration/module data first. Existing users/data are not reset.
-          Different-image module upgrades remain blocked pending transactional rollback (#177).
+          Includes native Frigate integration with official GitHub/GHCR discovery, exact digest approval, manual updates, verified configuration/SQLite backup and rollback.
+          See docs/integrations/frigate.md for the supported profile and tested scope.
 
           [Migration guide](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_SHA/docs/SECURITY_PORT82_MIGRATION.md)
           [Release verification](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_SHA/docs/RELEASE_SIGNING.md)
@@ -289,7 +291,18 @@ jobs:
           SHA256SUMS also authenticates release-metadata.json and the public key.
           Verify the public-key fingerprint against an independent trusted administrator record; a key downloaded next to a package alone is not a trust anchor.
           EOF
-          gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "Home-AI-Core $VERSION" --notes-file "$RUNNER_TEMP/release-notes.md" --prerelease --draft
+          # All build, test, Docker rollback and signing jobs must finish first.
+          # Verify the complete signed local release before publishing (never draft).
+          (
+            cd dist
+            base64 --decode SHA256SUMS.sig > "$RUNNER_TEMP/prepublish-signature.bin"
+            openssl pkeyutl -verify -rawin -pubin -inkey home-ai-core-update-trusted.pub -in SHA256SUMS -sigfile "$RUNNER_TEMP/prepublish-signature.bin"
+            sha256sum --check --strict SHA256SUMS
+          )
+          if [[ -f "docs/releases/$VERSION.md" ]]; then
+            cat "docs/releases/$VERSION.md" >> "$RUNNER_TEMP/release-notes.md"
+          fi
+          gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "Home-AI-Core $VERSION" --notes-file "$RUNNER_TEMP/release-notes.md" --prerelease=false --latest
           mkdir "$RUNNER_TEMP/verify-release"
           gh release download "$TAG" --dir "$RUNNER_TEMP/verify-release"
           for file in dist/*; do
@@ -301,7 +314,6 @@ jobs:
             openssl pkeyutl -verify -rawin -pubin -inkey home-ai-core-update-trusted.pub -in SHA256SUMS -sigfile "$RUNNER_TEMP/release-signature.bin"
             sha256sum --check --strict SHA256SUMS
           )
-          if [[ "$PUBLISH" == 'true' ]]; then
-            gh release edit "$TAG" --draft=false
-          fi
-          echo "Verified release $TAG; explicit publish=$PUBLISH" >> "$GITHUB_STEP_SUMMARY"
+          test "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = false
+          test "$(gh release view "$TAG" --json isPrerelease --jq .isPrerelease)" = false
+          echo "Published and byte-verified ordinary release $TAG (draft=false)" >> "$GITHUB_STEP_SUMMARY"

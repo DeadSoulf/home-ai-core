@@ -4,6 +4,7 @@ import { ErrorNotice } from "./components/ErrorNotice";
 import { LoadingState } from "./components/Panel";
 import { useUI } from "./ui/useUI";
 import { ModulePage } from "./pages/Module";
+import { FrigatePage } from "./pages/Frigate";
 import { NVRPage } from "./pages/NVR";
 import { AIPage } from "./pages/AI";
 import { isModuleRoute, isModuleManagementRoute, moduleSection, moduleSectionPath } from "./navigation";
@@ -295,8 +296,11 @@ export default function App() {
         : moduleRoute && allowedPath === "/modules/nvr.module" &&
         has("modules.read") && moduleNavigation?.some((item) => item.module_id === "nvr.module" && item.status === "enabled")
         ? <NVRPage canManage={has("modules.manage")} />
+        : moduleRoute && allowedPath === "/modules/frigate.module" &&
+        has("modules.manage") && moduleNavigation?.some((item) => item.module_id === "frigate.module" && item.status === "enabled")
+        ? <FrigatePage onNavigate={navigate} />
         : moduleRoute ? (!moduleNavigation ? navigationError ? <div className="page"><ErrorNotice error={navigationError} /><button type="button" className="button secondary" onClick={() => window.dispatchEvent(new CustomEvent("home-ai-core:modules-changed"))}>{u("retry")}</button></div> : <LoadingState /> : <ModulePage path={path} modules={moduleNavigation}
-        permitted={has("security.self.read")} canReadModules={has("modules.read")} onNavigate={navigate} />)
+        permitted={accessiblePath(actor, path, moduleNavigation) === path} canReadModules={has("modules.read")} canManage={has("modules.manage")} onNavigate={navigate} />)
         : dashboardAllowed ? <Dashboard actor={actor} revision={revision} onNavigate={navigate} /> : accountPage;
   }
 

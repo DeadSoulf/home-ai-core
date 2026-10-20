@@ -24,8 +24,13 @@ func ResolveAIEndpoint(ctx context.Context) (string, error) {
 	return resolveModuleEndpoint(ctx, "ai.agent")
 }
 
+// ResolveFrigateEndpoint resolves the fixed official Frigate container only.
+func ResolveFrigateEndpoint(ctx context.Context) (string, error) {
+	return resolveModuleEndpoint(ctx, "frigate.module")
+}
+
 func resolveModuleEndpoint(ctx context.Context, moduleID string) (string, error) {
-	if moduleID != "nvr.module" && moduleID != "ai.agent" {
+	if moduleID != "nvr.module" && moduleID != "ai.agent" && moduleID != "frigate.module" {
 		return "", errors.New("unsupported module endpoint")
 	}
 	dialCtx, cancel := context.WithTimeout(ctx, 8*time.Second)

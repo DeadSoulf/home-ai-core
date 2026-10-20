@@ -91,6 +91,10 @@ func registerModuleJobs(service *jobs.Service, registry *modules.Registry) error
 				progress = 8000
 			case "verify":
 				progress = 8900
+			case "snapshot":
+				progress = 7500
+			case "rollback":
+				progress = 9000
 			case "cleanup_warning":
 				progress = 9400
 			}

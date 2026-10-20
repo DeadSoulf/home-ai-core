@@ -418,6 +418,7 @@ export type RealtimeEvent = {
 
 export type ModuleNavigationState = {
   module_id: string;
+  name?: string;
   status: "registered" | "enabled" | "disabled" | "error";
   items?: Array<{
     id: string;
@@ -637,3 +638,18 @@ export type ModuleRuntime = {
   available: boolean; active: boolean; engine_ready: boolean; network_ready: boolean;
   version: string; error?: string; checked_at: string;
 };
+
+export interface FrigateCandidate {
+  version: string; architecture: string; image: string; digest: string;
+  index_digest: string; release_url: string; checked_at: string;
+}
+export interface FrigateSourceStatus {
+  repository: string; latest_version: string; supported_range: string;
+  candidate?: FrigateCandidate; warning?: string; checked_at?: string; stale: boolean; error?: string;
+}
+export interface FrigateConfig {cameras: Record<string, {enabled?: boolean}>}
+export interface FrigateStats {cameras?: Record<string, {camera_fps?: number; detection_fps?: number}>}
+export interface FrigateEvent {
+  id: string; camera: string; label: string; start_time: number;
+  end_time?: number | null; has_snapshot: boolean; has_clip: boolean;
+}

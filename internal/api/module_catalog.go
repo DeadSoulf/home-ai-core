@@ -27,12 +27,14 @@ const (
 )
 
 type moduleCatalogDocument struct {
-	SchemaVersion       int                `json:"schema_version"`
-	ID                  string             `json:"id"`
-	GeneratedAt         string             `json:"generated_at"`
-	Modules             []modules.Manifest `json:"modules"`
-	PrivateNVRStatus    string             `json:"-"`
-	HomeAssistantStatus string             `json:"-"`
+	SchemaVersion       int                    `json:"schema_version"`
+	ID                  string                 `json:"id"`
+	GeneratedAt         string                 `json:"generated_at"`
+	Modules             []modules.Manifest     `json:"modules"`
+	Upstreams           []moduleUpstreamSource `json:"upstreams,omitempty"`
+	PrivateNVRStatus    string                 `json:"-"`
+	FrigateUpstream     *frigateSourceStatus   `json:"-"`
+	HomeAssistantStatus string                 `json:"-"`
 }
 
 type githubContentResponse struct {
@@ -207,7 +209,7 @@ func (s *server) moduleCatalog(
 	_ security.Actor,
 	_ authSource,
 ) {
-	catalog, err := loadOfficialModuleCatalog(r)
+	catalog, err := s.loadModuleCatalog(r)
 	if err != nil {
 		writeAPIError(w, r, http.StatusServiceUnavailable, "module_catalog_unavailable", err.Error(), nil)
 		return
@@ -218,6 +220,7 @@ func (s *server) moduleCatalog(
 			"generated_at":         catalog.GeneratedAt,
 			"modules":              catalog.Modules,
 			"private_nvr_status":   catalog.PrivateNVRStatus,
+			"frigate_upstream":     catalog.FrigateUpstream,
 			"homeassistant_status": catalog.HomeAssistantStatus,
 		},
 	})
@@ -234,6 +237,10 @@ func (s *server) moduleCatalogInstall(
 		return
 	}
 	id := strings.TrimSpace(r.PathValue("moduleID"))
+	if id == "frigate.module" {
+		s.queueFrigateMutation(w, r, actor, source, false)
+		return
+	}
 	if id == "" {
 		s.notFound(w, r)
 		return
@@ -297,6 +304,10 @@ func (s *server) moduleCatalogUpgrade(w http.ResponseWriter, r *http.Request, ac
 		return
 	}
 	id := strings.TrimSpace(r.PathValue("moduleID"))
+	if id == "frigate.module" {
+		s.queueFrigateMutation(w, r, actor, source, true)
+		return
+	}
 	if id == "" {
 		s.notFound(w, r)
 		return

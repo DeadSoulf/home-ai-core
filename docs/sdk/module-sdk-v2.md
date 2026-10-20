@@ -115,3 +115,15 @@ Module installation can be submitted through the Web UI by pasting a trusted Man
 The REST API remains under `/api/v1/modules`. See `../api/modules-v1.md`.
 
 Executable JavaScript is not accepted from a manifest. UI contribution remains declarative navigation metadata only.
+
+## Reserved Frigate profile (Core 0.1.211+)
+
+`frigate.module` is another narrowly reviewed exception, not a configurable
+privilege mechanism in Manifest v2. Only official `ghcr.io/blakeblackshear/frigate`
+platform digests and the supported version range are accepted. The upstream
+container uses root and a writable image layer, fixed minimum capabilities,
+separate `home-ai-frigate` network and managed `/config` and `/media/frigate`
+mounts. Host ports, devices/GPU, privileged mode and docker.sock are forbidden.
+Core renders a native administrative API bridge, not module-supplied JavaScript.
+Updates include a verified stopped-container configuration/SQLite snapshot,
+transaction journal, manual approval and rollback. See `../integrations/frigate.md`.

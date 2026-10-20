@@ -57,15 +57,15 @@ func TestNVRLegacyManifestGetsBuiltInSidebarNavigation(t *testing.T) {
 	s := &server{modules: nvrTestService(true)}
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/modules/navigation", nil)
 	w := httptest.NewRecorder()
-	s.moduleNavigation(w, req, security.Actor{}, authBearer)
+	s.moduleNavigation(w, req, security.Actor{Permissions: []string{"modules.read"}}, authBearer)
 	if w.Code != 200 || !strings.Contains(w.Body.String(), `"route":"/modules/nvr.module"`) {
 		t.Fatalf("installed NVR missing from navigation: %d %s", w.Code, w.Body.String())
 	}
 	s.modules = nvrTestService(false)
 	w = httptest.NewRecorder()
-	s.moduleNavigation(w, req, security.Actor{}, authBearer)
-	if strings.Contains(w.Body.String(), `"route":"/modules/nvr.module"`) {
-		t.Fatalf("disabled module leaked into menu: %s", w.Body.String())
+	s.moduleNavigation(w, req, security.Actor{Permissions: []string{"modules.read"}}, authBearer)
+	if !strings.Contains(w.Body.String(), `"route":"/modules/nvr.module"`) {
+		t.Fatalf("stopped installed module disappeared from menu: %s", w.Body.String())
 	}
 }
 

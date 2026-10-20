@@ -48,6 +48,9 @@ func DecodeManifest(reader io.Reader) (Manifest, error) {
 }
 
 func ValidateManifest(m Manifest) error {
+	if err := validateFrigateManifest(m); err != nil {
+		return err
+	}
 	if m.SchemaVersion != ManifestSchemaVersion {
 		return fmt.Errorf("unsupported manifest schema version %d", m.SchemaVersion)
 	}

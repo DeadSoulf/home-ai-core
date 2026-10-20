@@ -229,7 +229,7 @@ func handleConnection(parent context.Context, logger *slog.Logger, conn *net.Uni
 	if request.Operation == "docker.module.endpoint" {
 		// Read-only, fixed-module discovery. No endpoint or URL is taken from
 		// the client and no Docker socket is exposed to Core.
-		if request.ModuleID != "nvr.module" && request.ModuleID != "ai.agent" {
+		if request.ModuleID != "nvr.module" && request.ModuleID != "ai.agent" && request.ModuleID != "frigate.module" {
 			_ = json.NewEncoder(conn).Encode(updaterhelper.Response{Error: "unsupported module endpoint"})
 			return
 		}

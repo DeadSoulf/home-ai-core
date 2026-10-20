@@ -25,6 +25,9 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
   const [accepted, setAccepted] = useState<Job>();
   const [confirmRemove, setConfirmRemove] = useState<RegisteredModule>();
   const [confirmUpgrade, setConfirmUpgrade] = useState<RegisteredModule>();
+  const [approvedUpgrade, setApprovedUpgrade] = useState<RegisteredModule["manifest"]>();
+  const [confirmFrigateInstall, setConfirmFrigateInstall] = useState<RegisteredModule["manifest"]>();
+  const [confirmFrigateRecovery, setConfirmFrigateRecovery] = useState(false);
   const [confirmNVRStorage, setConfirmNVRStorage] = useState<RegisteredModule>();
   const [confirmHomeAssistant, setConfirmHomeAssistant] = useState<() => Promise<Job>>();
   const mutation = useRef(false);
@@ -32,8 +35,8 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
   const load = useCallback(() => Promise.all([api.modules(), api.capabilities()]).then(([modules, capabilities]) => ({modules, capabilities})), []);
   const core = useResource(load, revision);
   // Each page loads only what it needs. Installed controls remain usable during catalog outages.
-  const loadCatalog = useCallback(() => section === "catalog" || section === "installed" ? api.moduleCatalog() : Promise.resolve(undefined), [section]);
-  const catalog = useResource(loadCatalog);
+  const loadCatalog = useCallback(() => section === "catalog" || section === "installed" ? api.moduleCatalog(true) : Promise.resolve(undefined), [section]);
+  const catalog = useResource(loadCatalog, 0, 300000);
   const loadRuntime = useCallback((signal: AbortSignal) =>
     section === "catalog" || section === "settings" ? api.moduleRuntime(signal) : Promise.resolve(undefined), [section]);
   const runtime = useResource(loadRuntime, 0, section === "settings" ? 15000 : 0);
@@ -88,6 +91,12 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
     else void run(action);
   }
 
+  function requestUpgrade(module: RegisteredModule, candidate: RegisteredModule["manifest"] | undefined) {
+    if (!candidate) return;
+    // Freeze the exact displayed manifest before opening confirmation.
+    setApprovedUpgrade(candidate); setConfirmUpgrade(module);
+  }
+
   function installManifest() {
     setManifestError(false);
     try {
@@ -116,6 +125,11 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
       <button type="button" className={"button " + (section === "settings" ? "primary" : "secondary")}
         aria-current={section === "settings" ? "page" : undefined} onClick={() => onSectionChange("settings")}>{u("uxModuleSettingsJump")}</button>
     </nav>
+    {(section === "installed" || section === "catalog") && catalog.data?.frigate_upstream && <div className="notice" role="status">
+      <p>Frigate: официальный GitHub blakeblackshear/frigate. {catalog.data.frigate_upstream.latest_version && <>Последний релиз: {catalog.data.frigate_upstream.latest_version}. </>}Поддерживаемые версии: {catalog.data.frigate_upstream.supported_range}. Установка обновлений — только вручную.</p>
+      {catalog.data.frigate_upstream.stale && <p>Источник временно недоступен. Показаны последние проверенные данные; установка и обновление заблокированы до успешной проверки.</p>}
+      {catalog.data.frigate_upstream.warning && <p>{catalog.data.frigate_upstream.warning}</p>}
+    </div>}
     {core.loading && !core.data && <LoadingState />}
     {core.error && <ErrorState message={core.error} onRetry={core.reload} />}
     {section === "settings" && <Panel title={t("dockerRuntime")} action={<button type="button" className="button secondary" disabled={runtime.loading} onClick={runtime.reload}>{u("checkRuntime")}</button>}>
@@ -161,7 +175,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
         {value.modules.map((module) => {
           const candidate = catalog.data?.modules.find((item) => item.id === module.manifest.id);
           const state = candidate ? catalogState(module, candidate) : undefined;
-          const upgradeReady = !catalog.error && !catalog.loading && !core.error && canUpgradeModule(module, candidate);
+          const upgradeReady = !catalog.error && !catalog.loading && !core.error && canUpgradeModule(module, candidate) && !(module.manifest.id === "frigate.module" && catalog.data?.frigate_upstream?.stale);
           const upgradeStatus = catalog.error ? u("moduleUpgradeCatalogError") :
             catalog.loading || !catalog.data ? u("moduleUpgradeChecking") :
             !candidate ? u("moduleUpgradeNotListed") :
@@ -195,16 +209,18 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
             </div>
             <div className="module-upgrade-controls">
               <div className="button-row">
-                <button type="button" className="button secondary" disabled={catalog.loading || busy}
-                  onClick={catalog.reload}>{catalog.loading ? u("refreshing") : u("moduleUpgradeCheck")}</button>
-                <button type="button" className="button primary" data-module-upgrade={module.manifest.id}
-                  disabled={busy || !upgradeReady} onClick={() => setConfirmUpgrade(module)}>{u("moduleUpgradeButton")}</button>
+                {upgradeReady && <button type="button" className="button primary" data-module-upgrade={module.manifest.id}
+                  disabled={busy} onClick={() => requestUpgrade(module, candidate)}>{u("moduleUpgradeButton")}</button>}
               </div>
               <p role="status" className="small muted">
                 {upgradeStatus}
                 {candidate && state === "newer" && <> {t("currentVersion")}: {module.manifest.version} → {t("availableVersion")}: {candidate.version}</>}
               </p>
             </div>
+            {module.manifest.id === "frigate.module" && <div className="button-row">
+              <button type="button" className="button secondary" disabled={busy} onClick={() => onNavigate("/modules/frigate.module")}>Открыть Frigate</button>
+              <button type="button" className="button secondary" disabled={busy} onClick={() => setConfirmFrigateRecovery(true)}>Восстановить прерванное обновление</button>
+            </div>}
             <div className="button-row destructive-actions"><button type="button" className="button danger" disabled={busy || (!core.data || Boolean(core.error))} onClick={() => setConfirmRemove(module)}>{t("moduleRemove")}</button></div>
           </div>}
           <details className="technical-details"><summary>{u("details")}</summary>
@@ -250,14 +266,14 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
               {hint && <p className="notice">{hint}</p>}
               {resumable && <p>{u("resumeHint")}</p>}
               {canManage && <div className="button-row"><button type="button" className="button primary"
-                disabled={busy || (!core.data || Boolean(core.error)) || Boolean(existing && !resumable)}
-                onClick={() => requestInstall(resumable ? resumable.manifest : manifest, () => resumable ? api.installModule(resumable.manifest) : api.installCatalogModule(manifest.id))}>
+                disabled={busy || !core.data || Boolean(core.error) || Boolean(existing && !resumable) || (manifest.id === "frigate.module" && Boolean(catalog.data?.frigate_upstream?.stale))}
+                onClick={() => manifest.id === "frigate.module" && !resumable ? setConfirmFrigateInstall(manifest) : requestInstall(resumable ? resumable.manifest : manifest, () => resumable ? api.installModule(resumable.manifest) : api.installCatalogModule(manifest.id))}>
                 {resumable ? u("retryInstall") : existing ? t("moduleInstalled") : runtime.data?.network_ready ? t("moduleInstall") : u("installAndPrepare")}
               </button>
                 {existing && <button type="button"
                   className="button primary" data-catalog-upgrade={manifest.id}
-                  disabled={busy || catalog.loading || Boolean(catalog.error) || !canUpgradeModule(existing, manifest)}
-                  onClick={() => setConfirmUpgrade(existing)}>{u("moduleUpgradeButton")}</button>}
+                  disabled={busy || catalog.loading || Boolean(catalog.error) || !canUpgradeModule(existing, manifest) || (manifest.id === "frigate.module" && Boolean(catalog.data?.frigate_upstream?.stale))}
+                  onClick={() => requestUpgrade(existing, manifest)}>{u("moduleUpgradeButton")}</button>}
               </div>}
             </article>;
           })}
@@ -288,6 +304,17 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
       <p>Конфигурация хранится отдельно и сохраняется при удалении. D-Bus подключается только при наличии. Docker socket контейнеру не передаётся.</p>
       <p>Доступ к порту 8123 ограничьте доверенной локальной сетью. Supervisor и магазин приложений Home Assistant OS не входят в Container.</p>
     </ConfirmDialog>}
+    {confirmFrigateInstall && <ConfirmDialog title="Установить официальный Frigate?" confirmLabel="Установить" onCancel={() => setConfirmFrigateInstall(undefined)} onConfirm={() => {
+      const approved = confirmFrigateInstall; setConfirmFrigateInstall(undefined); void run(() => api.installCatalogModule(approved.id, approved));
+    }}>
+      <p>Версия {confirmFrigateInstall.version}. Источник: blakeblackshear/frigate. Контейнер работает в отдельной сети, без открытых портов, Docker socket и доступа к GPU/USB.</p>
+      <p>Официальному образу требуется root внутри контейнера и записываемый слой образа. Это отдельный фиксированный профиль Frigate; ограничения других модулей не изменяются.</p>
+      <p>Конфигурация и архив хранятся в /var/lib/home-ai-modules/frigate.module. Проверьте свободное место перед включением записи камер.</p>
+      <p className="mono small" style={{overflowWrap: "anywhere"}}>{confirmFrigateInstall.runtime.docker.image}</p>
+    </ConfirmDialog>}
+    {confirmFrigateRecovery && <ConfirmDialog title="Восстановить прерванное обновление Frigate?" confirmLabel="Проверить и восстановить" onCancel={() => setConfirmFrigateRecovery(false)} onConfirm={() => {
+      setConfirmFrigateRecovery(false); void run(() => api.controlModule("frigate.module", "recover_upgrade"));
+    }}><p>HomeAiCore сверит журнал обновления с зарегистрированным образом: завершит подтверждённую транзакцию либо вернёт предыдущий контейнер, конфигурацию и базу. Новая версия не скачивается и не устанавливается.</p></ConfirmDialog>}
     {confirmNVRStorage && <ConfirmDialog title="Перенос NVR на назначенный диск" confirmLabel="Перенести и проверить"
       onCancel={() => setConfirmNVRStorage(undefined)} onConfirm={() => {
         void run(() => api.controlModule("nvr.module", "activate_storage"));
@@ -301,12 +328,17 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
       onConfirm={() => {
         const id = confirmUpgrade.manifest.id;
         setConfirmUpgrade(undefined);
-        void run(() => api.upgradeCatalogModule(id));
+        void run(() => api.upgradeCatalogModule(id, approvedUpgrade));
       }}>
       <p><strong>{confirmUpgrade.manifest.name}</strong></p>
       {confirmUpgrade.manifest.id === "homeassistant.module"
         ? <p>Home Assistant будет остановлен для копирования всей конфигурации. Новая версия запустится с отдельной копией и пройдёт HTTP-проверку. При ошибке запуска будет выполнена попытка вернуть предыдущий контейнер с неизменённой исходной конфигурацией. Требуется свободное место для полной копии.</p>
         : <p>{u("moduleUpgradeHint")}</p>}
+      {confirmUpgrade.manifest.id === "frigate.module" && approvedUpgrade && <>
+        <p>Официальный Frigate {confirmUpgrade.manifest.version} → {approvedUpgrade.version}. Запись будет временно остановлена. Перед обновлением сохраняются и проверяются конфигурация и база SQLite; при неудачном запуске они восстанавливаются вместе с предыдущим контейнером.</p>
+        <p>Видеозаписи не копируются в резервную копию конфигурации. Новые версии не устанавливаются автоматически.</p>
+        <p className="mono small" style={{overflowWrap: "anywhere"}}>{approvedUpgrade.runtime.docker.image}</p>
+      </>}
     </ConfirmDialog>}
     {confirmRemove && <ConfirmDialog title={u("removeTitle")} confirmLabel={u("confirmRemove")} onCancel={() => setConfirmRemove(undefined)}
       onConfirm={() => {void run(() => api.removeModule(confirmRemove.manifest.id)); setConfirmRemove(undefined);}}>

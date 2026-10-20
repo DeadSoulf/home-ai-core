@@ -52,6 +52,9 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 	if !moduleIDPattern.MatchString(moduleID) || len(moduleID) > 96 {
 		return moduleContainerStatus{}, "", errors.New("invalid module id")
 	}
+	if err := validateFrigateRequest(request); err != nil {
+		return moduleContainerStatus{}, "", err
+	}
 	// Reject malformed or unsupported operations before starting or installing Docker.
 	// Validation must not trigger privileged system changes.
 	switch request.Operation {
@@ -61,6 +64,10 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 		}
 		if request.Operation != "docker.module.install" && !imageDigestPattern.MatchString(strings.TrimSpace(request.PreviousImage)) {
 			return moduleContainerStatus{}, "", errors.New("previous module image must be an immutable @sha256 reference")
+		}
+	case "docker.module.recover":
+		if moduleID != "frigate.module" || !imageDigestPattern.MatchString(request.Image) {
+			return moduleContainerStatus{}, "", errors.New("invalid Frigate recovery request")
 		}
 	case "docker.module.start", "docker.module.stop", "docker.module.restart", "docker.module.remove", "docker.module.storage.activate":
 	default:
@@ -110,6 +117,8 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 		return controlDockerModule(ctx, moduleID, "restart")
 	case "docker.module.remove":
 		return removeDockerModule(ctx, moduleID)
+	case "docker.module.recover":
+		return recoverFrigateRegistered(ctx, request.Image)
 	case "docker.module.storage.activate":
 		return activateNVRStorage(ctx, moduleID, serviceUID, serviceGID)
 	default:
@@ -122,6 +131,9 @@ func installDockerModule(ctx context.Context, moduleID, image string, serviceUID
 		return installHomeAssistant(ctx, image, firstModuleProgress(progress))
 	}
 	report := firstModuleProgress(progress)
+	if moduleID == "frigate.module" {
+		return installFrigate(ctx, image, report)
+	}
 	dockerPath, err := exec.LookPath("docker")
 	if err != nil {
 		return moduleContainerStatus{}, "", errors.New("Docker CLI is unavailable")
@@ -372,6 +384,11 @@ func controlDockerModule(ctx context.Context, moduleID, action string) (moduleCo
 	if err != nil {
 		return moduleContainerStatus{}, "", err
 	}
+	if moduleID == "frigate.module" && action != "stop" {
+		if err := waitFrigateHealthy(ctx, dockerPath, name); err != nil {
+			return moduleContainerStatus{}, "", err
+		}
+	}
 	return status, "module " + action + " completed", nil
 }
 
@@ -462,7 +479,7 @@ func moduleRuntimeAllows(operation string, status dockerRuntimeStatus) bool {
 	if !status.Available || !status.Active {
 		return false
 	}
-	if operation == "docker.module.stop" || operation == "docker.module.remove" || operation == "docker.module.upgrade.rollback" || operation == "docker.module.upgrade.commit" {
+	if operation == "docker.module.stop" || operation == "docker.module.remove" || operation == "docker.module.upgrade.rollback" || operation == "docker.module.upgrade.commit" || operation == "docker.module.recover" {
 		return true
 	}
 	return status.NetworkReady

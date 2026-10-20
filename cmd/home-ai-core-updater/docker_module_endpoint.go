@@ -14,7 +14,7 @@ import (
 // native Core integrations. It never accepts a caller-chosen network target.
 // Docker labels and the managed network ID are verified before exposing an IP.
 func inspectManagedModuleAddress(ctx context.Context, moduleID string) (string, error) {
-	if moduleID != "nvr.module" && moduleID != "ai.agent" {
+	if moduleID != "nvr.module" && moduleID != "ai.agent" && moduleID != "frigate.module" {
 		return "", errors.New("unsupported module endpoint")
 	}
 	dockerPath, err := exec.LookPath("docker")
@@ -50,12 +50,19 @@ func inspectManagedModuleAddress(ctx context.Context, moduleID string) (string, 
 		container.Config.Labels["home-ai.module.id"] != moduleID {
 		return "", errors.New("refusing to connect to an unmanaged module container")
 	}
-	network, ok := container.NetworkSettings.Networks[dockerNetworkName]
+	networkName := dockerNetworkName
+	if moduleID == "frigate.module" {
+		networkName = frigateNetwork
+		if container.Config.Labels["home-ai.frigate.profile"] != "1" {
+			return "", errors.New("unrecognized Frigate runtime profile")
+		}
+	}
+	network, ok := container.NetworkSettings.Networks[networkName]
 	if !ok || network.NetworkID == "" {
 		return "", errors.New("module is not connected to the managed module network")
 	}
 	output, err = exec.CommandContext(ctx, dockerPath, "network", "inspect", "--format",
-		`{{index .Labels "home-ai.managed"}}|{{.Id}}`, dockerNetworkName).CombinedOutput()
+		`{{index .Labels "home-ai.managed"}}|{{.Id}}`, networkName).CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("inspect managed module network: %s", commandError(output, err))
 	}

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.211
+
+- Added independent official Frigate integration, dynamic GitHub release discovery and verified per-architecture GHCR manifests.
+- Require exact version/digest approval and fresh verification in both API and Job Engine; no automatic installation.
+- Added fixed isolated Docker profile, real health checks, configuration/SQLite snapshot, automatic rollback and interrupted-upgrade recovery.
+- Added native camera snapshots, events/clips, statistics and protected configuration editor.
+- Removed redundant per-card update checks; keep the global check and upgrade actions only for available versions.
+- Added real-container fault-injection tests, API/RBAC/CSRF tests, snapshot integrity and registry transaction tests.
+- Updated source-map-js to 1.2.2; publish signed ordinary releases only after required verification, without draft releases.
+
+
 ## Unreleased
 
 ### 0.1.209-dev — native Home Assistant Container

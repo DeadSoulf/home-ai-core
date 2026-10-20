@@ -28,6 +28,9 @@ func upgradeDockerModule(ctx context.Context, request updaterhelper.Request, uid
 		return upgradeHomeAssistant(ctx, request, report)
 	}
 	moduleID := request.ModuleID
+	if moduleID == "frigate.module" {
+		return upgradeFrigate(ctx, request, report)
+	}
 	if !moduleIDPattern.MatchString(moduleID) || len(moduleID) > 96 {
 		return moduleContainerStatus{}, "", errors.New("invalid module id")
 	}

@@ -97,7 +97,7 @@ export function Shell(props: {
           {groups.map((group) => (
             <div className="nav-group" key={group.label}>
               {group.label !== "home" && <span className="nav-group-label">{t(group.label)}</span>}
-              {group.items.map(({path, label, title}) => (
+              {group.items.map(({path, label, title, moduleStatus}) => (
                 <button type="button" key={path} className={isActivePath(path) ? "nav-item active" : "nav-item"}
                   aria-current={isActivePath(path) ? "page" : undefined}
                   aria-label={label ? t(label) : title}
@@ -106,7 +106,7 @@ export function Shell(props: {
                   <span className="ux-nav-icon"><NavigationIcon path={path} /></span>
                   <span className="ux-nav-copy">
                     <span>{label ? t(label) : title}</span>
-                    <small id={"nav-help-" + encodeURIComponent(path)}>{u(navigationHint(path))}</small>
+                    <small id={"nav-help-" + encodeURIComponent(path)}>{moduleStatus && moduleStatus !== "enabled" ? status(moduleStatus) : u(navigationHint(path))}</small>
                   </span>
                   {path === "/system" && props.availableUpdate && hasPermission(props.actor, "updates.read") &&
                     <span className="nav-update-badge" aria-label={t("newUpdateAvailable")}>↑</span>}

@@ -37,12 +37,8 @@ func (s *server) modulesCollection(
 	writeJSON(w, http.StatusOK, map[string]any{"modules": items})
 }
 
-func (s *server) moduleNavigation(
-	w http.ResponseWriter,
-	r *http.Request,
-	_ security.Actor,
-	_ authSource,
-) {
+// Installed registry records, not running-container availability, own sidebar entries.
+func (s *server) moduleNavigation(w http.ResponseWriter, r *http.Request, actor security.Actor, _ authSource) {
 	if r.Method != http.MethodGet {
 		methodNotAllowed(w, r, http.MethodGet)
 		return
@@ -52,37 +48,59 @@ func (s *server) moduleNavigation(
 		writeAPIError(w, r, http.StatusInternalServerError, "modules_unavailable", "module registry is unavailable", nil)
 		return
 	}
-	type navigationItem struct {
-		ModuleID string                   `json:"module_id"`
-		Status   string                   `json:"status"`
-		Items    []modules.NavigationItem `json:"items,omitempty"`
-	}
-	out := make([]navigationItem, 0, len(items))
+	out := make([]moduleNavigationEntry, 0, len(items))
 	for _, item := range items {
-		entry := navigationItem{ModuleID: item.Manifest.ID, Status: item.Status}
-		if item.Status == "enabled" {
-			entry.Items = append(entry.Items, item.Manifest.UI.Navigation...)
-			// Historical NVR manifests shipped without navigation. Existing
-			// installs remain immutable; expose the built-in route without
-			// forcing users to remove/reinstall the working container.
-			if item.Manifest.ID == "nvr.module" {
-				found := false
-				for _, nav := range entry.Items {
-					if nav.Route == "/modules/nvr.module" {
-						found = true
-						break
-					}
-				}
-				if !found {
-					entry.Items = append(entry.Items, modules.NavigationItem{
-						ID: "nvr", Title: "NVR", Route: "/modules/nvr.module", Icon: "video", Order: 20,
-					})
-				}
+		permission := "modules.read"
+		if item.Manifest.ID == "ai.agent" || item.Manifest.ID == "frigate.module" {
+			permission = "modules.manage"
+		}
+		allowed := false
+		for _, grant := range actor.Permissions {
+			if grant == permission {
+				allowed = true
+				break
 			}
 		}
-		out = append(out, entry)
+		if !allowed {
+			continue
+		}
+		out = append(out, moduleNavigationEntry{ModuleID: item.Manifest.ID, Name: item.Manifest.Name, Status: item.Status, Items: installedModuleNavigation(item.Manifest)})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"modules": out})
+}
+
+type moduleNavigationEntry struct {
+	ModuleID string                   `json:"module_id"`
+	Name     string                   `json:"name"`
+	Status   string                   `json:"status"`
+	Items    []modules.NavigationItem `json:"items"`
+}
+
+func installedModuleNavigation(manifest modules.Manifest) []modules.NavigationItem {
+	root := "/modules/" + manifest.ID
+	seen := map[string]bool{}
+	out := make([]modules.NavigationItem, 0, len(manifest.UI.Navigation)+1)
+	for _, item := range manifest.UI.Navigation {
+		if item.Route != root && !strings.HasPrefix(item.Route, root+"/") {
+			continue
+		}
+		if strings.Contains(item.Route, "..") || seen[item.Route] {
+			continue
+		}
+		if strings.TrimSpace(item.Title) == "" {
+			item.Title = manifest.Name
+		}
+		seen[item.Route] = true
+		out = append(out, item)
+	}
+	if !seen[root] {
+		title := manifest.Name
+		if title == "" {
+			title = manifest.ID
+		}
+		out = append(out, modules.NavigationItem{ID: manifest.ID, Title: title, Route: root, Order: 50})
+	}
+	return out
 }
 
 func (s *server) moduleCapabilities(
@@ -220,6 +238,11 @@ func (s *server) moduleControl(
 	input.Operation = strings.TrimSpace(input.Operation)
 	switch input.Operation {
 	case "enable", "disable", "restart":
+	case "recover_upgrade":
+		if id != "frigate.module" {
+			writeAPIError(w, r, http.StatusBadRequest, "invalid_module_operation", "upgrade recovery is restricted to Frigate", nil)
+			return
+		}
 	case "activate_storage":
 		if id != "nvr.module" {
 			writeAPIError(w, r, http.StatusBadRequest, "invalid_module_operation", "storage activation is restricted to NVR", nil)

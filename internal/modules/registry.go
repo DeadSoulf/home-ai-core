@@ -35,6 +35,7 @@ type Registry struct {
 	helper         func(context.Context, string, string, string) (helperModuleResult, error)
 	progressHelper func(context.Context, string, string, string, func(string, string)) (helperModuleResult, error)
 	upgradeHelper  func(context.Context, string, string, string, string, func(string, string)) (helperModuleResult, error)
+	verifyUpstream func(context.Context, Manifest) error
 }
 
 func NewRegistry(store Store, coreVersion ...string) *Registry {
@@ -48,6 +49,7 @@ func NewRegistry(store Store, coreVersion ...string) *Registry {
 		helper:         callModuleHelper,
 		progressHelper: callModuleHelperWithProgress,
 		upgradeHelper:  callModuleUpgradeHelper,
+		verifyUpstream: verifyOfficialFrigate,
 	}
 }
 
@@ -64,6 +66,11 @@ func (r *Registry) InstallManifest(ctx context.Context, manifest Manifest, progr
 
 	if err := ValidateManifest(manifest); err != nil {
 		return Registered{}, err
+	}
+	if r.verifyUpstream != nil {
+		if err := r.verifyUpstream(ctx, manifest); err != nil {
+			return Registered{}, err
+		}
 	}
 	if r.coreVersion != "" {
 		current := strings.TrimPrefix(r.coreVersion, "v")
@@ -149,6 +156,11 @@ func (r *Registry) UpgradeManifest(ctx context.Context, manifest Manifest, progr
 	if err := ValidateManifest(manifest); err != nil {
 		return Registered{}, err
 	}
+	if r.verifyUpstream != nil {
+		if err := r.verifyUpstream(ctx, manifest); err != nil {
+			return Registered{}, err
+		}
+	}
 	if r.coreVersion != "" {
 		current := strings.TrimPrefix(r.coreVersion, "v")
 		if idx := strings.IndexAny(current, "+-"); idx >= 0 {
@@ -212,6 +224,9 @@ func (r *Registry) UpgradeManifest(ctx context.Context, manifest Manifest, progr
 		if manifest.ID == homeassistant.ModuleID {
 			budget = 7 * time.Minute
 		}
+		if manifest.ID == "frigate.module" {
+			budget = 9 * time.Minute
+		}
 		recovery, done := context.WithTimeout(context.Background(), budget)
 		defer done()
 		_, rollbackErr := r.upgradeHelper(recovery, "docker.module.upgrade.rollback", manifest.ID, newImage, oldImage, nil)
@@ -219,7 +234,11 @@ func (r *Registry) UpgradeManifest(ctx context.Context, manifest Manifest, progr
 	}
 	// Cleanup failure leaves a stopped backup behind for manual recovery, not
 	// a falsely reported rollback of the already committed new manifest.
-	cleanup, done := context.WithTimeout(context.Background(), 30*time.Second)
+	cleanupBudget := 30 * time.Second
+	if manifest.ID == "frigate.module" {
+		cleanupBudget = 6 * time.Minute
+	}
+	cleanup, done := context.WithTimeout(context.Background(), cleanupBudget)
 	defer done()
 	if _, err := r.upgradeHelper(cleanup, "docker.module.upgrade.commit", manifest.ID, newImage, oldImage, nil); err != nil && callback != nil {
 		callback("cleanup_warning", "old container cleanup needs attention")
@@ -269,6 +288,12 @@ func (r *Registry) Control(ctx context.Context, id, operation string) (Registere
 	case "restart":
 		helperOperation = "docker.module.restart"
 		nextStatus = "enabled"
+	case "recover_upgrade":
+		if id != "frigate.module" {
+			return Registered{}, errors.New("upgrade recovery is restricted to Frigate")
+		}
+		helperOperation = "docker.module.recover"
+		nextStatus = item.Status
 	case "activate_storage":
 		if id != "nvr.module" || item.Status != "enabled" {
 			return Registered{}, errors.New("assigned storage can be activated only for enabled NVR")
@@ -278,7 +303,11 @@ func (r *Registry) Control(ctx context.Context, id, operation string) (Registere
 	default:
 		return Registered{}, fmt.Errorf("unsupported module control operation %q", operation)
 	}
-	if _, err := r.helper(ctx, helperOperation, id, ""); err != nil {
+	image := ""
+	if operation == "recover_upgrade" {
+		image = item.Manifest.Runtime.Docker.Image
+	}
+	if _, err := r.helper(ctx, helperOperation, id, image); err != nil {
 		recordCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		_ = r.store.SetModuleStatus(recordCtx, id, item.Status, err.Error())
