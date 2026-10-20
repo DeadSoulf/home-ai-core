@@ -31,17 +31,23 @@ func runClientInstall(reopenSettings bool, configPath, settingsPath string) (run
 	if err != nil {
 		return err
 	}
-	if result.AgentExitRequested {
-		info, statusErr := windowsclient.UserAgentAutostartStatus()
-		if statusErr != nil {
-			return fmt.Errorf("read agent autostart after client update: %w", statusErr)
+	// The NSIS wizard asks users to close HOME AI before upgrading.
+	// Restart a previously enabled background agent even if it was stopped
+	// manually at that prompt. Never enable new profiles or autostart here.
+	info, statusErr := windowsclient.UserAgentAutostartStatus()
+	if statusErr != nil {
+		return fmt.Errorf("read agent autostart after client update: %w", statusErr)
+	}
+	if info.Enabled && (result.AgentExitRequested || !windowsclient.UserAgentRunning()) {
+		if err := windowsclient.StartUserAgent(result.Path, info.ConfigPath); err != nil {
+			return fmt.Errorf("restart Home-AI sync agent: %w", err)
 		}
-		if info.Enabled {
-			if err := windowsclient.StartUserAgent(result.Path, info.ConfigPath); err != nil {
-				return fmt.Errorf("restart Home-AI sync agent: %w", err)
-			}
-			fmt.Println("Home-AI sync agent restarted after client update.")
-		}
+		fmt.Println("Home-AI sync agent restarted after client update.")
+	}
+	// Standalone portable users do not get an Installed Apps registry entry.
+	// Existing installer users see the true current version after GUI updates.
+	if err := windowsclient.RefreshInstalledClientVersion(version.Version); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: refresh HOME AI Installed apps version: %v\n", err)
 	}
 	if result.Changed {
 		fmt.Printf("Home-AI Windows client installed: %s\n", result.Path)
