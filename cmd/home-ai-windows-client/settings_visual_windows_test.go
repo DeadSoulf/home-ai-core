@@ -39,10 +39,9 @@ func TestTrayPopupSnapshotWithoutProfiles(t *testing.T) {
 	if headline == "" || subtitle == "" {
 		t.Fatal("empty tray popup status")
 	}
-	for i, row := range rows {
-		if row == "" {
-			t.Fatalf("tray popup row %d is empty", i)
-		}
+	if rows[0] != textForLanguage(uiLanguageEnglish, "recent_activity_empty") ||
+		rows[1] != "" || rows[2] != "" {
+		t.Fatalf("empty tray popup notice should display once, got rows %#v", rows)
 	}
 }
 
