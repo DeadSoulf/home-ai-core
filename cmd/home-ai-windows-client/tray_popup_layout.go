@@ -14,15 +14,15 @@ type trayPopupRect struct {
 }
 
 type trayPopupLayout struct {
-	Width, Height int32
-	Icon          trayPopupRect
-	Title         trayPopupRect
-	Headline      trayPopupRect
-	Subtitle      trayPopupRect
-	RecentTitle   trayPopupRect
-	Rows          [3]trayPopupRect
-	SyncButton    trayPopupRect
-	FolderButton  trayPopupRect
+	Width, Height  int32
+	Icon           trayPopupRect
+	Title          trayPopupRect
+	Headline       trayPopupRect
+	Subtitle       trayPopupRect
+	RecentTitle    trayPopupRect
+	Rows           [3]trayPopupRect
+	SyncButton     trayPopupRect
+	FolderButton   trayPopupRect
 	SettingsButton trayPopupRect
 }
 
