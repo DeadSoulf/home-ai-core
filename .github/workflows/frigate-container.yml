@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/frigate-browsers
+      PLAYWRIGHT_BROWSERS_PATH: /tmp/home-ai-frigate-browsers
     steps:
       - uses: actions/checkout@v4
         with:
