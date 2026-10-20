@@ -144,12 +144,33 @@ jobs:
               throw 'Windows Apps install registry entry is incorrect'
             }
           }
+          # Confirm the standalone Go updater also refreshes the version
+          # displayed in Windows Installed apps, without recreating profiles.
+          Set-ItemProperty -LiteralPath $uninstallKey -Name DisplayVersion -Value '0.0.0'
+          $refresh = Start-Process -FilePath $client -ArgumentList 'client install --reopen-settings=false' -Wait -PassThru
+          if ($refresh.ExitCode -ne 0) { throw 'client install upgrade-version smoke test failed' }
+          if ((Get-ItemProperty -LiteralPath $uninstallKey).DisplayVersion -ne $version) {
+            throw 'The native updater did not refresh Installed apps version'
+          }
+
+          $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+          $otherRunName = 'HOMEAI_CI_UnrelatedRunEntry'
+          New-ItemProperty -Path $runKey -Name $otherRunName -PropertyType String -Value 'do not remove' -Force | Out-Null
+          New-ItemProperty -Path $runKey -Name 'HomeAIWindowsSyncAgent' -PropertyType String -Value 'test agent registration' -Force | Out-Null
+
           $remove = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
           if ($remove.ExitCode -ne 0) { throw "Uninstaller failed: $($remove.ExitCode)" }
           if (Test-Path -LiteralPath $uninstallKey) { throw 'Apps uninstall registry entry survived uninstall' }
           if (Test-Path -LiteralPath $shortcut) { throw 'Start Menu shortcut survived uninstall' }
           if (Test-Path -LiteralPath $installed) { throw 'App EXE survived uninstall' }
           if (!(Test-Path -LiteralPath $sentinel)) { throw 'Uninstall deleted the user profile sentinel' }
+          if ((Get-ItemProperty -LiteralPath $runKey).PSObject.Properties.Name -contains 'HomeAIWindowsSyncAgent') {
+            throw 'Uninstaller left the HOME AI agent autostart entry enabled'
+          }
+          if ((Get-ItemPropertyValue -LiteralPath $runKey -Name $otherRunName) -ne 'do not remove') {
+            throw 'Uninstaller touched an unrelated Windows startup value'
+          }
+          Remove-ItemProperty -LiteralPath $runKey -Name $otherRunName
 
       - name: Upload unsigned test preview
         if: github.event_name == 'pull_request'
