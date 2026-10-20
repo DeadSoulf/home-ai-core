@@ -312,7 +312,7 @@ func trayWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintpt
 			state.showMenu()
 			return 0
 		case wmLButtonDblClk:
-			_ = startSettingsProcess(state.configPath)
+			showSettingsFromTray(state.configPath)
 			return 0
 		}
 	case trayStatusMessage:
