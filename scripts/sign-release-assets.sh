@@ -46,6 +46,7 @@ files=(
   "home-ai-core_${FILE_VERSION}_amd64.deb"
   "home-ai-core_${FILE_VERSION}_arm64.deb"
   "home-ai-windows-client_${VERSION}_amd64.exe"
+  "HOME-AI-Setup_${VERSION}_x64.exe"
 )
 # Check the complete set before generating any publication metadata.
 for file in "${files[@]}"; do
