@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DeadSoulf/home-ai-core/internal/homeassistant"
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
 
@@ -23,6 +24,9 @@ func moduleUpgradeStageNames(moduleID string) (candidate, previous string) {
 }
 
 func upgradeDockerModule(ctx context.Context, request updaterhelper.Request, uid, gid int, report moduleProgressFunc) (moduleContainerStatus, string, error) {
+	if request.ModuleID == homeassistant.ModuleID {
+		return upgradeHomeAssistant(ctx, request, report)
+	}
 	moduleID := request.ModuleID
 	if !moduleIDPattern.MatchString(moduleID) || len(moduleID) > 96 {
 		return moduleContainerStatus{}, "", errors.New("invalid module id")

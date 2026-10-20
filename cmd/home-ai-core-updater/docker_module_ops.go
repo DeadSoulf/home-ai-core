@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DeadSoulf/home-ai-core/internal/homeassistant"
 	"github.com/DeadSoulf/home-ai-core/internal/updaterhelper"
 )
 
@@ -65,6 +66,24 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 	default:
 		return moduleContainerStatus{}, "", errors.New("unsupported Docker module operation")
 	}
+	// Only this reserved module may use the reviewed host-access profile.
+	// Validate BOTH images before any Docker/service/package side effects.
+	if moduleID == homeassistant.ModuleID {
+		switch request.Operation {
+		case "docker.module.install", "docker.module.upgrade", "docker.module.upgrade.commit", "docker.module.upgrade.rollback":
+			if err := homeassistant.ValidateImage(strings.TrimSpace(request.Image)); err != nil {
+				return moduleContainerStatus{}, "", err
+			}
+			if request.Operation != "docker.module.install" {
+				if err := homeassistant.ValidateImage(strings.TrimSpace(request.PreviousImage)); err != nil {
+					return moduleContainerStatus{}, "", err
+				}
+			}
+		case "docker.module.start", "docker.module.stop", "docker.module.restart", "docker.module.remove":
+		default:
+			return moduleContainerStatus{}, "", errors.New("unsupported Home Assistant operation")
+		}
+	}
 	if request.Operation == "docker.module.install" {
 		report("prepare", "")
 		if _, err := ensureDockerRuntime(ctx, serviceGID); err != nil {
@@ -73,7 +92,7 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 	} else {
 		// Control/remove must never install Docker or change host services.
 		status := inspectDockerRuntime(ctx)
-		if !moduleRuntimeAllows(request.Operation, status) {
+		if !moduleRuntimeAllows(request.Operation, status) && !(moduleID == homeassistant.ModuleID && status.Available && status.Active) {
 			return moduleContainerStatus{}, "", fmt.Errorf("Docker runtime is not ready: %s", status.Error)
 		}
 	}
@@ -99,6 +118,9 @@ func performDockerModuleOperation(ctx context.Context, request updaterhelper.Req
 }
 
 func installDockerModule(ctx context.Context, moduleID, image string, serviceUID, serviceGID int, progress ...moduleProgressFunc) (moduleContainerStatus, string, error) {
+	if moduleID == homeassistant.ModuleID {
+		return installHomeAssistant(ctx, image, firstModuleProgress(progress))
+	}
 	report := firstModuleProgress(progress)
 	dockerPath, err := exec.LookPath("docker")
 	if err != nil {
@@ -319,6 +341,9 @@ func pullDockerModuleImage(ctx context.Context, dockerPath, image string, progre
 }
 
 func controlDockerModule(ctx context.Context, moduleID, action string) (moduleContainerStatus, string, error) {
+	if moduleID == homeassistant.ModuleID {
+		return controlHomeAssistant(ctx, action)
+	}
 	if moduleID == "nvr.module" && action != "stop" {
 		if _, err := validateNVRDataLink(ctx, filepath.Join(moduleDataRoot, moduleID)); err != nil {
 			return moduleContainerStatus{}, "", err
@@ -351,6 +376,9 @@ func controlDockerModule(ctx context.Context, moduleID, action string) (moduleCo
 }
 
 func removeDockerModule(ctx context.Context, moduleID string) (moduleContainerStatus, string, error) {
+	if moduleID == homeassistant.ModuleID {
+		return controlHomeAssistant(ctx, "remove")
+	}
 	dockerPath, err := exec.LookPath("docker")
 	if err != nil {
 		return moduleContainerStatus{}, "", errors.New("Docker CLI is unavailable")

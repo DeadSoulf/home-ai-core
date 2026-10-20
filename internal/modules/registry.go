@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DeadSoulf/home-ai-core/internal/homeassistant"
 	"github.com/DeadSoulf/home-ai-core/internal/state"
 )
 
@@ -135,7 +136,8 @@ func (r *Registry) InstallManifest(ctx context.Context, manifest Manifest, progr
 // UpgradeManifest replaces only a running, upgrade-capable module with a
 // strictly newer catalog-provided immutable image. A helper health-checks the
 // candidate and retains the old container until the new manifest is committed.
-// /data is preserved, not snapshotted; modules must handle schema migrations.
+// Generic /data is preserved, not snapshotted; those modules own migrations.
+// The reserved Home Assistant profile instead uses an isolated /config copy.
 func (r *Registry) UpgradeManifest(ctx context.Context, manifest Manifest, progress ...func(string, string)) (Registered, error) {
 	if err := ctx.Err(); err != nil {
 		return Registered{}, err
@@ -206,7 +208,11 @@ func (r *Registry) UpgradeManifest(ctx context.Context, manifest Manifest, progr
 		err = r.store.UpsertModule(finishCtx, state.ModuleRecord{ID: manifest.ID, Version: manifest.Version, Status: old.Status, ManifestJSON: string(raw)})
 	}
 	if err != nil {
-		recovery, done := context.WithTimeout(context.Background(), 90*time.Second)
+		budget := 90 * time.Second
+		if manifest.ID == homeassistant.ModuleID {
+			budget = 7 * time.Minute
+		}
+		recovery, done := context.WithTimeout(context.Background(), budget)
 		defer done()
 		_, rollbackErr := r.upgradeHelper(recovery, "docker.module.upgrade.rollback", manifest.ID, newImage, oldImage, nil)
 		return Registered{}, errors.Join(fmt.Errorf("failed to persist upgraded module: %w", err), rollbackErr)

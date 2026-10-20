@@ -1,0 +1,49 @@
+{
+  "schema_version": 2,
+  "id": "homeassistant.module",
+  "name": "Home Assistant",
+  "description": "Official Home Assistant Container. Dedicated host-network/privileged profile with persistent configuration, HTTP health checks and copy-isolated manual upgrades. No Supervisor or apps. Requires explicit host-access approval.",
+  "version": "2026.10.2",
+  "core": ">=0.1.209 <1.0.0",
+  "runtime": {
+    "type": "docker",
+    "docker": {
+      "image": "ghcr.io/home-assistant/home-assistant@sha256:33afb0659d786213264c2211f8d91c5fe87461c56eba6a3a546eb05fc71e89f4"
+    },
+    "health": {
+      "port": 8123,
+      "path": "/"
+    }
+  },
+  "permissions": [
+    "host.network",
+    "host.privileged"
+  ],
+  "capabilities": {
+    "requires": [
+      "host.docker"
+    ],
+    "provides": [
+      "homeassistant.service"
+    ]
+  },
+  "host": {
+    "architectures": [
+      "amd64",
+      "arm64"
+    ]
+  },
+  "api": {
+    "namespace": "homeassistant.module"
+  },
+  "events": {},
+  "ui": {},
+  "lifecycle": [
+    "install",
+    "upgrade",
+    "start",
+    "stop",
+    "restart",
+    "remove"
+  ]
+}

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### 0.1.209-dev — native Home Assistant Container
+
+- Added the reserved official Home Assistant module profile with explicit host-access confirmation, immutable images, platform/port validation and startup HTTP health checks.
+- Connected catalog install/start/stop/restart/remove and manual upgrades to Core jobs; ordinary module sandbox restrictions remain unchanged.
+- Added stable release discovery from upstream GitHub/GHCR with manifest-index digest verification and safe fallback to the pinned catalog entry.
+- Upgrades use separate configuration generations so failed startup or registry persistence can restore the previous image AND original database. Removal preserves all configuration data.
+- Added isolated lifecycle/recovery tests, manifest policy tests and frontend URL tests. See `docs/integrations/homeassistant-container.md` for privileges, supported platforms and recovery limitations.
+
 ### Core architecture reset
 
 - Product-specific embedded runtimes have been removed from Home-AI-Core.

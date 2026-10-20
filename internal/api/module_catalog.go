@@ -27,11 +27,12 @@ const (
 )
 
 type moduleCatalogDocument struct {
-	SchemaVersion    int                `json:"schema_version"`
-	ID               string             `json:"id"`
-	GeneratedAt      string             `json:"generated_at"`
-	Modules          []modules.Manifest `json:"modules"`
-	PrivateNVRStatus string             `json:"-"`
+	SchemaVersion       int                `json:"schema_version"`
+	ID                  string             `json:"id"`
+	GeneratedAt         string             `json:"generated_at"`
+	Modules             []modules.Manifest `json:"modules"`
+	PrivateNVRStatus    string             `json:"-"`
+	HomeAssistantStatus string             `json:"-"`
 }
 
 type githubContentResponse struct {
@@ -102,6 +103,7 @@ func loadOfficialModuleCatalog(r *http.Request) (moduleCatalogDocument, error) {
 			}
 		}
 	}
+	refreshHomeAssistantCandidate(r.Context(), &catalog, nil)
 	return catalog, nil
 }
 
@@ -212,10 +214,11 @@ func (s *server) moduleCatalog(
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"catalog": map[string]any{
-			"id":                 catalog.ID,
-			"generated_at":       catalog.GeneratedAt,
-			"modules":            catalog.Modules,
-			"private_nvr_status": catalog.PrivateNVRStatus,
+			"id":                   catalog.ID,
+			"generated_at":         catalog.GeneratedAt,
+			"modules":              catalog.Modules,
+			"private_nvr_status":   catalog.PrivateNVRStatus,
+			"homeassistant_status": catalog.HomeAssistantStatus,
 		},
 	})
 }

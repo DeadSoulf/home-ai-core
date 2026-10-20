@@ -11,6 +11,7 @@ import { useI18n } from "../i18n";
 import { useUI } from "../ui/useUI";
 import { activeJob, canUpgradeModule, catalogState, jobTitle, runtimeMessage } from "../ui/moduleState";
 import { PageHeading, Status } from "./Dashboard";
+import { homeAssistantURL } from "../ui/homeAssistant";
 
 export function ModulesPage({revision, section = "installed", canManage, canReadJobs = false, onSectionChange = () => {}, onNavigate = () => {}}: {
   revision: number; section?: ModuleSection; canManage: boolean; canReadJobs?: boolean;
@@ -25,6 +26,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
   const [confirmRemove, setConfirmRemove] = useState<RegisteredModule>();
   const [confirmUpgrade, setConfirmUpgrade] = useState<RegisteredModule>();
   const [confirmNVRStorage, setConfirmNVRStorage] = useState<RegisteredModule>();
+  const [confirmHomeAssistant, setConfirmHomeAssistant] = useState<() => Promise<Job>>();
   const mutation = useRef(false);
   // Catalog outages never hide the installed registry or stop/remove controls.
   const load = useCallback(() => Promise.all([api.modules(), api.capabilities()]).then(([modules, capabilities]) => ({modules, capabilities})), []);
@@ -81,13 +83,18 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
     } finally { mutation.current = false; setSending(false); }
   }
 
+  function requestInstall(manifest: RegisteredModule["manifest"], action: () => Promise<Job>) {
+    if (manifest.id === "homeassistant.module") setConfirmHomeAssistant(() => action);
+    else void run(action);
+  }
+
   function installManifest() {
     setManifestError(false);
     try {
       if (new TextEncoder().encode(manifestText).length > 256 * 1024) throw new Error("too large");
       const manifest = JSON.parse(manifestText) as RegisteredModule["manifest"];
       if (!manifest || typeof manifest !== "object" || Array.isArray(manifest) || typeof manifest.id !== "string" || !manifest.id.trim()) throw new Error("invalid object");
-      void run(() => api.installModule(manifest));
+      requestInstall(manifest, () => api.installModule(manifest));
     } catch { setManifestError(true); document.getElementById("module-manifest")?.focus(); }
   }
 
@@ -126,6 +133,8 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
     {monitoringFailed && <ErrorState message={u("operationMonitorFailed")} onRetry={() => void verifyStatus()} />}
     {uncertain && <div className="notice" role="status"><p>{u("operationUnknown")}</p><button type="button" className="button secondary" disabled={sending} onClick={() => void verifyStatus()}>{u("refresh")}</button></div>}
     {actionError !== undefined && <ErrorNotice error={actionError} />}
+    {catalog.data?.homeassistant_status === "upstream_unavailable" && <p className="notice" role="status">Проверка новых релизов Home Assistant временно недоступна. Доступна закреплённая версия из каталога; установленный контейнер не изменён.</p>}
+    {catalog.data?.homeassistant_status === "digest_changed" && <p className="notice" role="status">Digest уже опубликованной версии Home Assistant изменился. Автоматическая подмена отклонена; используется проверенный образ каталога.</p>}
     {section === "operations" && (displayedJobs.length > 0 ? <Panel title={u("uxOperationsJump")}>
       <div className="module-operations">
         {displayedJobs.map((job) => <article key={job.id} className="operation-card" data-job-id={job.id}>
@@ -166,11 +175,15 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
           return <article className="module-card" key={module.manifest.id} data-module-id={module.manifest.id}>
           <div className="module-title"><h2>{module.manifest.name}</h2>{module.status === "registered" ? <span className="tag">{u("incomplete")}</span> : <Status value={module.status} />}</div>
           <p>{module.manifest.description || t("noDescription")}</p>
+          {module.manifest.id === "homeassistant.module" && module.status === "enabled" && <div className="button-row">
+            <a className="button secondary" href={homeAssistantURL(window.location.href)} target="_blank" rel="noopener noreferrer">Открыть Home Assistant</a>
+            <span className="small muted">Порт 8123. У Home Assistant отдельная учётная запись.</span>
+          </div>}
           {module.error && <ErrorNotice error={{message: module.error}} message={module.status === "registered" ? u("resumeHint") : u("jobFailed")} />}
           {canManage && <div className="module-actions">
             <div className="button-row">
               {module.status === "registered" ? <button type="button" className="button primary" disabled={busy || (!core.data || Boolean(core.error))}
-                onClick={() => void run(() => api.installModule(module.manifest))}>{u("retryInstall")}</button> : <>
+                onClick={() => requestInstall(module.manifest, () => api.installModule(module.manifest))}>{u("retryInstall")}</button> : <>
                 <button type="button" className="button secondary" disabled={busy || (!core.data || Boolean(core.error))}
                   onClick={() => void run(() => api.controlModule(module.manifest.id, module.status === "enabled" ? "disable" : "enable"))}>{t(module.status === "enabled" ? "moduleStop" : "moduleStart")}</button>
                 <button type="button" className="button secondary" disabled={busy || (!core.data || Boolean(core.error))}
@@ -238,7 +251,7 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
               {resumable && <p>{u("resumeHint")}</p>}
               {canManage && <div className="button-row"><button type="button" className="button primary"
                 disabled={busy || (!core.data || Boolean(core.error)) || Boolean(existing && !resumable)}
-                onClick={() => void run(() => resumable ? api.installModule(resumable.manifest) : api.installCatalogModule(manifest.id))}>
+                onClick={() => requestInstall(resumable ? resumable.manifest : manifest, () => resumable ? api.installModule(resumable.manifest) : api.installCatalogModule(manifest.id))}>
                 {resumable ? u("retryInstall") : existing ? t("moduleInstalled") : runtime.data?.network_ready ? t("moduleInstall") : u("installAndPrepare")}
               </button>
                 {existing && <button type="button"
@@ -265,6 +278,16 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
         <div className="button-row"><button type="button" className="button primary" disabled={busy || !manifestText.trim() || (!core.data || Boolean(core.error))} onClick={installManifest}>{t("moduleInstall")}</button></div>
       </Panel>
     </details>}
+    {confirmHomeAssistant && <ConfirmDialog title="Установка Home Assistant" confirmLabel="Разрешить и установить"
+      onCancel={() => setConfirmHomeAssistant(undefined)} onConfirm={() => {
+        const action = confirmHomeAssistant;
+        setConfirmHomeAssistant(undefined);
+        void run(action);
+      }}>
+      <p>Официальный контейнер получит сеть сервера (host), порт 8123 и расширенные права (privileged), включая доступ к устройствам. Это не изолированный профиль обычного модуля.</p>
+      <p>Конфигурация хранится отдельно и сохраняется при удалении. D-Bus подключается только при наличии. Docker socket контейнеру не передаётся.</p>
+      <p>Доступ к порту 8123 ограничьте доверенной локальной сетью. Supervisor и магазин приложений Home Assistant OS не входят в Container.</p>
+    </ConfirmDialog>}
     {confirmNVRStorage && <ConfirmDialog title="Перенос NVR на назначенный диск" confirmLabel="Перенести и проверить"
       onCancel={() => setConfirmNVRStorage(undefined)} onConfirm={() => {
         void run(() => api.controlModule("nvr.module", "activate_storage"));
@@ -281,7 +304,9 @@ export function ModulesPage({revision, section = "installed", canManage, canRead
         void run(() => api.upgradeCatalogModule(id));
       }}>
       <p><strong>{confirmUpgrade.manifest.name}</strong></p>
-      <p>{u("moduleUpgradeHint")}</p>
+      {confirmUpgrade.manifest.id === "homeassistant.module"
+        ? <p>Home Assistant будет остановлен для копирования всей конфигурации. Новая версия запустится с отдельной копией и пройдёт HTTP-проверку. При ошибке запуска будет выполнена попытка вернуть предыдущий контейнер с неизменённой исходной конфигурацией. Требуется свободное место для полной копии.</p>
+        : <p>{u("moduleUpgradeHint")}</p>}
     </ConfirmDialog>}
     {confirmRemove && <ConfirmDialog title={u("removeTitle")} confirmLabel={u("confirmRemove")} onCancel={() => setConfirmRemove(undefined)}
       onConfirm={() => {void run(() => api.removeModule(confirmRemove.manifest.id)); setConfirmRemove(undefined);}}>

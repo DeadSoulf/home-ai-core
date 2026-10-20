@@ -6,6 +6,8 @@ import (
 	"io"
 	"regexp"
 	"strings"
+
+	"github.com/DeadSoulf/home-ai-core/internal/homeassistant"
 )
 
 const ManifestSchemaVersion = 2
@@ -76,6 +78,17 @@ func ValidateManifest(m Manifest) error {
 	}
 	if !imageDigestPattern.MatchString(strings.TrimSpace(m.Runtime.Docker.Image)) {
 		return fmt.Errorf("docker image must be an immutable @sha256 reference")
+	}
+	if m.ID == homeassistant.ModuleID {
+		if err := homeassistant.ValidateImage(m.Runtime.Docker.Image); err != nil {
+			return err
+		}
+		if !contains(m.Permissions, "host.network") || !contains(m.Permissions, "host.privileged") {
+			return fmt.Errorf("Home Assistant manifest must explicitly declare host.network and host.privileged permissions")
+		}
+		if m.Runtime.Health.Port != 8123 || m.Runtime.Health.Path != "/" {
+			return fmt.Errorf("Home Assistant health endpoint must be port 8123 path /")
+		}
 	}
 	if !contains(m.Capabilities.Requires, "host.docker") {
 		return fmt.Errorf("docker module must require host.docker capability")

@@ -707,7 +707,7 @@ export const api = {
   },
 
   moduleCatalog: async () => {
-    const result = await request<{catalog: {id: string; generated_at?: string; private_nvr_status?: string; modules: RegisteredModule["manifest"][]}}>("/api/v1/modules/catalog");
+    const result = await request<{catalog: {id: string; generated_at?: string; private_nvr_status?: string; homeassistant_status?: string; modules: RegisteredModule["manifest"][]}}>("/api/v1/modules/catalog");
     return result.catalog;
   },
 

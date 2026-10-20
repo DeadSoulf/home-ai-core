@@ -66,9 +66,23 @@ For the first v2 runtime profile, Core creates containers with a fixed policy:
 - tmpfs at `/tmp`;
 - persistent bind mount at `/data`;
 - container process runs as the unprivileged `home-ai-core` UID/GID;
-- persistent host data lives at `/var/lib/home-ai-core/modules/<module-id>`.
+- persistent host data lives at `/var/lib/home-ai-modules/<module-id>`.
 
 A future manifest revision may add explicitly reviewed declarations for ports, devices or extra mounts. v2 intentionally does not allow them.
+
+## Reserved upstream profiles
+
+Core 0.1.209 adds one explicitly reviewed exception: `homeassistant.module` with
+an immutable image from `ghcr.io/home-assistant/home-assistant` only. Its fixed
+upstream profile uses host networking, privileged device access, persistent
+`/config` generations and a fixed HTTP health check. The manifest must declare
+`host.network` and `host.privileged`, and the UI requests separate installation
+confirmation. These permission strings do not grant host access to other IDs.
+No generic manifest fields for shell commands, arbitrary devices/mounts, host
+networking or privilege escalation have been added.
+
+See [Home Assistant Container](../integrations/homeassistant-container.md) for
+its storage/backup/rollback contract and the limits of privileged isolation.
 
 ## Lifecycle
 
