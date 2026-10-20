@@ -75,6 +75,14 @@ func sameTraySyncConfig(left, right string) bool {
 	return strings.EqualFold(filepath.Clean(left), filepath.Clean(right))
 }
 
+func (state *windowsSettingsUI) requestCloseToTray() {
+	// Close is the user's hide-to-tray action. Preserve the settings window
+	// until the tray icon is confirmed running, so the UI cannot disappear
+	// when autostart has not yet launched or the agent failed.
+	state.trayClosePending = true
+	state.requestMinimizeToTray()
+}
+
 func (state *windowsSettingsUI) requestMinimizeToTray() {
 	if state.trayMinimizePending {
 		return
@@ -106,13 +114,14 @@ func (state *windowsSettingsUI) finishMinimizeToTray() {
 	}
 	state.trayMinimizePending = false
 	if result.err != nil {
+		state.trayClosePending = false
 		// The minimize button keeps its ordinary Windows taskbar behavior.
 		// A failure must never strand the application in an invisible window.
 		state.setStatus(state.tr("tray_unavailable") + ": " + result.err.Error())
 		return
 	}
 	minimized, _, _ := procSettingsIsIconic.Call(uintptr(state.hwnd))
-	if minimized == 0 || !windowsclient.UserAgentRunning() {
+	if (minimized == 0 && !state.trayClosePending) || !windowsclient.UserAgentRunning() {
 		return // User restored Settings during startup, or agent exited.
 	}
 	state.hideToTray()
@@ -124,6 +133,7 @@ func (state *windowsSettingsUI) hideToTray() {
 	}
 	procSettingsShowWindow.Call(uintptr(state.hwnd), settingsSWHide)
 	state.trayHidden = true
+	state.trayClosePending = false
 }
 
 // If the agent exits or fails after hiding Settings, restore the taskbar
@@ -154,6 +164,6 @@ func closeHiddenSettingsWhenTrayExits() {
 	}
 	visible, _, _ := procSettingsIsWindowVisible.Call(hwnd)
 	if visible == 0 {
-		procSettingsPostMessage.Call(hwnd, settingsWMClose, 0, 0)
+		procSettingsPostMessage.Call(hwnd, settingsWMExitFromTray, 0, 0)
 	}
 }
