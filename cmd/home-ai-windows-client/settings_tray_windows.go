@@ -9,10 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-	"unsafe"
 
 	"github.com/DeadSoulf/home-ai-core/internal/windowsclient"
-	"golang.org/x/sys/windows"
 )
 
 const trayStartupTimeout = 8 * time.Second
@@ -147,8 +145,7 @@ func showSettingsFromTray(configPath string) {
 }
 
 func closeHiddenSettingsWhenTrayExits() {
-	className, _ := windows.UTF16PtrFromString(settingsWindowClass)
-	hwnd, _, _ := procSettingsFindWindow.Call(uintptr(unsafe.Pointer(className)), 0)
+	hwnd := findHomeAISettingsWindow()
 	if hwnd == 0 {
 		return
 	}
