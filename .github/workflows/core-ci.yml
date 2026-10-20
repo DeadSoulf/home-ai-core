@@ -147,9 +147,11 @@ jobs:
           # Confirm the standalone Go updater also refreshes the version
           # displayed in Windows Installed apps, without recreating profiles.
           Set-ItemProperty -LiteralPath $uninstallKey -Name DisplayVersion -Value '0.0.0'
-          $refresh = Start-Process -FilePath $client -ArgumentList 'client install --reopen-settings=false' -Wait -PassThru
-          if ($refresh.ExitCode -ne 0) { throw 'client install upgrade-version smoke test failed' }
-          if ((Get-ItemProperty -LiteralPath $uninstallKey).DisplayVersion -ne $version) {
+          & $client client install --reopen-settings=false 2>&1 | Out-String | Write-Host
+          if ($LASTEXITCODE -ne 0) { throw "client install upgrade-version test failed: $LASTEXITCODE" }
+          $newVersion = (Get-ItemProperty -LiteralPath $uninstallKey).DisplayVersion
+          Write-Host "REFRESHED_APPS_VERSION=$newVersion EXPECTED=$version"
+          if ($newVersion -ne $version) {
             throw 'The native updater did not refresh Installed apps version'
           }
 
