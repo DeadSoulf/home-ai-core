@@ -40,14 +40,9 @@ func reopenWindowsClientSettings(executable, configPath, settingsPath string, ch
 }
 
 func waitForWindowsSettingsWindowExit(timeout time.Duration) error {
-	className, err := windows.UTF16PtrFromString(settingsWindowClass)
-	if err != nil {
-		return err
-	}
 	deadline := time.Now().Add(timeout)
 	for {
-		hwnd, _, _ := procSettingsFindWindow.Call(uintptr(unsafe.Pointer(className)), 0)
-		if hwnd == 0 {
+		if findHomeAISettingsWindow() == 0 {
 			return nil
 		}
 		if time.Now().After(deadline) {
