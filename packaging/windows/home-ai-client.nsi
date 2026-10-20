@@ -28,7 +28,6 @@ Unicode true
 Name "${APP_NAME} Windows Client ${VERSION}"
 OutFile "${OUTFILE}"
 InstallDir "$LOCALAPPDATA\HomeAI\bin"
-InstallDirRegKey HKCU "${APP_REG}" "InstallDir"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
 BrandingText "HOME AI"
@@ -68,8 +67,6 @@ LangString AgentStopText ${LANG_RUSSIAN} "Завершение работы фо
 LangString AgentStopText ${LANG_ENGLISH} "Stopping the HOME AI background agent..."
 LangString KeepUserData ${LANG_RUSSIAN} "Настройки, пароли и синхронизируемые файлы сохраняются."
 LangString KeepUserData ${LANG_ENGLISH} "Settings, credentials and synchronized files are preserved."
-LangString UninstallTitle ${LANG_RUSSIAN} "Удалить HOME AI"
-LangString UninstallTitle ${LANG_ENGLISH} "Uninstall HOME AI"
 
 Function .onInit
   !insertmacro MUI_LANGDLL_DISPLAY
@@ -122,7 +119,7 @@ installed:
   WriteUninstaller "$INSTDIR${APP_UNINSTALL}"
   CreateDirectory "${START_MENU}"
   CreateShortcut "${START_MENU}\HOME AI.lnk" "$INSTDIR${APP_EXE}" "settings" "$INSTDIR${APP_EXE}" 0
-  CreateShortcut "${START_MENU}\$(UninstallTitle).lnk" "$INSTDIR${APP_UNINSTALL}"
+  CreateShortcut "${START_MENU}\Uninstall HOME AI.lnk" "$INSTDIR${APP_UNINSTALL}"
 
   WriteRegStr HKCU "${APP_REG}" "InstallDir" "$INSTDIR"
   WriteRegStr HKCU "${UNINSTALL_REG}" "DisplayName" "HOME AI Windows Client"
@@ -153,7 +150,7 @@ Section "Uninstall"
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "HomeAIWindowsSyncAgent"
 
   Delete "${START_MENU}\HOME AI.lnk"
-  Delete "${START_MENU}\$(UninstallTitle).lnk"
+  Delete "${START_MENU}\Uninstall HOME AI.lnk"
   RMDir "${START_MENU}"
   Delete "${DESKTOP_SHORTCUT}"
 
