@@ -35,7 +35,7 @@ func TestTrayPopupLayoutDoesNotClipControls(t *testing.T) {
 
 func TestTrayPopupDPIIsBoundedByWorkArea(t *testing.T) {
 	for _, test := range []struct {
-		dpi  uint32
+		dpi                   uint32
 		workWidth, workHeight int32
 	}{
 		{96, 1920, 1040},
@@ -57,7 +57,7 @@ func TestTrayPopupDPIIsBoundedByWorkArea(t *testing.T) {
 
 func TestTrayPopupPositionWithinMonitorEvenWithNegativeCoordinates(t *testing.T) {
 	for _, test := range []struct {
-		cursorX, cursorY int32
+		cursorX, cursorY         int32
 		left, top, right, bottom int32
 	}{
 		{1900, 1050, 0, 0, 1920, 1080},
