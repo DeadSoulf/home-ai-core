@@ -9,7 +9,7 @@ import unittest
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'sign-release-assets.sh'
 VERSION = '0.1.173-dev'
-FILES = [f'home-ai-core-update_{VERSION}_{a}.tar.gz' for a in ('amd64', 'arm64')] + [f'home-ai-core_0.1.173.dev_{a}.deb' for a in ('amd64', 'arm64')] + [f'home-ai-windows-client_{VERSION}_amd64.exe']
+FILES = [f'home-ai-core-update_{VERSION}_{a}.tar.gz' for a in ('amd64', 'arm64')] + [f'home-ai-core_0.1.173.dev_{a}.deb' for a in ('amd64', 'arm64')] + [f'home-ai-windows-client_{VERSION}_amd64.exe', f'HOME-AI-Setup_{VERSION}_x64.exe']
 
 class SigningTests(unittest.TestCase):
     @classmethod
@@ -36,7 +36,7 @@ class SigningTests(unittest.TestCase):
         result = self.invoke()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('not configured', result.stderr)
-        self.assertEqual(len(list(self.dist.iterdir())), 5)
+        self.assertEqual(len(list(self.dist.iterdir())), len(FILES))
 
     def test_invalid_key(self):
         self.env['HOME_AI_UPDATE_SIGNING_KEY'] = 'not-a-key-private-test-value'
@@ -53,7 +53,7 @@ class SigningTests(unittest.TestCase):
     def test_self_check(self):
         result = self.invoke('--check-key')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(len(list(self.dist.iterdir())), 5)
+        self.assertEqual(len(list(self.dist.iterdir())), len(FILES))
         self.assertNotIn('PRIVATE KEY', result.stdout + result.stderr)
         self.assertFalse(list(self.root.glob('home-ai-sign.*')))
 
