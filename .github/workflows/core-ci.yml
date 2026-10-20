@@ -122,6 +122,13 @@ jobs:
             Write-Host "UNINSTALL_PATH=$uninstaller EXISTS=$(Test-Path -LiteralPath $uninstaller)"
             Write-Host "START_MENU_PATH=$shortcut EXISTS=$(Test-Path -LiteralPath $shortcut)"
             Write-Host "REGISTRY_PRESENT=$(Test-Path -LiteralPath $uninstallKey)"
+            if (Test-Path -LiteralPath $uninstallKey) {
+              $record = Get-ItemProperty -LiteralPath $uninstallKey
+              Write-Host "REGISTERED_INSTALLDIR=$($record.InstallLocation) UNINSTALL_CMD=$($record.UninstallString)"
+            }
+            Write-Host "BIN_DIRECTORY_CONTENTS:"
+            Get-ChildItem -LiteralPath (Split-Path $installed -Parent) -ErrorAction SilentlyContinue |
+              Select-Object Name,Length,FullName | Format-Table -AutoSize | Out-String | Write-Host
             if (!(Test-Path -LiteralPath $installed) -or !(Test-Path -LiteralPath $uninstaller)) { throw 'Client or uninstaller is missing' }
             if (!(Test-Path -LiteralPath $shortcut)) { throw 'Start Menu shortcut missing' }
             if (!(Test-Path -LiteralPath $sentinel)) { throw 'Sync data removed during install' }
