@@ -84,8 +84,10 @@ SectionEnd
 
 Function un.onInit
   SetShellVarContext current
-  MessageBox MB_ICONEXCLAMATION|MB_YESNO "Uninstall HOME AI Windows Client? Saved synchronization profiles and credentials are kept." IDYES +2
+  IfSilent proceed
+  MessageBox MB_ICONEXCLAMATION|MB_YESNO "Uninstall HOME AI Windows Client? Saved synchronization profiles and credentials are kept." IDYES proceed
   Abort
+proceed:
 FunctionEnd
 
 Section "Uninstall"
