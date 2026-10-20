@@ -38,7 +38,7 @@ ShowUninstDetails show
 !define MUI_LANGDLL_REGISTRY_ROOT "HKCU"
 !define MUI_LANGDLL_REGISTRY_KEY "${APP_REG}"
 !define MUI_LANGDLL_REGISTRY_VALUENAME "InstallerLanguage"
-!define MUI_FINISHPAGE_RUN "$INSTDIR${APP_EXE}"
+!define MUI_FINISHPAGE_RUN "$INSTDIR\${APP_EXE}"
 !define MUI_FINISHPAGE_RUN_PARAMETERS "settings"
 !define MUI_FINISHPAGE_RUN_TEXT "$(LaunchAfterSetup)"
 
@@ -116,26 +116,26 @@ Section "$(AppComponent)" SecMain
 
 installed:
   SetOutPath "$INSTDIR"
-  WriteUninstaller "$INSTDIR${APP_UNINSTALL}"
+  WriteUninstaller "$INSTDIR\${APP_UNINSTALL}"
   CreateDirectory "${START_MENU}"
-  CreateShortcut "${START_MENU}\HOME AI.lnk" "$INSTDIR${APP_EXE}" "settings" "$INSTDIR${APP_EXE}" 0
-  CreateShortcut "${START_MENU}\Uninstall HOME AI.lnk" "$INSTDIR${APP_UNINSTALL}"
+  CreateShortcut "${START_MENU}\HOME AI.lnk" "$INSTDIR\${APP_EXE}" "settings" "$INSTDIR\${APP_EXE}" 0
+  CreateShortcut "${START_MENU}\Uninstall HOME AI.lnk" "$INSTDIR\${APP_UNINSTALL}"
 
   WriteRegStr HKCU "${APP_REG}" "InstallDir" "$INSTDIR"
   WriteRegStr HKCU "${UNINSTALL_REG}" "DisplayName" "HOME AI Windows Client"
   WriteRegStr HKCU "${UNINSTALL_REG}" "DisplayVersion" "${VERSION}"
   WriteRegStr HKCU "${UNINSTALL_REG}" "Publisher" "Home AI Core"
   WriteRegStr HKCU "${UNINSTALL_REG}" "InstallLocation" "$INSTDIR"
-  WriteRegStr HKCU "${UNINSTALL_REG}" "DisplayIcon" "$INSTDIR${APP_EXE},0"
-  WriteRegStr HKCU "${UNINSTALL_REG}" "UninstallString" '"$INSTDIR${APP_UNINSTALL}"'
-  WriteRegStr HKCU "${UNINSTALL_REG}" "QuietUninstallString" '"$INSTDIR${APP_UNINSTALL}" /S'
+  WriteRegStr HKCU "${UNINSTALL_REG}" "DisplayIcon" "$INSTDIR\${APP_EXE},0"
+  WriteRegStr HKCU "${UNINSTALL_REG}" "UninstallString" '"$INSTDIR\${APP_UNINSTALL}"'
+  WriteRegStr HKCU "${UNINSTALL_REG}" "QuietUninstallString" '"$INSTDIR\${APP_UNINSTALL}" /S'
   WriteRegStr HKCU "${UNINSTALL_REG}" "URLInfoAbout" "https://github.com/DeadSoulf/home-ai-core"
   WriteRegDWORD HKCU "${UNINSTALL_REG}" "NoModify" 1
   WriteRegDWORD HKCU "${UNINSTALL_REG}" "NoRepair" 1
 SectionEnd
 
 Section /o "$(DesktopComponent)" SecDesktop
-  CreateShortcut "${DESKTOP_SHORTCUT}" "$INSTDIR${APP_EXE}" "settings" "$INSTDIR${APP_EXE}" 0
+  CreateShortcut "${DESKTOP_SHORTCUT}" "$INSTDIR\${APP_EXE}" "settings" "$INSTDIR\${APP_EXE}" 0
 SectionEnd
 
 Section "Uninstall"
@@ -156,8 +156,8 @@ Section "Uninstall"
 
   ; Existing sync profiles, client settings, credentials, TLS pins, local and
   ; remote files are retained by design. Only binaries and shortcuts removed.
-  Delete /REBOOTOK "$INSTDIR${APP_EXE}"
-  Delete /REBOOTOK "$INSTDIR${APP_UNINSTALL}"
+  Delete /REBOOTOK "$INSTDIR\${APP_EXE}"
+  Delete /REBOOTOK "$INSTDIR\${APP_UNINSTALL}"
   RMDir /REBOOTOK "$INSTDIR"
   DeleteRegKey HKCU "${UNINSTALL_REG}"
   DeleteRegValue HKCU "${APP_REG}" "InstallDir"
