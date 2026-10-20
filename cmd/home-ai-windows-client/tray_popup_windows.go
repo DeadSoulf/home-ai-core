@@ -89,25 +89,37 @@ func (state *windowsAgentTray) showStatusPopup() {
 		return
 	}
 
-	dpi := settingsWindowDPI(windows.Handle(hwnd))
+	observedDPI := settingsWindowDPI(windows.Handle(hwnd))
 	var work settingsRect
 	monitor, _, _ := procTrayPopupMonitorFromWindow.Call(hwnd, trayPopupMonitorNearest)
 	if monitor != 0 {
 		info := trayPopupMonitorInfo{CbSize: uint32(unsafe.Sizeof(trayPopupMonitorInfo{}))}
 		if result, _, _ := procTrayPopupGetMonitorInfo.Call(monitor, uintptr(unsafe.Pointer(&info))); result != 0 {
 			work = info.RcWork
-			dpi = trayPopupEffectiveDPI(dpi, work.Right-work.Left, work.Bottom-work.Top)
 		}
 	}
-	layout := trayPopupBuildLayout(dpi)
-	x, y := trayPopupPosition(point.X, point.Y,
-		work.Left, work.Top, work.Right, work.Bottom, layout.Width, layout.Height)
-	moved, _, _ := procSettingsMoveWindow.Call(hwnd, uintptr(x), uintptr(y),
-		uintptr(layout.Width), uintptr(layout.Height), 0)
-	if moved == 0 {
-		procDestroyWindow.Call(hwnd)
-		state.showMenu()
-		return
+	// Some Windows sessions first report 96 DPI for a new hidden 1px
+	// window, then apply the monitor's actual DPI after MoveWindow. Re-query
+	// and reflow before creating fonts/controls or they will still clip.
+	var dpi uint32
+	var layout trayPopupLayout
+	for attempt := 0; attempt < 3; attempt++ {
+		dpi = trayPopupEffectiveDPI(observedDPI, work.Right-work.Left, work.Bottom-work.Top)
+		layout = trayPopupBuildLayout(dpi)
+		x, y := trayPopupPosition(point.X, point.Y,
+			work.Left, work.Top, work.Right, work.Bottom, layout.Width, layout.Height)
+		moved, _, _ := procSettingsMoveWindow.Call(hwnd, uintptr(x), uintptr(y),
+			uintptr(layout.Width), uintptr(layout.Height), 0)
+		if moved == 0 {
+			procDestroyWindow.Call(hwnd)
+			state.showMenu()
+			return
+		}
+		actualDPI := settingsWindowDPI(windows.Handle(hwnd))
+		if actualDPI == observedDPI {
+			break
+		}
+		observedDPI = actualDPI
 	}
 	state.popup = windows.Handle(hwnd)
 	state.createStatusPopupControls(windows.Handle(module), layout, dpi)
