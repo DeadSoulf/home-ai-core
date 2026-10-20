@@ -1,9 +1,8 @@
-# Standalone Home Assistant Container profile for HomeAiCore.
-# Staged deployment: this file does NOT register a module in the Core catalog.
-# Before using, verify host-port 8123 and review privileged/host-network access.
+# Manual staging profile; not integrated with Core module lifecycle yet.
+# Run resolve-image.sh and export HOME_ASSISTANT_IMAGE from its output first.
 services:
   homeassistant:
-    image: ghcr.io/home-assistant/home-assistant:stable
+    image: ${HOME_ASSISTANT_IMAGE:?Resolve and pin a registry image digest first}
     container_name: home-ai-homeassistant
     restart: unless-stopped
     stop_grace_period: 60s
