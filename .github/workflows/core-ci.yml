@@ -154,6 +154,7 @@ jobs:
           }
 
           $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+          New-Item -Path $runKey -Force | Out-Null
           $otherRunName = 'HOMEAI_CI_UnrelatedRunEntry'
           New-ItemProperty -Path $runKey -Name $otherRunName -PropertyType String -Value 'do not remove' -Force | Out-Null
           New-ItemProperty -Path $runKey -Name 'HomeAIWindowsSyncAgent' -PropertyType String -Value 'test agent registration' -Force | Out-Null
