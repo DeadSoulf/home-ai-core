@@ -177,11 +177,51 @@ jobs:
             dist/*.exe
             dist/*.exe.sha256
           if-no-files-found: error
+  windows-installer:
+    needs: [preflight, windows-client]
+    name: Build Windows setup wizard
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download verified Windows client build
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-client
+          path: dist
+      - name: Install NSIS packaging tool
+        shell: pwsh
+        run: |
+          choco install nsis --yes --no-progress --limit-output
+          if ($LASTEXITCODE -ne 0) { throw "NSIS installation failed" }
+      - name: Package per-user Windows installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content VERSION -Raw).Trim()
+          $client = Join-Path (Resolve-Path dist) "home-ai-windows-client_${version}_amd64.exe"
+          if (!(Test-Path -LiteralPath $client)) { throw "Windows client asset missing" }
+          $compiler = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          if (!(Test-Path -LiteralPath $compiler)) { throw "NSIS compiler missing" }
+          $output = (Resolve-Path dist).Path
+          & $compiler "/DVERSION=$version" "/DCLIENT_EXE=$client" "/DOUTPUT_DIR=$output" "packaging/windows/HOME-AI-Setup.nsi"
+          if ($LASTEXITCODE -ne 0) { throw "NSIS packaging failed" }
+          $setup = Join-Path $output "HOME-AI-Setup_${version}_x64.exe"
+          if (!(Test-Path -LiteralPath $setup)) { throw "Setup output missing" }
+          $hash = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $(Split-Path $setup -Leaf)" | Set-Content -LiteralPath "$setup.sha256" -Encoding ascii
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-client-installer
+          path: |
+            dist/HOME-AI-Setup_*.exe
+            dist/HOME-AI-Setup_*.exe.sha256
+          if-no-files-found: error
+
   release:
     permissions:
       contents: write
     name: Publish GitHub release
-    needs: [build, debian-installer, windows-client]
+    needs: [build, debian-installer, windows-client, windows-installer]
     runs-on: ubuntu-latest
 
     steps:
@@ -206,6 +246,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: windows-client
+          path: dist
+
+      - name: Download Windows Setup wizard
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-client-installer
           path: dist
 
       - name: Sign and verify every release artifact and source metadata
