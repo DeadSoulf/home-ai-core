@@ -131,6 +131,11 @@ jobs:
               Select-Object Name,Length,FullName | Format-Table -AutoSize | Out-String | Write-Host
             if (!(Test-Path -LiteralPath $installed) -or !(Test-Path -LiteralPath $uninstaller)) { throw 'Client or uninstaller is missing' }
             if (!(Test-Path -LiteralPath $shortcut)) { throw 'Start Menu shortcut missing' }
+            $shell = New-Object -ComObject WScript.Shell
+            $shortcutTarget = $shell.CreateShortcut($shortcut).TargetPath
+            if ($shortcutTarget -ne $installed) {
+              throw "Start Menu shortcut points to $shortcutTarget rather than $installed"
+            }
             if (!(Test-Path -LiteralPath $sentinel)) { throw 'Sync data removed during install' }
             if ((Get-FileHash -LiteralPath $installed -Algorithm SHA256).Hash -ne
                 (Get-FileHash -LiteralPath $client -Algorithm SHA256).Hash) { throw 'Installed client SHA-256 mismatch' }
