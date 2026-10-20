@@ -36,6 +36,7 @@ jobs:
         run: |
           python web/tests/browser_regressions.py
           python web/tests/frigate_module_regressions.py
+          python web/tests/module_navigation_regressions.py
           python web/tests/nvr_storage_purpose_regressions.py
           python web/tests/nvr_storage_capacity_regressions.py
           python web/tests/csrf_regressions.py

@@ -732,8 +732,8 @@ export const api = {
     return result.job;
   },
 
-  moduleNavigation: async () => {
-    const result = await request<{modules: ModuleNavigationState[]}>("/api/v1/modules/navigation");
+  moduleNavigation: async (signal?: AbortSignal) => {
+    const result = await request<{modules: ModuleNavigationState[]}>("/api/v1/modules/navigation", {signal});
     return result.modules;
   },
 

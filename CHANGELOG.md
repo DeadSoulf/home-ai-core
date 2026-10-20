@@ -13,6 +13,12 @@
 
 ## Unreleased
 
+### 0.1.212 — automatic installed-module sidebar refresh
+
+- Preserve module lifecycle refresh events arriving during an in-flight sidebar request; refresh on reconnect/focus and cancel obsolete-session requests.
+- Regression-test existing Home Assistant manifests with empty navigation, installation without reload, stop/error state, new login, removal and permission filtering.
+- Keep the registry-based sidebar fallback and module management pages introduced alongside Frigate; no Home Assistant reinstall or data migration is required.
+
 ### 0.1.209-dev — native Home Assistant Container
 
 - Added the reserved official Home Assistant module profile with explicit host-access confirmation, immutable images, platform/port validation and startup HTTP health checks.

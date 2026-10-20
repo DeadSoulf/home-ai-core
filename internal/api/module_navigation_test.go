@@ -70,3 +70,36 @@ func TestInstalledNavigationPermissionFiltering(t *testing.T) {
 		}
 	}
 }
+
+// A catalog refresh must not be needed to repair installations made with the
+// original Home Assistant manifest (ui:{}). The persisted registry is enough.
+func TestLegacyHomeAssistantNavigationAcrossLifecycle(t *testing.T) {
+	actor := security.Actor{Permissions: []string{"security.self.read", "modules.read"}}
+	for _, status := range []string{"enabled", "disabled", "error", "registered"} {
+		t.Run(status, func(t *testing.T) {
+			manifest := modules.Manifest{ID: "homeassistant.module", Name: "Home Assistant"}
+			s := &server{modules: fakeModules{items: []modules.Registered{{Manifest: manifest, Status: status}}}}
+			w := httptest.NewRecorder()
+			s.moduleNavigation(w, httptest.NewRequest("GET", "/api/v1/modules/navigation", nil), actor, authBearer)
+			if w.Code != 200 {
+				t.Fatalf("navigation status: %d", w.Code)
+			}
+			var response struct {
+				Modules []moduleNavigationEntry `json:"modules"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+				t.Fatal(err)
+			}
+			if len(response.Modules) != 1 {
+				t.Fatalf("legacy installation omitted: %s", w.Body.String())
+			}
+			item := response.Modules[0]
+			if item.Name != "Home Assistant" || item.Status != status || len(item.Items) != 1 || item.Items[0].Title != "Home Assistant" || item.Items[0].Route != "/modules/homeassistant.module" {
+				t.Fatalf("invalid legacy navigation: %#v", item)
+			}
+			if len(manifest.UI.Navigation) != 0 {
+				t.Fatal("navigation modified the installed manifest")
+			}
+		})
+	}
+}

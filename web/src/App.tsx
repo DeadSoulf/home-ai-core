@@ -3,6 +3,7 @@ import { api, APIError, CSRF_FAILURE_EVENT, connectRealtime, setCSRFToken, type 
 import { ErrorNotice } from "./components/ErrorNotice";
 import { LoadingState } from "./components/Panel";
 import { useUI } from "./ui/useUI";
+import { resourcePoller } from "./hooks/resourcePoller";
 import { ModulePage } from "./pages/Module";
 import { FrigatePage } from "./pages/Frigate";
 import { NVRPage } from "./pages/NVR";
@@ -151,25 +152,29 @@ export default function App() {
       setModuleNavigation(undefined); setNavigationError(undefined);
       return;
     }
-    let stopped = false, checking = false;
-    const refresh = async () => {
-      if (checking) return;
-      checking = true;
-      try {
-        const items = await api.moduleNavigation();
-        if (!stopped) {setModuleNavigation(items); setNavigationError(undefined);}
-      } catch (error) {
-        if (!stopped) setNavigationError(error);
-      } finally {checking = false;}
-    };
-    void refresh();
-    const changed = () => { void refresh(); };
+    // Do not reuse another session's navigation while its permissions load.
+    setModuleNavigation(undefined); setNavigationError(undefined);
+    // Installation may finish while an older registry snapshot is in flight.
+    // Queue a follow-up refresh instead of dropping that completion event.
+    const poller = resourcePoller((signal) => api.moduleNavigation(signal), {
+      start: () => {},
+      success: (items) => {setModuleNavigation(items); setNavigationError(undefined);},
+      failure: setNavigationError,
+      finish: () => {},
+    }, 10000);
+    const changed = () => poller.refresh();
+    const whenVisible = () => { if (document.visibilityState === "visible") changed(); };
     window.addEventListener("home-ai-core:modules-changed", changed);
-    const timer = window.setInterval(changed, 10000);
+    window.addEventListener("focus", whenVisible);
+    window.addEventListener("online", changed);
+    document.addEventListener("visibilitychange", whenVisible);
+    poller.refresh();
     return () => {
-      stopped = true;
+      poller.dispose();
       window.removeEventListener("home-ai-core:modules-changed", changed);
-      window.clearInterval(timer);
+      window.removeEventListener("focus", whenVisible);
+      window.removeEventListener("online", changed);
+      document.removeEventListener("visibilitychange", whenVisible);
     };
   }, [phase, actor]);
 

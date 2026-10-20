@@ -127,3 +127,18 @@ mounts. Host ports, devices/GPU, privileged mode and docker.sock are forbidden.
 Core renders a native administrative API bridge, not module-supplied JavaScript.
 Updates include a verified stopped-container configuration/SQLite snapshot,
 transaction journal, manual approval and rollback. See `../integrations/frigate.md`.
+
+
+## Installed-module sidebar contract
+
+Installed registry records own sidebar entries, not the module catalog or the
+container running state. Missing/empty `ui.navigation` receives a standard route
+`/modules/<module-id>` with the module name. Existing stored manifests are supported
+without rewriting them or reinstalling their containers. Declared routes remain
+scoped to that module, are deduplicated and obey module permissions.
+
+A stopped/error module keeps its entry and opens management; removal removes the
+entry. Successful lifecycle operations refresh navigation without a page reload.
+The frontend coalesces events during an in-flight read, polls as a fallback,
+refreshes on focus/reconnect and cancels reads from a previous login session.
+The browser regression suite covers this contract using the production bundle.
