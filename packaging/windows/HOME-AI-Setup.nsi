@@ -19,7 +19,6 @@ Unicode true
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\HomeAIWindowsClient"
 !define CLIENT_NAME "home-ai-windows-client.exe"
 !define MUI_ABORTWARNING
-!define MUI_ICON "$%WINDIR%\system32\shell32.dll"
 
 Name "${PRODUCT_NAME}"
 OutFile "${OUTPUT_DIR}\HOME-AI-Setup_${VERSION}_x64.exe"
@@ -31,7 +30,6 @@ ShowUninstDetails show
 BrandingText "HOME AI | ${VERSION}"
 
 !insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_LICENSE "${NSISDIR}\Docs\Modern UI 2\Readme.txt"
 !insertmacro MUI_PAGE_INSTFILES
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${CLIENT_NAME}"
 !define MUI_FINISHPAGE_RUN_PARAMETERS "settings"
@@ -49,8 +47,8 @@ FunctionEnd
 
 Section "HOME AI" SecCore
   SectionIn RO
-  SetOutPath "$PLUGINSDIR"
   InitPluginsDir
+  SetOutPath "$PLUGINSDIR"
   File "/oname=home-ai-windows-client.exe" "${CLIENT_EXE}"
 
   ; Use the existing verified, atomic per-user Go installer rather than
