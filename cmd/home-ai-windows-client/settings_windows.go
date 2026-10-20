@@ -26,12 +26,13 @@ const (
 	settingsWindowClass = "HomeAIWindowsSettingsWindow"
 	settingsWindowTitle = "Home-AI Windows Client"
 
-	settingsWMCommand = 0x0111
-	settingsWMTimer   = 0x0113
-	settingsWMDestroy = 0x0002
-	settingsWMClose   = 0x0010
-	settingsWMSetFont = 0x0030
-	settingsWMApp     = 0x8000
+	settingsWMCommand    = 0x0111
+	settingsWMTimer      = 0x0113
+	settingsWMDestroy    = 0x0002
+	settingsWMClose      = 0x0010
+	settingsWMShowWindow = 0x0018
+	settingsWMSetFont    = 0x0030
+	settingsWMApp        = 0x8000
 
 	settingsWMConnected            = settingsWMApp + 201
 	settingsWMSyncDone             = settingsWMApp + 202
@@ -39,6 +40,7 @@ const (
 	settingsWMUpdateCheckDone      = settingsWMApp + 204
 	settingsWMCertificateProbeDone = settingsWMApp + 205
 	settingsWMUpdateInstallDone    = settingsWMApp + 206
+	settingsWMTrayMinimizeDone     = settingsWMApp + 207
 
 	settingsWSOverlappedWindow = 0x00CF0000
 	settingsWSVisible          = 0x10000000
@@ -55,8 +57,11 @@ const (
 
 	settingsLBSNotify = 0x0001
 
+	settingsSWHide    = 0
 	settingsSWShow    = 5
 	settingsSWRestore = 9
+
+	settingsSizeMinimized = 1
 
 	settingsBNClicked   = 0
 	settingsLBNSelect   = 1
@@ -202,6 +207,8 @@ type windowsSettingsUI struct {
 	updateLatestVersion  string
 	updateCheckedChannel string
 	updateError          string
+	trayHidden           bool
+	trayMinimizePending  bool
 
 	page                   int
 	pageControls           [settingsPageCount][]windows.Handle
@@ -243,44 +250,47 @@ type windowsSettingsUI struct {
 	updateResult        *settingsUpdateCheckResult
 	updateInstallResult *settingsUpdateInstallResult
 	certificateProbe    *settingsCertificateProbeResult
+	trayMinimizeResult  *settingsTrayMinimizeResult
 }
 
 var (
-	settingsUser32            = windows.NewLazySystemDLL("user32.dll")
-	settingsKernel32          = windows.NewLazySystemDLL("kernel32.dll")
-	settingsGDI32             = windows.NewLazySystemDLL("gdi32.dll")
-	settingsShell32           = windows.NewLazySystemDLL("shell32.dll")
-	settingsOle32             = windows.NewLazySystemDLL("ole32.dll")
-	procSettingsRegisterClass = settingsUser32.NewProc("RegisterClassExW")
-	procSettingsCreateWindow  = settingsUser32.NewProc("CreateWindowExW")
-	procSettingsDefWindowProc = settingsUser32.NewProc("DefWindowProcW")
-	procSettingsDestroyWindow = settingsUser32.NewProc("DestroyWindow")
-	procSettingsPostQuit      = settingsUser32.NewProc("PostQuitMessage")
-	procSettingsGetMessage    = settingsUser32.NewProc("GetMessageW")
-	procSettingsTranslate     = settingsUser32.NewProc("TranslateMessage")
-	procSettingsDispatch      = settingsUser32.NewProc("DispatchMessageW")
-	procSettingsShowWindow    = settingsUser32.NewProc("ShowWindow")
-	procSettingsUpdateWindow  = settingsUser32.NewProc("UpdateWindow")
-	procSettingsSetForeground = settingsUser32.NewProc("SetForegroundWindow")
-	procSettingsFindWindow    = settingsUser32.NewProc("FindWindowW")
-	procSettingsPostMessage   = settingsUser32.NewProc("PostMessageW")
-	procSettingsSendMessage   = settingsUser32.NewProc("SendMessageW")
-	procSettingsSetWindowText = settingsUser32.NewProc("SetWindowTextW")
-	procSettingsGetTextLength = settingsUser32.NewProc("GetWindowTextLengthW")
-	procSettingsGetWindowText = settingsUser32.NewProc("GetWindowTextW")
-	procSettingsEnableWindow  = settingsUser32.NewProc("EnableWindow")
-	procSettingsMessageBox    = settingsUser32.NewProc("MessageBoxW")
-	procSettingsLoadIcon      = settingsUser32.NewProc("LoadIconW")
-	procSettingsLoadCursor    = settingsUser32.NewProc("LoadCursorW")
-	procSettingsSetTimer      = settingsUser32.NewProc("SetTimer")
-	procSettingsKillTimer     = settingsUser32.NewProc("KillTimer")
-	procSettingsGetModule     = settingsKernel32.NewProc("GetModuleHandleW")
-	procSettingsGetConsole    = settingsKernel32.NewProc("GetConsoleWindow")
-	procSettingsConsolePIDs   = settingsKernel32.NewProc("GetConsoleProcessList")
-	procSettingsGetStock      = settingsGDI32.NewProc("GetStockObject")
-	procSettingsBrowseFolder  = settingsShell32.NewProc("SHBrowseForFolderW")
-	procSettingsGetPath       = settingsShell32.NewProc("SHGetPathFromIDListW")
-	procSettingsTaskMemFree   = settingsOle32.NewProc("CoTaskMemFree")
+	settingsUser32              = windows.NewLazySystemDLL("user32.dll")
+	settingsKernel32            = windows.NewLazySystemDLL("kernel32.dll")
+	settingsGDI32               = windows.NewLazySystemDLL("gdi32.dll")
+	settingsShell32             = windows.NewLazySystemDLL("shell32.dll")
+	settingsOle32               = windows.NewLazySystemDLL("ole32.dll")
+	procSettingsRegisterClass   = settingsUser32.NewProc("RegisterClassExW")
+	procSettingsCreateWindow    = settingsUser32.NewProc("CreateWindowExW")
+	procSettingsDefWindowProc   = settingsUser32.NewProc("DefWindowProcW")
+	procSettingsDestroyWindow   = settingsUser32.NewProc("DestroyWindow")
+	procSettingsPostQuit        = settingsUser32.NewProc("PostQuitMessage")
+	procSettingsGetMessage      = settingsUser32.NewProc("GetMessageW")
+	procSettingsTranslate       = settingsUser32.NewProc("TranslateMessage")
+	procSettingsDispatch        = settingsUser32.NewProc("DispatchMessageW")
+	procSettingsShowWindow      = settingsUser32.NewProc("ShowWindow")
+	procSettingsUpdateWindow    = settingsUser32.NewProc("UpdateWindow")
+	procSettingsSetForeground   = settingsUser32.NewProc("SetForegroundWindow")
+	procSettingsFindWindow      = settingsUser32.NewProc("FindWindowW")
+	procSettingsIsIconic        = settingsUser32.NewProc("IsIconic")
+	procSettingsIsWindowVisible = settingsUser32.NewProc("IsWindowVisible")
+	procSettingsPostMessage     = settingsUser32.NewProc("PostMessageW")
+	procSettingsSendMessage     = settingsUser32.NewProc("SendMessageW")
+	procSettingsSetWindowText   = settingsUser32.NewProc("SetWindowTextW")
+	procSettingsGetTextLength   = settingsUser32.NewProc("GetWindowTextLengthW")
+	procSettingsGetWindowText   = settingsUser32.NewProc("GetWindowTextW")
+	procSettingsEnableWindow    = settingsUser32.NewProc("EnableWindow")
+	procSettingsMessageBox      = settingsUser32.NewProc("MessageBoxW")
+	procSettingsLoadIcon        = settingsUser32.NewProc("LoadIconW")
+	procSettingsLoadCursor      = settingsUser32.NewProc("LoadCursorW")
+	procSettingsSetTimer        = settingsUser32.NewProc("SetTimer")
+	procSettingsKillTimer       = settingsUser32.NewProc("KillTimer")
+	procSettingsGetModule       = settingsKernel32.NewProc("GetModuleHandleW")
+	procSettingsGetConsole      = settingsKernel32.NewProc("GetConsoleWindow")
+	procSettingsConsolePIDs     = settingsKernel32.NewProc("GetConsoleProcessList")
+	procSettingsGetStock        = settingsGDI32.NewProc("GetStockObject")
+	procSettingsBrowseFolder    = settingsShell32.NewProc("SHBrowseForFolderW")
+	procSettingsGetPath         = settingsShell32.NewProc("SHGetPathFromIDListW")
+	procSettingsTaskMemFree     = settingsOle32.NewProc("CoTaskMemFree")
 )
 
 var activeSettingsUI struct {
@@ -530,8 +540,17 @@ func settingsWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) ui
 		}
 	case settingsWMSize:
 		if state != nil {
-			state.layoutControls()
+			if wParam == settingsSizeMinimized {
+				state.requestMinimizeToTray()
+			} else {
+				state.trayHidden = false
+				state.layoutControls()
+			}
 			return 0
+		}
+	case settingsWMShowWindow:
+		if state != nil && wParam != 0 {
+			state.trayHidden = false
 		}
 	case settingsWMDPIChanged:
 		if state != nil {
@@ -540,7 +559,10 @@ func settingsWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) ui
 		}
 	case settingsWMTimer:
 		if state != nil && wParam == settingsTransferTimerID {
-			state.refreshTransfers()
+			state.restoreIfTrayStopped()
+			if !state.trayHidden {
+				state.refreshTransfers()
+			}
 			return 0
 		}
 	case settingsWMPaint:
@@ -590,6 +612,11 @@ func settingsWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) ui
 	case settingsWMCertificateProbeDone:
 		if state != nil {
 			state.finishTrustServerCertificate()
+			return 0
+		}
+	case settingsWMTrayMinimizeDone:
+		if state != nil {
+			state.finishMinimizeToTray()
 			return 0
 		}
 	case settingsWMClose:

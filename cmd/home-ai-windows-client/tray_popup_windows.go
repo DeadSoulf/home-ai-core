@@ -215,12 +215,13 @@ func (state *windowsAgentTray) handleTrayCommand(id uint16) {
 			state.openPath(path)
 		}
 	case traySettings:
-		_ = startSettingsProcess(state.configPath)
+		showSettingsFromTray(state.configPath)
 	case trayCheckUpdates:
 		state.checkTrayUpdates()
 	case trayInstallUpdate:
 		state.installTrayUpdate()
 	case trayExit:
+		closeHiddenSettingsWhenTrayExits()
 		state.signalExit()
 		if state.hwnd != 0 {
 			procDestroyWindow.Call(uintptr(state.hwnd))

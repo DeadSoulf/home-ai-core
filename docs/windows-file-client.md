@@ -92,7 +92,11 @@ The settings window can connect to Home-AI, discover writable NAS folders, choos
 
 The last server URL and username are stored in `%APPDATA%\HomeAI\windows-client.json`. Passwords are never stored there: after a successful connection they are kept in Windows Credential Manager. Sync profiles remain in `%APPDATA%\HomeAI\sync-profiles.json` and contain no password or bearer token.
 
-Once the background agent is enabled, the tray menu includes **Settings** and **Sync now**. Double-clicking the tray icon opens the settings window. If the agent is already running, GUI **Sync now** signals that existing scheduler instead of starting another one.
+Once the background agent is enabled, the tray menu includes **Settings** and **Sync now**. Double-clicking the tray icon restores an existing settings window (or opens a new one). If the agent is already running, GUI **Sync now** signals that existing scheduler instead of starting another one.
+
+**Minimize to notification area:** with the agent running, clicking the standard Windows **minimize** button hides Settings from the taskbar and leaves the existing Home-AI tray icon available. Clicking **Settings** in the tray menu or double-clicking the tray icon restores the original window. The normal **X** closes Settings (not the independent background agent). Choosing **Exit** in the tray menu stops the agent and also closes any hidden Settings window.
+
+If the agent's per-user autostart is registered but the agent has not started (for example, agent install was run without logging out and back in), the minimize button starts that same registered agent and waits briefly for its tray icon before hiding the GUI. If autostart is disabled, the profile file differs, or startup fails, Settings remains minimized on the Windows taskbar with a visible error when restored—never hidden without a working tray icon. If the tray agent disappears while Settings is hidden, Settings is restored automatically. This does not change the sync schedule, enable disabled profiles or turn on unattended updates.
 
 ## Windows display and transfer activity
 
