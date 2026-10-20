@@ -55,6 +55,20 @@ func TestTrayPopupDPIIsBoundedByWorkArea(t *testing.T) {
 	}
 }
 
+func TestTrayPopupKeepsReadableScaleOnAsusWorkArea(t *testing.T) {
+	// The 192-DPI monitor reported a 1440x762 work area in native QA.
+	// At this size the popup must be scaled up yet still fit completely.
+	dpi := trayPopupEffectiveDPI(192, 1440, 762)
+	if dpi <= 96 || dpi >= 192 {
+		t.Fatalf("expected readable, work-area-capped DPI for Asus, got %d", dpi)
+	}
+	layout := trayPopupBuildLayout(dpi)
+	if layout.Width <= trayPopupLogicalWidth || layout.Height <= trayPopupLogicalHeight ||
+		layout.Width > 1440-2*trayPopupMargin || layout.Height > 762-2*trayPopupMargin {
+		t.Fatalf("Asus 192-DPI popup geometry invalid: dpi=%d, layout=%+v", dpi, layout)
+	}
+}
+
 func TestTrayPopupPositionWithinMonitorEvenWithNegativeCoordinates(t *testing.T) {
 	for _, test := range []struct {
 		cursorX, cursorY         int32
