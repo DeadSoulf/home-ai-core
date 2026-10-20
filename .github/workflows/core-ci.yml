@@ -374,3 +374,11 @@ jobs:
         run: |
           sh ./scripts/build-windows-client-resource.sh amd64
           GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build             -trimpath             -o /tmp/home-ai-windows-client.exe             ./cmd/home-ai-windows-client
+
+      - name: Verify release-compatible Linux NSIS build
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends nsis
+          sh ./scripts/build-windows-setup.sh /tmp/home-ai-windows-client.exe /tmp/HOMEAI-Setup-CI.exe
+          test -s /tmp/HOMEAI-Setup-CI.exe
