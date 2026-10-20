@@ -93,20 +93,20 @@ FunctionEnd
 Section "Uninstall"
   ; Do not remove profile JSON, Windows Credential Manager entries, transfer
   ; history or other user data under %APPDATA%\HomeAI.
-  ; Remove autostart only for this client's own registration.
-  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "HomeAIWindowsSyncAgent"
-
-  Delete "$SMPROGRAMS\HOME AI\HOME AI.lnk"
-  Delete "$SMPROGRAMS\HOME AI\Uninstall HOME AI.lnk"
-  RMDir "$SMPROGRAMS\HOME AI"
-  Delete "$DESKTOP\HOME AI.lnk"
-
+  ; Fail before unregistering autostart/shortcuts if a running executable
+  ; cannot be deleted; otherwise an aborted uninstall would leave a broken app.
   ClearErrors
   Delete "$INSTDIR\${CLIENT_NAME}"
   ${If} ${Errors}
     MessageBox MB_ICONEXCLAMATION|MB_OK "HOME AI is still running. Exit the tray application and run uninstall again to remove its executable."
     Abort
   ${EndIf}
+
+  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "HomeAIWindowsSyncAgent"
+  Delete "$SMPROGRAMS\HOME AI\HOME AI.lnk"
+  Delete "$SMPROGRAMS\HOME AI\Uninstall HOME AI.lnk"
+  RMDir "$SMPROGRAMS\HOME AI"
+  Delete "$DESKTOP\HOME AI.lnk"
   Delete "$INSTDIR\Uninstall HOME AI.exe"
   RMDir "$INSTDIR"
   DeleteRegKey HKCU "${UNINSTALL_KEY}"
