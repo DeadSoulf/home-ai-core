@@ -72,15 +72,67 @@ jobs:
       - name: Test Windows copy engine, queue and CLI
         run: go test ./internal/windowsclient ./cmd/home-ai-windows-client
 
-      - name: Build Windows UI preview for PR review
-        if: github.event_name == 'pull_request'
+      - name: Build Windows UI preview for PR review and installer test
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
-          go build -trimpath -o dist/home-ai-windows-client-preview_amd64.exe ./cmd/home-ai-windows-client
+          $version = (Get-Content -Raw VERSION).Trim()
+          go build -trimpath -ldflags "-X github.com/DeadSoulf/home-ai-core/internal/version.Version=$version" -o dist/home-ai-windows-client-preview_amd64.exe ./cmd/home-ai-windows-client
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $hash = (Get-FileHash -Algorithm SHA256 dist/home-ai-windows-client-preview_amd64.exe).Hash.ToLowerInvariant()
           "$hash  home-ai-windows-client-preview_amd64.exe" | Out-File -FilePath dist/home-ai-windows-client-preview_amd64.exe.sha256 -NoNewline -Encoding ascii
+
+      - name: Install NSIS compiler
+        shell: pwsh
+        run: |
+          $nsis = Join-Path ${env:ProgramFiles(x86)} "NSIS\makensis.exe"
+          if (!(Test-Path -LiteralPath $nsis)) {
+            choco install nsis --version=3.12.0 -y --no-progress --limit-output
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          if (!(Test-Path -LiteralPath $nsis)) { throw "NSIS compiler unavailable" }
+
+      - name: Build and smoke-test Windows Setup and uninstaller
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $nsis = Join-Path ${env:ProgramFiles(x86)} "NSIS\makensis.exe"
+          $version = (Get-Content -Raw VERSION).Trim()
+          $client = (Resolve-Path -LiteralPath 'dist/home-ai-windows-client-preview_amd64.exe').Path
+          $setup = Join-Path (Resolve-Path -LiteralPath 'dist').Path 'HOMEAI-Setup-preview_amd64.exe'
+          & $nsis /V3 /WX "/DVERSION=$version" "/DCLIENT_EXE=$client" "/DOUTFILE=$setup" packaging/windows/home-ai-client.nsi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (!(Test-Path -LiteralPath $setup)) { throw 'NSIS installer was not created' }
+          $hash = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  HOMEAI-Setup-preview_amd64.exe" | Out-File -FilePath "$setup.sha256" -NoNewline -Encoding ascii
+
+          $configDirectory = Join-Path $env:APPDATA 'HomeAI'
+          New-Item -ItemType Directory -Path $configDirectory -Force | Out-Null
+          $sentinel = Join-Path $configDirectory 'setup-ci-preserve-this.txt'
+          Set-Content -LiteralPath $sentinel -Value 'preserve Home AI user profiles' -NoNewline
+          $installed = Join-Path $env:LOCALAPPDATA 'HomeAI\bin\home-ai-windows-client.exe'
+          $uninstaller = Join-Path $env:LOCALAPPDATA 'HomeAI\bin\Uninstall HOME AI.exe'
+          $shortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\HOME AI\HOME AI.lnk'
+          $uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\HomeAIWindowsClient'
+          for ($pass = 0; $pass -lt 2; $pass++) {
+            $process = Start-Process -FilePath $setup -ArgumentList '/S' -Wait -PassThru
+            if ($process.ExitCode -ne 0) { throw "Setup failed (pass $pass): $($process.ExitCode)" }
+            if (!(Test-Path -LiteralPath $installed) -or !(Test-Path -LiteralPath $uninstaller)) { throw 'Client or uninstaller is missing' }
+            if (!(Test-Path -LiteralPath $shortcut)) { throw 'Start Menu shortcut missing' }
+            if (!(Test-Path -LiteralPath $sentinel)) { throw 'Sync data removed during install' }
+            if ((Get-FileHash -LiteralPath $installed -Algorithm SHA256).Hash -ne
+                (Get-FileHash -LiteralPath $client -Algorithm SHA256).Hash) { throw 'Installed client SHA-256 mismatch' }
+            $apps = Get-ItemProperty -LiteralPath $uninstallKey -ErrorAction Stop
+            if ($apps.DisplayName -ne 'HOME AI Windows Client' -or $apps.DisplayVersion -ne $version) {
+              throw 'Windows Apps install registry entry is incorrect'
+            }
+          }
+          $remove = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
+          if ($remove.ExitCode -ne 0) { throw "Uninstaller failed: $($remove.ExitCode)" }
+          if (Test-Path -LiteralPath $uninstallKey) { throw 'Apps uninstall registry entry survived uninstall' }
+          if (Test-Path -LiteralPath $shortcut) { throw 'Start Menu shortcut survived uninstall' }
+          if (Test-Path -LiteralPath $installed) { throw 'App EXE survived uninstall' }
+          if (!(Test-Path -LiteralPath $sentinel)) { throw 'Uninstall deleted the user profile sentinel' }
 
       - name: Upload unsigned test preview
         if: github.event_name == 'pull_request'
