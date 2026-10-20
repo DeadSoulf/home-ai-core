@@ -10,15 +10,17 @@ The existing v2 Docker module runtime enforces a fixed private network, no host 
 
 ## Trial deployment (Linux host with Docker Compose)
 
-Review the privilege implications before enabling this profile. Check that port 8123 is unused, Docker Compose is installed, and the `/run/dbus` socket is present. Set the timezone to your deployment's value.
+Review the privilege implications before enabling this profile. The resolver prints a registry-pinned sha256 image reference; keep that exact digest for repeatable restarts and backup/restore. Running it again can select a newer stable release; never use it as an unattended update. Check that port 8123 is unused, Docker Compose is installed, and the `/run/dbus` socket is present. Set the timezone to your deployment's value.
 
 ```bash
 sudo install -d -m 0750 /var/lib/home-ai-core/integrations/homeassistant/config
+export HOME_ASSISTANT_IMAGE="$(bash packaging/homeassistant/resolve-image.sh stable | sed -n 's/^HOME_ASSISTANT_IMAGE=//p')"
+test -n "$HOME_ASSISTANT_IMAGE"
 docker compose -f packaging/homeassistant/compose.yaml pull
 docker compose -f packaging/homeassistant/compose.yaml up -d
 ```
 
-Then open `http://HOST_IP:8123`. This is a manual pilot, **not yet** a native HomeAiCore install button. No Core API integration is provided by this profile. To stop: `docker compose -f packaging/homeassistant/compose.yaml down`. The configuration is retained.
+Then open `http://HOST_IP:8123`. This is a manual pilot, **not yet** a native HomeAiCore install button. No Core API integration is provided by this profile. To stop: `HOME_ASSISTANT_IMAGE="$HOME_ASSISTANT_IMAGE" docker compose -f packaging/homeassistant/compose.yaml down`. The configuration is retained.
 
 ## Required native integration work
 
