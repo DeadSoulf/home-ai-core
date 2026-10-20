@@ -1,10 +1,13 @@
 package main
 
-import "testing"
+import (
+	"strconv"
+	"testing"
+)
 
 func TestTrayPopupLayoutDoesNotClipControls(t *testing.T) {
 	for _, dpi := range []uint32{72, 96, 120, 144, 168, 192, 240, 288, 384} {
-		t.Run(string(rune(dpi)), func(t *testing.T) {
+		t.Run(strconv.FormatUint(uint64(dpi), 10), func(t *testing.T) {
 			l := trayPopupBuildLayout(dpi)
 			items := []trayPopupRect{
 				l.Icon, l.Title, l.Headline, l.Subtitle, l.RecentTitle,
