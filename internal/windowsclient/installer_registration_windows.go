@@ -42,7 +42,7 @@ func RefreshInstalledClientVersion(value string) error {
 	if err != nil {
 		return err
 	}
-	if !strings.EqualFold(filepath.Clean(path), filepath.Clean(expected)) {
+	if !strings.EqualFold(filepath.Clean(path), filepath.Clean(filepath.Dir(expected))) {
 		return fmt.Errorf("HOME AI installation metadata points to a different directory")
 	}
 	if err := key.SetStringValue("DisplayVersion", value); err != nil {
