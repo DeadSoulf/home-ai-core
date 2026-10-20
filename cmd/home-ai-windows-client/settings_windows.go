@@ -28,8 +28,9 @@ const (
 
 	settingsWMCommand = 0x0111
 	settingsWMTimer   = 0x0113
-	settingsWMDestroy = 0x0002
-	settingsWMClose   = 0x0010
+	settingsWMDestroy    = 0x0002
+	settingsWMClose      = 0x0010
+	settingsWMShowWindow = 0x0018
 	settingsWMSetFont = 0x0030
 	settingsWMApp     = 0x8000
 
@@ -39,6 +40,7 @@ const (
 	settingsWMUpdateCheckDone      = settingsWMApp + 204
 	settingsWMCertificateProbeDone = settingsWMApp + 205
 	settingsWMUpdateInstallDone    = settingsWMApp + 206
+	settingsWMTrayMinimizeDone    = settingsWMApp + 207
 
 	settingsWSOverlappedWindow = 0x00CF0000
 	settingsWSVisible          = 0x10000000
@@ -55,8 +57,11 @@ const (
 
 	settingsLBSNotify = 0x0001
 
+	settingsSWHide    = 0
 	settingsSWShow    = 5
 	settingsSWRestore = 9
+
+	settingsSizeMinimized = 1
 
 	settingsBNClicked   = 0
 	settingsLBNSelect   = 1
@@ -202,6 +207,8 @@ type windowsSettingsUI struct {
 	updateLatestVersion  string
 	updateCheckedChannel string
 	updateError          string
+	trayHidden           bool
+	trayMinimizePending  bool
 
 	page                   int
 	pageControls           [settingsPageCount][]windows.Handle
@@ -243,6 +250,7 @@ type windowsSettingsUI struct {
 	updateResult        *settingsUpdateCheckResult
 	updateInstallResult *settingsUpdateInstallResult
 	certificateProbe    *settingsCertificateProbeResult
+	trayMinimizeResult *settingsTrayMinimizeResult
 }
 
 var (
@@ -263,6 +271,8 @@ var (
 	procSettingsUpdateWindow  = settingsUser32.NewProc("UpdateWindow")
 	procSettingsSetForeground = settingsUser32.NewProc("SetForegroundWindow")
 	procSettingsFindWindow    = settingsUser32.NewProc("FindWindowW")
+	procSettingsIsIconic      = settingsUser32.NewProc("IsIconic")
+	procSettingsIsWindowVisible = settingsUser32.NewProc("IsWindowVisible")
 	procSettingsPostMessage   = settingsUser32.NewProc("PostMessageW")
 	procSettingsSendMessage   = settingsUser32.NewProc("SendMessageW")
 	procSettingsSetWindowText = settingsUser32.NewProc("SetWindowTextW")
@@ -530,8 +540,17 @@ func settingsWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) ui
 		}
 	case settingsWMSize:
 		if state != nil {
-			state.layoutControls()
+			if wParam == settingsSizeMinimized {
+				state.requestMinimizeToTray()
+			} else {
+				state.trayHidden = false
+				state.layoutControls()
+			}
 			return 0
+		}
+	case settingsWMShowWindow:
+		if state != nil && wParam != 0 {
+			state.trayHidden = false
 		}
 	case settingsWMDPIChanged:
 		if state != nil {
@@ -540,7 +559,10 @@ func settingsWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) ui
 		}
 	case settingsWMTimer:
 		if state != nil && wParam == settingsTransferTimerID {
-			state.refreshTransfers()
+			state.restoreIfTrayStopped()
+			if !state.trayHidden {
+				state.refreshTransfers()
+			}
 			return 0
 		}
 	case settingsWMPaint:
@@ -590,6 +612,11 @@ func settingsWindowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) ui
 	case settingsWMCertificateProbeDone:
 		if state != nil {
 			state.finishTrustServerCertificate()
+			return 0
+		}
+	case settingsWMTrayMinimizeDone:
+		if state != nil {
+			state.finishMinimizeToTray()
 			return 0
 		}
 	case settingsWMClose:
