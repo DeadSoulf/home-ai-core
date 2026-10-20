@@ -22,6 +22,18 @@ Each Home-AI development release publishes two separate Windows client assets:
 home-ai-windows-client_<version>_amd64.exe
 home-ai-windows-client_<version>_amd64.exe.sha256
 
+## Windows setup (recommended)
+
+For ordinary Windows installation use the versioned **HOMEAI-Setup** Windows
+installer from official releases rather than treating the portable client EXE
+as a wizard. Setup provides a Russian/English installation dialog, Start Menu
+shortcut, optional desktop shortcut, and Windows **Installed apps → Uninstall**
+integration. It uses the existing per-user HOME AI directory without admin
+rights, preserves profiles, stored Windows credentials, TLS pins and user
+files, and supports reinstalling over an existing version.
+
+See [Windows installer](windows-installer.md) for setup, upgrade and removal.
+
 ## HTTPS certificate trust
 
 If the client reports `x509: certificate signed by unknown authority` or a
@@ -360,7 +372,7 @@ verification are prerequisites for unattended installation.
 
 - the Transfers page shows per-file speed/ETA and recent history; whole-run ETA and advanced filtering are not implemented;
 - release updates can be checked and explicitly installed through GUI, tray or CLI; background polling and unattended installation are deferred pending verified publisher trust;
-- a conventional Windows installer / Start Menu / uninstall entry is still deferred;
+- a conventional per-user Windows setup installer is provided alongside the portable EXE, with Start Menu and Apps & features uninstall; Windows Authenticode signing is still pending;
 - no bidirectional sync or local-delete propagation;
 - no sync-history/recycle-bin retention policy;
 - queue history pruning is still deferred.

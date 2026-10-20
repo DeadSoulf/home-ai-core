@@ -169,6 +169,18 @@ jobs:
             ./cmd/home-ai-windows-client
           sha256sum "$EXE" > "$EXE.sha256"
 
+      - name: Build normal Windows installer (NSIS)
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends nsis
+          VERSION="$(tr -d '\r\n' < VERSION)"
+          EXE="dist/home-ai-windows-client_${VERSION}_amd64.exe"
+          SETUP="dist/HOMEAI-Setup_${VERSION}_amd64.exe"
+          sh ./scripts/build-windows-setup.sh "$EXE" "$SETUP"
+          sha256sum "$SETUP" > "$SETUP.sha256"
+
       - name: Upload Windows client artifact
         uses: actions/upload-artifact@v4
         with:
