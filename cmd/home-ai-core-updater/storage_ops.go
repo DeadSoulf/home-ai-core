@@ -572,6 +572,11 @@ func performStorageOperation(ctx context.Context, request updaterhelper.Request)
 		return "device unmounted", nil
 
 	case "storage.partition.create":
+		if request.RequireBlank {
+			if err := requireBlankDataDisk(ctx, device); err != nil {
+				return "", err
+			}
+		}
 		if request.Confirm != "CREATE "+device {
 			return "", errors.New("partition creation confirmation does not match disk")
 		}
@@ -836,6 +841,11 @@ func planStorageOperation(ctx context.Context, request updaterhelper.Request, de
 		return fmt.Sprintf("dry-run OK: would unmount %s from %s; no changes made", device, strings.Join(targets, ", ")), nil
 
 	case "storage.partition.create":
+		if request.RequireBlank {
+			if err := requireBlankDataDisk(ctx, device); err != nil {
+				return "", err
+			}
+		}
 		if err := requireDiskType(ctx, device); err != nil {
 			return "", err
 		}
