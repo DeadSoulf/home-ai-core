@@ -21,7 +21,17 @@ func writeBackupMetadata(backup string, metadata backupMetadata) error {
 		return err
 	}
 	data = append(data, '\n')
-	return os.WriteFile(filepath.Join(backup, "metadata.json"), data, 0o600)
+	file, err := os.OpenFile(filepath.Join(backup, "metadata.json"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return err
+	}
+	_, writeErr := file.Write(data)
+	var syncErr error
+	if writeErr == nil {
+		syncErr = file.Sync()
+	}
+	closeErr := file.Close()
+	return errors.Join(writeErr, syncErr, closeErr)
 }
 
 func readBackupMetadata(backup string) (backupMetadata, error) {
@@ -53,68 +63,75 @@ func availableRollback() (backupMetadata, bool) {
 	return metadata, true
 }
 
-func performInstall(ctx context.Context, currentVersion, version, prepared string, uid, gid int) (bool, error) {
-	backup := filepath.Join(trustedUpdateRoot, "backup")
-	if err := os.RemoveAll(backup); err != nil {
+func performInstall(ctx context.Context, currentVersion, version, prepared string, uid, gid int) (helperUpdated bool, resultErr error) {
+	rollbackWeb := filepath.Join(filepath.Dir(liveWeb), ".home-ai-core-web-rollback")
+	if err := refuseInterruptedBackupStaging(trustedUpdateRoot, rollbackWeb); err != nil {
 		return false, err
 	}
-	if err := os.MkdirAll(filepath.Join(backup, "bin"), 0o700); err != nil {
-		return false, err
-	}
-	if err := copyFile(liveBinary, filepath.Join(backup, "bin", "home-ai-core"), 0o700); err != nil {
-		return false, fmt.Errorf("backup core binary: %w", err)
-	}
-	if err := copyTree(liveWeb, filepath.Join(backup, "web")); err != nil {
-		return false, fmt.Errorf("backup web ui: %w", err)
-	}
-	if validVersion(currentVersion) {
-		if err := writeBackupMetadata(backup, backupMetadata{
-			Version:    currentVersion,
-			ReplacedBy: version,
-			CreatedAt:  time.Now().UTC().Format(time.RFC3339Nano),
-		}); err != nil {
-			return false, fmt.Errorf("write rollback metadata: %w", err)
-		}
-	}
-
+	// Prepare the replacement entirely before touching the running installation.
 	newBinary := filepath.Join(filepath.Dir(liveBinary), ".home-ai-core.new")
 	if err := copyFile(filepath.Join(prepared, "bin", "home-ai-core"), newBinary, 0o755); err != nil {
 		return false, fmt.Errorf("stage new core binary: %w", err)
 	}
 	newWeb := filepath.Join(filepath.Dir(liveWeb), ".home-ai-core-web-new")
-	rollbackWeb := filepath.Join(filepath.Dir(liveWeb), ".home-ai-core-web-rollback")
-	_ = os.RemoveAll(newWeb)
-	_ = os.RemoveAll(rollbackWeb)
+	if err := os.RemoveAll(newWeb); err != nil {
+		return false, fmt.Errorf("clear previous web staging: %w", err)
+	}
 	if err := copyTree(filepath.Join(prepared, "web"), newWeb); err != nil {
 		return false, fmt.Errorf("stage new web ui: %w", err)
 	}
 
-	helperUpdated := false
 	preparedHelper := filepath.Join(prepared, "helper", "home-ai-core-updater")
 	newHelper := filepath.Join(filepath.Dir(liveHelper), ".home-ai-core-updater.new")
-	if helperInfo, err := os.Stat(preparedHelper); err == nil && helperInfo.Mode().IsRegular() {
-		if err := os.MkdirAll(filepath.Join(backup, "helper"), 0o700); err != nil {
-			return false, fmt.Errorf("prepare helper backup: %w", err)
-		}
-		if err := copyFile(liveHelper, filepath.Join(backup, "helper", "home-ai-core-updater"), 0o700); err != nil {
-			return false, fmt.Errorf("backup updater helper: %w", err)
+	includeHelper := false
+	if info, err := os.Lstat(preparedHelper); err == nil {
+		if !info.Mode().IsRegular() {
+			return false, errors.New("staged updater helper must be a regular file")
 		}
 		if err := copyFile(preparedHelper, newHelper, 0o755); err != nil {
 			return false, fmt.Errorf("stage updater helper: %w", err)
 		}
+		includeHelper = true
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return false, fmt.Errorf("inspect staged updater helper: %w", err)
 	}
 
-	if err := systemctl(ctx, "stop", serviceName); err != nil {
-		return false, fmt.Errorf("stop Home-AI-Core: %w", err)
+	// The committed rollback stays untouched until the new Core has started.
+	// Any failure while copying the current Core leaves its old backup valid.
+	stagedBackup, err := stageRollbackBackup(
+		trustedUpdateRoot, liveBinary, liveWeb, liveHelper, currentVersion, version, includeHelper,
+	)
+	if err != nil {
+		return false, err
 	}
 
-	rollbackNeeded := true
+	rollbackNeeded := false
+	preserveBackup := false
 	defer func() {
 		if rollbackNeeded {
-			rollback(context.Background(), backup, rollbackWeb)
+			restoreCtx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+			restoreErr := rollback(restoreCtx, stagedBackup, rollbackWeb)
+			cancel()
+			if restoreErr != nil {
+				preserveBackup = true
+				resultErr = errors.Join(resultErr,
+					fmt.Errorf("automatic rollback failed; recovery snapshot retained at %s: %w", stagedBackup, restoreErr))
+			}
+		}
+		if !preserveBackup {
+			_ = os.RemoveAll(stagedBackup)
 		}
 	}()
 
+	if err := systemctl(ctx, "stop", serviceName); err != nil {
+		// A service manager error does not prove that the old service is still running.
+		restartCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		restartErr := systemctl(restartCtx, "start", serviceName)
+		cancel()
+		return false, errors.Join(fmt.Errorf("stop Home-AI-Core: %w", err), restartErr)
+	}
+
+	rollbackNeeded = true
 	if err := os.Rename(newBinary, liveBinary); err != nil {
 		return false, fmt.Errorf("replace core binary: %w", err)
 	}
@@ -122,10 +139,8 @@ func performInstall(ctx context.Context, currentVersion, version, prepared strin
 		return false, fmt.Errorf("preserve current web ui: %w", err)
 	}
 	if err := os.Rename(newWeb, liveWeb); err != nil {
-		_ = os.Rename(rollbackWeb, liveWeb)
 		return false, fmt.Errorf("replace web ui: %w", err)
 	}
-
 	if err := systemctl(ctx, "start", serviceName); err != nil {
 		return false, fmt.Errorf("start updated Home-AI-Core: %w", err)
 	}
@@ -133,7 +148,7 @@ func performInstall(ctx context.Context, currentVersion, version, prepared strin
 		return false, err
 	}
 
-	if _, err := os.Stat(newHelper); err == nil {
+	if includeHelper {
 		if err := os.Rename(newHelper, liveHelper); err != nil {
 			return false, fmt.Errorf("replace updater helper: %w", err)
 		}
@@ -141,15 +156,18 @@ func performInstall(ctx context.Context, currentVersion, version, prepared strin
 			return false, fmt.Errorf("set updater helper permissions: %w", err)
 		}
 		helperUpdated = true
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return false, fmt.Errorf("inspect staged updater helper: %w", err)
 	}
 
+	backup := filepath.Join(trustedUpdateRoot, "backup")
+	if err := replaceDirectoryAtomically(stagedBackup, backup); err != nil {
+		return false, fmt.Errorf("commit new rollback backup: %w", err)
+	}
+	// The commit above is the final fallible step. The previous backup now
+	// resides at stagedBackup and can be cleaned up after returning.
 	rollbackNeeded = false
 	_ = os.RemoveAll(rollbackWeb)
 	return helperUpdated, nil
 }
-
 func performManualRollback(ctx context.Context, backup string) (bool, error) {
 	if _, ok := availableRollback(); !ok {
 		return false, errors.New("rollback backup is incomplete")
@@ -261,31 +279,69 @@ func performManualRollback(ctx context.Context, backup string) (bool, error) {
 	return helperUpdated, nil
 }
 
-func rollback(ctx context.Context, backup, rollbackWeb string) {
-	_ = systemctl(ctx, "stop", serviceName)
-
-	tmp := filepath.Join(filepath.Dir(liveBinary), ".home-ai-core.rollback")
-	if err := copyFile(filepath.Join(backup, "bin", "home-ai-core"), tmp, 0o755); err == nil {
-		_ = os.Rename(tmp, liveBinary)
+func rollback(ctx context.Context, backup, rollbackWeb string) error {
+	// Restore from the staged pre-update snapshot, not from the previous
+	// committed rollback. Prepare everything before disturbing live files.
+	stagedCore := filepath.Join(filepath.Dir(liveBinary), ".home-ai-core.rollback")
+	if err := copyFile(filepath.Join(backup, "bin", "home-ai-core"), stagedCore, 0o755); err != nil {
+		return errors.Join(fmt.Errorf("stage rollback binary: %w", err), systemctl(ctx, "start", serviceName))
 	}
 
-	_ = os.RemoveAll(liveWeb)
-	if _, err := os.Stat(rollbackWeb); err == nil {
-		_ = os.Rename(rollbackWeb, liveWeb)
-	} else {
-		_ = copyTree(filepath.Join(backup, "web"), liveWeb)
+	webSource := rollbackWeb
+	if info, err := os.Lstat(webSource); errors.Is(err, os.ErrNotExist) {
+		webSource = filepath.Join(filepath.Dir(liveWeb), ".home-ai-core-web-restore")
+		if err := os.RemoveAll(webSource); err != nil {
+			return errors.Join(fmt.Errorf("clear rollback web staging: %w", err), systemctl(ctx, "start", serviceName))
+		}
+		if err := copyTree(filepath.Join(backup, "web"), webSource); err != nil {
+			return errors.Join(fmt.Errorf("stage rollback web: %w", err), systemctl(ctx, "start", serviceName))
+		}
+	} else if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return errors.Join(fmt.Errorf("invalid prior web directory: %v", err), systemctl(ctx, "start", serviceName))
 	}
 
 	backupHelper := filepath.Join(backup, "helper", "home-ai-core-updater")
-	if info, err := os.Stat(backupHelper); err == nil && info.Mode().IsRegular() {
-		tmpHelper := filepath.Join(filepath.Dir(liveHelper), ".home-ai-core-updater.rollback")
-		if err := copyFile(backupHelper, tmpHelper, 0o755); err == nil {
-			_ = os.Rename(tmpHelper, liveHelper)
+	stagedHelper := filepath.Join(filepath.Dir(liveHelper), ".home-ai-core-updater.rollback")
+	helperStaged := false
+	if info, err := os.Lstat(backupHelper); err == nil {
+		if !info.Mode().IsRegular() {
+			return errors.Join(errors.New("rollback helper is not a regular file"), systemctl(ctx, "start", serviceName))
+		}
+		if err := copyFile(backupHelper, stagedHelper, 0o755); err != nil {
+			return errors.Join(fmt.Errorf("stage rollback helper: %w", err), systemctl(ctx, "start", serviceName))
+		}
+		helperStaged = true
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return errors.Join(fmt.Errorf("inspect rollback helper: %w", err), systemctl(ctx, "start", serviceName))
+	}
+
+	if err := systemctl(ctx, "stop", serviceName); err != nil {
+		return errors.Join(fmt.Errorf("stop Core for rollback: %w", err), systemctl(ctx, "start", serviceName))
+	}
+	var failures []error
+	if err := os.Rename(stagedCore, liveBinary); err != nil {
+		failures = append(failures, fmt.Errorf("restore Core binary: %w", err))
+	}
+	// Never delete a live Web tree before the replacement is ready. Exchange
+	// existing directories atomically; webSource then holds the displaced tree.
+	if err := replaceDirectoryAtomically(webSource, liveWeb); err != nil {
+		failures = append(failures, fmt.Errorf("restore Web UI: %w", err))
+	}
+	if helperStaged {
+		if err := os.Rename(stagedHelper, liveHelper); err != nil {
+			failures = append(failures, fmt.Errorf("restore updater helper: %w", err))
 		}
 	}
-	_ = systemctl(ctx, "start", serviceName)
+	if err := systemctl(ctx, "start", serviceName); err != nil {
+		failures = append(failures, fmt.Errorf("restart Core after rollback: %w", err))
+	} else if err := waitActive(ctx, serviceName, 15*time.Second); err != nil {
+		failures = append(failures, fmt.Errorf("confirm Core after rollback: %w", err))
+	}
+	if len(failures) == 0 {
+		_ = os.RemoveAll(webSource)
+	}
+	return errors.Join(failures...)
 }
-
 func waitActive(ctx context.Context, service string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
@@ -328,12 +384,13 @@ func copyFile(source, target string, mode os.FileMode) error {
 		return err
 	}
 	_, copyErr := io.Copy(out, in)
-	closeErr := out.Close()
-	if copyErr != nil {
-		return copyErr
+	var syncErr error
+	if copyErr == nil {
+		syncErr = out.Sync()
 	}
-	if closeErr != nil {
-		return closeErr
+	closeErr := out.Close()
+	if err := errors.Join(copyErr, syncErr, closeErr); err != nil {
+		return err
 	}
 	if err := os.Chmod(target, mode); err != nil {
 		return err
